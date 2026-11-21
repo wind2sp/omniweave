@@ -1,0 +1,12 @@
+{
+  "tablemenu.rowAbove": "上に行を挿入",
+  "tablemenu.rowBelow": "下に行を挿入",
+  "tablemenu.colLeft": "左に列を挿入",
+  "tablemenu.colRight": "右に列を挿入",
+  "tablemenu.deleteRows": "行の削除",
+  "tablemenu.deleteCols": "列の削除",
+  "tablemenu.deleteTable": "表の削除",
+  "tablemenu.merge": "セルの結合",
+  "tablemenu.split": "セルの分割",
+  "tablemenu.props": "表のプロパティ（幅・網かけ・罫線）…"
+}

@@ -1,0 +1,11 @@
+{
+  "modeswitch.autoOn": "自動 — このページは今「{mode}」の方法で編集します。ページを移るとそのページの種類に従います",
+  "modeswitch.autoUses": "自動がこのページに使う方法",
+  "modeswitch.pageIs": "このページの種類は「{mode}」です — 自動ならこの方法",
+  "modeswitch.pageCtx": "ページ",
+  "cmd.mode.AUTO": "作業モード: 自動",
+  "cmd.mode.DOCUMENT": "作業モード: ドキュメント",
+  "cmd.mode.SLIDE": "作業モード: スライド",
+  "cmd.mode.IMAGE": "作業モード: 画像",
+  "cmd.mode.DESIGN": "作業モード: デザイン"
+}

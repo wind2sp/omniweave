@@ -1,0 +1,456 @@
+{
+  "meta": {
+    "lang": "zh",
+    "htmlLang": "zh-Hans",
+    "ogLocale": "zh_CN",
+    "label": "简体中文",
+    "short": "中文",
+    "dir": "zh"
+  },
+  "js": {
+    "soon": "即将发布",
+    "preparing": "暂未提供",
+    "platformsBtn": "查看各平台文件",
+    "mobileMsg": "Omniweave 是桌面应用，请在 Windows、macOS 或 Linux 电脑上打开本页面。",
+    "unknownMsg": "无法识别你的操作系统，请在下方选择。",
+    "dlFor": "下载 {os} 版",
+    "installerSuffix": "（安装版）",
+    "experimentalBuild": "实验性版本",
+    "soonFor": "{os} 版 · 即将发布",
+    "prepFor": "{os} 版 · 暂未提供",
+    "notAvailable": "该平台暂时还没有安装文件，请查看下方列表。",
+    "firstRelease": "首个版本 v{v} 正在准备中。",
+    "copied": "已复制",
+    "locale": "zh-CN",
+    "loomStroke": "本次笔画：<span class=\"m\">重绘屏幕图块 {n} 个</span> · <span class=\"h\">直接复用 {r} 个</span>（共 {t} 个）",
+    "loomUndo": "撤销：旧的键重新出现，<span class=\"h\">{n} 个图块直接命中缓存</span> · 重绘 0 个"
+  },
+  "common": {
+    "skip": "跳到正文",
+    "homeAria": "Omniweave 首页",
+    "navAria": "主菜单",
+    "langAria": "选择语言",
+    "logoSub": "欧梅",
+    "nav": {
+      "modules": "功能模块",
+      "loom": "Loom 引擎",
+      "faq": "常见问题",
+      "oss": "开源",
+      "download": "下载",
+      "home": "首页",
+      "proof": "证据"
+    },
+    "ctaOn": "免费下载",
+    "ctaOff": "下载 · 即将发布",
+    "soon": "即将发布",
+    "get": "下载",
+    "copy": "复制",
+    "repoOn": "GitHub 仓库",
+    "repoOff": "仓库即将公开",
+    "ogImageAlt": "Omniweave 标志与标语：文件格式只是出口，编辑都在同一块画布上。",
+    "footer": {
+      "tagline": "不破坏原文件的本地 6 合 1 编辑器。位图、矢量、PDF、DOCX、HWPX、幻灯片，还有 PSD，都在同一张画布上。",
+      "nameLine": "“欧梅”（韩语 오메，Ome）是韩国全罗道方言里表示惊叹的口头语，相当于“哎呀！”“哇！”；同时也取自 <b>Om</b>niweave 的开头。",
+      "exploreH": "浏览",
+      "l1": "六合一模块",
+      "l2": "Loom 引擎",
+      "l3": ".omw 格式",
+      "l4": "坦诚的常见问题",
+      "l5": "名字的由来",
+      "projectH": "项目",
+      "repoOff": "GitHub 仓库（即将公开）",
+      "issuesOn": "Issue 与问题反馈",
+      "issuesOff": "Issue（公开后开放）",
+      "licenseOn": "GPL-3.0 许可证全文",
+      "licenseOff": "GPL-3.0 许可证",
+      "licenseH": "许可证",
+      "license": "GPL-3.0-or-later（GNU 通用公共许可证第 3 版或更高版本）。本软件按“原样”提供，不附带任何形式的保证。",
+      "cleanH": "净室实现",
+      "clean": "我们不对任何第三方商业软件的二进制文件进行逆向工程，仅依据公开标准和公开文档（ISO 32000 PDF、ECMA-376 Office Open XML、KS X 6101 HWPX/OWPML 等）实现。",
+      "tmH": "商标",
+      "tm": "Omniweave™ and the Omniweave logo are trademarks of the project's copyright holder. Microsoft, Windows, Word, Excel, PowerPoint, Office, WebView2 and Edge are trademarks of Microsoft Corporation. Adobe, Photoshop, Illustrator, Acrobat and PostScript are registered trademarks or trademarks of Adobe Inc. Hangul, Hancom and HWP are trademarks of Hancom Inc. AutoCAD, Autodesk and DXF are registered trademarks or trademarks of Autodesk, Inc. in the USA and other countries; \"DWG\" names the drawing file format. ACIS is a trademark of Spatial Corp. All other names are the property of their owners. Omniweave is not affiliated with, sponsored or endorsed by any of these companies; their names are used only to describe file compatibility.",
+      "ossH": "使用的开源项目",
+      "oss": "pdf.js、pdf-lib、fflate、cbor-x、polygon-clipping、immer、zustand、React、Tauri。本站的西文与韩文字体为 Pretendard (SIL Open Font License)。"
+    }
+  },
+  "index": {
+    "title": "Omniweave（欧梅）— 不破坏原文件的本地 6 合 1 编辑器",
+    "description": "安装包约 17 MB、从不上传文件的免费开源 (GPL-3.0) 编辑器。在同一张画布上打开、编辑并保存位图、矢量 (AI)、PDF、DOCX、HWPX、幻灯片和 PSD。",
+    "ogTitle": "Omniweave（欧梅）— 不破坏原文件的本地 6 合 1 编辑器",
+    "ogDescription": "安装包约 17 MB · 文件不上传到任何地方 · 位图/矢量/PDF/DOCX/HWPX/幻灯片/PSD 同一画布编辑。",
+    "hero": {
+      "pillSoon": "v<span data-cfg=\"version\">0.1.0</span> 即将发布",
+      "pillOut": "v<span data-cfg=\"version\">0.1.0</span> 已发布",
+      "pillFree": "免费 · 开源 (GPL-3.0)",
+      "h1a": "不破坏原文件的",
+      "h1b": "本地 6 合 1 编辑器。",
+      "lead": "安装包约 17 MB，文件不会上传到任何地方。位图、矢量 (AI)、PDF、DOCX、HWPX、幻灯片，还有 PSD——在同一张画布上打开、修改，并保存为需要的格式。",
+      "how": "查看实测结果",
+      "meta": "Windows 10·11 · 韩语/英语/日语/中文界面 · 可在浏览器中运行 · macOS/Linux 构建为实验性",
+      "chipsAria": "支持的格式",
+      "shotAlt": "Omniweave 实际界面：位图、矢量、文档和幻灯片对象放在同一块画布上。",
+      "phAria": "应用界面示意图，真实截图即将补上。",
+      "phCap": "真实截图即将补上",
+      "demo": "无需安装，立即试用"
+    },
+    "proof": {
+      "eyebrow": "用证据说话",
+      "h2": "只写实测过的。<br><em>做不到的也一起写。</em>",
+      "lead": "以下数字都来自实际运行，并注明了条件。仍在开发中的内容另外标为“开发中”。",
+      "size": {
+        "k": "安装包大小",
+        "d": "Windows x64 安装包 0.1.0 开发版（10,239,987 字节）。界面由 Windows 自带的 WebView2 绘制。"
+      },
+      "corpus": {
+        "k": "打开 81 个真实样本文件的结果",
+        "d": "成功 65 · 部分 8 · 失败 0 · 不支持并给出说明 8。“部分”指旧版 DOC/HWP（仅正文和表格）、PSD（不含效果和调整）等情况。"
+      },
+      "local": {
+        "unit": "个",
+        "k": "接收你文件的服务器",
+        "d": "打开、编辑、保存、转换和快捷工具都在你的电脑上完成。网络只用于检查新版本 (GitHub Releases)。"
+      },
+      "crypto": {
+        "k": "加密文档保存后仍是加密的",
+        "d": "PDF (AES-256) · DOCX/XLSX/PPTX (Office Agile) · .omw (AES-256-GCM)。编辑后重新加密保存；已确认重新加密的 Office 文件可在 Microsoft Office 16 中打开。"
+      },
+      "formatsH": "40 多种扩展名",
+      "formats": "文档、表格、幻灯片、图像、PSD、视频、音频、电子书、文本和代码。每种格式都会标明支持程度（完整、部分或说明）。",
+      "historyH": "历史时间线",
+      "history": "记录从开始以来的每一个操作。可预览任意时间点并一步回到那里，历史随 .omw 一起保存。",
+      "toolsH": "6 个快捷工具 · 本地",
+      "tools": "PDF 合并、压缩、转 JPG，图片转 PDF，照片压缩，JPG 批量转换——在你的电脑上处理，不必上传到网站。",
+      "losslessH": "原文件无损保存 <span class=\"note-inline\">开发中</span>",
+      "lossless": "目标：未修改的部分按原文件字节原样保存。PDF 和 PSD 正在实现，DOCX 和 HWPX 在路线图中。目前保存为 DOCX/HWPX 时，会根据已理解的内容重新生成文档。",
+      "signH": "代码签名",
+      "sign": "当前构建尚未进行代码签名，首次运行时可能出现 SmartScreen 警告。下载页面说明了如何用 SHA-256 校验文件。",
+      "uiH": "语言",
+      "ui": "应用界面支持韩语、英语、日语和中文：安装时选择，之后可随时在“首选项”中更改。本网站同样提供这四种语言版本。",
+      "note": "样本结果仅引用 <code>test-corpus/REPORT.md</code> 中的数量（不公开文件内容和名称）。安装包大小基于开发版，每次发布可能不同。"
+    },
+    "chips": {
+      "raster": "位图",
+      "vector": "矢量",
+      "slides": "幻灯片"
+    },
+    "why": {
+      "eyebrow": "为什么要做它",
+      "h2": "做一件事，<br><em>要开六个软件。</em>",
+      "lead": "修图、插画、PDF 编辑、DOCX·HWPX 文档编辑、演示文稿。同一个标志复制六遍，同一段文字用六种方式反复排版。",
+      "s1": "放上图片和文字",
+      "s2": "画出形状和线条",
+      "s3": "调整所选对象的位置、大小、颜色、不透明度和字体",
+      "claim": "<strong>软件名字不同，做的事其实一样。</strong>“页面还是图层”“矢量还是位图”，说到底只是<strong>以什么形式保存</strong>的区别，编辑的时候并不重要。"
+    },
+    "matrix": {
+      "caption": "在这六类软件里，你动手做的事情都一样；不同的只是功能深度和保存格式。",
+      "task": "操作",
+      "yes": "有",
+      "c1": "修图",
+      "c2": "插画",
+      "c4": "DOCX",
+      "c5": "HWPX",
+      "c6": "幻灯片",
+      "h1": "修图",
+      "h2": "插画",
+      "h4": "DOCX",
+      "h5": "HWPX",
+      "h6": "幻灯<br>片",
+      "rows": [
+        "放置图片",
+        "文字与格式",
+        "形状与线条",
+        "移动·缩放·旋转",
+        "颜色·不透明度·层级",
+        "撤销"
+      ]
+    },
+    "mods": {
+      "eyebrow": "六合一模块",
+      "h2": "六种工作，<br><em>一张场景图。</em>",
+      "lead": "位图图块、贝塞尔路径、文本段落、表格、PDF 页面、图像和视频都是同一种节点。下面只列出目前代码中已实现的功能。真正的较量在于每种格式能处理得多深。",
+      "raster": {
+        "name": "位图",
+        "like": "图像 · PSD",
+        "items": [
+          "基于 256px 图块的画笔与橡皮擦（压感、硬度、不透明度）",
+          "打开 <strong>PSD</strong>：像素图层 + 合并图像（不含效果和调整图层）",
+          "打开 TIFF、WebP、AVIF 等图像"
+        ]
+      },
+      "vector": {
+        "name": "矢量",
+        "like": "矢量 · AI · SVG",
+        "items": [
+          "钢笔（贝塞尔手柄）、直接选择、矩形、椭圆",
+          "路径查找器：合并/减去/交集/排除",
+          "打开 <strong>AI</strong> 文件（以 PDF 兼容方式保存的文件）"
+        ]
+      },
+      "pdf": {
+        "like": "PDF 编辑",
+        "items": [
+          "渲染页面 + 将文字提升为按行的<strong>可编辑文本对象</strong>",
+          "打开并重新加密受密码保护的 PDF (AES-256)",
+          "快捷工具：合并、压缩、转 JPG"
+        ]
+      },
+      "word": {
+        "items": [
+          "打开并保存 DOCX 段落与字符格式",
+          "编辑表格对象 · 保存为 DOCX",
+          "旧版 DOC：导入正文和表格内容"
+        ]
+      },
+      "hwpx": {
+        "name": "HWPX",
+        "items": [
+          "打开并保存 HWPX（基于公开 OWPML 结构的净室实现）",
+          "旧版 HWP (5.0)：导入正文和表格内容",
+          "按字素和语节进行韩文换行"
+        ]
+      },
+      "slides": {
+        "name": "幻灯片",
+        "like": "PPTX · PPT",
+        "items": [
+          "打开并保存 PPTX（文本、形状、图片、表格、背景）",
+          "母版 · 切换 FADE / SLIDE_LEFT / ZOOM",
+          "关键帧动画 · 全屏放映"
+        ]
+      },
+      "note": "导入存在限制 — 请先阅读<a href=\"#faq\" class=\"grad\">坦诚的 FAQ</a>。"
+    },
+    "common": {
+      "allH": "对所有对象一视同仁",
+      "all": "选择、移动、缩放、旋转、不透明度、混合模式、锁定与隐藏、调整层级、撤销。",
+      "exportH": "导出",
+      "typoH": "韩文排版",
+      "typo": "通过 <code>Intl.Segmenter</code> 按字素断行，韩文音节不会被拆开；并用 <code>keep-all</code> 按词换行。"
+    },
+    "loom": {
+      "eyebrow": "Loom 引擎",
+      "h2": "万物皆有<br><em>内容地址。</em>",
+      "lead": "每个像素图块、节点和资源都有自己的 64 位内容地址。画面显示、保存和撤销，全都由这些地址决定。",
+      "thread": "256px 像素图块、节点和资源的内容地址。相同的图块在文件里只存一份；打开时会重新计算哈希，只跳过损坏的部分。",
+      "weave": "屏幕图块的键，就是覆盖该区域的所有片段地址的哈希。<strong>没有脏标记，也没有缓存失效代码</strong>，所以“明明擦掉了却还留在屏幕上”这类 bug 从结构上就不会出现。",
+      "shuttle": "只把第一次出现的片段增量写入 IndexedDB。自动保存很轻量，程序异常退出后也能恢复。",
+      "historyName": "不可变历史",
+      "history": "撤销 = 替换不可变文档的引用。不复制像素，所以开销与文档大小无关。",
+      "canvasAria": "示意图：左侧是 40 个屏幕图块组成的网格，右侧图块拆散成紫、青、珊瑚红三股线交织在一起。在网格上拖动，只有碰到的图块会被重绘。",
+      "statInit": "在网格上拖动试试，只有碰到的屏幕图块会被重绘。",
+      "paint": "画一笔",
+      "undo": "撤销",
+      "legendMiss": "重绘（键已改变）",
+      "legendHit": "命中缓存（复用旧的键）",
+      "legendNote": "简化示意图 · 并非实测"
+    },
+    "metrics": {
+      "h": "实测数据",
+      "m1k": "图块数据去重",
+      "m1d": "合成 4K 文档 · 205 个图块引用 → 42 个唯一图块",
+      "m2k": ".omw 文件大小",
+      "m2d": "原始 RGBA 51.3 MiB → 去重后 10.5 MiB → 保存",
+      "m3k": "计算一整帧的屏幕键",
+      "m3d": "1920×1080 · 40 个屏幕图块 · 31 个节点",
+      "m4k": "撤销 + 重做",
+      "m4d": "对同一 4K 文档做深拷贝 (<code>structuredClone</code>) 需要 24–28 ms",
+      "note": "数据来自 <code>bench/loom.bench.ts</code>（Vitest bench，Node，不涉及 DOM 的代码路径），测试对象为<strong>合成文档</strong>，与实际文档可能有差异。测试环境：Intel Core Ultra 5 125H、Windows 11、Node v24.13.1 · 两次运行平均值的范围（测试时有其他任务在运行，波动较大）· 保存→打开往返：损坏 0 · 缺失 0 · 文档根地址一致。不含渲染（画布绘制）耗时，可在应用状态栏的 Loom 仪表中实时查看。复现：<code>npm run bench</code>"
+    },
+    "omw": {
+      "eyebrow": ".omw 格式",
+      "h2": "一个<em>能直接打开的 zip。</em>",
+      "lead": "<code>.omw</code> (Omniweave Workspace Package) 就是普通的 zip 容器。相同的图块只存一份，同时附带其他工具也能读取的副本。",
+      "treeAria": ".omw 包的结构",
+      "t1": "\"application/x-omniweave\"（不压缩，首个条目）",
+      "t2": "元数据、Loom 根地址、页面索引",
+      "t3": "统一场景图（像素以图块地址表示）",
+      "t4": "去重后的 256×256 RGBA 图块",
+      "t5": "图片、PDF、字体原件",
+      "t6": "幻灯片顺序、切换与动画（副本）",
+      "t7": "幻灯片母版（副本）",
+      "t8": "矢量节点的 SVG 路径（副本）",
+      "t9": "全部文本段落（副本）",
+      "t10": "用于搜索和索引的纯文本",
+      "f1h": "每次打开都全部重新校验",
+      "f1": "重新计算所有图块和资源的哈希。对不上的片段会被跳过并报告数量，文档其余部分照常打开。",
+      "f2h": "打开时只用到两样东西",
+      "f2": "Omniweave 只读取 <code>scene_graph.cbor</code> 和内容寻址的片段，其余都是给其他工具准备的<strong>只读副本</strong>。",
+      "f3h": "Windows 文件关联",
+      "f3": "安装版会把 <code>.omw</code> 关联到 Omniweave，双击即可打开。"
+    },
+    "faq": {
+      "eyebrow": "常见问题",
+      "h2": "<em>坦诚版</em>常见问题",
+      "lead": "项目还处于早期开发阶段，能做什么、还做不到什么，先说清楚。",
+      "items": [
+        {
+          "q": "能完全取代现有软件吗？",
+          "a": "<p>不能。目标是在一个地方处理多种格式的<strong>集成编辑器</strong>，较量点在于每种格式的处理深度。高级滤镜、印刷分色、公式编辑器、修订跟踪等专业功能目前不在范围内。</p>"
+        },
+        {
+          "q": "“不破坏原文件”具体指什么？",
+          "a": "<p>方向是<strong>未修改的部分按原样保存</strong>。如实说明现状：</p><ul><li><strong>开发中：</strong>PDF 和 PSD 的保留原文件保存。</li><li><strong>路线图：</strong>DOCX 和 HWPX 的保留原文件（直通）保存。</li><li><strong>目前：</strong>保存为 DOCX/HWPX 时，会根据已理解的内容（段落、字符格式、表格对象）生成新文档，脚注、页眉等元素可能丢失。</li><li>加密文档在保存时会重新加密。</li></ul>"
+        },
+        {
+          "q": "打开 DOCX/HWPX 会和原文件一模一样吗？",
+          "a": "<p>目前以<strong>段落和字符格式为主</strong>（对齐、行距、字体、字号、颜色、加粗/斜体/下划线）。以下尚不支持或已简化：</p><ul><li>DOCX/HWPX 中的<strong>表格</strong>还不能按表格导入，会展开为段落。</li><li>脚注/尾注、页眉/页脚、页码、样式继承、目录、修订跟踪。</li><li>文档中的图片、形状和公式。</li><li>分页按 A4 版式重新计算，可能与原文件不同。</li></ul>"
+        },
+        {
+          "q": "可以编辑 PDF 吗？",
+          "a": "<p>页面按原样渲染；使用“文字提升”后，文字会变成<strong>按行的文本对象</strong>，可以修改，原文字用背景色矩形遮盖。复杂背景上的文字、多栏和表格的重排目前还不支持。</p><p>当前版本的 PDF 导出是把页面作为图像嵌入。保留可选文字的 PDF 导出正在开发中。</p>"
+        },
+        {
+          "q": "PPTX、旧版 HWP 和 PSD 支持到什么程度？",
+          "a": "<ul><li><strong>PPTX：</strong>将文本、形状、图片、表格和背景作为幻灯片打开，并可保存为 PPTX。EMF 等部分图片格式会被省略，部分形状以矩形近似。</li><li><strong>旧版 HWP/DOC/PPT：</strong>仅导入正文和表格内容（文本）。如需格式和图片，请先在原软件中另存为 HWPX/DOCX/PPTX。</li><li><strong>PSD：</strong>打开像素图层和合并图像，不含图层效果、调整图层和文字引擎。</li></ul>"
+        },
+        {
+          "q": "真的不会上传我的文件吗？",
+          "a": "<p>是的。打开、编辑、保存、转换和快捷工具都在你的电脑上完成，自动保存日志也记录在本地。网络只用于检查新版本 (GitHub Releases)，本网站也没有任何跟踪或统计脚本。源代码公开，可以自行核实。</p>"
+        },
+        {
+          "q": "可以不安装就试用吗？",
+          "a": "<p>同一个应用可以在网页浏览器中运行。浏览器演示公开后，本页面会出现“无需安装，立即试用”按钮。演示同样在浏览器内处理文件，不会发送到服务器。</p>"
+        },
+        {
+          "q": "听说很快，用了 GPU 吗？",
+          "a": "<p>还没有——目前是 <strong>Canvas 2D + TypeScript</strong>。WebGPU 渲染器和 Rust/WASM 内核在路线图中。现在的优势来自 Loom“只重绘、只重存改动部分”的结构。我们给出的数字仅限 <a href=\"#loom\" class=\"grad\">Loom 引擎表格</a>。</p>"
+        },
+        {
+          "q": "有英文界面吗？macOS 和 Linux 呢？",
+          "a": "<p>有。应用界面支持韩语、英语、日语和简体中文：安装时选择语言，之后可随时在“首选项”中更改。macOS 和 Linux 构建在真机验证之前标为<strong>实验性</strong>。正式支持 Windows 10·11 和浏览器运行。</p>"
+        }
+      ]
+    },
+    "oss": {
+      "eyebrow": "开源 · GPL-3.0",
+      "h2": "一根一根，<br><em>一起织起来。</em>",
+      "lead": "欢迎提交 Issue 和 PR。最有帮助的，是<strong>真实文件中出现的显示错误</strong>。",
+      "w1h": "反馈出问题的文件",
+      "w1": "请把无法正常打开的 DOCX、HWPX、PDF 去除敏感信息后作为样本发给我们。",
+      "w2h": "贡献代码",
+      "w2": "TypeScript (strict) · React · Tauri 2。开发环境和提交规范见 CONTRIBUTING.md。",
+      "w3h": "净室原则",
+      "w3": "不对第三方二进制文件进行逆向工程，只依据公开标准（ISO 32000、ECMA-376、KS X 6101）实现。",
+      "contribOn": "贡献指南",
+      "contribOff": "贡献指南（公开后开放）",
+      "termH": "从源码运行 · Node.js 18 及以上",
+      "qsNote": "仓库公开后即可使用",
+      "qsDev": "在浏览器中运行",
+      "qsTest": "单元测试",
+      "qsBench": "Loom 基准测试",
+      "roadH": "接下来",
+      "roadNote": "（顺序可能调整）",
+      "road": [
+        "四种语言界面（韩语、英语、日语、中文） <span class=\"note-inline done\">已完成</span>",
+        "原文件无损保存 — PDF、PSD 开发中",
+        "DOCX/HWPX 保留原文件（直通）保存",
+        "将 DOCX/HWPX 表格按表格导入",
+        "保留可选文字的 PDF 导出 — 开发中",
+        "代码签名的安装包",
+        "WebGPU 渲染器 · Rust/WASM 内核",
+        "正式支持 macOS 和 Linux"
+      ]
+    },
+    "name": {
+      "eyebrow": "名字的由来",
+      "h2": "为什么叫<em>“欧梅”</em>？",
+      "p1": "“오메（Ome）！”是韩国西南部全罗道的方言感叹词，人们在吃惊或赞叹时会脱口而出，意思接近“哎呀！”“哇！”。就算是其他地区的韩国人，听到也会觉得很有地方味儿。",
+      "p2": "它同时也是 <strong>Om</strong>niweave 开头的发音（OM-niweave → 오메）。第一次看到图片、文档、PDF 和幻灯片都能在一块画布上搞定时，那声脱口而出的“哇！”，就是这个名字的由来。中文名“欧梅”取其音，梅花也寓意坚韧与美好。",
+      "quote": "“一个文件全搞定？欧梅！”"
+    },
+    "cta": {
+      "h2a": "原文件保持原样，",
+      "h2b": "编辑集中一处。",
+      "meta": "v<span data-cfg=\"version\">0.1.0</span> · Windows 10·11 · 安装包约 17 MB · 免费 · GPL-3.0"
+    }
+  },
+  "dl": {
+    "title": "下载 — Omniweave（欧梅）",
+    "description": "下载最新版 Omniweave。安装包约 17 MB，提供 Windows 安装版和便携版、SHA-256 校验方法与系统要求。",
+    "ogTitle": "下载 Omniweave",
+    "ogDescription": "不破坏原文件的本地 6 合 1 编辑器。安装包约 17 MB，免费开源 (GPL-3.0)。",
+    "h1": "下载 Omniweave",
+    "sub": "免费 · 开源 (GPL-3.0) · 版本 <b data-cfg=\"version\">0.1.0</b><span data-when=\"dated\" hidden> · <span data-cfg=\"releaseDate\"></span> 发布</span>",
+    "recInit": "首个版本 v0.1.0 正在准备中。",
+    "banner": "<strong>即将发布。</strong>首个版本发布后，本页面的按钮即可直接下载。在此之前，可以从源码直接运行（仓库公开后）。",
+    "platH": "各平台文件",
+    "platLead": "所有文件都托管在 GitHub Releases 上。每个平台只需一个文件即可安装或运行。",
+    "thisPc": "这台电脑",
+    "thisMac": "这台 Mac",
+    "exp": "实验性",
+    "win": {
+      "setup": "安装版",
+      "rec": "推荐",
+      "setupD": "约 17 MB。添加开始菜单项、关联 <code>.omw</code> 文件，无需管理员权限，为当前用户安装。",
+      "portable": "便携版",
+      "portableD": "免安装的单个 exe 文件，不关联文件，也不添加开始菜单项。"
+    },
+    "web": {
+      "h": "浏览器（从源码运行）",
+      "p": "无需安装包，直接在浏览器中运行。需要 Node.js 18 或更高版本。",
+      "term": "终端",
+      "noRepo": "仓库即将公开，公开后上面的命令即可直接使用。",
+      "demo": "无需安装，立即试用",
+      "demoNote": "完全在浏览器中运行，文件不会发送到服务器。"
+    },
+    "mac": {
+      "dmg": "磁盘映像 (Universal)",
+      "dmgD": "同时支持 Apple 芯片和 Intel 芯片的 Mac，尚未在真机上验证。",
+      "gate": "此版本尚未经过 Apple 公证，首次打开时可能被拦截。遇到这种情况，请前往<strong>系统设置 → 隐私与安全性</strong>，点击<strong>仍要打开</strong>。"
+    },
+    "linux": {
+      "d": "在 Ubuntu 22.04 上构建，尚未在各发行版上验证。",
+      "chmod": "下载后请赋予执行权限："
+    },
+    "allReleases": "所有版本与更新日志：",
+    "releasesLink": "GitHub Releases",
+    "releasesSoon": "首个版本发布后开放链接。",
+    "infoAria": "安装说明",
+    "ss": {
+      "h": "如果出现“Windows 已保护你的电脑”",
+      "unsigned": "目前的版本<strong>尚未进行代码签名</strong>，Microsoft Defender SmartScreen 可能会阻止首次运行。如果文件是从本页面 (GitHub Releases) 下载，并且下方的校验值一致：",
+      "signed": "安装程序已进行代码签名。如果 SmartScreen 仍然提示警告，可以按以下步骤运行：",
+      "steps": [
+        "在警告窗口中点击<strong>更多信息</strong>。",
+        "确认应用名称是 Omniweave。",
+        "点击<strong>仍要运行</strong>。"
+      ],
+      "warn": "如果文件来源不明，请不要运行。"
+    },
+    "up": {
+      "h": "更新",
+      "manual": "<strong>自动更新正在准备中。</strong>计划加入安装版，在此之前请这样更新：",
+      "steps": [
+        "从本页面下载新版本的安装程序。",
+        "直接运行，覆盖安装。你的工作文件 (<code>.omw</code>) 不会受影响。"
+      ],
+      "portable": "便携版只需换成新的 exe 即可。",
+      "auto": "<strong>安装版和便携版都会自动检查新版本。</strong>有新版本时应用会先下载并校验，再提示你，确认后即更新。Microsoft Store 版本由应用商店更新。",
+      "autoPortable": "便携版会在校验所下载 exe 的大小、SHA-256 和签名后，以相同文件夹、相同文件名替换自身。若文件夹不可写入，则打开本页面。"
+    },
+    "ck": {
+      "h": "校验下载的文件 (SHA-256)",
+      "p1": "每个版本都会附带",
+      "p2": "，其中列出所有文件的 SHA-256 值。如果你在本机计算出的值与其中的值<strong>完全一致</strong>，说明文件在下载过程中没有被篡改。",
+      "tabsAria": "各操作系统的校验命令",
+      "inFolder": "在下载文件夹中运行",
+      "inFolderTerm": "终端 · 在下载文件夹中",
+      "winNote": "将输出的 Hash 与 SHA256SUMS.txt 中同一文件那一行对比（不区分大小写）",
+      "unix": "在 macOS 和 Linux 上，把 <code>SHA256SUMS.txt</code> 放在下载文件旁边再运行命令，校验一致的文件会显示 <code>OK</code>。"
+    },
+    "req": {
+      "h": "系统要求",
+      "osH": "操作系统",
+      "os": "Windows 10/11（64 位，x64）",
+      "wv": "Windows 11 已内置。Windows 10 若未安装，<strong>安装版</strong>会在安装过程中自动下载并安装（需要联网）。<strong>便携版</strong>只能在已安装 WebView2 的电脑上运行。",
+      "permH": "安装权限",
+      "perm": "安装到当前用户，无需管理员权限。",
+      "webH": "在浏览器中运行",
+      "web": "Node.js 18 及以上，以及较新的 Chromium 系浏览器、Firefox 或 Safari",
+      "other": "实验性版本——在真机上验证之后，我们会在本页列出支持范围。",
+      "note": "这是早期预览版。重要文档请另外保留原文件后再使用。导入方面的局限请见<a class=\"grad\" href=\"index.html#faq\">坦诚的常见问题</a>。"
+    },
+    "tm": "Microsoft、Windows、Edge 是 Microsoft Corporation 的商标，macOS 是 Apple Inc. 的商标。Omniweave 与上述公司无关。"
+  }
+}

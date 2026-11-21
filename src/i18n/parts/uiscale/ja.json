@@ -1,0 +1,8 @@
+{
+  "uiscale.title": "画面の文字サイズ",
+  "uiscale.small": "小 (90%)",
+  "uiscale.normal": "標準 (100%)",
+  "uiscale.large": "大 (112%)",
+  "uiscale.xlarge": "特大 (125%)",
+  "uiscale.hint": "メニュー・リボン・パネル・ダイアログの文字とボタンの大きさを変えます。キャンバスのズームには影響しません。"
+}

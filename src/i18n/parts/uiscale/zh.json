@@ -1,0 +1,8 @@
+{
+  "uiscale.title": "界面文字大小",
+  "uiscale.small": "小 (90%)",
+  "uiscale.normal": "标准 (100%)",
+  "uiscale.large": "大 (112%)",
+  "uiscale.xlarge": "特大 (125%)",
+  "uiscale.hint": "更改菜单、功能区、面板和对话框中文字与按钮的大小。不影响画布缩放。"
+}

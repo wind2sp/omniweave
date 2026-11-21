@@ -1,0 +1,13 @@
+{
+  "docmode.tab.review": "검토",
+  "spell.group": "언어 교정",
+  "spell.toggle": "맞춤법 검사",
+  "spell.toggleTip": "입력을 멈추면 틀린 단어에 빨간 물결 밑줄을 긋습니다. 화면에만 보이고 저장·인쇄·내보내기에는 들어가지 않습니다. 사전은 Windows에 설치된 언어 팩의 것을 씁니다.",
+  "spell.web": "브라우저 버전에는 맞춤법 검사가 없습니다(Windows 앱에서 쓸 수 있습니다).",
+  "spell.using": "Windows 맞춤법 검사 사용 중",
+  "spell.missing": "이 언어는 검사 사전이 없습니다: {langs}. Windows 설정 ▸ 시간 및 언어 ▸ 언어 및 지역에서 그 언어를 추가하면 검사합니다.",
+  "spell.noSuggestions": "(추천 단어 없음)",
+  "spell.ignoreAll": "모두 무시",
+  "spell.addToDictionary": "사전에 추가",
+  "spell.hist.replace": "맞춤법 고치기"
+}

@@ -1,0 +1,6 @@
+{
+  "statusbar.devInfo.title": "開発者情報",
+  "statusbar.devInfo.show": "開発者情報を表示",
+  "statusbar.devInfo.hint": "ステータスバーに描画メーター（タイル・ヒット率・ms・fps・キャッシュ）を表示します。",
+  "statusbar.pageKindTip": "このページの種類とサイズ — 作業モード切り替えの下線と同じ情報です"
+}

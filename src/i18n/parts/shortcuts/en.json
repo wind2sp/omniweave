@@ -1,0 +1,15 @@
+{
+  "cmd.review.spelling": "Spelling",
+  "cmd.format.paragraph": "Paragraph",
+  "cmd.view.layersPanel": "Layers panel",
+  "shortcuts.linkMissing": "Ctrl+K (insert hyperlink) is not available yet. Command search is now {search}.",
+  "shortcuts.context": "Keys for this page: {ctx}",
+  "shortcuts.ctx.WORD": "DOCX document",
+  "shortcuts.ctx.HWP": "HWP / HWPX document",
+  "shortcuts.ctx.PDF": "PDF",
+  "shortcuts.ctx.SLIDE": "Slides",
+  "shortcuts.ctx.IMAGE": "Image",
+  "shortcuts.ctx.DESIGN": "Design",
+  "shortcuts.ctx.SHEET": "Sheet",
+  "shortcuts.ctx.CAD": "Drawing"
+}

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<!-- 이 파일은 build-i18n.mjs가 _templates/index.html + i18n/en.json으로 만든 결과입니다. 직접 고치지 말고 템플릿·번역 파일을 고친 뒤 다시 생성하세요. -->
+<html lang="en" data-lang="en" data-root="../" data-page="index">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Omniweave — a local 6-in-1 editor that doesn't break your originals</title>
+<meta name="description" content="A free, open-source (GPL-3.0) editor with a ~17 MB installer that never uploads your files. Open, edit and save raster, vector (AI), PDF, DOCX, HWPX, slides and PSD on one canvas.">
+<meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Omniweave">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Omniweave — a local 6-in-1 editor that doesn't break your originals">
+<meta property="og:description" content="~17 MB installer · your files never leave your PC · raster, vector, PDF, DOCX, HWPX, slides and PSD on one canvas.">
+<link rel="alternate" hreflang="ko" href="../index.html">
+<link rel="alternate" hreflang="en" href="../en/index.html">
+<link rel="alternate" hreflang="ja" href="../ja/index.html">
+<link rel="alternate" hreflang="zh-Hans" href="../zh/index.html">
+<link rel="alternate" hreflang="x-default" href="../index.html">
+<meta property="og:image" content="../assets/img/og-image.png">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Omniweave logo with the line: file formats are just exits — editing happens on one canvas.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/site.css?v=5">
+<script src="../assets/js/lang.js?v=5"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="index.html" aria-label="Omniweave home">
+      <img src="../assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>Ome</span>
+    </a>
+    <nav class="nav-links" aria-label="Main menu">
+      <a href="#proof">Proof</a>
+      <a href="#modules">Modules</a>
+      <a href="#loom">Loom engine</a>
+      <a href="#omw">.omw</a>
+      <a href="#faq">FAQ</a>
+      <a href="#oss">Open source</a>
+    </nav>
+    <div class="nav-r">
+      <details class="lang">
+        <summary aria-label="Choose language"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3"/></svg><span>EN</span></summary>
+        <ul>
+          <li><a href="../index.html" hreflang="ko" lang="ko" data-setlang="ko">한국어</a></li>
+          <li><a href="../en/index.html" hreflang="en" lang="en" data-setlang="en" aria-current="true">English</a></li>
+          <li><a href="../ja/index.html" hreflang="ja" lang="ja" data-setlang="ja">日本語</a></li>
+          <li><a href="../zh/index.html" hreflang="zh-Hans" lang="zh-Hans" data-setlang="zh">简体中文</a></li>
+        </ul>
+      </details>
+      <a class="btn btn-primary btn-sm" href="download.html">Download</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ───────── 히어로 ───────── -->
+<section class="hero" aria-labelledby="hero-h">
+  <div class="wrap">
+    <div class="hero-copy">
+      <div class="pills">
+        <span class="pill"><i></i><span data-when="unreleased">v<span data-cfg="version">0.1.0</span> coming soon</span><span data-when="released" hidden>v<span data-cfg="version">0.1.0</span> is out</span></span>
+        <span class="pill">Free · open source (GPL-3.0)</span>
+      </div>
+      <h1 id="hero-h">A local 6-in-1 editor<span class="l2"><span class="grad">that doesn't break your originals.</span></span></h1>
+      <p class="lead">A ~17 MB installer. Your files are never uploaded anywhere. Raster, vector (AI), PDF, DOCX, HWPX, slides — and PSD — open, edit and save them on one canvas.</p>
+      <div class="btn-row">
+        <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="Download free" data-off-text="Download · coming soon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          <span class="t">Download · coming soon</span>
+        </a>
+        <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Try it now — no install</span></a>
+        <a class="btn btn-ghost btn-lg" href="#proof" data-when="no-demo">See the measurements</a>
+      </div>
+      <p class="dl-meta">Windows 10·11 · UI in Korean, English, Japanese and Chinese · runs in the browser · macOS and Linux builds are experimental</p>
+      <div class="chips" aria-label="Supported formats">
+        <span class="chip c-v">Raster</span><span class="chip c-t">Vector</span><span class="chip c-c">PDF</span><span class="chip c-b">DOCX</span><span class="chip c-o">HWPX</span><span class="chip c-p">Slides</span><span class="chip c-v">PSD</span>
+      </div>
+    </div>
+
+    <figure class="shot">
+      <div class="frame">
+        <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>Omniweave</span></div>
+        <div class="frame-body" data-shot="hero" data-alt="Omniweave in action — raster, vector, document and slide objects on one canvas.">
+          <div class="ph" role="img" aria-label="Placeholder illustration of the app — real screenshot coming soon.">
+            <div class="ph-tools"><b></b><b></b><b></b><b></b><b></b><b></b></div>
+            <div class="ph-stage">
+              <div class="ph-page"><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
+              <div class="ph-slide"></div>
+              <div class="ph-blob"></div>
+              <span class="ph-cap">Real screenshot coming soon</span>
+            </div>
+            <div class="ph-side"><u></u><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ───────── 증거 (실측·구현 상태) ───────── -->
+<section class="sec" id="proof" aria-labelledby="proof-h">
+  <div class="wrap">
+    <p class="eyebrow">Proof, not adjectives</p>
+    <h2 class="h-sec" id="proof-h">Only what we measured.<br><em>And what doesn't work yet.</em></h2>
+    <p class="lead">Every number below comes from an actual run, with its conditions. Work that is still in progress is marked “in progress”.</p>
+    <div class="metrics">
+      <div class="metric"><div class="v grad">6.1<small>MiB</small></div><div class="k">Installer size</div><div class="d">Windows x64 installer, 0.1.0 development build (10,239,987 bytes). Rendering uses WebView2, which ships with Windows.</div></div>
+      <div class="metric"><div class="v">65<small>/ 81</small></div><div class="k">Opened 81 real-world sample files</div><div class="d">65 succeeded · 8 partial · 0 failed · 8 unsupported with an explanation. “Partial” means cases like legacy DOC/HWP (text and tables only) or PSD (effects and adjustments excluded).</div></div>
+      <div class="metric"><div class="v">0<small>servers</small></div><div class="k">Servers your files are sent to</div><div class="d">Opening, editing, saving, converting and the quick tools all run on your PC. The network is used only to check for new versions (GitHub Releases).</div></div>
+      <div class="metric"><div class="v">AES<small>-256</small></div><div class="k">Encrypted documents stay encrypted</div><div class="d">PDF (AES-256) · DOCX/XLSX/PPTX (Office Agile) · .omw (AES-256-GCM). Edited files are re-encrypted on save; re-encrypted Office files were verified to open in Microsoft Office 16.</div></div>
+    </div>
+    <div class="common">
+      <div><h4>40+ file extensions</h4>Documents, spreadsheets, slides, images, PSD, video, audio, e-books, text and code. Each format states its support level (full, partial, or an explanation).</div>
+      <div><h4>History timeline</h4>Every command since you started is recorded. Preview any point and jump back in one step; the history is saved inside the .omw.</div>
+      <div><h4>6 quick tools · local</h4>Merge PDFs, shrink PDFs, PDF→JPG, images→PDF, shrink photos, batch JPG conversion — processed on your PC instead of an upload website.</div>
+    </div>
+    <div class="common">
+      <div><h4>Lossless save of originals <span class="note-inline">in progress</span></h4>Goal: parts you didn't edit are saved byte-for-byte as in the original. In progress for PDF and PSD; DOCX and HWPX are on the roadmap. Today, saving DOCX/HWPX writes a new document from what Omniweave understood.</div>
+      <div><h4>Code signing</h4>Current builds are not code-signed yet, so SmartScreen may warn on first run. The download page explains how to verify files with SHA-256.</div>
+      <div><h4>Language</h4>The app UI is available in Korean, English, Japanese and Chinese: pick one in the installer and change it any time in Preferences. This website is available in the same four languages.</div>
+    </div>
+    <p class="bench-note">Sample results copy only the counts from <code>test-corpus/REPORT.md</code> (file contents and names are not published). Installer size is from a development build and may change per release.</p>
+  </div>
+</section>
+
+<!-- ───────── 문제 정의 ───────── -->
+<section class="sec alt" id="why" aria-labelledby="why-h">
+  <div class="wrap prob">
+    <div>
+      <p class="eyebrow">Why we built it</p>
+      <h2 class="h-sec" id="why-h">One job.<br><em>Six programs.</em></h2>
+      <p class="lead">An image editor, an illustration tool, a PDF editor, two word processors (DOCX and HWPX), a slide app. You paste the same logo six times and re-fit the same paragraph six different ways.</p>
+      <div class="switch" aria-hidden="true">
+        <b>Image</b>→<b>Illustration</b>→<b>PDF</b>→<b>DOCX</b>→<b>HWPX</b>→<b>Slides</b>→ …
+      </div>
+      <ul class="same">
+        <li><span class="c-v">1</span>Place images and text</li>
+        <li><span class="c-t">2</span>Draw shapes and lines</li>
+        <li><span class="c-c">3</span>Tweak the position, size, color, opacity and font of whatever is selected</li>
+      </ul>
+      <p class="claim"><strong>Different names, same work.</strong> Pages or layers, vectors or bitmaps — in the end that only decides <strong>how the result is saved</strong>. It doesn't matter while you're editing.</p>
+    </div>
+    <div class="matrix">
+      <table>
+        <caption>What your hands actually do is the same in all six. What differs is feature depth and the file format.</caption>
+        <thead>
+          <tr><th scope="col"><span class="sr-only">Task</span></th><th scope="col">Image</th><th scope="col">Illus&shy;tration</th><th scope="col">PDF</th><th scope="col">DOCX</th><th scope="col">HWPX</th><th scope="col">Slides</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Place images</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
+          <tr><th scope="row">Text & styling</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
+          <tr><th scope="row">Shapes & lines</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
+          <tr><th scope="row">Move, resize, rotate</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
+          <tr><th scope="row">Color, opacity, order</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
+          <tr><th scope="row">Undo</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 6개 모듈 ───────── -->
+<section class="sec" id="modules" aria-labelledby="mod-h">
+  <div class="wrap">
+    <p class="eyebrow">6-in-1 modules</p>
+    <h2 class="h-sec" id="mod-h">Six kinds of work,<br><em>one scene graph.</em></h2>
+    <p class="lead">Raster tiles, Bézier paths, text paragraphs, tables, PDF pages, images and video are all the same kind of node. Only what is implemented in code today is listed. Depth per format is where we compete.</p>
+
+    <div class="mods">
+      <article class="mod c-v">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L12 15.6 8.4 12z"/><path d="M8.4 12C6 12 4.5 13.6 4.5 16c0 1.6-.8 2.6-1.5 3 3.7.9 8.6.2 9-3.4"/></svg></div>
+        <h3>Raster<small>Images · PSD</small></h3>
+        <ul><li>256 px tile brush and eraser (pressure, hardness, opacity)</li><li>Open <strong>PSD</strong>: pixel layers + composite (effects and adjustment layers excluded)</li><li>Open TIFF, WebP, AVIF and more</li></ul>
+      </article>
+      <article class="mod c-t">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19C7 8 17 16 20 5"/><rect x="2.5" y="17.5" width="3" height="3" rx=".6"/><rect x="18.5" y="3.5" width="3" height="3" rx=".6"/><path d="M4 19l5-9M20 5l-6 3"/><circle cx="9" cy="10" r="1.2"/><circle cx="14" cy="8" r="1.2"/></svg></div>
+        <h3>Vector<small>Vector · AI · SVG</small></h3>
+        <ul><li>Pen (Bézier handles), direct selection, rectangle, ellipse</li><li>Pathfinder unite/subtract/intersect/exclude</li><li>Open <strong>AI</strong> files (saved with PDF compatibility)</li></ul>
+      </article>
+      <article class="mod c-c">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></svg></div>
+        <h3>PDF<small>PDF editing</small></h3>
+        <ul><li>Render pages + elevate text into <strong>editable line-level text objects</strong></li><li>Open and re-encrypt password-protected PDFs (AES-256)</li><li>Quick tools: merge, shrink, convert to JPG</li></ul>
+      </article>
+      <article class="mod c-b">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 11.5h8M8 15h5"/></svg></div>
+        <h3>Word<small>DOCX</small></h3>
+        <ul><li>Open and save DOCX paragraph and character formatting</li><li>Edit table objects · save to DOCX</li><li>Legacy DOC: import body text and table contents</li></ul>
+      </article>
+      <article class="mod c-o">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.5 8.5h5c0 4-1.8 6.5-5 7.5M15.5 7v10M15.5 12h2"/></svg></div>
+        <h3>HWPX<small>HWPX</small></h3>
+        <ul><li>Open and save HWPX (clean-room, from the public OWPML structure)</li><li>Legacy HWP (5.0): import body text and table contents</li><li>Hangul line breaking by grapheme and eojeol</li></ul>
+      </article>
+      <article class="mod c-p">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.8"/><path d="M12 16v4M8.5 20h7M10 8.2v4.6l4-2.3z"/></svg></div>
+        <h3>Slides<small>PPTX · PPT</small></h3>
+        <ul><li>Open and save PPTX (text, shapes, pictures, tables, backgrounds)</li><li>Masters · transitions FADE / SLIDE_LEFT / ZOOM</li><li>Keyframe animation · full-screen slideshow</li></ul>
+      </article>
+    </div>
+
+    <div class="common">
+      <div><h4>The same for every object</h4>Select, move, resize, rotate, opacity, blend modes, lock and hide, reorder, undo.</div>
+      <div><h4>Export</h4>PNG · PDF · SVG · DOCX · HWPX · PPTX · XLSX · CSV · Markdown · HTML · SRT · <code>.omw</code></div>
+      <div><h4>Korean typesetting</h4>Line breaks by grapheme with <code>Intl.Segmenter</code>, so Hangul syllables never split, plus word-level <code>keep-all</code> wrapping.</div>
+    </div>
+    <p class="note">Import has limits — please read the <a href="#faq" class="grad">honest FAQ</a> first.</p>
+  </div>
+</section>
+
+<!-- ───────── Loom 엔진 ───────── -->
+<section class="sec alt" id="loom" aria-labelledby="loom-h">
+  <div class="wrap">
+    <div class="loom-grid">
+      <div>
+        <p class="eyebrow">Loom engine</p>
+        <h2 class="h-sec" id="loom-h">Everything gets<br><em>a content address.</em></h2>
+        <p class="lead">Every pixel tile, node and asset has its own 64-bit content address. The screen, saving and undo are all functions of those addresses.</p>
+        <ul class="parts">
+          <li class="c-v"><b>Thread</b><span>Content addresses for 256 px pixel tiles, nodes and assets. Identical tiles are stored once, and on open every hash is recomputed so only damaged pieces get skipped.</span></li>
+          <li class="c-t"><b>Weave Cache</b><span>A screen tile's key is the hash of the pieces that touch it. With <strong>no dirty flags and no invalidation code</strong>, “I erased it but it's still on screen” bugs simply can't happen by design.</span></li>
+          <li class="c-c"><b>Shuttle Journal</b><span>Writes only never-seen pieces to IndexedDB, incrementally. Autosave stays light, and you can recover after a crash.</span></li>
+          <li class="c-p"><b>Immutable history</b><span>Undo just swaps an immutable document reference. No pixels are copied, so its cost doesn't grow with document size.</span></li>
+        </ul>
+      </div>
+
+      <figure class="loom-viz">
+        <canvas id="loom-canvas" width="800" height="500" role="img" aria-label="Illustration: a grid of 40 screen tiles on the left; on the right the tiles unravel into three threads — violet, teal and coral. Rubbing the grid redraws only the tiles you touch."></canvas>
+        <div class="loom-ctl">
+          <p class="loom-stat" id="loom-stat" aria-live="polite">Rub the grid. Only the screen tiles you touch get redrawn.</p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost btn-sm" id="loom-paint">Draw a stroke</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="loom-undo" disabled aria-disabled="true">Undo</button>
+          </div>
+        </div>
+        <figcaption class="loom-legend">
+          <span class="c-c">Redrawn (key changed)</span><span class="c-t">Cache hit (old key reused)</span><span>Simplified illustration · not a measurement</span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <h3 class="sr-only">Measurements</h3>
+    <div class="metrics">
+      <div class="metric"><div class="v grad">79.5<small>%</small></div><div class="k">Tile data deduplicated</div><div class="d">Synthetic 4K document · 205 tile refs → 42 unique</div></div>
+      <div class="metric"><div class="v">1.43<small>MiB</small></div><div class="k">.omw file size</div><div class="d">Raw RGBA 51.3 MiB → 10.5 MiB deduped → saved</div></div>
+      <div class="metric"><div class="v">0.36–0.43<small>ms</small></div><div class="k">Keys for a whole frame</div><div class="d">1920×1080 · 40 screen tiles · 31 nodes</div></div>
+      <div class="metric"><div class="v">0.09–0.18<small>ms</small></div><div class="k">Undo + redo</div><div class="d">A deep copy of the same 4K document (<code>structuredClone</code>) takes 24–28 ms</div></div>
+    </div>
+    <p class="bench-note">Measured with <code>bench/loom.bench.ts</code> (Vitest bench, Node, DOM-free code paths) on <strong>synthetic documents</strong>; real documents may differ. Machine: Intel Core Ultra 5 125H, Windows 11, Node v24.13.1 · range of means over two runs (other work was running, so variance is high) · save→open round trip: 0 corrupt · 0 missing · document root address matches. Rendering (canvas drawing) time is not included — the Loom meter in the app's status bar shows it live. Reproduce with <code>npm run bench</code>.</p>
+  </div>
+</section>
+
+<!-- ───────── .omw ───────── -->
+<section class="sec" id="omw" aria-labelledby="omw-h">
+  <div class="wrap">
+    <p class="eyebrow">.omw format</p>
+    <h2 class="h-sec" id="omw-h">Just a <em>zip you can open.</em></h2>
+    <p class="lead"><code>.omw</code> (Omniweave Workspace Package) is a plain zip container. Identical tiles go in once, along with copies other tools can read.</p>
+    <div class="omw">
+<pre class="tree" tabindex="0" aria-label="Structure of an .omw package"><span class="f">document.omw</span>
+├── <span class="f">mimetype</span>                    <span class="c">"application/x-omniweave" (stored, first entry)</span>
+├── <span class="f">manifest.json</span>               <span class="c">metadata, Loom root address, page index</span>
+├── <span class="k">scene_graph.cbor</span>            <span class="c">unified scene graph (pixels as tile addresses)</span>
+├── <span class="t">rasters/&lt;hash&gt;.raw</span>          <span class="c">deduplicated 256×256 RGBA tiles</span>
+├── <span class="t">assets/&lt;hash&gt;.&lt;ext&gt;</span>         <span class="c">original images, PDFs, fonts</span>
+├── <span class="f">slides/slide_deck.json</span>      <span class="c">slide order, transitions, animations (copy)</span>
+├── <span class="f">slides/master_styles.json</span>   <span class="c">slide masters (copy)</span>
+├── <span class="f">vectors/paths.json</span>          <span class="c">SVG paths of vector nodes (copy)</span>
+├── <span class="f">documents/document.xml</span>      <span class="c">every text paragraph (copy)</span>
+└── <span class="f">documents/preview.txt</span>       <span class="c">plain text for search and indexing</span></pre>
+      <ul class="facts">
+        <li><h3>Verified on every open</h3><p>Every tile and asset hash is recomputed. Pieces that don't match are skipped and counted, and the rest of the document opens normally.</p></li>
+        <li><h3>Only two things are needed to open it</h3><p>Omniweave reads just <code>scene_graph.cbor</code> and the content-addressed pieces. Everything else is a <strong>read-only copy</strong> for other tools.</p></li>
+        <li><h3>Windows file association</h3><p>The installer associates <code>.omw</code> with Omniweave, so a double-click opens it.</p></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── FAQ ───────── -->
+<section class="sec alt" id="faq" aria-labelledby="faq-h">
+  <div class="wrap center">
+    <p class="eyebrow">FAQ</p>
+    <h2 class="h-sec" id="faq-h">The <em>honest</em> FAQ.</h2>
+    <p class="lead">We're in early development, so here is what works and what doesn't — up front.</p>
+  </div>
+  <div class="wrap">
+    <div class="faq">
+      <details>
+        <summary>Does it fully replace the existing programs?</summary>
+        <div class="a"><p>No. The goal is an <strong>integrated editor</strong> for many formats in one place, and depth per format is where we compete. Specialist features such as advanced filters, print separations, equation editors and track changes are out of scope today.</p></div>
+      </details>
+      <details>
+        <summary>What exactly does “doesn't break your originals” mean?</summary>
+        <div class="a"><p>The direction is: <strong>parts you didn't edit are saved exactly as in the original</strong>. Honestly, today:</p><ul><li><strong>In progress:</strong> original-preserving save for PDF and PSD.</li><li><strong>Roadmap:</strong> original-preserving (pass-through) save for DOCX and HWPX.</li><li><strong>Today:</strong> saving to DOCX/HWPX writes a new document from what Omniweave understood (paragraphs, character formatting, table objects). Elements such as footnotes and headers can be lost.</li><li>Encrypted documents are re-encrypted when saved.</li></ul></div>
+      </details>
+      <details>
+        <summary>Will DOCX/HWPX files look exactly like the original?</summary>
+        <div class="a"><p>Import is <strong>paragraph- and character-format centric</strong> (alignment, line spacing, font, size, color, bold/italic/underline). Not yet supported or simplified:</p><ul><li><strong>Tables</strong> inside DOCX/HWPX are not yet imported as tables; they flatten into paragraphs.</li><li>Footnotes/endnotes, headers/footers, page numbers, style inheritance, TOC, tracked changes.</li><li>Embedded pictures, shapes and equations.</li><li>Pagination is recomputed with A4 layout and may differ from the original.</li></ul></div>
+      </details>
+      <details>
+        <summary>Can I edit PDFs?</summary>
+        <div class="a"><p>Pages render as-is; “text elevation” turns the text into <strong>line-level text objects</strong> you can edit, covering the original glyphs with a background-colored rectangle. Text over complex backgrounds and reflowing columns or tables are not supported yet.</p><p>PDF export in the current release embeds each page as an image. Export with live text is in progress.</p></div>
+      </details>
+      <details>
+        <summary>How far do PPTX, legacy HWP and PSD go?</summary>
+        <div class="a"><ul><li><strong>PPTX:</strong> opens text, shapes, pictures, tables and backgrounds as slides and saves back to PPTX. Some picture formats such as EMF are skipped and some shapes are approximated as rectangles.</li><li><strong>Legacy HWP/DOC/PPT:</strong> body text and table contents only. For formatting and pictures, save as HWPX/DOCX/PPTX in the original program first.</li><li><strong>PSD:</strong> opens pixel layers and the composite image. Layer effects, adjustment layers and the text engine are excluded.</li></ul></div>
+      </details>
+      <details>
+        <summary>Are my files really never uploaded?</summary>
+        <div class="a"><p>Yes. Opening, editing, saving, converting and the quick tools all run on your PC, and the autosave journal is local. The network is used only to check for new versions (GitHub Releases), and this website has no tracking or analytics scripts. The source is open, so you can verify it.</p></div>
+      </details>
+      <details>
+        <summary>Can I try it without installing?</summary>
+        <div class="a"><p>The same app runs in a web browser. When the browser demo goes public, a “Try it now — no install” button appears on this page. The demo also processes files inside your browser, without sending them to a server.</p></div>
+      </details>
+      <details>
+        <summary>Is it GPU-accelerated?</summary>
+        <div class="a"><p>Not yet — it is <strong>Canvas 2D + TypeScript</strong>. A WebGPU renderer and a Rust/WASM core are on the roadmap. Today's speed comes from Loom's “repaint and re-save only what changed” structure. The <a href="#loom" class="grad">Loom table</a> is everything we claim.</p></div>
+      </details>
+      <details>
+        <summary>Is there an English UI? What about macOS and Linux?</summary>
+        <div class="a"><p>Yes. The app UI comes in Korean, English, Japanese and Simplified Chinese: pick one in the installer and change it any time in Preferences. macOS and Linux builds are marked <strong>experimental</strong> until verified on real machines. Officially supported: Windows 10·11 and running in the browser.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 오픈소스 ───────── -->
+<section class="sec" id="oss" aria-labelledby="oss-h">
+  <div class="wrap oss">
+    <div>
+      <p class="eyebrow">Open source · GPL-3.0</p>
+      <h2 class="h-sec" id="oss-h">One thread at a time —<br><em>weave it with us.</em></h2>
+      <p class="lead">Issues and pull requests are welcome. The most helpful thing of all: <strong>real files that break</strong>.</p>
+      <ul class="ways">
+        <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg><div><b>Report files that break</b><span>Send DOCX, HWPX or PDF files that don't open correctly, with any sensitive content removed.</span></div></li>
+        <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><div><b>Contribute code</b><span>TypeScript (strict) · React · Tauri 2. Dev setup and commit rules are in CONTRIBUTING.md.</span></div></li>
+        <li class="c-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3 4.7-5"/></svg><div><b>Clean-room rule</b><span>No reverse engineering of third-party binaries — only public standards (ISO 32000, ECMA-376, KS X 6101).</span></div></li>
+      </ul>
+      <div class="btn-row mt-28">
+        <a class="btn btn-primary" data-repo="" data-on-text="GitHub repository" data-off-text="Repository going public soon" aria-disabled="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3-11 6.6"/></svg>
+          <span class="t">Repository going public soon</span>
+        </a>
+        <a class="btn btn-ghost" data-repo="/blob/main/CONTRIBUTING.md" data-on-text="How to contribute" data-off-text="Contributing (after launch)" aria-disabled="true"><span class="t">Contributing (after launch)</span></a>
+      </div>
+    </div>
+    <div>
+      <div class="term">
+        <div class="term-h"><span>Run from source · Node.js 18+</span><button type="button" class="copy" data-copy="qs">Copy</button></div>
+<pre id="qs"><span class="c"># Works as soon as the repository is public</span>
+git clone https://github.com/wind2sp/omniweave.git
+cd omniweave
+npm i
+npm run dev      <span class="c"># run in the browser</span>
+npm test         <span class="c"># unit tests</span>
+npm run bench    <span class="c"># Loom benchmarks</span></pre>
+      </div>
+      <p class="road-h">Coming next <span class="note">(order may change)</span></p>
+      <ul class="road"><li>UI in four languages (Korean, English, Japanese, Chinese) <span class="note-inline done">Done</span></li><li>Lossless save of originals — PDF and PSD in progress</li><li>Original-preserving (pass-through) save for DOCX/HWPX</li><li>Import DOCX/HWPX tables as tables</li><li>PDF export with live text — in progress</li><li>Code-signed installer</li><li>WebGPU renderer · Rust/WASM core</li><li>Official macOS and Linux support</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 이름 이야기 ───────── -->
+<section class="sec alt" id="name" aria-labelledby="name-h">
+  <div class="wrap">
+    <div class="name-story">
+      <div>
+        <p class="eyebrow">About the name</p>
+        <h2 class="h-sec" id="name-h">Why <em>“Ome”</em>?</h2>
+        <p class="lead">“Ome!” (Oh-meh) is what people in Jeolla, in southwestern Korea, blurt out when something surprises or amazes them — the local way of saying “Oh my!” or “Wow!”. Even many Koreans from other regions know it only from friends or TV.</p>
+        <p class="lead">It's also the first letters of <strong>Om</strong>niweave (OM-niweave → Ome). The name holds that little gasp you let out the first time you see images, documents, PDFs and slides all working on one canvas.</p>
+        <p class="name-quote">“All of it, in one file? Ome!”</p>
+      </div>
+      <dl class="say">
+        <div lang="ko"><dt>한국어</dt><dd><b>오메</b><span>[o.me]</span></dd></div>
+        <div lang="en"><dt>English</dt><dd><b>Oh-meh</b><span>/oʊ.meɪ/</span></dd></div>
+        <div lang="ja"><dt>日本語</dt><dd><b>オメ</b><span>ome</span></dd></div>
+        <div lang="zh-Hans"><dt>中文</dt><dd><b>欧梅</b><span>Ōuméi</span></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 다운로드 CTA ───────── -->
+<section class="cta" aria-labelledby="cta-h">
+  <div class="wrap">
+    <img src="../assets/img/icon-192.png" alt="" width="72" height="72" loading="lazy">
+    <h2 id="cta-h">Keep the original,<br><span class="grad">edit in one place.</span></h2>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="Download free" data-off-text="Download · coming soon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        <span class="t">Download · coming soon</span>
+      </a>
+      <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Try it now — no install</span></a>
+    </div>
+    <p class="dl-meta">v<span data-cfg="version">0.1.0</span> · Windows 10·11 · ~17 MB installer · free · GPL-3.0</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div>
+        <div class="brand"><img src="../assets/img/logo-96.png" alt="" width="28" height="28" loading="lazy">Omniweave (Ome)</div>
+        <p class="mt-10">A local 6-in-1 editor that doesn't break your originals. Raster, vector, PDF, DOCX, HWPX, slides — and PSD — on one canvas.</p>
+        <p class="mt-10 name-line">“Ome” (Oh-meh) is what people in Korea's Jeolla region blurt out when something amazes them — think “Oh my!” — and it's also the first letters of <b>Om</b>niweave.</p>
+      </div>
+      <div>
+        <h2>Explore</h2>
+        <ul><li><a href="#modules">6-in-1 modules</a></li><li><a href="#loom">Loom engine</a></li><li><a href="#omw">.omw format</a></li><li><a href="#faq">Honest FAQ</a></li><li><a href="#name">About the name</a></li><li><a href="download.html">Download</a></li></ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a data-repo="" data-on-text="GitHub repository" data-off-text="GitHub repository (going public soon)"><span class="t">GitHub repository (going public soon)</span></a></li>
+          <li><a data-repo="/issues" data-on-text="Issues &amp; bug reports" data-off-text="Issues (after launch)"><span class="t">Issues (after launch)</span></a></li>
+          <li><a data-repo="/blob/main/LICENSE" data-on-text="Full GPL-3.0 license" data-off-text="GPL-3.0 license"><span class="t">GPL-3.0 license</span></a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <p><strong>License</strong> GPL-3.0-or-later (GNU General Public License v3 or later). The software is provided “as is”, without warranty of any kind. <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later</span></p>
+      <p><strong>Clean room</strong> We never reverse-engineer binaries of commercial third-party software. Everything is built only from public standards and public documentation (ISO 32000 PDF, ECMA-376 Office Open XML, KS X 6101 HWPX/OWPML and others).</p>
+      <p><strong>Trademarks</strong> Omniweave™ and the Omniweave logo are trademarks of the project's copyright holder. Microsoft, Windows, Word, Excel, PowerPoint, Office, WebView2 and Edge are trademarks of Microsoft Corporation. Adobe, Photoshop, Illustrator, Acrobat and PostScript are registered trademarks or trademarks of Adobe Inc. Hangul, Hancom and HWP are trademarks of Hancom Inc. AutoCAD, Autodesk and DXF are registered trademarks or trademarks of Autodesk, Inc. in the USA and other countries; "DWG" names the drawing file format. ACIS is a trademark of Spatial Corp. All other names are the property of their owners. Omniweave is not affiliated with, sponsored or endorsed by any of these companies; their names are used only to describe file compatibility.</p>
+      <p><strong>Open source used</strong> pdf.js, pdf-lib, fflate, cbor-x, polygon-clipping, immer, zustand, React, Tauri. This site uses the Pretendard typeface (SIL Open Font License).</p>
+    </div>
+  </div>
+</footer>
+
+<script type="application/json" id="i18n">{"soon":"Coming soon","preparing":"Not yet available","platformsBtn":"See all platforms","mobileMsg":"Omniweave is a desktop app. Open this page on a Windows, macOS or Linux computer.","unknownMsg":"We couldn't detect your operating system. Please pick one below.","dlFor":"Download for {os}","installerSuffix":" (installer)","experimentalBuild":"experimental build","soonFor":"{os} · coming soon","prepFor":"{os} · not yet available","notAvailable":"There's no file for this platform yet. Please check the list below.","firstRelease":"The first release, v{v}, is on its way.","copied":"Copied","locale":"en-US","loomStroke":"This stroke: \u003cspan class=\"m\">screen tiles redrawn: {n}\u003c/span> · \u003cspan class=\"h\">reused as-is: {r}\u003c/span> (of {t})","loomUndo":"Undo: the old keys come back, so \u003cspan class=\"h\">instant cache hits: {n}\u003c/span> · tiles redrawn: 0"}</script>
+<script src="../assets/js/site.js?v=5" defer></script>
+<script src="../assets/js/loom.js?v=5" defer></script>
+</body>
+</html>

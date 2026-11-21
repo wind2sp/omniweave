@@ -1,0 +1,2053 @@
+{
+ "about": "Real-image evaluation set for background removal (docs/design/MATTE_EVAL.md). Images are NOT stored in the repo: they are downloaded from Wikimedia Commons (scaled thumbnails) and composited outside the repo; this file records every source, its licence and author, and the composite recipe. Run: node scripts/matte-eval.mjs <dataset-dir>.",
+ "licenceCountsUniqueSources": {
+  "CC BY 3.0": 1,
+  "CC BY 4.0": 4,
+  "CC BY-SA 2.0": 1,
+  "CC BY-SA 3.0": 7,
+  "CC BY-SA 4.0": 12,
+  "CC0": 29,
+  "No restrictions": 2,
+  "Public domain": 22
+ },
+ "items": [
+  {
+   "id": "tr-poe",
+   "class": "transparent",
+   "split": "tune",
+   "kind": "transparent",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-4f4b96b927",
+    "size": [
+     768,
+     1024
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Edgar Allan Poe 2 retouched and transparent bg.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Edgar_Allan_Poe_2_retouched_and_transparent_bg.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/7/75/Edgar_Allan_Poe_2_retouched_and_transparent_bg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Edgar_Allan_Poe_2.jpg: Edwin H. Manchester\nderivative work: Beao"
+    }
+   ]
+  },
+  {
+   "id": "tr-mole",
+   "class": "transparent",
+   "split": "test",
+   "kind": "transparent",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "cut_animal-2d05d8423c",
+    "size": [
+     1024,
+     768
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Talpa europaea MHNT on transparent background.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Talpa_europaea_MHNT_on_transparent_background.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/0/04/Talpa_europaea_MHNT_on_transparent_background.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Didier Descouens, white background by Amada44"
+    }
+   ]
+  },
+  {
+   "id": "tr-helmet",
+   "class": "transparent",
+   "split": "tune",
+   "kind": "transparent",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "cut_object-fbb1256e56",
+    "size": [
+     1024,
+     768
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Bicycle Helmet 0085 Transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Bicycle_Helmet_0085_Transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/8/81/Bicycle_Helmet_0085_Transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by/4.0",
+     "author": "SonOfWasps"
+    }
+   ]
+  },
+  {
+   "id": "tr-adams",
+   "class": "transparent",
+   "split": "test",
+   "kind": "transparent",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-e94f80b7ef",
+    "size": [
+     768,
+     1024
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:William Notman - Henry Brooks Adams, 1885 (transparent).png",
+     "page": "https://commons.wikimedia.org/wiki/File:William_Notman_-_Henry_Brooks_Adams,_1885_(transparent).png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/bf/William_Notman_-_Henry_Brooks_Adams%2C_1885_%28transparent%29.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "William Notman"
+    }
+   ]
+  },
+  {
+   "id": "tr-docx",
+   "class": "transparent",
+   "split": "tune",
+   "kind": "transparent",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-b6085308f7",
+    "size": [
+     800,
+     900
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:DOCX icon bold.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:DOCX_icon_bold.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/d/db/DOCX_icon_bold.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Turbolego"
+    }
+   ]
+  },
+  {
+   "id": "tr-tawney",
+   "class": "transparent",
+   "split": "test",
+   "kind": "transparent",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-1c50749963",
+    "size": [
+     768,
+     1024
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:R. H. Tawney.png",
+     "page": "https://commons.wikimedia.org/wiki/File:R._H._Tawney.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/a/aa/R._H._Tawney.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "No restrictions",
+     "licence_url": "https://www.flickr.com/commons/usage/",
+     "author": "R._H._Tawney.jpg: Library of the London School of Economics and Political Science\nderivative work: nagualdesign (talk)"
+    }
+   ]
+  },
+  {
+   "id": "gr-doc",
+   "class": "graphic",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-04b875c433",
+    "bg": {
+     "type": "flat",
+     "color": [
+      255,
+      255,
+      255
+     ]
+    },
+    "noise": 0,
+    "size": [
+     900,
+     1000
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:DOC icon bold.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:DOC_icon_bold.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/7/71/DOC_icon_bold.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Turbolego"
+    }
+   ]
+  },
+  {
+   "id": "gr-trilobite",
+   "class": "graphic",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-1acc89d4ec",
+    "bg": {
+     "type": "flat",
+     "color": [
+      255,
+      255,
+      255
+     ]
+    },
+    "noise": 0,
+    "size": [
+     1000,
+     1000
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Trilobite clipart-vector.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Trilobite_clipart-vector.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/97/Trilobite_clipart-vector.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Offnfopt"
+    }
+   ]
+  },
+  {
+   "id": "gr-rhino",
+   "class": "graphic",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-9d363b9414",
+    "bg": {
+     "type": "flat",
+     "color": [
+      236,
+      238,
+      240
+     ]
+    },
+    "noise": 0
+   },
+   "sources": [
+    {
+     "title": "File:Rhino.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Rhino.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Rhino.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Bejó Gábor (artbejo)"
+    }
+   ]
+  },
+  {
+   "id": "gr-snail",
+   "class": "graphic",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-cd650f95a8",
+    "bg": {
+     "type": "flat",
+     "color": [
+      255,
+      246,
+      200
+     ]
+    },
+    "noise": 0
+   },
+   "sources": [
+    {
+     "title": "File:Machovka snail.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Machovka_snail.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/b6/Machovka_snail.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Sarka Slukova / Machovka"
+    }
+   ]
+  },
+  {
+   "id": "gr-owl",
+   "class": "graphic",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-d608cd338b",
+    "bg": {
+     "type": "flat",
+     "color": [
+      255,
+      255,
+      255
+     ]
+    },
+    "noise": 0,
+    "size": [
+     900,
+     1000
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Sword owl.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Sword_owl.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Sword_owl.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "rones"
+    }
+   ]
+  },
+  {
+   "id": "gr-dogman",
+   "class": "graphic",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-f7d0f47a93",
+    "bg": {
+     "type": "flat",
+     "color": [
+      255,
+      255,
+      255
+     ]
+    },
+    "noise": 0
+   },
+   "sources": [
+    {
+     "title": "File:Man with a dog head.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Man_with_a_dog_head.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Man_with_a_dog_head.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Hartmann Schedel"
+    }
+   ]
+  },
+  {
+   "id": "gr-chick",
+   "class": "graphic",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "graphic-f9805fbba0",
+    "bg": {
+     "type": "flat",
+     "color": [
+      210,
+      232,
+      250
+     ]
+    },
+    "noise": 0,
+    "size": [
+     800,
+     1000
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Chick (PSF).svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Chick_(PSF).svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/6/6a/Chick_%28PSF%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Chick_(PSF).jpg: Pearson Scott Foresman\nderivative work: papapishu"
+    }
+   ]
+  },
+  {
+   "id": "doc-franklin",
+   "class": "document",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-40b438076e",
+    "bg": {
+     "type": "paper"
+    },
+    "ink": [
+     20,
+     30,
+     90
+    ],
+    "noise": 2,
+    "fill": 0.6
+   },
+   "sources": [
+    {
+     "title": "File:Autograph of Benjamin Franklin.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Autograph_of_Benjamin_Franklin.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Autograph_of_Benjamin_Franklin.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": ""
+    }
+   ]
+  },
+  {
+   "id": "doc-hob",
+   "class": "document",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-0c23b48094",
+    "bg": {
+     "type": "paper",
+     "lines": true
+    },
+    "ink": [
+     15,
+     15,
+     20
+    ],
+    "noise": 2,
+    "fill": 0.5
+   },
+   "sources": [
+    {
+     "title": "File:Handofblood Autograph.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Handofblood_Autograph.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/1/1c/Handofblood_Autograph.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "KilianFelix"
+    }
+   ]
+  },
+  {
+   "id": "doc-shoval",
+   "class": "document",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-6bd8bff628",
+    "bg": {
+     "type": "paper",
+     "color": [
+      236,
+      228,
+      206
+     ]
+    },
+    "ink": [
+     10,
+     10,
+     10
+    ],
+    "noise": 2.5,
+    "fill": 0.55,
+    "size": [
+     800,
+     1000
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Graffiti artist Dudi Shoval signature.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Graffiti_artist_Dudi_Shoval_signature.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/28/Graffiti_artist_Dudi_Shoval_signature.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "דודי שובל / Dudi Shoval (ONE LOVE)"
+    }
+   ]
+  },
+  {
+   "id": "doc-urdu",
+   "class": "document",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-4034a56afb",
+    "bg": {
+     "type": "paper",
+     "color": [
+      228,
+      228,
+      226
+     ]
+    },
+    "ink": [
+     25,
+     40,
+     140
+    ],
+    "noise": 3,
+    "fill": 0.6
+   },
+   "sources": [
+    {
+     "title": "File:Madani's Signature in Urdu.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Madani%27s_Signature_in_Urdu.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/5/54/Madani%27s_Signature_in_Urdu.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Unknown authorUnknown author"
+    }
+   ]
+  },
+  {
+   "id": "doc-tissier",
+   "class": "document",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-e8c510f09b",
+    "bg": {
+     "type": "paper"
+    },
+    "ink": [
+     30,
+     30,
+     35
+    ],
+    "noise": 2,
+    "fill": 0.6
+   },
+   "sources": [
+    {
+     "title": "File:Signature-of-Bishop-Tissier-de-Mallerais.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Signature-of-Bishop-Tissier-de-Mallerais.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/ba/Signature-of-Bishop-Tissier-de-Mallerais.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Bernard Tissier de Mallerais"
+    }
+   ]
+  },
+  {
+   "id": "doc-desani",
+   "class": "document",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-0d2fa8e3a2",
+    "bg": {
+     "type": "paper",
+     "lines": true,
+     "color": [
+      248,
+      246,
+      238
+     ]
+    },
+    "ink": [
+     20,
+     35,
+     120
+    ],
+    "noise": 2,
+    "fill": 0.5
+   },
+   "sources": [
+    {
+     "title": "File:Emilia Clarke autograph.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Emilia_Clarke_autograph.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Emilia_Clarke_autograph.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Emilia Clarke"
+    }
+   ]
+  },
+  {
+   "id": "doc-gee",
+   "class": "document",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-9d20f47a61",
+    "bg": {
+     "type": "paper",
+     "color": [
+      240,
+      236,
+      222
+     ]
+    },
+    "ink": [
+     10,
+     10,
+     10
+    ],
+    "noise": 2,
+    "fill": 0.6
+   },
+   "sources": [
+    {
+     "title": "File:Harry Northwood - autograph.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Harry_Northwood_-_autograph.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/90/Harry_Northwood_-_autograph.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Harry Northwood"
+    }
+   ]
+  },
+  {
+   "id": "doc-cornell",
+   "class": "document",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "signature-0c3daac5f2",
+    "bg": {
+     "type": "paper"
+    },
+    "ink": [
+     140,
+     20,
+     30
+    ],
+    "noise": 2,
+    "fill": 0.5
+   },
+   "sources": [
+    {
+     "title": "File:Chris Cornell Signature.svg",
+     "page": "https://commons.wikimedia.org/wiki/File:Chris_Cornell_Signature.svg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Chris_Cornell_Signature.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "AEWisJericho"
+    }
+   ]
+  },
+  {
+   "id": "doc-real-letter",
+   "class": "document",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_doc-0d614ea4f8"
+   },
+   "sources": [
+    {
+     "title": "File:Momtaz al-Saltaneh - Handwritten Letter - Qajar period.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Momtaz_al-Saltaneh_-_Handwritten_Letter_-_Qajar_period.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Momtaz_al-Saltaneh_-_Handwritten_Letter_-_Qajar_period.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Samad khan momtaz al-saltaneh صمد خان ممتاز السلطنه"
+    }
+   ]
+  },
+  {
+   "id": "doc-real-yat",
+   "class": "document",
+   "split": "test",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_doc-41ce6b320f"
+   },
+   "sources": [
+    {
+     "title": "File:Handwritten yat.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Handwritten_yat.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/6/67/Handwritten_yat.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Charles-Philippe Reiff"
+    }
+   ]
+  },
+  {
+   "id": "doc-real-envelope",
+   "class": "document",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_doc-bbc52ae98a"
+   },
+   "sources": [
+    {
+     "title": "File:Handwritten letter by Wilbur Underhill Jr. - Envelope.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Handwritten_letter_by_Wilbur_Underhill_Jr._-_Envelope.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Handwritten_letter_by_Wilbur_Underhill_Jr._-_Envelope.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Wilbur Underhill Jr."
+    }
+   ]
+  },
+  {
+   "id": "ch-basshunter-g",
+   "class": "chroma",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-bca5df0d23",
+    "bg": {
+     "type": "green"
+    },
+    "fill": 0.85,
+    "anchor": "bottom"
+   },
+   "sources": [
+    {
+     "title": "File:Basshunter Gibson Guitar Studio 2009 (trsp).png",
+     "page": "https://commons.wikimedia.org/wiki/File:Basshunter_Gibson_Guitar_Studio_2009_(trsp).png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Basshunter_Gibson_Guitar_Studio_2009_%28trsp%29.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY 3.0",
+     "licence_url": "https://creativecommons.org/licenses/by/3.0",
+     "author": "Houlihanmartin"
+    }
+   ]
+  },
+  {
+   "id": "ch-lasri-b",
+   "class": "chroma",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-1b94837413",
+    "bg": {
+     "type": "blue"
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Portrait of Yehiel Lasri (Mayor of Ashdod) by Sharon Gabay, June 2023, transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Portrait_of_Yehiel_Lasri_(Mayor_of_Ashdod)_by_Sharon_Gabay,_June_2023,_transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/98/Portrait_of_Yehiel_Lasri_%28Mayor_of_Ashdod%29_by_Sharon_Gabay%2C_June_2023%2C_transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Sharon Gabay"
+    }
+   ]
+  },
+  {
+   "id": "ch-shepherd-g",
+   "class": "chroma",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "cut_animal-de51521512",
+    "bg": {
+     "type": "green",
+     "color": [
+      70,
+      190,
+      90
+     ]
+    },
+    "noise": 2
+   },
+   "sources": [
+    {
+     "title": "File:German Shepherd Transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:German_Shepherd_Transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/2d/German_Shepherd_Transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 3.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+     "author": "Untitled"
+    }
+   ]
+  },
+  {
+   "id": "ch-moka-b",
+   "class": "chroma",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-d93b9e934d",
+    "bg": {
+     "type": "blue",
+     "color": [
+      40,
+      90,
+      210
+     ]
+    },
+    "size": [
+     768,
+     1024
+    ]
+   },
+   "sources": [
+    {
+     "title": "File:Moka Express sideview.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Moka_Express_sideview.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Moka_Express_sideview.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 3.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+     "author": "photograph by Hans Chr. R., derivative work by Saibo"
+    }
+   ]
+  },
+  {
+   "id": "ch-greenwald-g",
+   "class": "chroma",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-ce5046d7f7",
+    "bg": {
+     "type": "green",
+     "color": [
+      40,
+      160,
+      60
+     ]
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "anchor": "bottom"
+   },
+   "sources": [
+    {
+     "title": "File:Glenn greenwald portrait transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Glenn_greenwald_portrait_transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Glenn_greenwald_portrait_transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 3.0",
+     "licence_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+     "author": "Glenn Greenwald"
+    }
+   ]
+  },
+  {
+   "id": "ch-real-presenter",
+   "class": "chroma",
+   "split": "test",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_chroma-6bdb4b2cfa"
+   },
+   "sources": [
+    {
+     "title": "File:20230215 TV3 CEI-TN RaquelSansDuran.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:20230215_TV3_CEI-TN_RaquelSansDuran.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/b0/20230215_TV3_CEI-TN_RaquelSansDuran.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Eloibg"
+    }
+   ]
+  },
+  {
+   "id": "ch-real-john",
+   "class": "chroma",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_chroma-9ef8d7f8b5"
+   },
+   "sources": [
+    {
+     "title": "File:John Chroma key 1.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:John_Chroma_key_1.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/John_Chroma_key_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "John Coleman"
+    }
+   ]
+  },
+  {
+   "id": "pr-grapefruit",
+   "class": "product",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-09821b4909",
+    "bg": {
+     "type": "studio"
+    },
+    "shadow": 0.3,
+    "anchor": "floor",
+    "fill": 0.7
+   },
+   "sources": [
+    {
+     "title": "File:Citrus paradisi (Grapefruit, pink) transparent bg.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Citrus_paradisi_(Grapefruit,_pink)_transparent_bg.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/7/7a/Citrus_paradisi_%28Grapefruit%2C_pink%29_transparent_bg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by/4.0",
+     "author": "Original photograph by א (Aleph)Derivative version by ReneeWrites"
+    }
+   ]
+  },
+  {
+   "id": "pr-apple",
+   "class": "product",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-1d04be0e33",
+    "bg": {
+     "type": "gradient"
+    },
+    "shadow": 0.35,
+    "anchor": "floor",
+    "size": [
+     900,
+     900
+    ],
+    "fill": 0.65
+   },
+   "sources": [
+    {
+     "title": "File:Apple in lightbox.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Apple_in_lightbox.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/5/53/Apple_in_lightbox.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 2.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/2.0",
+     "author": "Apple_in_lightbox.jpg: Slewrate\nderivative work: Σ"
+    }
+   ]
+  },
+  {
+   "id": "pr-chalk",
+   "class": "product",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-39b6fb67fd",
+    "bg": {
+     "type": "pastel",
+     "color": [
+      250,
+      226,
+      214
+     ]
+    },
+    "size": [
+     900,
+     900
+    ],
+    "fill": 0.6
+   },
+   "sources": [
+    {
+     "title": "File:Billiard chalk 20050724.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Billiard_chalk_20050724.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/7/73/Billiard_chalk_20050724.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "File:Billiard chalk 20050724 001.jpg by Jonas Bergsten\nAltered by SMcCandlish"
+    }
+   ]
+  },
+  {
+   "id": "pr-flashlight",
+   "class": "product",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-40529f623f",
+    "bg": {
+     "type": "studio"
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.85
+   },
+   "sources": [
+    {
+     "title": "File:LED LENSER T7M LED flashlight.png",
+     "page": "https://commons.wikimedia.org/wiki/File:LED_LENSER_T7M_LED_flashlight.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/3/3a/LED_LENSER_T7M_LED_flashlight.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 3.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+     "author": "Lucasbosch"
+    }
+   ]
+  },
+  {
+   "id": "pr-cup",
+   "class": "product",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-67c59965db",
+    "bg": {
+     "type": "gradient",
+     "c0": [
+      245,
+      245,
+      245
+     ],
+     "c1": [
+      205,
+      205,
+      210
+     ]
+    },
+    "shadow": 0.25,
+    "anchor": "floor",
+    "fill": 0.7
+   },
+   "sources": [
+    {
+     "title": "File:2025.03.27 Royal Albert Sweet Violets Coffee Cup Soucer Bone China 04.png",
+     "page": "https://commons.wikimedia.org/wiki/File:2025.03.27_Royal_Albert_Sweet_Violets_Coffee_Cup_Soucer_Bone_China_04.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/4/4d/2025.03.27_Royal_Albert_Sweet_Violets_Coffee_Cup_Soucer_Bone_China_04.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Tess Mattew"
+    }
+   ]
+  },
+  {
+   "id": "pr-camera",
+   "class": "product",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-7c0471c2fb",
+    "bg": {
+     "type": "pastel",
+     "color": [
+      214,
+      230,
+      246
+     ]
+    },
+    "fill": 0.7
+   },
+   "sources": [
+    {
+     "title": "File:Olympus E-PL1.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Olympus_E-PL1.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/0/04/Olympus_E-PL1.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 3.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+     "author": "Tiia Monto"
+    }
+   ]
+  },
+  {
+   "id": "pr-teacup",
+   "class": "product",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pproduct-ded9592ea5",
+    "bg": {
+     "type": "studio",
+     "color": [
+      252,
+      252,
+      252
+     ]
+    },
+    "shadow": 0.3,
+    "anchor": "floor",
+    "fill": 0.7
+   },
+   "sources": [
+    {
+     "title": "File:Teacup.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Teacup.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Teacup.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Rijksmuseum"
+    }
+   ]
+  },
+  {
+   "id": "po-thune",
+   "class": "portrait",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-ea5ee95ae9",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-705e97cd97",
+     "blur": 6
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:John Thune 117th Congress portrait (no background).png",
+     "page": "https://commons.wikimedia.org/wiki/File:John_Thune_117th_Congress_portrait_(no_background).png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/e9/John_Thune_117th_Congress_portrait_%28no_background%29.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "U.S. Senate Photographic Studio"
+    },
+    {
+     "title": "File:Eboracum Way York Jun26.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Eboracum_Way_York_Jun26.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/24/Eboracum_Way_York_Jun26.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Malcolmxl5"
+    }
+   ]
+  },
+  {
+   "id": "po-flynn",
+   "class": "portrait",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-f3e0b472b2",
+    "bg": {
+     "type": "photo",
+     "src": "bg_busy-5e78ea509d",
+     "blur": 0
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Ed Flynn 53602558539 o (1) transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Ed_Flynn_53602558539_o_(1)_transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Ed_Flynn_53602558539_o_%281%29_transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Original photo by Joshua Qualls/Governor's Press Office"
+    },
+    {
+     "title": "File:The living room that needs houseplants.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:The_living_room_that_needs_houseplants.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/The_living_room_that_needs_houseplants.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Lo"
+    }
+   ]
+  },
+  {
+   "id": "po-daley",
+   "class": "portrait",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-436dad9c0f",
+    "bg": {
+     "type": "gradient",
+     "c0": [
+      120,
+      130,
+      150
+     ],
+     "c1": [
+      60,
+      66,
+      80
+     ]
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:William M. Daley official portrait (transparent crop).png",
+     "page": "https://commons.wikimedia.org/wiki/File:William_M._Daley_official_portrait_(transparent_crop).png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/9d/William_M._Daley_official_portrait_%28transparent_crop%29.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "William_M._Daley_official_portrait.jpg: Office of the White House\nderivative work: César (talk)"
+    }
+   ]
+  },
+  {
+   "id": "po-mendoza",
+   "class": "portrait",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-599cef1ffb",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-2bee9a6e62",
+     "blur": 8
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Susana Mendoza Blue Suit (a) transparent background.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Susana_Mendoza_Blue_Suit_(a)_transparent_background.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/bc/Susana_Mendoza_Blue_Suit_%28a%29_transparent_background.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Original photo by HJB Photo for Friends for Susana Mendoza Political Committee). This was extracted from that original photo by SecretName101"
+    },
+    {
+     "title": "File:Street city.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Street_city.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/0/01/Street_city.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Omina006"
+    }
+   ]
+  },
+  {
+   "id": "po-austin",
+   "class": "portrait",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-94b1b3dc07",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-6a16dbf89a",
+     "blur": 3
+    },
+    "size": [
+     800,
+     1000
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Austin Transparent Official Photo.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Austin_Transparent_Official_Photo.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/a/a1/Austin_Transparent_Official_Photo.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Department of Defense"
+    },
+    {
+     "title": "File:Lalbagh Bangalore India Garden Flower Colorful (48186334521).jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Lalbagh_Bangalore_India_Garden_Flower_Colorful_(48186334521).jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/4/44/Lalbagh_Bangalore_India_Garden_Flower_Colorful_%2848186334521%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Abhiman Singh"
+    }
+   ]
+  },
+  {
+   "id": "po-blanton",
+   "class": "portrait",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-cbccf75da9",
+    "bg": {
+     "type": "photo",
+     "src": "bg_busy-8bf93e3cbe",
+     "blur": 0
+    },
+    "size": [
+     800,
+     1000
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Lewis M. Blanton, U.S. Magistrate Judge (transparent background).png",
+     "page": "https://commons.wikimedia.org/wiki/File:Lewis_M._Blanton,_U.S._Magistrate_Judge_(transparent_background).png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Lewis_M._Blanton%2C_U.S._Magistrate_Judge_%28transparent_background%29.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "United States District Court for the Eastern District of Missouri"
+    },
+    {
+     "title": "File:Living room of a typical rural house in northeast Brazil.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Living_room_of_a_typical_rural_house_in_northeast_Brazil.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Living_room_of_a_typical_rural_house_in_northeast_Brazil.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Wilfredor"
+    }
+   ]
+  },
+  {
+   "id": "po-humborg",
+   "class": "portrait",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pperson-c84e61cfac",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-c792509977",
+     "blur": 10
+    },
+    "size": [
+     900,
+     1000
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Portrait Christian Humborg transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Portrait_Christian_Humborg_transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/90/Portrait_Christian_Humborg_transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Ekvidi"
+    },
+    {
+     "title": "File:Main Street of Richmond, Maine.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Main_Street_of_Richmond,_Maine.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/92/Main_Street_of_Richmond%2C_Maine.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "L'Mainerque"
+    }
+   ]
+  },
+  {
+   "id": "an-toyger",
+   "class": "animal",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "panimal-22e8b6af4a",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-2c897010f2",
+     "blur": 6
+    },
+    "fill": 0.8
+   },
+   "sources": [
+    {
+     "title": "File:Toyger cat transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Toyger_cat_transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Toyger_cat_transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Heikki Siltala from catza.net"
+    },
+    {
+     "title": "File:Suncheon Bay National Garden- Part II - SuncheonBNG2945.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Suncheon_Bay_National_Garden-_Part_II_-_SuncheonBNG2945.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/d/d8/Suncheon_Bay_National_Garden-_Part_II_-_SuncheonBNG2945.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "lumoplank"
+    }
+   ]
+  },
+  {
+   "id": "an-catstretch",
+   "class": "animal",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "panimal-27b834e48b",
+    "bg": {
+     "type": "photo",
+     "src": "bg_busy-ce23e8e271",
+     "blur": 4
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.85
+   },
+   "sources": [
+    {
+     "title": "File:Cat Stretch.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Cat_Stretch.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Cat_Stretch.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Lisafern"
+    },
+    {
+     "title": "File:Forest path to Roche du Taureau, Cléron, 2026.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Forest_path_to_Roche_du_Taureau,_Cl%C3%A9ron,_2026.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/a/a0/Forest_path_to_Roche_du_Taureau%2C_Cl%C3%A9ron%2C_2026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "DimiTalen"
+    }
+   ]
+  },
+  {
+   "id": "an-turkishvan",
+   "class": "animal",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "panimal-4c9f4d234f",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-d1601fefc4",
+     "blur": 8
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.8
+   },
+   "sources": [
+    {
+     "title": "File:Turkish Van cat transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Turkish_Van_cat_transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/be/Turkish_Van_cat_transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Matsu1024"
+    },
+    {
+     "title": "File:Red healthy Petunias floral flowers bloom garden flowerbed seamless texture.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Red_healthy_Petunias_floral_flowers_bloom_garden_flowerbed_seamless_texture.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Red_healthy_Petunias_floral_flowers_bloom_garden_flowerbed_seamless_texture.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Sisters.seamless"
+    }
+   ]
+  },
+  {
+   "id": "an-pipi",
+   "class": "animal",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "panimal-ada1c397f8",
+    "bg": {
+     "type": "studio",
+     "color": [
+      238,
+      236,
+      232
+     ]
+    },
+    "size": [
+     900,
+     900
+    ],
+    "fill": 0.8
+   },
+   "sources": [
+    {
+     "title": "File:Cat named Pipi (2).png",
+     "page": "https://commons.wikimedia.org/wiki/File:Cat_named_Pipi_(2).png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Cat_named_Pipi_%282%29.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by/4.0",
+     "author": "Painjet"
+    }
+   ]
+  },
+  {
+   "id": "an-labradoodle",
+   "class": "animal",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "panimal-c04cd23b1f",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-2bee9a6e62",
+     "blur": 0
+    },
+    "fill": 0.8
+   },
+   "sources": [
+    {
+     "title": "File:Labradoodle-Brown-Transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Labradoodle-Brown-Transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/a/ac/Labradoodle-Brown-Transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Anton Porsche"
+    },
+    {
+     "title": "File:Street city.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Street_city.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/0/01/Street_city.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Omina006"
+    }
+   ]
+  },
+  {
+   "id": "an-asiantabby",
+   "class": "animal",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "panimal-e8b79f2833",
+    "bg": {
+     "type": "photo",
+     "src": "bg_busy-5e78ea509d",
+     "blur": 5
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.8
+   },
+   "sources": [
+    {
+     "title": "File:Asian tabby cat transparent.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Asian_tabby_cat_transparent.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Asian_tabby_cat_transparent.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Matt Buck from London, United Kingdom"
+    },
+    {
+     "title": "File:The living room that needs houseplants.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:The_living_room_that_needs_houseplants.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/The_living_room_that_needs_houseplants.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Lo"
+    }
+   ]
+  },
+  {
+   "id": "an-bengal",
+   "class": "animal",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "cut_animal-092bdb4718",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-705e97cd97",
+     "blur": 0
+    },
+    "fill": 0.8
+   },
+   "sources": [
+    {
+     "title": "File:Brown spotted tabby bengal cat 2.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Brown_spotted_tabby_bengal_cat_2.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/ea/Brown_spotted_tabby_bengal_cat_2.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "V. Sauvaget"
+    },
+    {
+     "title": "File:Eboracum Way York Jun26.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Eboracum_Way_York_Jun26.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/24/Eboracum_Way_York_Jun26.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Malcolmxl5"
+    }
+   ]
+  },
+  {
+   "id": "ob-broccoli",
+   "class": "object",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pobject-224b0b1e36",
+    "bg": {
+     "type": "photo",
+     "src": "bg_busy-8bf93e3cbe",
+     "blur": 3
+    },
+    "fill": 0.7
+   },
+   "sources": [
+    {
+     "title": "File:Broccoli DSC00861.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Broccoli_DSC00861.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/5/5c/Broccoli_DSC00861.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 3.0",
+     "licence_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+     "author": "David Monniaux"
+    },
+    {
+     "title": "File:Living room of a typical rural house in northeast Brazil.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Living_room_of_a_typical_rural_house_in_northeast_Brazil.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Living_room_of_a_typical_rural_house_in_northeast_Brazil.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Wilfredor"
+    }
+   ]
+  },
+  {
+   "id": "ob-guitar",
+   "class": "object",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pobject-2526521979",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-c792509977",
+     "blur": 0
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Guitar 3.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Guitar_3.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/c/cf/Guitar_3.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 3.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/3.0",
+     "author": "Tiia Monto"
+    },
+    {
+     "title": "File:Main Street of Richmond, Maine.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Main_Street_of_Richmond,_Maine.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/92/Main_Street_of_Richmond%2C_Maine.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "L'Mainerque"
+    }
+   ]
+  },
+  {
+   "id": "ob-statue",
+   "class": "object",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pobject-671f98a8a3",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-2c897010f2",
+     "blur": 0
+    },
+    "size": [
+     900,
+     1000
+    ],
+    "fill": 0.85
+   },
+   "sources": [
+    {
+     "title": "File:Statue-2925351.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Statue-2925351.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/9/9a/Statue-2925351.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Momentmal on Pixabay"
+    },
+    {
+     "title": "File:Suncheon Bay National Garden- Part II - SuncheonBNG2945.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Suncheon_Bay_National_Garden-_Part_II_-_SuncheonBNG2945.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/d/d8/Suncheon_Bay_National_Garden-_Part_II_-_SuncheonBNG2945.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "lumoplank"
+    }
+   ]
+  },
+  {
+   "id": "ob-cypress",
+   "class": "object",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pobject-778c984bfe",
+    "bg": {
+     "type": "photo",
+     "src": "bg_busy-ce23e8e271",
+     "blur": 0
+    },
+    "size": [
+     768,
+     1024
+    ],
+    "fill": 0.9
+   },
+   "sources": [
+    {
+     "title": "File:Chamaecyparis lawsoniana, ellwoodii.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Chamaecyparis_lawsoniana,_ellwoodii.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/c/c5/Chamaecyparis_lawsoniana%2C_ellwoodii.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Tiia Monto"
+    },
+    {
+     "title": "File:Forest path to Roche du Taureau, Cléron, 2026.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Forest_path_to_Roche_du_Taureau,_Cl%C3%A9ron,_2026.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/a/a0/Forest_path_to_Roche_du_Taureau%2C_Cl%C3%A9ron%2C_2026.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "DimiTalen"
+    }
+   ]
+  },
+  {
+   "id": "ob-quince",
+   "class": "object",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pobject-d8727266ae",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-99adec1b84",
+     "blur": 0
+    },
+    "fill": 0.7
+   },
+   "sources": [
+    {
+     "title": "File:Quitte.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Quitte.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/be/Quitte.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Zimtstern 2k"
+    },
+    {
+     "title": "File:Siracusan Street at Night.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Siracusan_Street_at_Night.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Siracusan_Street_at_Night.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Julian Lupyan"
+    }
+   ]
+  },
+  {
+   "id": "ob-eggplant",
+   "class": "object",
+   "split": "test",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "pobject-dd0fceee25",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-d1601fefc4",
+     "blur": 2
+    },
+    "size": [
+     900,
+     1000
+    ],
+    "fill": 0.8
+   },
+   "sources": [
+    {
+     "title": "File:Solanum melongena.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Solanum_melongena.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Solanum_melongena.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY-SA 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+     "author": "Tiia Monto"
+    },
+    {
+     "title": "File:Red healthy Petunias floral flowers bloom garden flowerbed seamless texture.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Red_healthy_Petunias_floral_flowers_bloom_garden_flowerbed_seamless_texture.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Red_healthy_Petunias_floral_flowers_bloom_garden_flowerbed_seamless_texture.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Sisters.seamless"
+    }
+   ]
+  },
+  {
+   "id": "ob-mount",
+   "class": "object",
+   "split": "tune",
+   "kind": "composite",
+   "gt": "exact (composite of a free-licence cut-out's own alpha)",
+   "recipe": {
+    "fg": "cut_object-dd86d49b28",
+    "bg": {
+     "type": "photo",
+     "src": "pbg-6a16dbf89a",
+     "blur": 0
+    },
+    "fill": 0.75
+   },
+   "sources": [
+    {
+     "title": "File:Bicycle mount and smartphone holder.png",
+     "page": "https://commons.wikimedia.org/wiki/File:Bicycle_mount_and_smartphone_holder.png",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Bicycle_mount_and_smartphone_holder.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC BY 4.0",
+     "licence_url": "https://creativecommons.org/licenses/by/4.0",
+     "author": "Tiia Monto"
+    },
+    {
+     "title": "File:Lalbagh Bangalore India Garden Flower Colorful (48186334521).jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Lalbagh_Bangalore_India_Garden_Flower_Colorful_(48186334521).jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/4/44/Lalbagh_Bangalore_India_Garden_Flower_Colorful_%2848186334521%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Abhiman Singh"
+    }
+   ]
+  },
+  {
+   "id": "cx-b3192d",
+   "class": "complex",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "pcomplex-b3192d155e"
+   },
+   "sources": [
+    {
+     "title": "File:Ban Nanuea Soi 1 (street) 03.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Ban_Nanuea_Soi_1_(street)_03.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/ba/Ban_Nanuea_Soi_1_%28street%29_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "This is Arthur Morganar (RDR2-THR)"
+    }
+   ]
+  },
+  {
+   "id": "cx-c4796d",
+   "class": "complex",
+   "split": "test",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "pcomplex-c4796d2842"
+   },
+   "sources": [
+    {
+     "title": "File:Princes Road Synagogue Nave.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Princes_Road_Synagogue_Nave.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Princes_Road_Synagogue_Nave.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Michael D Beckwith"
+    }
+   ]
+  },
+  {
+   "id": "cx-ee4cde",
+   "class": "complex",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "pcomplex-ee4cde41ae"
+   },
+   "sources": [
+    {
+     "title": "File:Shiraz Street at night.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Shiraz_Street_at_night.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/b1/Shiraz_Street_at_night.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Maximden"
+    }
+   ]
+  },
+  {
+   "id": "cx-f3a8e8",
+   "class": "complex",
+   "split": "test",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "pcomplex-f3a8e80767"
+   },
+   "sources": [
+    {
+     "title": "File:Street near Yoyogi Hachiman.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Street_near_Yoyogi_Hachiman.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Street_near_Yoyogi_Hachiman.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Syced"
+    }
+   ]
+  },
+  {
+   "id": "cx-2894bb",
+   "class": "complex",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "pcomplex-2894bb6b61"
+   },
+   "sources": [
+    {
+     "title": "File:Koppeldijk (street in Utrecht, the Netherlands).jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Koppeldijk_(street_in_Utrecht,_the_Netherlands).jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Koppeldijk_%28street_in_Utrecht%2C_the_Netherlands%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Robbie Klinkenberg"
+    }
+   ]
+  },
+  {
+   "id": "cx-9ec07a",
+   "class": "complex",
+   "split": "test",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_complex-9ec07a71bb"
+   },
+   "sources": [
+    {
+     "title": "File:Eighth Street. Soulard Market with crowds.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Eighth_Street._Soulard_Market_with_crowds.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/2/2b/Eighth_Street._Soulard_Market_with_crowds.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Swekosky, William G., 1895-1964"
+    }
+   ]
+  },
+  {
+   "id": "cx-ef2bcb",
+   "class": "complex",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_complex-ef2bcb58fc"
+   },
+   "sources": [
+    {
+     "title": "File:Crowd on Market Street for the Welcome Parade of the 138th Infantry. - DPLA - a44ed99d30fa8b8552157f8fa71433bd.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Crowd_on_Market_Street_for_the_Welcome_Parade_of_the_138th_Infantry._-_DPLA_-_a44ed99d30fa8b8552157f8fa71433bd.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/5/54/Crowd_on_Market_Street_for_the_Welcome_Parade_of_the_138th_Infantry._-_DPLA_-_a44ed99d30fa8b8552157f8fa71433bd.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "No restrictions",
+     "licence_url": "",
+     "author": "Peters, William J. 1884-1926"
+    }
+   ]
+  },
+  {
+   "id": "cx-ef6784",
+   "class": "complex",
+   "split": "test",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "real_complex-ef6784cfd2"
+   },
+   "sources": [
+    {
+     "title": "File:EFTA00002619 - Cluttered workshop with shelves packed with tools parts and equipment against blue walls.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:EFTA00002619_-_Cluttered_workshop_with_shelves_packed_with_tools_parts_and_equipment_against_blue_walls.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/3/36/EFTA00002619_-_Cluttered_workshop_with_shelves_packed_with_tools_parts_and_equipment_against_blue_walls.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "Public domain",
+     "licence_url": "",
+     "author": "Federal Bureau of Investigation"
+    }
+   ]
+  },
+  {
+   "id": "cx-186273",
+   "class": "complex",
+   "split": "tune",
+   "kind": "real",
+   "gt": "none (qualitative only)",
+   "recipe": {
+    "src": "bg_busy-186273a8b4"
+   },
+   "sources": [
+    {
+     "title": "File:Living room in apartment of Condomínio do Edifício Zaher, Le Blond, Rio de Janeiro, Brazil.jpg",
+     "page": "https://commons.wikimedia.org/wiki/File:Living_room_in_apartment_of_Condom%C3%ADnio_do_Edif%C3%ADcio_Zaher,_Le_Blond,_Rio_de_Janeiro,_Brazil.jpg",
+     "orig_url": "https://upload.wikimedia.org/wikipedia/commons/3/36/Living_room_in_apartment_of_Condom%C3%ADnio_do_Edif%C3%ADcio_Zaher%2C_Le_Blond%2C_Rio_de_Janeiro%2C_Brazil.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+     "licence": "CC0",
+     "licence_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+     "author": "Wilfredor"
+    }
+   ]
+  }
+ ]
+}

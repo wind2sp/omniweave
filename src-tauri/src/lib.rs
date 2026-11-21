@@ -1,0 +1,274 @@
+use std::path::PathBuf;
+
+mod portable;
+mod spell;
+
+fn startup_path() -> Option<PathBuf> {
+    std::env::args_os().skip(1).map(PathBuf::from).find(|p| p.is_file())
+}
+
+/// The .omw / .pdf / .docx / .hwpx file the app was launched with (file association or CLI).
+#[tauri::command]
+fn startup_file() -> Option<String> {
+    startup_path().map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Bytes of that launch file. Read here (not through the fs plugin scope) because the user
+/// chose it by double-clicking; only this one path can be read this way.
+#[tauri::command]
+fn startup_bytes() -> Result<tauri::ipc::Response, String> {
+    let p = startup_path().ok_or("no startup file")?;
+    std::fs::read(&p).map(tauri::ipc::Response::new).map_err(|e| e.to_string())
+}
+
+/// Self-test (`omniweave.exe --selftest`): the app icon and frontend assets must be embedded.
+fn selftest<R: tauri::Runtime>(ctx: &tauri::Context<R>) -> i32 {
+    let icon = ctx.default_window_icon().map(|i| (i.width(), i.height()));
+    let keys: Vec<String> = ctx.assets().iter().map(|(k, _)| k.to_string()).collect();
+    let index = keys.iter().any(|k| k.trim_start_matches('/') == "index.html");
+    println!("omniweave selftest: icon={:?} index.html={} assets={}", icon, index, keys.len());
+    if icon.is_some() && index { 0 } else { 1 }
+}
+
+/// Portable copy = no NSIS uninstaller next to the exe. Portable builds are told about
+/// updates but never self-install (that would create a second, installed copy).
+#[tauri::command]
+fn is_portable() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| !d.join("uninstall.exe").exists()))
+        .unwrap_or(true)
+}
+
+/// Running from an MSIX package (the Microsoft Store build, packaging/msix): the process has a package identity.
+/// The Store installs and updates that build, so the app's own updater stays off there (no checks, no pill, no
+/// "Check for updates" menu item). GetCurrentPackageFullName answers APPMODEL_ERROR_NO_PACKAGE (15700) for an
+/// unpackaged process and ERROR_INSUFFICIENT_BUFFER (122) for a packaged one when asked for the length only.
+/// A process started by another packaged app (an assistant or file manager installed from the Store) can carry that
+/// app's identity, so the exe must also lie inside the package's own folder (GetCurrentPackagePath): an installed
+/// or portable copy started that way keeps its updater.
+#[cfg(windows)]
+fn store_package() -> bool {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetCurrentPackageFullName(length: *mut u32, name: *mut u16) -> i32;
+        fn GetCurrentPackagePath(length: *mut u32, path: *mut u16) -> i32;
+    }
+    let mut len: u32 = 0;
+    // SAFETY: a null buffer with length 0 is the documented way to ask only for the length
+    let rc = unsafe { GetCurrentPackageFullName(&mut len, std::ptr::null_mut()) };
+    if !package_rc_means_packaged(rc) {
+        return false;
+    }
+    let mut len: u32 = 0;
+    // SAFETY: as above; then a buffer of exactly the length it reported
+    if unsafe { GetCurrentPackagePath(&mut len, std::ptr::null_mut()) } != 122 || len == 0 {
+        return false;
+    }
+    let mut buf = vec![0u16; len as usize];
+    if unsafe { GetCurrentPackagePath(&mut len, buf.as_mut_ptr()) } != 0 {
+        return false;
+    }
+    let root = String::from_utf16_lossy(&buf[..buf.iter().position(|&c| c == 0).unwrap_or(buf.len())]);
+    let exe = std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+    exe_inside(&exe, &root)
+}
+/// `exe` lies in the folder `root` (Windows paths: case-insensitive, either slash, an optional \\?\ prefix)
+#[cfg_attr(not(windows), allow(dead_code))]
+fn exe_inside(exe: &str, root: &str) -> bool {
+    let norm = |s: &str| s.trim_start_matches(r"\\?\").replace('/', "\\").trim_end_matches('\\').to_lowercase();
+    let (exe, root) = (norm(exe), norm(root));
+    !root.is_empty() && exe.len() > root.len() && exe.starts_with(&root) && exe.as_bytes()[root.len()] == b'\\'
+}
+#[cfg(not(windows))]
+fn store_package() -> bool {
+    false
+}
+/// 0 or ERROR_INSUFFICIENT_BUFFER: there is a package identity; APPMODEL_ERROR_NO_PACKAGE (and anything else): none
+#[cfg_attr(not(windows), allow(dead_code))]
+fn package_rc_means_packaged(rc: i32) -> bool {
+    rc == 0 || rc == 122
+}
+
+#[tauri::command]
+fn is_store_package() -> bool {
+    store_package()
+}
+
+/// UI language picked in the installer ("ko" / "en" / "zh" / "ja"), written next to the exe by the NSIS hook
+/// (windows/installer-hooks.nsh). None for portable copies; the app then follows the OS language.
+#[tauri::command]
+fn installer_language() -> Option<String> {
+    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let lang = std::fs::read_to_string(dir.join("language.txt")).ok()?.trim().to_string();
+    matches!(lang.as_str(), "ko" | "en" | "zh" | "ja").then_some(lang)
+}
+
+/// One line of the UI's update flow (check, download, install, errors) appended to %TEMP%/omniweave-update.log,
+/// so a failed or silent update can be diagnosed after the fact (the startup check shows nothing on failure).
+#[tauri::command]
+fn update_log(app: tauri::AppHandle, line: String) {
+    use std::io::Write;
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(std::env::temp_dir().join("omniweave-update.log")) {
+        let _ = writeln!(f, "{secs} v{} {line}", app.package_info().version);
+    }
+}
+
+/// Why an update check could not even start, for the update log: the updater resolves the app's path once at
+/// process start (tauri `current_exe`, canonicalized) and fails every check of that process with that error. Seen
+/// when the app was started outside the file-system view it was installed in (an install run from a packaged app
+/// such as Claude Desktop lands in its private %LOCALAPPDATA% copy; the installer's RunAsUser relaunch then starts
+/// the app outside that copy). See docs/RELEASING.md "업데이트 확인 실패".
+#[tauri::command]
+fn update_diag() -> String {
+    let exe = std::env::current_exe();
+    let canon = exe.as_ref().map(|p| p.canonicalize().map(|_| ()));
+    match tauri::utils::platform::current_exe() {
+        Ok(_) => "app path ok".to_string(),
+        Err(e) => format!("app path unavailable since start: {e} (exe {exe:?}, canonicalize now {canon:?})"),
+    }
+}
+
+/// `omniweave.exe --update-test`: the UI checks at once and installs a found update without a click (QA of the
+/// whole check → download → install → relaunch path; see update_log).
+/// The environment variable OMW_UPDATE_QA=1 does the same and also moves the window out of sight; unlike the argument it is passed
+/// on through a portable swap (`--finish-update` → restart), so a QA run can follow both versions without a window.
+/// It is honoured only by debug builds and by test builds with their own identifier (scripts/portable-update-e2e.ps1 uses
+/// app.omniweave.updatetest), never by the released app: a stray variable must not hide its window or update it unasked.
+#[tauri::command]
+fn update_test_mode(app: tauri::AppHandle) -> bool {
+    std::env::args().any(|a| a == "--update-test") || update_qa_env(&app.config().identifier)
+}
+
+/// The identifier of the released app (tauri.conf.json); OMW_UPDATE_QA does nothing there.
+const RELEASE_IDENTIFIER: &str = "app.omniweave.studio";
+
+fn update_qa_env(identifier: &str) -> bool {
+    update_qa_allowed(cfg!(debug_assertions), identifier) && std::env::var("OMW_UPDATE_QA").map(|v| v == "1").unwrap_or(false)
+}
+
+fn update_qa_allowed(debug: bool, identifier: &str) -> bool {
+    debug || identifier != RELEASE_IDENTIFIER
+}
+
+/// Updater self-check (`omniweave.exe --update-check`): asks the configured update endpoint exactly like the app
+/// does and writes what it saw (current version, remote version, decision or error) to
+/// %TEMP%/omniweave-update-check.txt, then exits. Lets QA test the update channel without clicking the UI.
+fn update_check(app: &tauri::AppHandle) {
+    use tauri_plugin_updater::UpdaterExt;
+    if store_package() {
+        let line = format!("store package: updates come from the Microsoft Store | app={}\n", app.package_info().version);
+        let _ = std::fs::write(std::env::temp_dir().join("omniweave-update-check.txt"), line);
+        app.exit(0);
+        return;
+    }
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+        let seen2 = seen.clone();
+        let result = match handle
+            .updater_builder()
+            .version_comparator(move |current, remote| {
+                *seen2.lock().unwrap() = format!("current={current} remote={}", remote.version);
+                remote.version > current
+            })
+            .build()
+        {
+            Ok(u) => match u.check().await {
+                Ok(Some(up)) => format!("available version={} date={:?}", up.version, up.date),
+                Ok(None) => "no update".to_string(),
+                Err(e) => format!("error: {e}"),
+            },
+            Err(e) => format!("builder error: {e} [{}]", update_diag()),
+        };
+        let line = format!("{} | {} | app={}{}", result, seen.lock().unwrap(), handle.package_info().version, "
+");
+        let _ = std::fs::write(std::env::temp_dir().join("omniweave-update-check.txt"), line);
+        handle.exit(0);
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn package_identity_answers() {
+        assert!(package_rc_means_packaged(122)); // ERROR_INSUFFICIENT_BUFFER: packaged, length returned
+        assert!(package_rc_means_packaged(0));
+        assert!(!package_rc_means_packaged(15700)); // APPMODEL_ERROR_NO_PACKAGE
+        assert!(!package_rc_means_packaged(87));
+    }
+
+    #[test]
+    fn exe_must_be_inside_the_package_folder() {
+        let root = r"C:\Program Files\WindowsApps\NinerowPartners.Omniweave_0.2.0.0_x64__abc";
+        assert!(exe_inside(&format!(r"{root}\Omniweave\omniweave.exe"), root));
+        assert!(exe_inside(&format!(r"\\?\{}\Omniweave\omniweave.exe", root.to_uppercase()), &format!("{root}\\")));
+        // the installed copy started by another packaged app: that app's folder, not ours
+        assert!(!exe_inside(r"C:\Users\u\AppData\Local\Omniweave\omniweave.exe", root));
+        assert!(!exe_inside(&format!("{root}2\\omniweave.exe"), root));
+        assert!(!exe_inside(r"C:\x\omniweave.exe", ""));
+    }
+    #[test]
+    fn update_qa_env_is_for_test_builds_only() {
+        assert!(!update_qa_allowed(false, RELEASE_IDENTIFIER)); // the released app ignores OMW_UPDATE_QA
+        assert!(update_qa_allowed(false, "app.omniweave.updatetest")); // scripts/portable-update-e2e.ps1 builds
+        assert!(update_qa_allowed(true, RELEASE_IDENTIFIER)); // debug builds
+        let conf = include_str!("../tauri.conf.json");
+        assert!(conf.contains(&format!("\"identifier\": \"{RELEASE_IDENTIFIER}\"")), "RELEASE_IDENTIFIER must match tauri.conf.json");
+    }
+    // (no test of store_package() itself: a process started by a packaged app — an IDE or assistant installed from
+    // the Store — runs with that app's package identity, so the answer depends on who started the tests)
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // portable self-update, before anything else (no window, no plugins): the downloaded `<name>.new.exe` puts
+    // itself in place of the old exe and starts it (src/portable.rs)
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--finish-update") {
+        std::process::exit(portable::finish_update(&args));
+    }
+    let ctx = tauri::generate_context!();
+    if args.iter().any(|a| a == "--selftest") {
+        std::process::exit(selftest(&ctx));
+    }
+    // leftovers of a finished portable update (`.new.exe`, `.exe.old`); the old process may still be closing
+    if let Ok(exe) = std::env::current_exe() {
+        std::thread::spawn(move || {
+            if is_portable() && !store_package() {
+                for p in portable::cleanup_leftovers(&exe, 20, std::time::Duration::from_millis(500)) {
+                    portable::log(&format!("removed {}", p.display()));
+                }
+            }
+        });
+    }
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![startup_file, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, portable::portable_update_download, portable::portable_update_finish, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore])
+        .setup(|app| {
+            use tauri::Manager;
+            if update_qa_env(&app.config().identifier) {
+                // QA run: out of sight but not hidden (a hidden WebView2 may hold its page back)
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.set_skip_taskbar(true);
+                    let _ = w.set_position(tauri::PhysicalPosition::new(-30000, -30000));
+                }
+            }
+            if std::env::args().any(|a| a == "--update-check") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
+                update_check(app.handle());
+            }
+            Ok(())
+        })
+        .run(ctx)
+        .expect("error while running Omniweave");
+}

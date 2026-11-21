@@ -1,0 +1,15 @@
+{
+  "cmd.review.spelling": "スペルチェック",
+  "cmd.format.paragraph": "段落",
+  "cmd.view.layersPanel": "レイヤーパネル",
+  "shortcuts.linkMissing": "Ctrl+K（ハイパーリンクの挿入）はまだありません。コマンド検索は {search} になりました。",
+  "shortcuts.context": "このページのショートカット: {ctx}",
+  "shortcuts.ctx.WORD": "DOCX 文書",
+  "shortcuts.ctx.HWP": "HWP・HWPX 文書",
+  "shortcuts.ctx.PDF": "PDF",
+  "shortcuts.ctx.SLIDE": "スライド",
+  "shortcuts.ctx.IMAGE": "画像",
+  "shortcuts.ctx.DESIGN": "デザイン",
+  "shortcuts.ctx.SHEET": "シート",
+  "shortcuts.ctx.CAD": "図面"
+}

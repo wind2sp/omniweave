@@ -1,0 +1,8 @@
+{
+  "progress.cancel": "取消",
+  "progress.open": "正在打开 {name}…",
+  "progress.save": "正在保存…",
+  "progress.export": "正在导出 {fmt}…",
+  "progress.ocr": "正在识别文字…",
+  "progress.matte": "正在去除背景…"
+}

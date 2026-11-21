@@ -1,0 +1,56 @@
+# website/ 폴더(정적 홈페이지)를 GitHub Pages로 배포합니다.
+# - main 브랜치에서 website/ 아래 파일이 바뀌면 자동 실행, Actions 탭에서 수동 실행도 가능.
+# - 처음 한 번: 저장소 Settings → Pages → Build and deployment → Source를 "GitHub Actions"로 바꿔 두세요.
+# - 비공개 저장소의 Pages는 GitHub 유료 플랜(Pro/Team/Enterprise)에서만 됩니다.
+name: Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "src/**"
+      - "public/**"
+      - ".github/workflows/pages.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Check config.json is valid JSON
+        run: python3 -m json.tool website/config.json > /dev/null
+      - name: Check localized pages are up to date (i18n/*.json → HTML)
+        run: node website/build-i18n.mjs --check
+      - name: Copy public files only
+        run: |
+          mkdir _site
+          rsync -a --exclude '_templates/' --exclude 'i18n/' --exclude 'build-i18n.mjs' \
+                   --exclude 'README.txt' --exclude '.htaccess' website/ _site/
+      # browser demo: the real app (web build) served at /app/ — "try it now, no install"
+      - name: Build the web app into /app
+        run: |
+          npx vite build --outDir _site/app --emptyOutDir
+          cp docs/demo/omniweave-demo.omw _site/app/demo.omw
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

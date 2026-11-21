@@ -1,0 +1,11 @@
+{
+  "psdtext.hist.edit": "Edit type layer",
+  "psdtext.bar": "Type layer editing bar",
+  "psdtext.title": "Edit text",
+  "psdtext.size": "Size",
+  "psdtext.color": "Color",
+  "psdtext.apply": "Apply",
+  "psdtext.applyHint": "Ctrl+Enter or click outside",
+  "psdtext.cancel": "Cancel",
+  "psdtext.textLabel": "Text of layer '{name}'"
+}

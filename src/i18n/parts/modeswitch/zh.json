@@ -1,0 +1,11 @@
+{
+  "modeswitch.autoOn": "自动 — 此页现在以“{mode}”方式编辑。切换页面时跟随该页的类型",
+  "modeswitch.autoUses": "自动为此页使用的方式",
+  "modeswitch.pageIs": "此页的类型是“{mode}” — 设为自动时使用此方式",
+  "modeswitch.pageCtx": "页面",
+  "cmd.mode.AUTO": "工作模式：自动",
+  "cmd.mode.DOCUMENT": "工作模式：文档",
+  "cmd.mode.SLIDE": "工作模式：幻灯片",
+  "cmd.mode.IMAGE": "工作模式：图像",
+  "cmd.mode.DESIGN": "工作模式：设计"
+}

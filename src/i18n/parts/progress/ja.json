@@ -1,0 +1,8 @@
+{
+  "progress.cancel": "キャンセル",
+  "progress.open": "{name} を開いています…",
+  "progress.save": "保存しています…",
+  "progress.export": "{fmt} に書き出しています…",
+  "progress.ocr": "文字を認識しています…",
+  "progress.matte": "背景を削除しています…"
+}

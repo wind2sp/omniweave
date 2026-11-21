@@ -1,0 +1,9 @@
+{
+  "hwp5write.export.label": "HWP 문서 (.hwp)",
+  "hwp5write.filter": "HWP 문서",
+  "hwp5write.err.notFromHwp": "이 문서는 HWP 파일에서 열지 않아 HWP로 저장할 수 없습니다. HWPX로 저장하세요.",
+  "hwp5write.err.noOriginal": "원본 HWP 파일 내용을 찾지 못해 HWP로 저장할 수 없습니다. HWPX로 저장하세요.",
+  "hwp5write.export.hint2": "연 HWP 파일에 고친 글자만 넣어 저장 · 서식·그림 등을 고친 문서는 HWPX로 저장",
+  "hwp5write.format.level2": "문단·글자 서식·표·그림 열기 · 고치지 않으면 HWP 그대로, 글자만 고치면 HWP로, 그 밖에는 HWPX로 저장",
+  "hwp5write.err.otherEdit": "글자 말고 다른 것(글자·문단 서식, 그림, 도형, 표 모양, 쪽 설정, 머리말·꼬리말, 각주, 메모·변경 추적 등)을 고친 문서는 HWP로 저장할 수 없습니다. 'HWPX로 저장'을 쓰면 고친 내용과 원본 서식이 그대로 남습니다."
+}

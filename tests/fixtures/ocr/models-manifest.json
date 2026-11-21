@@ -1,0 +1,43 @@
+{
+  "note": "Third-party OCR weights used in the Phase 1 prototype. Not stored in this repository (docs/design/OCR.md §6). Downloaded only from the official PaddlePaddle organisation on Hugging Face, checked (magic bytes, sha256 = the LFS oid published by the hub) and converted offline by scripts/convert-ppocr.mjs. Only data files were read (inference.json graph, inference.pdiparams tensors, inference.yml character list); no third-party code was run.",
+  "retrieved": "2026-11-12",
+  "models": [
+    {
+      "name": "PP-OCRv5_mobile_det",
+      "role": "text line detection (PP-LCNetV3 + RSE-FPN + DB head)",
+      "source": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det",
+      "revision": "0d63e78e2b680928f6b1747d76a08db6e645efb7",
+      "license": "Apache-2.0 (model card metadata; PaddleOCR repository LICENSE is Apache-2.0)",
+      "files": {
+        "inference.pdiparams": { "bytes": 4692937, "sha256": "afa1820cb16c1fd0dad589d0f8b389139061c1ef6d68019685fd07be997dda5b" },
+        "inference.json": { "bytes": 229777 },
+        "inference.yml": { "bytes": 903 }
+      },
+      "converted": { "f16": 2459616, "i8": 1359356, "params": 1171881 }
+    },
+    {
+      "name": "korean_PP-OCRv5_mobile_rec",
+      "role": "text line recognition, Korean + Latin + digits + symbols (PP-LCNetV3 + SVTR neck + CTC, 11,947 classes)",
+      "source": "https://huggingface.co/PaddlePaddle/korean_PP-OCRv5_mobile_rec",
+      "revision": "c02ecaf1f22bfd1c618cce154fd19185b47e663a",
+      "license": "Apache-2.0 (model card metadata; PaddleOCR repository LICENSE is Apache-2.0)",
+      "model_card_accuracy": "88.0% line accuracy on PaddleOCR's Korean set (a line counts only if every character is right)",
+      "files": {
+        "inference.pdiparams": { "bytes": 13342671, "sha256": "cac3e5f12cf04aaa77f6a5bc704e4e736ef2908476551891d84b41b4e9090462" },
+        "inference.json": { "bytes": 217724 },
+        "inference.yml": { "bytes": 96039 }
+      },
+      "converted": { "f16": 6799282, "i8": 3574744, "params": 3331503 },
+      "verification": "model-card sample line: published '리에 씨가 자기는돈이 많이있는다고 했어요' score 0.9142; Loom Infer f16: identical text, score 0.9137"
+    }
+  ],
+  "bundle": {
+    "note": "What release builds ship in models/ocr: these files are stored in git in public/models/ocr; scripts/ocr-models.mjs checks every byte by sha256 on each build (a missing or wrong file is taken from the local model cache, else the build stops) and removes anything else from public/models/ocr. int8 = per-output-channel int8 weights converted by scripts/convert-ppocr.mjs from the pinned revisions above (docs/design/OCR.md 3.3, option A in 4).",
+    "variant": "i8",
+    "license": "src/assets/models/LICENSE-PPOCR.txt",
+    "files": {
+      "ppocr-det.lwt": { "model": "PP-OCRv5_mobile_det", "bytes": 1359356, "sha256": "4ab2c674f4d64749dbcd7945f19ebee986b20b34882aa774b78cffaa50c0e449" },
+      "ppocr-rec-ko.lwt": { "model": "korean_PP-OCRv5_mobile_rec", "bytes": 3574744, "sha256": "7257175ca8c80957d62c306cd264f2a4eca941c25cfeabeeb81f3095b40af48f" }
+    }
+  }
+}

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!-- 이 파일은 build-i18n.mjs가 _templates/download.html + i18n/zh.json으로 만든 결과입니다. 직접 고치지 말고 템플릿·번역 파일을 고친 뒤 다시 생성하세요. -->
+<html lang="zh-Hans" data-lang="zh" data-root="../" data-page="download">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>下载 — Omniweave（欧梅）</title>
+<meta name="description" content="下载最新版 Omniweave。安装包约 17 MB，提供 Windows 安装版和便携版、SHA-256 校验方法与系统要求。">
+<meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Omniweave">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="下载 Omniweave">
+<meta property="og:description" content="不破坏原文件的本地 6 合 1 编辑器。安装包约 17 MB，免费开源 (GPL-3.0)。">
+<link rel="alternate" hreflang="ko" href="../download.html">
+<link rel="alternate" hreflang="en" href="../en/download.html">
+<link rel="alternate" hreflang="ja" href="../ja/download.html">
+<link rel="alternate" hreflang="zh-Hans" href="../zh/download.html">
+<link rel="alternate" hreflang="x-default" href="../download.html">
+<meta property="og:image" content="../assets/img/og-image.png">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Omniweave 标志与标语：文件格式只是出口，编辑都在同一块画布上。">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/site.css?v=5">
+<script src="../assets/js/lang.js?v=5"></script>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="index.html" aria-label="Omniweave 首页">
+      <img src="../assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>欧梅</span>
+    </a>
+    <nav class="nav-links" aria-label="主菜单">
+      <a href="index.html#modules">功能模块</a>
+      <a href="index.html#loom">Loom 引擎</a>
+      <a href="index.html#faq">常见问题</a>
+      <a href="download.html" aria-current="page">下载</a>
+    </nav>
+    <div class="nav-r">
+      <details class="lang">
+        <summary aria-label="选择语言"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3"/></svg><span>中文</span></summary>
+        <ul>
+          <li><a href="../download.html" hreflang="ko" lang="ko" data-setlang="ko">한국어</a></li>
+          <li><a href="../en/download.html" hreflang="en" lang="en" data-setlang="en">English</a></li>
+          <li><a href="../ja/download.html" hreflang="ja" lang="ja" data-setlang="ja">日本語</a></li>
+          <li><a href="../zh/download.html" hreflang="zh-Hans" lang="zh-Hans" data-setlang="zh" aria-current="true">简体中文</a></li>
+        </ul>
+      </details>
+      <a class="btn btn-ghost btn-sm" href="index.html">首页</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<section class="dl-hero" aria-labelledby="dl-h">
+  <div class="wrap">
+    <img class="app" src="../assets/img/icon-192.png" alt="" width="88" height="88">
+    <h1 id="dl-h">下载 Omniweave</h1>
+    <p class="lead center-x">免费 · 开源 (GPL-3.0) · 版本 <b data-cfg="version">0.1.0</b><span data-when="dated" hidden> · <span data-cfg="releaseDate"></span> 发布</span></p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg off" id="rec-btn" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        <span class="t">即将发布</span>
+      </a>
+    </div>
+    <p class="rec-sub" id="rec-sub" aria-live="polite">首个版本 v0.1.0 正在准备中。</p>
+
+    <div class="banner" data-when="unreleased" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
+      <p><strong>即将发布。</strong>首个版本发布后，本页面的按钮即可直接下载。在此之前，可以从源码直接运行（仓库公开后）。</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="platforms" aria-labelledby="plat-h">
+  <div class="wrap">
+    <h2 class="h-sec" id="plat-h">各平台文件</h2>
+    <p class="lead">所有文件都托管在 GitHub Releases 上。每个平台只需一个文件即可安装或运行。</p>
+
+    <div class="plats">
+      <article class="plat" data-os="win">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.6"/><path d="M8.5 20.5h7M12 17v3.5"/></svg>
+          <h2>Windows 10 · 11</h2><span class="you" hidden>这台电脑</span>
+        </div>
+        <ul class="files">
+          <li class="file">
+            <div><b>安装版 <span class="note-inline">推荐</span></b><code data-fname="winSetup">Omniweave_0.1.0_x64-setup.exe</code><p>约 17 MB。添加开始菜单项、关联 <code>.omw</code> 文件，无需管理员权限，为当前用户安装。</p></div>
+            <a class="btn btn-primary btn-sm off" data-dl="winSetup" data-on-text="下载" data-off-text="即将发布" aria-disabled="true"><span class="t">即将发布</span></a>
+          </li>
+          <li class="file">
+            <div><b>便携版</b><code data-fname="winPortable">Omniweave_0.1.0_x64-portable.exe</code><p>免安装的单个 exe 文件，不关联文件，也不添加开始菜单项。</p></div>
+            <a class="btn btn-ghost btn-sm off" data-dl="winPortable" data-on-text="下载" data-off-text="即将发布" aria-disabled="true"><span class="t">即将发布</span></a>
+          </li>
+        </ul>
+      </article>
+
+      <article class="plat" data-os="web">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3"/></svg>
+          <h2>浏览器（从源码运行）</h2>
+        </div>
+        <p>无需安装包，直接在浏览器中运行。需要 Node.js 18 或更高版本。</p>
+        <p data-when="demo" hidden><a class="btn btn-ghost btn-sm" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">无需安装，立即试用</span></a> <span class="note">完全在浏览器中运行，文件不会发送到服务器。</span></p>
+        <div class="term">
+          <div class="term-h"><span>终端</span><button type="button" class="copy" data-copy="qs-web">复制</button></div>
+<pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
+cd omniweave
+npm i
+npm run dev</pre>
+        </div>
+        <p class="note" data-when="no-repo">仓库即将公开，公开后上面的命令即可直接使用。</p>
+      </article>
+
+      <article class="plat" data-os="mac">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="12" rx="1.6"/><path d="M1 19.5h22"/></svg>
+          <h2>macOS <span class="tag-exp">实验性</span></h2><span class="you" hidden>这台 Mac</span>
+        </div>
+        <ul class="files">
+          <li class="file">
+            <div><b>磁盘映像 (Universal)</b><code data-fname="macDmg">Omniweave_0.1.0_universal.dmg</code><p>同时支持 Apple 芯片和 Intel 芯片的 Mac，尚未在真机上验证。</p></div>
+            <a class="btn btn-ghost btn-sm off" data-dl="macDmg" data-on-text="下载" data-off-text="即将发布" aria-disabled="true"><span class="t">即将发布</span></a>
+          </li>
+        </ul>
+        <p>此版本尚未经过 Apple 公证，首次打开时可能被拦截。遇到这种情况，请前往<strong>系统设置 → 隐私与安全性</strong>，点击<strong>仍要打开</strong>。</p>
+      </article>
+
+      <article class="plat" data-os="linux">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12.5 15H17"/></svg>
+          <h2>Linux <span class="tag-exp">实验性</span></h2><span class="you" hidden>这台电脑</span>
+        </div>
+        <ul class="files">
+          <li class="file">
+            <div><b>AppImage (x86_64)</b><code data-fname="linuxAppImage">Omniweave_0.1.0_amd64.AppImage</code><p>在 Ubuntu 22.04 上构建，尚未在各发行版上验证。</p></div>
+            <a class="btn btn-ghost btn-sm off" data-dl="linuxAppImage" data-on-text="下载" data-off-text="即将发布" aria-disabled="true"><span class="t">即将发布</span></a>
+          </li>
+        </ul>
+        <p>下载后请赋予执行权限： <code>chmod +x Omniweave_*.AppImage</code></p>
+      </article>
+    </div>
+
+    <p class="note">所有版本与更新日志： <a data-release-page hidden class="grad">GitHub Releases</a><span data-when="unreleased">首个版本发布后开放链接。</span></p>
+  </div>
+</section>
+
+<section class="sec alt" aria-label="安装说明">
+  <div class="wrap">
+    <div class="info">
+
+      <div class="box" id="smartscreen">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M12 8v4.5M12 16h.01"/></svg>如果出现“Windows 已保护你的电脑”</h2>
+        <p data-when="unsigned">目前的版本<strong>尚未进行代码签名</strong>，Microsoft Defender SmartScreen 可能会阻止首次运行。如果文件是从本页面 (GitHub Releases) 下载，并且下方的校验值一致：</p>
+        <p data-when="signed" hidden>安装程序已进行代码签名。如果 SmartScreen 仍然提示警告，可以按以下步骤运行：</p>
+        <ol><li>在警告窗口中点击<strong>更多信息</strong>。</li><li>确认应用名称是 Omniweave。</li><li>点击<strong>仍要运行</strong>。</li></ol>
+        <p>如果文件来源不明，请不要运行。</p>
+      </div>
+
+      <div class="box" id="update">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v3.5h3.5M4 13a8 8 0 0 0 14.6 4.5M20 20v-3.5h-3.5"/></svg>更新</h2>
+        <div data-when="no-autoupdate">
+          <p><strong>自动更新正在准备中。</strong>计划加入安装版，在此之前请这样更新：</p>
+          <ol><li>从本页面下载新版本的安装程序。</li><li>直接运行，覆盖安装。你的工作文件 (<code>.omw</code>) 不会受影响。</li></ol>
+          <p>便携版只需换成新的 exe 即可。</p>
+        </div>
+        <div data-when="autoupdate" hidden>
+          <p><strong>安装版和便携版都会自动检查新版本。</strong>有新版本时应用会先下载并校验，再提示你，确认后即更新。Microsoft Store 版本由应用商店更新。</p>
+          <p>便携版会在校验所下载 exe 的大小、SHA-256 和签名后，以相同文件夹、相同文件名替换自身。若文件夹不可写入，则打开本页面。</p>
+        </div>
+      </div>
+
+      <div class="box wide" id="checksum">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>校验下载的文件 (SHA-256)</h2>
+        <p>每个版本都会附带 <a class="grad off-link" data-dl="checksums" data-on-text="SHA256SUMS.txt" data-off-text="SHA256SUMS.txt" aria-disabled="true"><span class="t">SHA256SUMS.txt</span></a>，其中列出所有文件的 SHA-256 值。如果你在本机计算出的值与其中的值<strong>完全一致</strong>，说明文件在下载过程中没有被篡改。</p>
+        <div class="tabs" role="tablist" aria-label="各操作系统的校验命令">
+          <button type="button" role="tab" id="t-win" aria-controls="p-win" aria-selected="true" data-os="win">Windows (PowerShell)</button>
+          <button type="button" role="tab" id="t-mac" aria-controls="p-mac" aria-selected="false" tabindex="-1" data-os="mac">macOS</button>
+          <button type="button" role="tab" id="t-lin" aria-controls="p-lin" aria-selected="false" tabindex="-1" data-os="linux">Linux</button>
+        </div>
+        <div class="term" id="p-win" role="tabpanel" aria-labelledby="t-win">
+          <div class="term-h"><span>在下载文件夹中运行</span><button type="button" class="copy" data-copy="ck-win">复制</button></div>
+<pre id="ck-win">Get-FileHash .\Omniweave_<span data-ver>0.1.0</span>_x64-setup.exe -Algorithm SHA256
+<span class="c"># 将输出的 Hash 与 SHA256SUMS.txt 中同一文件那一行对比（不区分大小写）</span></pre>
+        </div>
+        <div class="term" id="p-mac" role="tabpanel" aria-labelledby="t-mac" hidden>
+          <div class="term-h"><span>终端 · 在下载文件夹中</span><button type="button" class="copy" data-copy="ck-mac">复制</button></div>
+<pre id="ck-mac">shasum -a 256 -c SHA256SUMS.txt --ignore-missing</pre>
+        </div>
+        <div class="term" id="p-lin" role="tabpanel" aria-labelledby="t-lin" hidden>
+          <div class="term-h"><span>终端 · 在下载文件夹中</span><button type="button" class="copy" data-copy="ck-lin">复制</button></div>
+<pre id="ck-lin">sha256sum -c SHA256SUMS.txt --ignore-missing</pre>
+        </div>
+        <p>在 macOS 和 Linux 上，把 <code>SHA256SUMS.txt</code> 放在下载文件旁边再运行命令，校验一致的文件会显示 <code>OK</code>。</p>
+      </div>
+
+      <div class="box wide" id="requirements">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1.5V4M15 1.5V4M9 20v2.5M15 20v2.5M1.5 9H4M1.5 15H4M20 9h2.5M20 15h2.5"/></svg>系统要求</h2>
+        <table class="req">
+          <tbody>
+            <tr><th scope="row">操作系统</th><td>Windows 10/11（64 位，x64）</td></tr>
+            <tr><th scope="row">Microsoft Edge WebView2</th><td>Windows 11 已内置。Windows 10 若未安装，<strong>安装版</strong>会在安装过程中自动下载并安装（需要联网）。<strong>便携版</strong>只能在已安装 WebView2 的电脑上运行。</td></tr>
+            <tr><th scope="row">安装权限</th><td>安装到当前用户，无需管理员权限。</td></tr>
+            <tr><th scope="row">在浏览器中运行</th><td>Node.js 18 及以上，以及较新的 Chromium 系浏览器、Firefox 或 Safari</td></tr>
+            <tr><th scope="row">macOS · Linux</th><td>实验性版本——在真机上验证之后，我们会在本页列出支持范围。</td></tr>
+          </tbody>
+        </table>
+        <p class="note">这是早期预览版。重要文档请另外保留原文件后再使用。导入方面的局限请见<a class="grad" href="index.html#faq">坦诚的常见问题</a>。</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="legal">
+      <p><strong>Omniweave (欧梅)</strong> · <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later</span> · GPL-3.0-or-later（GNU 通用公共许可证第 3 版或更高版本）。本软件按“原样”提供，不附带任何形式的保证。</p>
+      <p class="name-line">“欧梅”（韩语 오메，Ome）是韩国全罗道方言里表示惊叹的口头语，相当于“哎呀！”“哇！”；同时也取自 <b>Om</b>niweave 的开头。</p>
+      <p><strong>商标</strong> Microsoft、Windows、Edge 是 Microsoft Corporation 的商标，macOS 是 Apple Inc. 的商标。Omniweave 与上述公司无关。</p>
+      <p><a href="index.html">首页</a> · <a href="index.html#faq">FAQ</a> · <a href="index.html#name">名字的由来</a> · <a data-repo="" data-on-text="GitHub 仓库" data-off-text="GitHub 仓库（即将公开）"><span class="t">GitHub 仓库（即将公开）</span></a></p>
+    </div>
+  </div>
+</footer>
+
+<script type="application/json" id="i18n">{"soon":"即将发布","preparing":"暂未提供","platformsBtn":"查看各平台文件","mobileMsg":"Omniweave 是桌面应用，请在 Windows、macOS 或 Linux 电脑上打开本页面。","unknownMsg":"无法识别你的操作系统，请在下方选择。","dlFor":"下载 {os} 版","installerSuffix":"（安装版）","experimentalBuild":"实验性版本","soonFor":"{os} 版 · 即将发布","prepFor":"{os} 版 · 暂未提供","notAvailable":"该平台暂时还没有安装文件，请查看下方列表。","firstRelease":"首个版本 v{v} 正在准备中。","copied":"已复制","locale":"zh-CN","loomStroke":"本次笔画：\u003cspan class=\"m\">重绘屏幕图块 {n} 个\u003c/span> · \u003cspan class=\"h\">直接复用 {r} 个\u003c/span>（共 {t} 个）","loomUndo":"撤销：旧的键重新出现，\u003cspan class=\"h\">{n} 个图块直接命中缓存\u003c/span> · 重绘 0 个"}</script>
+<script src="../assets/js/site.js?v=5" defer></script>
+</body>
+</html>

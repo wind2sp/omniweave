@@ -1,0 +1,53 @@
+{
+  "name": "omniweave",
+  "version": "0.2.0",
+  "description": "Omniweave (오메) — 6-in-1 studio: raster, vector, PDF, Word, HWPX, slides on one canvas",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "bench": "vitest bench --run",
+    "coverage:features": "node scripts/coverage-report.mjs",
+    "fidelity": "node scripts/fidelity.mjs",
+    "tauri": "tauri",
+    "release": "node scripts/release.mjs",
+    "release:win": "powershell -NoProfile -File scripts/release-win.ps1",
+    "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/ocr-models.mjs --dev",
+    "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/ocr-models.mjs",
+    "notices": "node scripts/third-party-notices.mjs",
+    "size:budget": "node scripts/size-budget.mjs"
+  },
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-fs": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2.7.3",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1",
+    "cbor-x": "^1.6.0",
+    "fflate": "^0.8.2",
+    "immer": "^10.1.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "polygon-clipping": "^0.15.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@xmldom/xmldom": "^0.8.10",
+    "pretendard": "^1.3.9",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  },
+  "private": true
+}

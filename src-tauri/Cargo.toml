@@ -1,0 +1,47 @@
+[package]
+name = "omniweave"
+version = "0.2.0"
+description = "Omniweave (오메) — 6-in-1 studio"
+authors = ["NINEROW partners Co., Ltd.", "Omniweave contributors"]
+license = "GPL-3.0-or-later"
+edition = "2021"
+
+[lib]
+name = "omniweave_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-opener = "2"
+# Portable exe self-update (src/portable.rs): download, SHA-256 and minisign check. All of these are already in the
+# tree through tauri-plugin-updater, pinned here to the versions Cargo.lock has, with no extra features (no new crates;
+# rustls "ring" = the crypto provider the tree already builds, installed before the download client is made).
+reqwest = { version = "=0.13.5", default-features = false }
+sha2 = "=0.10.9"
+minisign-verify = "=0.3.0"
+base64 = "=0.23.1"
+rustls = { version = "=0.23.46", default-features = false, features = ["ring"] }
+
+# Windows Spell Checking API (src/spell.rs). Microsoft's own crate, already in the tree through Tauri (wry,
+# webview2-com): pinned to the version Cargo.lock has, MIT OR Apache-2.0; only two more API features are compiled in.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = ["Win32_Globalization", "Win32_System_Com"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+# "s": the Rust side is IPC/file glue (no hot loops; image work runs in JS/WASM), so size wins over speed — the
+# profile Tauri recommends for small apps. Expected −0.2…0.4 MB in the installer; measure with a release build
+# (docs/design/INSTALLER_SIZE.md §6).
+opt-level = "s"
+strip = true
+panic = "abort"

@@ -1,0 +1,43 @@
+{
+  "_help": "홈페이지 설정. 수정 후 이 파일만 다시 올리면 됩니다. 자세한 설명은 README.txt [config.json] 참고.",
+  "siteUrl": "",
+  "copyright": "© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later",
+  "version": "0.2.0",
+  "released": false,
+  "releaseDate": "",
+  "repoPublic": false,
+  "repoUrl": "https://github.com/wind2sp/omniweave",
+  "releasePageUrl": "https://github.com/wind2sp/omniweave/releases/latest",
+  "demoPublic": false,
+  "demoUrl": "app/?demo",
+  "downloadBase": "https://github.com/wind2sp/omniweave/releases/download/v{version}/",
+  "files": {
+    "winSetup": {
+      "name": "Omniweave_{version}_x64-setup.exe",
+      "enabled": true
+    },
+    "winPortable": {
+      "name": "Omniweave_{version}_x64-portable.exe",
+      "enabled": true
+    },
+    "macDmg": {
+      "name": "Omniweave_{version}_universal.dmg",
+      "enabled": false,
+      "experimental": true
+    },
+    "linuxAppImage": {
+      "name": "Omniweave_{version}_amd64.AppImage",
+      "enabled": false,
+      "experimental": true
+    },
+    "checksums": {
+      "name": "SHA256SUMS.txt",
+      "enabled": true
+    }
+  },
+  "autoUpdate": true,
+  "codeSigned": false,
+  "screenshots": {
+    "hero": "assets/img/hero.webp"
+  }
+}

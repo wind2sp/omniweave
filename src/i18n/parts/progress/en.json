@@ -1,0 +1,8 @@
+{
+  "progress.cancel": "Cancel",
+  "progress.open": "Opening {name}…",
+  "progress.save": "Saving…",
+  "progress.export": "Exporting {fmt}…",
+  "progress.ocr": "Recognizing text…",
+  "progress.matte": "Removing background…"
+}

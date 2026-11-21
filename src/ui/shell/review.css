@@ -1,0 +1,212 @@
+/* Review pane (ReviewPanel.tsx): comment cards and the list of tracked changes. */
+.review-pane .seg {
+  width: 100%;
+}
+.review-pane .seg-btn {
+  flex: 1;
+}
+.rv-list,
+.rv-replies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rv-card,
+.rv-change {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-2);
+}
+.rv-card.on {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+.rv-card.done {
+  opacity: 0.72;
+}
+.rv-card-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rv-card-btn:hover {
+  background: var(--accent-softer);
+}
+.rv-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.rv-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.rv-author {
+  color: var(--text-2);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rv-kind {
+  flex: none;
+  color: var(--text-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rv-by {
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rv-date {
+  margin-left: auto;
+  flex: none;
+  white-space: nowrap;
+}
+.rv-quote {
+  margin-top: 4px;
+  padding-left: 6px;
+  border-left: 3px solid #e7c24a;
+  color: var(--text-3);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rv-text {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rv-badge {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--bg-3);
+  color: var(--text-3);
+  font-size: 10px;
+}
+.rv-replies {
+  margin: 0 9px 8px 18px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+.rv-ctext {
+  margin-top: 3px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rv-ctext.k-ins,
+.rv-ctext.k-moveTo {
+  text-decoration: underline;
+}
+.rv-ctext.k-del,
+.rv-ctext.k-moveFrom {
+  text-decoration: line-through;
+}
+.rv-none {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.rv-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.rv-track.on {
+  color: var(--text);
+  font-weight: 600;
+}
+.rv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.rv-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 0 9px 6px;
+}
+.rv-reply .rv-tools {
+  padding: 2px 0 0;
+}
+.rv-tool {
+  padding: 1px 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.rv-tool:hover {
+  color: var(--accent, var(--text));
+  text-decoration: underline;
+}
+.rv-tool.danger:hover {
+  color: #c0392b;
+}
+.rv-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 9px 8px;
+}
+.rv-compose-text,
+.rv-author-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.rv-compose-text {
+  resize: vertical;
+  min-height: 52px;
+}
+.rv-compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.rv-note {
+  margin: 10px 12px 14px;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.45;
+}

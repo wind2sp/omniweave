@@ -1,0 +1,12 @@
+{
+  "tablemenu.rowAbove": "위에 행 삽입",
+  "tablemenu.rowBelow": "아래에 행 삽입",
+  "tablemenu.colLeft": "왼쪽에 열 삽입",
+  "tablemenu.colRight": "오른쪽에 열 삽입",
+  "tablemenu.deleteRows": "행 삭제",
+  "tablemenu.deleteCols": "열 삭제",
+  "tablemenu.deleteTable": "표 삭제",
+  "tablemenu.merge": "셀 합치기",
+  "tablemenu.split": "셀 나누기",
+  "tablemenu.props": "표 속성(너비·음영·테두리)…"
+}

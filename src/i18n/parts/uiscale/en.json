@@ -1,0 +1,8 @@
+{
+  "uiscale.title": "Interface text size",
+  "uiscale.small": "Small (90%)",
+  "uiscale.normal": "Normal (100%)",
+  "uiscale.large": "Large (112%)",
+  "uiscale.xlarge": "Extra large (125%)",
+  "uiscale.hint": "Changes the size of text and buttons in menus, the ribbon, panels and dialogs. Canvas zoom is not affected."
+}

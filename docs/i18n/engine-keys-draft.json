@@ -1,0 +1,4574 @@
+{
+  "engine.history.start": {
+    "file": "src/core/history.ts:59",
+    "category": "A",
+    "ko": "기록 시작",
+    "en": "History started",
+    "zh": "开始记录",
+    "ja": "記録開始",
+    "vars": []
+  },
+  "engine.history.restart": {
+    "file": "src/core/history.ts:69",
+    "category": "A",
+    "ko": "기록 다시 시작",
+    "en": "History restarted",
+    "zh": "重新开始记录",
+    "ja": "記録を再開",
+    "vars": []
+  },
+  "engine.history.restored": {
+    "file": "src/core/history.ts:102",
+    "category": "A",
+    "ko": "히스토리 복원: {label} ({time})",
+    "en": "Restore history: {label} ({time})",
+    "zh": "恢复历史：{label}（{time}）",
+    "ja": "履歴を復元: {label} ({time})",
+    "vars": [
+      "label",
+      "time"
+    ],
+    "testsMatch": "히스토리 복원",
+    "note": "time은 toLocaleTimeString(\"ko-KR\") 대신 현재 언어 로캘로 만든다"
+  },
+  "doc.history.open": {
+    "file": "src/core/history.ts:117",
+    "category": "A",
+    "ko": "열기",
+    "en": "Open",
+    "zh": "打开",
+    "ja": "開く",
+    "vars": [],
+    "existingKey": true,
+    "testsMatch": "열기"
+  },
+  "engine.history.newDoc": {
+    "file": "src/core/history.ts:118",
+    "category": "A",
+    "ko": "새 문서",
+    "en": "New document",
+    "zh": "新建文档",
+    "ja": "新規ドキュメント",
+    "vars": []
+  },
+  "engine.image.unknownOp": {
+    "file": "src/core/image/ops.ts:276",
+    "category": "A",
+    "ko": "알 수 없는 이미지 작업입니다: {op}",
+    "koOld": "알 수 없는 이미지 작업: ${o.op}",
+    "en": "Unknown image operation: {op}",
+    "zh": "未知的图像操作：{op}",
+    "ja": "不明な画像処理です: {op}",
+    "vars": [
+      "op"
+    ],
+    "note": "워커에서 던지므로 코드 UNKNOWN_OP + 표시 때 번역 권장"
+  },
+  "engine.image.failed": {
+    "file": "src/core/image/run.ts:29",
+    "category": "A",
+    "ko": "이미지 작업에 실패했습니다",
+    "koOld": "이미지 작업 실패",
+    "en": "The image operation failed",
+    "zh": "图像操作失败。",
+    "ja": "画像処理に失敗しました",
+    "vars": []
+  },
+  "engine.image.workerError": {
+    "file": "src/core/image/run.ts:33",
+    "category": "A",
+    "ko": "이미지 작업 스레드에 오류가 났습니다",
+    "koOld": "이미지 작업 스레드 오류",
+    "en": "The image worker thread failed",
+    "zh": "图像处理线程出错。",
+    "ja": "画像処理スレッドでエラーが発生しました",
+    "vars": []
+  },
+  "engine.pages.empty": {
+    "file": "src/core/pages.ts:22",
+    "category": "A",
+    "ko": "쪽 범위를 입력하세요 (예: 1-3, 5, 8-)",
+    "en": "Enter a page range (e.g. 1-3, 5, 8-)",
+    "zh": "请输入页码范围（例如：1-3, 5, 8-）",
+    "ja": "ページ範囲を入力してください (例: 1-3, 5, 8-)",
+    "vars": []
+  },
+  "engine.pages.unreadable": {
+    "file": "src/core/pages.ts:25",
+    "category": "A",
+    "ko": "읽을 수 없는 범위입니다: \"{part}\"",
+    "koOld": "읽을 수 없는 범위: \"${part}\"",
+    "en": "Cannot read the range: \"{part}\"",
+    "zh": "无法识别的范围：“{part}”",
+    "ja": "読み取れない範囲です: 「{part}」",
+    "vars": [
+      "part"
+    ],
+    "testsMatch": "읽을 수 없는"
+  },
+  "engine.pages.fromOne": {
+    "file": "src/core/pages.ts:28",
+    "category": "A",
+    "ko": "쪽 번호는 1부터입니다: \"{part}\"",
+    "en": "Page numbers start at 1: \"{part}\"",
+    "zh": "页码从 1 开始：“{part}”",
+    "ja": "ページ番号は 1 から始まります: 「{part}」",
+    "vars": [
+      "part"
+    ],
+    "testsMatch": "1부터"
+  },
+  "engine.pages.noSuchPage": {
+    "file": "src/core/pages.ts:29",
+    "category": "A",
+    "ko": "{page}쪽은 없습니다 (전체 {total}쪽)",
+    "en": "There is no page {page} (total: {total})",
+    "zh": "没有第 {page} 页（共 {total} 页）",
+    "ja": "{page} ページはありません (全 {total} ページ)",
+    "vars": [
+      "page",
+      "total"
+    ],
+    "testsMatch": "{page}쪽은 없습니다"
+  },
+  "engine.history.undo": {
+    "file": "src/core/store.ts:149, src/core/store.ts:150",
+    "category": "A",
+    "ko": "실행 취소: {label}",
+    "en": "Undo: {label}",
+    "zh": "撤销：{label}",
+    "ja": "元に戻す: {label}",
+    "vars": [
+      "label"
+    ]
+  },
+  "engine.history.redo": {
+    "file": "src/core/store.ts:159, src/core/store.ts:160",
+    "category": "A",
+    "ko": "다시 실행: {label}",
+    "en": "Redo: {label}",
+    "zh": "重做：{label}",
+    "ja": "やり直し: {label}",
+    "vars": [
+      "label"
+    ]
+  },
+  "engine.default.rasterLayer": {
+    "file": "src/core/types.ts:373",
+    "category": "B",
+    "ko": "래스터 레이어",
+    "en": "Raster layer",
+    "zh": "栅格图层",
+    "ja": "ラスターレイヤー",
+    "vars": []
+  },
+  "engine.default.path": {
+    "file": "src/core/types.ts:377",
+    "category": "B",
+    "ko": "패스",
+    "en": "Path",
+    "zh": "路径",
+    "ja": "パス",
+    "vars": [],
+    "note": "shell.name.path와 같은 글 — 재사용 가능"
+  },
+  "engine.default.text": {
+    "file": "src/core/types.ts:397, src/io/pdfsurgeon/elevate.ts:175",
+    "category": "B",
+    "ko": "텍스트",
+    "en": "Text",
+    "zh": "文本",
+    "ja": "テキスト",
+    "vars": []
+  },
+  "engine.default.image": {
+    "file": "src/core/types.ts:400",
+    "category": "B",
+    "ko": "이미지",
+    "en": "Image",
+    "zh": "图像",
+    "ja": "画像",
+    "vars": []
+  },
+  "engine.default.pdfPage": {
+    "file": "src/core/types.ts:405",
+    "category": "B",
+    "ko": "PDF {page}쪽",
+    "en": "PDF page {page}",
+    "zh": "PDF 第 {page} 页",
+    "ja": "PDF {page} ページ",
+    "vars": [
+      "page"
+    ]
+  },
+  "engine.default.table": {
+    "file": "src/core/types.ts:410, src/io/formats/csv.ts:121, src/io/formats/flow.ts:135, src/io/formats/pptx.ts:550",
+    "category": "B",
+    "ko": "표",
+    "en": "Table",
+    "zh": "表格",
+    "ja": "表",
+    "vars": [],
+    "note": "cmd.insert.table / dock.node.TABLE과 같은 글"
+  },
+  "engine.default.video": {
+    "file": "src/core/types.ts:431",
+    "category": "B",
+    "ko": "동영상",
+    "en": "Video",
+    "zh": "视频",
+    "ja": "ビデオ",
+    "vars": []
+  },
+  "engine.default.audio": {
+    "file": "src/core/types.ts:431",
+    "category": "B",
+    "ko": "오디오",
+    "en": "Audio",
+    "zh": "音频",
+    "ja": "オーディオ",
+    "vars": []
+  },
+  "engine.default.page": {
+    "file": "src/core/types.ts:442",
+    "category": "B",
+    "ko": "페이지",
+    "en": "Page",
+    "zh": "页面",
+    "ja": "ページ",
+    "vars": []
+  },
+  "doc.pageName.DESIGN": {
+    "file": "src/core/types.ts:462",
+    "category": "B",
+    "ko": "아트보드 {n}",
+    "koOld": "아트보드 1",
+    "en": "Artboard {n}",
+    "zh": "画板 {n}",
+    "ja": "アートボード {n}",
+    "vars": [
+      "n"
+    ],
+    "existingKey": true,
+    "note": "n = 1로 부른다"
+  },
+  "engine.default.backgroundRaster": {
+    "file": "src/core/types.ts:463",
+    "category": "B",
+    "ko": "배경 래스터",
+    "en": "Background raster",
+    "zh": "背景栅格",
+    "ja": "背景ラスター",
+    "vars": []
+  },
+  "engine.crypto.cfbNameTooLong": {
+    "file": "src/io/crypto/cfbWrite.ts:38",
+    "category": "A",
+    "ko": "CFB 이름이 너무 깁니다: {name}",
+    "en": "CFB name is too long: {name}",
+    "zh": "CFB 名称过长：{name}",
+    "ja": "CFB 名が長すぎます: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.crypto.cfbNameBadChar": {
+    "file": "src/io/crypto/cfbWrite.ts:39",
+    "category": "A",
+    "ko": "CFB 이름에 쓸 수 없는 문자가 있습니다: {name}",
+    "koOld": "CFB 이름에 쓸 수 없는 문자: ${name}",
+    "en": "CFB name contains a character that is not allowed: {name}",
+    "zh": "CFB 名称中含有不允许的字符：{name}",
+    "ja": "CFB 名に使用できない文字があります: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.crypto.cfbNameDuplicate": {
+    "file": "src/io/crypto/cfbWrite.ts:47",
+    "category": "A",
+    "ko": "CFB 이름이 중복됩니다: {name}",
+    "koOld": "CFB 이름 중복: ${names[i]}",
+    "en": "Duplicate CFB name: {name}",
+    "zh": "CFB 名称重复：{name}",
+    "ja": "CFB 名が重複しています: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.crypto.hwpxManifest": {
+    "file": "src/io/crypto/hwpx.ts:52",
+    "category": "A",
+    "ko": "HWPX 암호 정보(manifest)가 불완전합니다",
+    "en": "The HWPX encryption information (manifest) is incomplete",
+    "zh": "HWPX 加密信息（manifest）不完整。",
+    "ja": "HWPX の暗号化情報 (manifest) が不完全です",
+    "vars": []
+  },
+  "engine.crypto.hwpxKdf": {
+    "file": "src/io/crypto/hwpx.ts:64",
+    "category": "A",
+    "ko": "지원하지 않는 HWPX 키 유도 방식입니다: {name}",
+    "koOld": "지원하지 않는 HWPX 키 유도 방식: ${attr(kd, \"key-derivation-name\")}",
+    "en": "Unsupported HWPX key derivation: {name}",
+    "zh": "不支持的 HWPX 密钥派生方式：{name}",
+    "ja": "対応していない HWPX 鍵導出方式です: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.crypto.hwpxAlgorithm": {
+    "file": "src/io/crypto/hwpx.ts:99",
+    "category": "A",
+    "ko": "지원하지 않는 HWPX 암호 알고리즘입니다: {name}",
+    "koOld": "지원하지 않는 HWPX 암호 알고리즘: ${e.algorithm}",
+    "en": "Unsupported HWPX encryption algorithm: {name}",
+    "zh": "不支持的 HWPX 加密算法：{name}",
+    "ja": "対応していない HWPX 暗号アルゴリズムです: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.crypto.noWebCrypto": {
+    "file": "src/io/crypto/office.ts:14",
+    "category": "A",
+    "ko": "이 환경에는 WebCrypto(crypto.subtle)가 없어 암호 문서를 처리할 수 없습니다",
+    "en": "This environment has no WebCrypto (crypto.subtle), so encrypted documents cannot be processed",
+    "zh": "此环境没有 WebCrypto（crypto.subtle），无法处理加密文档。",
+    "ja": "この環境には WebCrypto (crypto.subtle) がないため、暗号化された文書を処理できません",
+    "vars": []
+  },
+  "engine.crypto.aesInputLength": {
+    "file": "src/io/crypto/office.ts:121",
+    "category": "A",
+    "ko": "AES 입력 길이가 16의 배수가 아닙니다",
+    "en": "AES input length is not a multiple of 16",
+    "zh": "AES 输入长度不是 16 的倍数。",
+    "ja": "AES の入力長が 16 の倍数ではありません",
+    "vars": []
+  },
+  "engine.crypto.aesCipherLength": {
+    "file": "src/io/crypto/office.ts:130",
+    "category": "A",
+    "ko": "AES 암호문 길이가 16의 배수가 아닙니다",
+    "en": "AES ciphertext length is not a multiple of 16",
+    "zh": "AES 密文长度不是 16 的倍数。",
+    "ja": "AES の暗号文長が 16 の倍数ではありません",
+    "vars": []
+  },
+  "engine.crypto.hashUnsupported": {
+    "file": "src/io/crypto/office.ts:180",
+    "category": "A",
+    "ko": "지원하지 않는 해시 알고리즘입니다: {name}",
+    "en": "Unsupported hash algorithm: {name}",
+    "zh": "不支持的哈希算法：{name}",
+    "ja": "対応していないハッシュアルゴリズムです: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.common.none": {
+    "file": "src/io/crypto/office.ts:180, src/io/crypto/office.ts:184, src/io/crypto/office.ts:185",
+    "category": "A",
+    "ko": "(없음)",
+    "en": "(none)",
+    "zh": "（无）",
+    "ja": "(なし)",
+    "vars": []
+  },
+  "engine.crypto.cipherUnsupported": {
+    "file": "src/io/crypto/office.ts:184",
+    "category": "A",
+    "ko": "지원하지 않는 암호 알고리즘입니다: {name} (AES만 지원)",
+    "en": "Unsupported cipher: {name} (only AES is supported)",
+    "zh": "不支持的加密算法：{name}（仅支持 AES）",
+    "ja": "対応していない暗号アルゴリズムです: {name} (AES のみ対応)",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.crypto.chainingUnsupported": {
+    "file": "src/io/crypto/office.ts:185",
+    "category": "A",
+    "ko": "지원하지 않는 암호 연결 방식입니다: {name}",
+    "en": "Unsupported cipher chaining: {name}",
+    "zh": "不支持的加密链接方式：{name}",
+    "ja": "対応していない暗号連鎖方式です: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.crypto.aesKeyBits": {
+    "file": "src/io/crypto/office.ts:187",
+    "category": "A",
+    "ko": "지원하지 않는 AES 키 길이입니다: {bits}",
+    "en": "Unsupported AES key length: {bits}",
+    "zh": "不支持的 AES 密钥长度：{bits}",
+    "ja": "対応していない AES 鍵長です: {bits}",
+    "vars": [
+      "bits"
+    ]
+  },
+  "engine.crypto.aesBlockSize": {
+    "file": "src/io/crypto/office.ts:188",
+    "category": "A",
+    "ko": "AES 블록 크기가 16이 아닙니다",
+    "en": "AES block size is not 16",
+    "zh": "AES 块大小不是 16。",
+    "ja": "AES のブロックサイズが 16 ではありません",
+    "vars": []
+  },
+  "engine.crypto.packageDamaged": {
+    "file": "src/io/crypto/office.ts:198, src/io/crypto/office.ts:290",
+    "category": "A",
+    "ko": "EncryptedPackage 스트림이 손상되었습니다",
+    "en": "The EncryptedPackage stream is damaged",
+    "zh": "EncryptedPackage 流已损坏。",
+    "ja": "EncryptedPackage ストリームが破損しています",
+    "vars": []
+  },
+  "engine.crypto.packageTruncated": {
+    "file": "src/io/crypto/office.ts:202, src/io/crypto/office.ts:295",
+    "category": "A",
+    "ko": "EncryptedPackage 스트림이 잘렸습니다",
+    "en": "The EncryptedPackage stream is truncated",
+    "zh": "EncryptedPackage 流被截断。",
+    "ja": "EncryptedPackage ストリームが途中で切れています",
+    "vars": []
+  },
+  "engine.crypto.noKeyData": {
+    "file": "src/io/crypto/office.ts:218",
+    "category": "A",
+    "ko": "EncryptionInfo에 keyData가 없습니다",
+    "en": "EncryptionInfo has no keyData",
+    "zh": "EncryptionInfo 中没有 keyData。",
+    "ja": "EncryptionInfo に keyData がありません",
+    "vars": []
+  },
+  "engine.crypto.certificateUnsupported": {
+    "file": "src/io/crypto/office.ts:220",
+    "category": "A",
+    "ko": "인증서로 암호화된 문서는 지원하지 않습니다(비밀번호 암호만 지원)",
+    "en": "Certificate-encrypted documents are not supported (password encryption only)",
+    "zh": "不支持用证书加密的文档（仅支持密码加密）。",
+    "ja": "証明書で暗号化された文書には対応していません (パスワード暗号のみ対応)",
+    "vars": []
+  },
+  "engine.crypto.noPasswordKey": {
+    "file": "src/io/crypto/office.ts:221",
+    "category": "A",
+    "ko": "EncryptionInfo에 비밀번호 키 정보가 없습니다",
+    "en": "EncryptionInfo has no password key information",
+    "zh": "EncryptionInfo 中没有密码密钥信息。",
+    "ja": "EncryptionInfo にパスワード鍵の情報がありません",
+    "vars": []
+  },
+  "engine.crypto.badSpinCount": {
+    "file": "src/io/crypto/office.ts:228",
+    "category": "A",
+    "ko": "spinCount 값이 올바르지 않습니다",
+    "en": "The spinCount value is invalid",
+    "zh": "spinCount 值无效。",
+    "ja": "spinCount の値が正しくありません",
+    "vars": []
+  },
+  "engine.crypto.integrityFailed": {
+    "file": "src/io/crypto/office.ts:251",
+    "category": "A",
+    "ko": "암호 문서의 무결성 검사(dataIntegrity)에 실패했습니다 — 파일이 손상되었거나 변조되었습니다",
+    "en": "The integrity check (dataIntegrity) of the encrypted document failed — the file is damaged or has been tampered with",
+    "zh": "加密文档的完整性检查（dataIntegrity）失败——文件已损坏或被篡改。",
+    "ja": "暗号化された文書の整合性チェック (dataIntegrity) に失敗しました — ファイルが破損しているか改ざんされています",
+    "vars": [],
+    "testsMatch": "무결성"
+  },
+  "engine.crypto.extensibleUnsupported": {
+    "file": "src/io/crypto/office.ts:259, src/io/crypto/office.ts:314",
+    "category": "A",
+    "ko": "확장 암호(Extensible Encryption)는 지원하지 않습니다",
+    "en": "Extensible Encryption is not supported",
+    "zh": "不支持可扩展加密（Extensible Encryption）。",
+    "ja": "拡張暗号 (Extensible Encryption) には対応していません",
+    "vars": []
+  },
+  "engine.crypto.rc4Unsupported": {
+    "file": "src/io/crypto/office.ts:265",
+    "category": "A",
+    "ko": "RC4 방식의 표준 암호는 지원하지 않습니다(AES만 지원)",
+    "en": "Standard encryption with RC4 is not supported (only AES)",
+    "zh": "不支持 RC4 方式的标准加密（仅支持 AES）。",
+    "ja": "RC4 方式の標準暗号には対応していません (AES のみ対応)",
+    "vars": []
+  },
+  "engine.crypto.standardAlgorithm": {
+    "file": "src/io/crypto/office.ts:266",
+    "category": "A",
+    "ko": "지원하지 않는 표준 암호 알고리즘입니다: 0x{id}",
+    "en": "Unsupported standard encryption algorithm: 0x{id}",
+    "zh": "不支持的标准加密算法：0x{id}",
+    "ja": "対応していない標準暗号アルゴリズムです: 0x{id}",
+    "vars": [
+      "id"
+    ]
+  },
+  "engine.crypto.standardHash": {
+    "file": "src/io/crypto/office.ts:267",
+    "category": "A",
+    "ko": "표준 암호의 해시가 SHA-1이 아닙니다",
+    "en": "The standard encryption hash is not SHA-1",
+    "zh": "标准加密的哈希不是 SHA-1。",
+    "ja": "標準暗号のハッシュが SHA-1 ではありません",
+    "vars": []
+  },
+  "engine.crypto.notEncryptedOffice": {
+    "file": "src/io/crypto/office.ts:300",
+    "category": "A",
+    "ko": "암호화된 Office 문서(OLE 복합 파일)가 아닙니다",
+    "en": "Not an encrypted Office document (OLE compound file)",
+    "zh": "不是加密的 Office 文档（OLE 复合文件）。",
+    "ja": "暗号化された Office 文書 (OLE 複合ファイル) ではありません",
+    "vars": []
+  },
+  "engine.crypto.legacyBinary": {
+    "file": "src/io/crypto/office.ts:306",
+    "category": "A",
+    "ko": "구형 바이너리 문서(.doc/.xls/.ppt)의 암호(RC4/XOR)는 지원하지 않습니다",
+    "en": "Encryption of legacy binary documents (.doc/.xls/.ppt, RC4/XOR) is not supported",
+    "zh": "不支持旧版二进制文档（.doc/.xls/.ppt）的加密（RC4/XOR）。",
+    "ja": "旧形式のバイナリ文書 (.doc/.xls/.ppt) の暗号 (RC4/XOR) には対応していません",
+    "vars": [],
+    "testsMatch": "구형 바이너리"
+  },
+  "engine.crypto.notOoxml": {
+    "file": "src/io/crypto/office.ts:307",
+    "category": "A",
+    "ko": "EncryptionInfo/EncryptedPackage 스트림이 없어 암호화된 OOXML 문서가 아닙니다",
+    "en": "No EncryptionInfo/EncryptedPackage stream — not an encrypted OOXML document",
+    "zh": "缺少 EncryptionInfo/EncryptedPackage 流，不是加密的 OOXML 文档。",
+    "ja": "EncryptionInfo/EncryptedPackage ストリームがないため、暗号化された OOXML 文書ではありません",
+    "vars": []
+  },
+  "engine.crypto.infoDamaged": {
+    "file": "src/io/crypto/office.ts:309",
+    "category": "A",
+    "ko": "EncryptionInfo 스트림이 손상되었습니다",
+    "en": "The EncryptionInfo stream is damaged",
+    "zh": "EncryptionInfo 流已损坏。",
+    "ja": "EncryptionInfo ストリームが破損しています",
+    "vars": []
+  },
+  "engine.crypto.versionUnsupported": {
+    "file": "src/io/crypto/office.ts:315",
+    "category": "A",
+    "ko": "지원하지 않는 암호 버전입니다: {major}.{minor}",
+    "en": "Unsupported encryption version: {major}.{minor}",
+    "zh": "不支持的加密版本：{major}.{minor}",
+    "ja": "対応していない暗号バージョンです: {major}.{minor}",
+    "vars": [
+      "major",
+      "minor"
+    ]
+  },
+  "engine.crypto.omwNotEncrypted": {
+    "file": "src/io/crypto/omwCrypt.ts:49",
+    "category": "A",
+    "ko": "암호화된 Omniweave 파일 구조가 아닙니다",
+    "en": "Not an encrypted Omniweave file structure",
+    "zh": "不是加密的 Omniweave 文件结构。",
+    "ja": "暗号化された Omniweave ファイルの構造ではありません",
+    "vars": []
+  },
+  "engine.crypto.omwMethod": {
+    "file": "src/io/crypto/omwCrypt.ts:51",
+    "category": "A",
+    "ko": "지원하지 않는 암호화 방식입니다",
+    "en": "Unsupported encryption method",
+    "zh": "不支持的加密方式。",
+    "ja": "対応していない暗号化方式です",
+    "vars": []
+  },
+  "engine.crypto.omwIterations": {
+    "file": "src/io/crypto/omwCrypt.ts:53",
+    "category": "A",
+    "ko": "암호화 헤더의 반복 횟수가 올바르지 않습니다",
+    "en": "The iteration count in the encryption header is invalid",
+    "zh": "加密头中的迭代次数无效。",
+    "ja": "暗号化ヘッダーの反復回数が正しくありません",
+    "vars": [],
+    "testsMatch": "반복 횟수"
+  },
+  "engine.crypto.pdfAlreadyEncrypted": {
+    "file": "src/io/crypto/pdfEncrypt.ts:85",
+    "category": "A",
+    "ko": "이미 암호화된 PDF입니다",
+    "en": "This PDF is already encrypted",
+    "zh": "此 PDF 已加密。",
+    "ja": "すでに暗号化された PDF です",
+    "vars": []
+  },
+  "engine.format.notCfb": {
+    "file": "src/io/formats/cfb.ts:12",
+    "category": "A",
+    "ko": "복합 파일(OLE2) 형식이 아닙니다",
+    "en": "Not a compound file (OLE2)",
+    "zh": "不是复合文件（OLE2）格式。",
+    "ja": "複合ファイル (OLE2) 形式ではありません",
+    "vars": []
+  },
+  "engine.csv.noTable": {
+    "file": "src/io/formats/csv.ts:167",
+    "category": "A",
+    "ko": "내보낼 표가 없습니다 — 표가 있는 페이지에서 CSV로 저장하세요",
+    "en": "There is no table to export — save as CSV from a page that has a table",
+    "zh": "没有可导出的表格——请在含有表格的页面中另存为 CSV。",
+    "ja": "書き出す表がありません — 表があるページで CSV として保存してください",
+    "vars": []
+  },
+  "engine.epub.noContainer": {
+    "file": "src/io/formats/epub.ts:28",
+    "category": "A",
+    "ko": "META-INF/container.xml이 없습니다 — EPUB이 아닙니다",
+    "en": "META-INF/container.xml is missing — this is not an EPUB",
+    "zh": "缺少 META-INF/container.xml——这不是 EPUB。",
+    "ja": "META-INF/container.xml がありません — EPUB ではありません",
+    "vars": []
+  },
+  "engine.epub.drm": {
+    "file": "src/io/formats/epub.ts:30",
+    "category": "A",
+    "ko": "DRM으로 보호된 EPUB은 열 수 없습니다",
+    "en": "DRM-protected EPUBs cannot be opened",
+    "zh": "无法打开受 DRM 保护的 EPUB。",
+    "ja": "DRM で保護された EPUB は開けません",
+    "vars": [],
+    "testsMatch": "DRM (REFUSAL_REASON)"
+  },
+  "engine.epub.noOpf": {
+    "file": "src/io/formats/epub.ts:34",
+    "category": "A",
+    "ko": "OPF 패키지 문서를 찾지 못했습니다",
+    "en": "Could not find the OPF package document",
+    "zh": "找不到 OPF 包文档。",
+    "ja": "OPF パッケージ文書が見つかりませんでした",
+    "vars": []
+  },
+  "engine.epub.noBody": {
+    "file": "src/io/formats/epub.ts:78",
+    "category": "A",
+    "ko": "본문이 없는 EPUB입니다",
+    "en": "This EPUB has no content",
+    "zh": "此 EPUB 没有正文。",
+    "ja": "本文がない EPUB です",
+    "vars": []
+  },
+  "engine.default.pageOfFile": {
+    "file": "src/io/formats/flow.ts:79, src/io/office.ts:714, src/io/pdf.ts:202",
+    "category": "B",
+    "ko": "{title} · {page}쪽",
+    "en": "{title} · page {page}",
+    "zh": "{title} · 第 {page} 页",
+    "ja": "{title} · {page} ページ",
+    "vars": [
+      "page",
+      "title"
+    ],
+    "testsMatch": "five.pdf · 2쪽 (pageActions.test)"
+  },
+  "engine.default.body": {
+    "file": "src/io/formats/flow.ts:111, src/io/office.ts:717",
+    "category": "B",
+    "ko": "본문",
+    "en": "Body",
+    "zh": "正文",
+    "ja": "本文",
+    "vars": [],
+    "testsMatch": "본문 (pdfVectorQa)"
+  },
+  "engine.default.tableN": {
+    "file": "src/io/formats/flow.ts:173",
+    "category": "B",
+    "ko": "표 {n}",
+    "en": "Table {n}",
+    "zh": "表格 {n}",
+    "ja": "表 {n}",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.open.paraCount": {
+    "file": "src/io/formats/index.ts:32",
+    "category": "A",
+    "ko": "문단 {n}개",
+    "koOld": "문단 ${items.length - tables}개${tables ? ` · 표 ${tables}개` : \"\"}",
+    "en": "{n} paragraphs",
+    "zh": "{n} 个段落",
+    "ja": "段落 {n} 個",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.open.paraCount_one": {
+    "file": "src/io/formats/index.ts:32",
+    "category": "A",
+    "ko": "문단 {n}개",
+    "en": "{n} paragraph",
+    "zh": "{n} 个段落",
+    "ja": "段落 {n} 個",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.paraCount)"
+  },
+  "engine.open.tableCount": {
+    "file": "src/io/formats/index.ts:32",
+    "category": "A",
+    "ko": "표 {n}개",
+    "koOld": " · 표 ${tables}개",
+    "en": "{n} tables",
+    "zh": "{n} 个表格",
+    "ja": "表 {n} 個",
+    "vars": [
+      "n"
+    ],
+    "testsMatch": "표 1개 (officeStructure)",
+    "note": "앞의 \" · \"는 코드가 붙인다"
+  },
+  "engine.open.tableCount_one": {
+    "file": "src/io/formats/index.ts:32",
+    "category": "A",
+    "ko": "표 {n}개",
+    "en": "{n} table",
+    "zh": "{n} 个表格",
+    "ja": "表 {n} 個",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.tableCount)"
+  },
+  "engine.text.problemAt": {
+    "file": "src/io/formats/index.ts:81",
+    "category": "A",
+    "ko": "{line}행 {col}열: {message}",
+    "en": "Line {line}, column {col}: {message}",
+    "zh": "第 {line} 行第 {col} 列：{message}",
+    "ja": "{line} 行 {col} 列: {message}",
+    "vars": [
+      "col",
+      "line",
+      "message"
+    ]
+  },
+  "engine.text.syntaxProblem": {
+    "file": "src/io/formats/index.ts:123",
+    "category": "A",
+    "ko": "{format} 문법 문제 — {problem}",
+    "en": "{format} syntax problem — {problem}",
+    "zh": "{format} 语法问题——{problem}",
+    "ja": "{format} の構文の問題 — {problem}",
+    "vars": [
+      "format",
+      "problem"
+    ]
+  },
+  "engine.text.jsonPrettyConfirm": {
+    "file": "src/io/formats/index.ts:124",
+    "category": "A",
+    "ko": "JSON 문법 검사를 통과했습니다.\n보기 좋게 들여쓰기(2칸)로 정렬해서 열까요?\n(취소하면 원본 그대로 엽니다)",
+    "koOld": "JSON 문법 검사 통과.\n보기 좋게 들여쓰기(2칸)로 정렬해서 열까요?\n(취소하면 원본 그대로 엽니다)",
+    "en": "The JSON syntax check passed.\nOpen it reformatted with 2-space indentation?\n(Cancel opens the original as is.)",
+    "zh": "JSON 语法检查通过。\n是否以 2 格缩进格式化后打开？\n（取消则按原样打开。）",
+    "ja": "JSON の構文チェックに合格しました。\n2 文字インデントで整形して開きますか?\n(キャンセルすると元のまま開きます)",
+    "vars": []
+  },
+  "engine.open.textLines": {
+    "file": "src/io/formats/index.ts:128",
+    "category": "A",
+    "ko": "{name} — {n}줄",
+    "koOld": "${f.name} — ${lines.toLocaleString()}줄${warnings.length ? \" · \" + warnings[0] : format === \"json\" || format === \"xml\" || format === \"yaml\" ? \" · 문법 검사 통과\" : \"\"}",
+    "en": "{name} — {n} lines",
+    "zh": "{name} — {n} 行",
+    "ja": "{name} — {n} 行",
+    "vars": [
+      "n",
+      "name"
+    ],
+    "note": "뒤의 \" · 경고/문법 검사 통과\"는 코드가 붙인다"
+  },
+  "engine.open.textLines_one": {
+    "file": "src/io/formats/index.ts:128",
+    "category": "A",
+    "ko": "{name} — {n}줄",
+    "en": "{name} — {n} line",
+    "zh": "{name} — {n} 行",
+    "ja": "{name} — {n} 行",
+    "vars": [
+      "n",
+      "name"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.textLines)"
+  },
+  "engine.text.syntaxOk": {
+    "file": "src/io/formats/index.ts:128",
+    "category": "A",
+    "ko": "문법 검사 통과",
+    "koOld": " · 문법 검사 통과",
+    "en": "Syntax check passed",
+    "zh": "语法检查通过",
+    "ja": "構文チェック合格",
+    "vars": []
+  },
+  "engine.open.pdf": {
+    "file": "src/io/formats/index.ts:153",
+    "category": "A",
+    "ko": "PDF {n}쪽을 가져왔습니다 — 'PDF 텍스트 편집'으로 텍스트를 원래 글꼴 그대로 편집할 수 있습니다",
+    "en": "Imported {n} PDF pages — use Edit PDF Text to edit the text in its original fonts",
+    "zh": "已导入 PDF {n} 页——可使用“编辑 PDF 文字”以原始字体编辑文本。",
+    "ja": "PDF {n} ページを読み込みました — 「PDF のテキストを編集」で元のフォントのままテキストを編集できます",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.open.pdf_one": {
+    "file": "src/io/formats/index.ts:153",
+    "category": "A",
+    "ko": "PDF {n}쪽을 가져왔습니다 — 'PDF 텍스트 편집'으로 텍스트를 원래 글꼴 그대로 편집할 수 있습니다",
+    "en": "Imported {n} PDF page — use Edit PDF Text to edit the text in its original fonts",
+    "zh": "已导入 PDF {n} 页——可使用“编辑 PDF 文字”以原始字体编辑文本。",
+    "ja": "PDF {n} ページを読み込みました — 「PDF のテキストを編集」で元のフォントのままテキストを編集できます",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.pdf)"
+  },
+  "engine.ai.noCompatInfo": {
+    "file": "src/io/formats/index.ts:163",
+    "category": "A",
+    "ko": "PDF 호환 정보 없이 저장된 Illustrator 파일입니다 — Illustrator에서 'PDF 호환 파일 만들기'를 켜고 저장하거나 PDF/SVG로 내보낸 뒤 여세요",
+    "en": "This Illustrator file was saved without PDF compatibility — turn on \"Create PDF Compatible File\" in Illustrator and save again, or export to PDF/SVG, then open it",
+    "zh": "此 Illustrator 文件保存时未包含 PDF 兼容信息——请在 Illustrator 中开启“创建 PDF 兼容文件”后重新保存，或导出为 PDF/SVG 后再打开。",
+    "ja": "PDF 互換情報なしで保存された Illustrator ファイルです — Illustrator で「PDF 互換ファイルを作成」をオンにして保存するか、PDF/SVG に書き出してから開いてください",
+    "vars": [],
+    "testsMatch": "PDF 호환 파일 만들기 · PDF 호환 정보 (REFUSAL_REASON)"
+  },
+  "engine.open.ai": {
+    "file": "src/io/formats/index.ts:167",
+    "category": "A",
+    "ko": "Illustrator 파일의 PDF 호환 사본 {n}쪽을 열었습니다 — 'PDF 텍스트 편집'으로 텍스트와 패스를 개체로 승격해 고칠 수 있습니다. 고쳐서 .ai로 저장하면 Illustrator 전용 데이터 대신 PDF 내용 기준으로 저장됩니다",
+    "en": "Opened {n} pages of the Illustrator file's PDF-compatible copy — use Edit PDF Text to turn text and paths into editable objects. If you edit and save as .ai, it is saved from the PDF content instead of the Illustrator-only data",
+    "zh": "已打开 Illustrator 文件的 PDF 兼容副本 {n} 页——可使用“编辑 PDF 文字”将文本和路径提升为对象进行修改。修改后另存为 .ai 时，将以 PDF 内容为准保存，而不是 Illustrator 专用数据。",
+    "ja": "Illustrator ファイルの PDF 互換コピー {n} ページを開きました — 「PDF のテキストを編集」でテキストとパスをオブジェクトに昇格して修正できます。修正して .ai で保存すると、Illustrator 専用データではなく PDF の内容に基づいて保存されます",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.open.ai_one": {
+    "file": "src/io/formats/index.ts:167",
+    "category": "A",
+    "ko": "Illustrator 파일의 PDF 호환 사본 {n}쪽을 열었습니다 — 'PDF 텍스트 편집'으로 텍스트와 패스를 개체로 승격해 고칠 수 있습니다. 고쳐서 .ai로 저장하면 Illustrator 전용 데이터 대신 PDF 내용 기준으로 저장됩니다",
+    "en": "Opened {n} page of the Illustrator file's PDF-compatible copy — use Edit PDF Text to turn text and paths into editable objects. If you edit and save as .ai, it is saved from the PDF content instead of the Illustrator-only data",
+    "zh": "已打开 Illustrator 文件的 PDF 兼容副本 {n} 页——可使用“编辑 PDF 文字”将文本和路径提升为对象进行修改。修改后另存为 .ai 时，将以 PDF 内容为准保存，而不是 Illustrator 专用数据。",
+    "ja": "Illustrator ファイルの PDF 互換コピー {n} ページを開きました — 「PDF のテキストを編集」でテキストとパスをオブジェクトに昇格して修正できます。修正して .ai で保存すると、Illustrator 専用データではなく PDF の内容に基づいて保存されます",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.ai)"
+  },
+  "engine.open.office": {
+    "file": "src/io/formats/index.ts:181, src/io/formats/index.ts:204",
+    "category": "A",
+    "ko": "{fmt} {summary} → {n}쪽",
+    "koOld": "DOCX ${officeSummary(items)} → ${pages.length}쪽",
+    "en": "{fmt} {summary} → {n} pages",
+    "zh": "{fmt} {summary} → {n} 页",
+    "ja": "{fmt} {summary} → {n} ページ",
+    "vars": [
+      "fmt",
+      "n",
+      "summary"
+    ],
+    "note": "fmt = DOCX/HWPX, summary = engine.open.paraCount/tableCount"
+  },
+  "engine.open.office_one": {
+    "file": "src/io/formats/index.ts:181, src/io/formats/index.ts:204",
+    "category": "A",
+    "ko": "{fmt} {summary} → {n}쪽",
+    "en": "{fmt} {summary} → {n} page",
+    "zh": "{fmt} {summary} → {n} 页",
+    "ja": "{fmt} {summary} → {n} ページ",
+    "vars": [
+      "fmt",
+      "n",
+      "summary"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.office)"
+  },
+  "engine.pw.hwpxTitle": {
+    "file": "src/io/formats/index.ts:196",
+    "category": "A",
+    "ko": "암호로 보호된 한글 문서",
+    "en": "Password-Protected Hangul Document",
+    "zh": "受密码保护的韩文文档",
+    "ja": "パスワードで保護されたハングル文書",
+    "vars": []
+  },
+  "engine.pw.hwpxMessage": {
+    "file": "src/io/formats/index.ts:196",
+    "category": "A",
+    "ko": "{name} — 문서 암호를 입력하세요",
+    "en": "{name} — enter the document password",
+    "zh": "{name} — 请输入文档密码",
+    "ja": "{name} — 文書のパスワードを入力してください",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.hwpx.needPassword": {
+    "file": "src/io/formats/index.ts:197",
+    "category": "A",
+    "ko": "암호로 보호된 HWPX입니다 — 암호를 입력해야 열 수 있습니다",
+    "en": "This HWPX is password-protected — enter the password to open it",
+    "zh": "此 HWPX 受密码保护——需要输入密码才能打开。",
+    "ja": "パスワードで保護された HWPX です — 開くにはパスワードを入力してください",
+    "vars": [],
+    "testsMatch": "암호"
+  },
+  "engine.doc.actuallyDocx": {
+    "file": "src/io/formats/index.ts:215",
+    "category": "A",
+    "ko": "확장자는 .doc이지만 실제로는 DOCX입니다 — 확장자를 .docx로 바꿔 여세요",
+    "en": "The extension is .doc but the file is actually DOCX — rename it to .docx and open it",
+    "zh": "扩展名是 .doc，但实际上是 DOCX——请将扩展名改为 .docx 后再打开。",
+    "ja": "拡張子は .doc ですが実際は DOCX です — 拡張子を .docx に変えて開いてください",
+    "vars": []
+  },
+  "engine.doc.notWord97": {
+    "file": "src/io/formats/index.ts:216",
+    "category": "A",
+    "ko": "Word 97-2003 문서가 아닙니다 (RTF/HTML을 .doc로 저장한 파일일 수 있습니다)",
+    "en": "Not a Word 97-2003 document (it may be RTF/HTML saved as .doc)",
+    "zh": "不是 Word 97-2003 文档（可能是另存为 .doc 的 RTF/HTML 文件）。",
+    "ja": "Word 97-2003 文書ではありません (RTF/HTML を .doc として保存したファイルかもしれません)",
+    "vars": []
+  },
+  "engine.open.docText": {
+    "file": "src/io/formats/index.ts:219",
+    "category": "A",
+    "ko": "DOC 텍스트 {blocks}블록 → {pages}쪽 · {warning}",
+    "en": "DOC text · blocks: {blocks} → pages: {pages} · {warning}",
+    "zh": "DOC 文本 {blocks} 个块 → {pages} 页 · {warning}",
+    "ja": "DOC テキスト {blocks} ブロック → {pages} ページ · {warning}",
+    "vars": [
+      "blocks",
+      "pages",
+      "warning"
+    ],
+    "note": "en은 수가 둘이라 '이름: 수' 꼴로 복수 문제를 피함"
+  },
+  "engine.open.hwpText": {
+    "file": "src/io/formats/index.ts:232",
+    "category": "A",
+    "ko": "HWP 텍스트 문단 {paras}개·표 {tables}개 → {pages}쪽 · {warning}",
+    "koOld": "HWP 텍스트 ${r.blocks.filter((b) => b.kind === \"para\").length}문단·표 ${r.blocks.filter((b) => b.kind === \"table\").length}개 → ${pages.length}쪽 · ${r.warnings[0]}",
+    "en": "HWP text · paragraphs: {paras}, tables: {tables} → pages: {pages} · {warning}",
+    "zh": "HWP 文本 {paras} 个段落、{tables} 个表格 → {pages} 页 · {warning}",
+    "ja": "HWP テキスト 段落 {paras} 個・表 {tables} 個 → {pages} ページ · {warning}",
+    "vars": [
+      "pages",
+      "paras",
+      "tables",
+      "warning"
+    ]
+  },
+  "engine.open.markdown": {
+    "file": "src/io/formats/index.ts:245",
+    "category": "A",
+    "ko": "Markdown → {n}쪽 (원본 텍스트로 편집하려면 '텍스트 원본으로 열기')",
+    "en": "Markdown → {n} pages (to edit the source text, use Open as Plain Text)",
+    "zh": "Markdown → {n} 页（如需编辑源文本，请使用“以纯文本打开”）",
+    "ja": "Markdown → {n} ページ (元のテキストを編集するには「テキストとして開く」)",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.open.markdown_one": {
+    "file": "src/io/formats/index.ts:245",
+    "category": "A",
+    "ko": "Markdown → {n}쪽 (원본 텍스트로 편집하려면 '텍스트 원본으로 열기')",
+    "en": "Markdown → {n} page (to edit the source text, use Open as Plain Text)",
+    "zh": "Markdown → {n} 页（如需编辑源文本，请使用“以纯文本打开”）",
+    "ja": "Markdown → {n} ページ (元のテキストを編集するには「テキストとして開く」)",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.markdown)"
+  },
+  "engine.open.html": {
+    "file": "src/io/formats/index.ts:258",
+    "category": "A",
+    "ko": "HTML 본문 → {n}쪽 (스크립트·스타일은 가져오지 않습니다. 태그째 고치려면 '텍스트 원본으로 열기')",
+    "en": "HTML body → {n} pages (scripts and styles are not imported; to edit the tags, use Open as Plain Text)",
+    "zh": "HTML 正文 → {n} 页（不导入脚本和样式。如需连同标签一起修改，请使用“以纯文本打开”）",
+    "ja": "HTML 本文 → {n} ページ (スクリプトとスタイルは読み込みません。タグごと修正するには「テキストとして開く」)",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.open.html_one": {
+    "file": "src/io/formats/index.ts:258",
+    "category": "A",
+    "ko": "HTML 본문 → {n}쪽 (스크립트·스타일은 가져오지 않습니다. 태그째 고치려면 '텍스트 원본으로 열기')",
+    "en": "HTML body → {n} page (scripts and styles are not imported; to edit the tags, use Open as Plain Text)",
+    "zh": "HTML 正文 → {n} 页（不导入脚本和样式。如需连同标签一起修改，请使用“以纯文本打开”）",
+    "ja": "HTML 本文 → {n} ページ (スクリプトとスタイルは読み込みません。タグごと修正するには「テキストとして開く」)",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.html)"
+  },
+  "engine.open.epub": {
+    "file": "src/io/formats/index.ts:270",
+    "category": "A",
+    "ko": "EPUB '{title}' — {chapters}개 장 → {pages}쪽",
+    "en": "EPUB \"{title}\" · chapters: {chapters} → pages: {pages}",
+    "zh": "EPUB“{title}”— {chapters} 章 → {pages} 页",
+    "ja": "EPUB「{title}」— {chapters} 章 → {pages} ページ",
+    "vars": [
+      "chapters",
+      "pages",
+      "title"
+    ]
+  },
+  "engine.xlsx.mergedCells": {
+    "file": "src/io/formats/index.ts:283",
+    "category": "A",
+    "ko": "병합된 셀 {n}곳은 풀어서 표시합니다",
+    "en": "{n} merged cells are shown unmerged",
+    "zh": "{n} 处合并单元格将拆分显示。",
+    "ja": "結合されたセル {n} か所は解除して表示します",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.xlsx.mergedCells_one": {
+    "file": "src/io/formats/index.ts:283",
+    "category": "A",
+    "ko": "병합된 셀 {n}곳은 풀어서 표시합니다",
+    "en": "{n} merged cell is shown unmerged",
+    "zh": "{n} 处合并单元格将拆分显示。",
+    "ja": "結合されたセル {n} か所は解除して表示します",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.xlsx.mergedCells)"
+  },
+  "engine.xlsx.truncated": {
+    "file": "src/io/formats/index.ts:283",
+    "category": "A",
+    "ko": "2만 행을 넘는 시트는 앞부분만 열었습니다",
+    "en": "Sheets with more than 20,000 rows were opened only up to that limit",
+    "zh": "超过 2 万行的工作表只打开了前面部分。",
+    "ja": "2 万行を超えるシートは先頭部分のみ開きました",
+    "vars": []
+  },
+  "engine.open.sheets": {
+    "file": "src/io/formats/index.ts:284, src/io/formats/index.ts:302",
+    "category": "A",
+    "ko": "{fmt} 시트 {sheets}개 → {pages}쪽",
+    "koOld": "XLSX 시트 ${sheets.length}개 → ${pages.length}쪽${warnings.length ? \" · \" + warnings.join(\" · \") : \"\"}",
+    "en": "{fmt} · sheets: {sheets} → pages: {pages}",
+    "zh": "{fmt} 工作表 {sheets} 个 → {pages} 页",
+    "ja": "{fmt} シート {sheets} 個 → {pages} ページ",
+    "vars": [
+      "fmt",
+      "pages",
+      "sheets"
+    ],
+    "note": "fmt = XLSX/XLS; 뒤의 \" · 경고\"는 코드가 붙인다"
+  },
+  "engine.xls.actuallyXlsx": {
+    "file": "src/io/formats/index.ts:297",
+    "category": "A",
+    "ko": "확장자는 .xls지만 XLSX 형식이라 그대로 열었습니다",
+    "en": "The extension is .xls but the file is XLSX, so it was opened as XLSX",
+    "zh": "扩展名是 .xls，但文件为 XLSX 格式，已按 XLSX 打开。",
+    "ja": "拡張子は .xls ですが XLSX 形式なので、そのまま開きました",
+    "vars": []
+  },
+  "engine.xls.noValues": {
+    "file": "src/io/formats/index.ts:300",
+    "category": "A",
+    "ko": "값이 있는 시트가 없습니다",
+    "en": "No sheet contains any values",
+    "zh": "没有包含数值的工作表。",
+    "ja": "値のあるシートがありません",
+    "vars": []
+  },
+  "engine.open.csv": {
+    "file": "src/io/formats/index.ts:315",
+    "category": "A",
+    "ko": "CSV {rows}행 × {cols}열 → {pages}쪽",
+    "koOld": "CSV ${r.rows.toLocaleString()}행 × ${r.cols}열 → ${r.pages.length}쪽${r.truncated ? \" (2만 행까지만)\" : \"\"}",
+    "en": "CSV · rows: {rows} × columns: {cols} → pages: {pages}",
+    "zh": "CSV {rows} 行 × {cols} 列 → {pages} 页",
+    "ja": "CSV {rows} 行 × {cols} 列 → {pages} ページ",
+    "vars": [
+      "cols",
+      "pages",
+      "rows"
+    ]
+  },
+  "engine.open.csvTruncated": {
+    "file": "src/io/formats/index.ts:315",
+    "category": "A",
+    "ko": "(2만 행까지만)",
+    "koOld": " (2만 행까지만)",
+    "en": "(first 20,000 rows only)",
+    "zh": "（仅前 2 万行）",
+    "ja": "(2 万行まで)",
+    "vars": []
+  },
+  "engine.pptx.skipped": {
+    "file": "src/io/formats/index.ts:328",
+    "category": "A",
+    "ko": "근사·생략: {list}",
+    "en": "Approximated or skipped: {list}",
+    "zh": "近似或省略：{list}",
+    "ja": "近似・省略: {list}",
+    "vars": [
+      "list"
+    ]
+  },
+  "engine.open.slides": {
+    "file": "src/io/formats/index.ts:328, src/io/formats/index.ts:341",
+    "category": "A",
+    "ko": "{fmt} 슬라이드 {n}장",
+    "koOld": "PPTX 슬라이드 ${r.pages.length}장${skipped ? ` · 근사·생략: ${skipped}` : \"\"}",
+    "en": "{fmt} · {n} slides",
+    "zh": "{fmt} 幻灯片 {n} 张",
+    "ja": "{fmt} スライド {n} 枚",
+    "vars": [
+      "fmt",
+      "n"
+    ],
+    "note": "fmt = PPTX/PPT; 뒤의 \" · …\"는 코드가 붙인다"
+  },
+  "engine.open.slides_one": {
+    "file": "src/io/formats/index.ts:328, src/io/formats/index.ts:341",
+    "category": "A",
+    "ko": "{fmt} 슬라이드 {n}장",
+    "en": "{fmt} · {n} slide",
+    "zh": "{fmt} 幻灯片 {n} 张",
+    "ja": "{fmt} スライド {n} 枚",
+    "vars": [
+      "fmt",
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.slides)"
+  },
+  "engine.open.srt": {
+    "file": "src/io/formats/index.ts:354",
+    "category": "A",
+    "ko": "자막 {n}개 — 셀을 더블클릭해 시간·내용을 고친 뒤 '원래 형식으로 저장'을 고르세요",
+    "koOld": "자막 ${r.cues.length}개 — 셀을 더블클릭해 시간·내용을 고치고 '원래 형식으로 저장'",
+    "en": "{n} subtitles — double-click a cell to edit the time or text, then choose Save in Original Format",
+    "zh": "{n} 条字幕——双击单元格修改时间和内容，然后选择“以原格式保存”。",
+    "ja": "字幕 {n} 件 — セルをダブルクリックして時間と内容を修正し、「元の形式で保存」を選んでください",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.open.srt_one": {
+    "file": "src/io/formats/index.ts:354",
+    "category": "A",
+    "ko": "자막 {n}개 — 셀을 더블클릭해 시간·내용을 고친 뒤 '원래 형식으로 저장'을 고르세요",
+    "en": "{n} subtitle — double-click a cell to edit the time or text, then choose Save in Original Format",
+    "zh": "{n} 条字幕——双击单元格修改时间和内容，然后选择“以原格式保存”。",
+    "ja": "字幕 {n} 件 — セルをダブルクリックして時間と内容を修正し、「元の形式で保存」を選んでください",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.open.srt)"
+  },
+  "engine.open.psd": {
+    "file": "src/io/formats/index.ts:407",
+    "category": "A",
+    "ko": "PSD {w}×{h} · 레이어 {layers}개",
+    "koOld": "PSD ${r.image.width}×${r.image.height} · 레이어 ${r.pixelLayers}개${r.warnings.length ? \" · \" + r.warnings[0] : \"\"}",
+    "en": "PSD {w}×{h} · layers: {layers}",
+    "zh": "PSD {w}×{h} · {layers} 个图层",
+    "ja": "PSD {w}×{h} · レイヤー {layers} 個",
+    "vars": [
+      "h",
+      "layers",
+      "w"
+    ],
+    "note": "뒤의 \" · 경고\"는 코드가 붙인다"
+  },
+  "engine.heic.open": {
+    "file": "src/io/formats/index.ts:428",
+    "category": "A",
+    "ko": "HEIC/HEIF 사진은 열 수 없습니다 — 내장 브라우저 엔진(WebView2)에 HEVC 이미지 디코더가 없습니다. 휴대폰·Windows 사진 앱에서 JPG로 내보내거나 '도구 → JPG 변환'에서 다른 형식을 쓰세요",
+    "en": "HEIC/HEIF photos cannot be opened — the built-in browser engine (WebView2) has no HEVC image decoder. Export them as JPG from your phone or the Windows Photos app, or use another format via Tools → Convert to JPG",
+    "zh": "无法打开 HEIC/HEIF 照片——内置浏览器引擎（WebView2）没有 HEVC 图像解码器。请在手机或 Windows 照片应用中导出为 JPG，或通过“工具 → 转换为 JPG”使用其他格式。",
+    "ja": "HEIC/HEIF の写真は開けません — 内蔵ブラウザーエンジン (WebView2) に HEVC 画像デコーダーがありません。スマートフォンや Windows のフォトアプリで JPG に書き出すか、「ツール → JPG に変換」で別の形式を使ってください",
+    "vars": [],
+    "testsMatch": "HEIC (screen.ts)"
+  },
+  "engine.open.tiff": {
+    "file": "src/io/formats/index.ts:433",
+    "category": "A",
+    "ko": "TIFF {w}×{h}{multi} — PNG로 변환해 배치했습니다",
+    "en": "TIFF {w}×{h}{multi} — converted to PNG and placed",
+    "zh": "TIFF {w}×{h}{multi}——已转换为 PNG 并放置。",
+    "ja": "TIFF {w}×{h}{multi} — PNG に変換して配置しました",
+    "vars": [
+      "h",
+      "multi",
+      "w"
+    ],
+    "note": "multi = \"\" 또는 \" \" + engine.open.tiffFirstPage"
+  },
+  "engine.open.tiffFirstPage": {
+    "file": "src/io/formats/index.ts:433",
+    "category": "A",
+    "ko": "(여러 쪽 중 첫 쪽만, 총 {n}쪽)",
+    "koOld": " (여러 쪽 중 첫 쪽만, 총 ${img.pages}쪽)",
+    "en": "(first page only, {n} pages in total)",
+    "zh": "（多页中仅第一页，共 {n} 页）",
+    "ja": "(複数ページのうち最初のページのみ、全 {n} ページ)",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.format.level.text": {
+    "file": "src/io/formats/index.ts:131",
+    "category": "A",
+    "ko": "텍스트로 열기·편집·같은 형식 저장",
+    "en": "Open and edit as text · save in the same format",
+    "zh": "以文本打开和编辑 · 以相同格式保存",
+    "ja": "テキストとして開いて編集 · 同じ形式で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.filter.omw": {
+    "file": "src/io/formats/index.ts:142, src/io/formats/index.ts:463, src/io/platform.ts:80",
+    "category": "A",
+    "ko": "Omniweave 작업 파일",
+    "en": "Omniweave work file",
+    "zh": "Omniweave 工作文件",
+    "ja": "Omniweave 作業ファイル",
+    "vars": []
+  },
+  "engine.format.level.full": {
+    "file": "src/io/formats/index.ts:142",
+    "category": "A",
+    "ko": "전체",
+    "en": "Full support",
+    "zh": "完全支持",
+    "ja": "完全対応",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.pdf": {
+    "file": "src/io/formats/index.ts:148",
+    "category": "A",
+    "ko": "페이지로 열기 · 텍스트 줄을 원래 글꼴 그대로 직접 편집(PDF 수술) · 고친 부분만 다시 쓰는 원래 형식 저장",
+    "en": "Open as pages · edit text lines directly in their original fonts (PDF surgery) · save in the original format, rewriting only the edited parts",
+    "zh": "以页面打开 · 以原始字体直接编辑文本行（PDF 手术）· 以原格式保存，仅重写修改部分",
+    "ja": "ページとして開く · テキスト行を元のフォントのまま直接編集 (PDF 手術) · 修正部分だけを書き直して元の形式で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.ai.label": {
+    "file": "src/io/formats/index.ts:158",
+    "category": "A",
+    "ko": "Illustrator (PDF 호환)",
+    "en": "Illustrator (PDF compatible)",
+    "zh": "Illustrator（PDF 兼容）",
+    "ja": "Illustrator (PDF 互換)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.ai": {
+    "file": "src/io/formats/index.ts:161",
+    "category": "A",
+    "ko": "PDF 호환으로 저장된 파일 · 텍스트·패스를 직접 편집(레이어 이름 유지) · 고치면 Illustrator 전용 데이터를 빼고 PDF 내용 기준으로 저장",
+    "en": "Files saved with PDF compatibility · edit text and paths directly (layer names kept) · edited files are saved from the PDF content without the Illustrator-only data",
+    "zh": "以 PDF 兼容方式保存的文件 · 直接编辑文本和路径（保留图层名称）· 修改后去除 Illustrator 专用数据，以 PDF 内容为准保存",
+    "ja": "PDF 互換で保存されたファイル · テキストとパスを直接編集 (レイヤー名を保持) · 修正すると Illustrator 専用データを除き PDF の内容に基づいて保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.docx.label": {
+    "file": "src/io/formats/index.ts:172",
+    "category": "A",
+    "ko": "Word 문서",
+    "en": "Word document",
+    "zh": "Word 文档",
+    "ja": "Word 文書",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.richDoc": {
+    "file": "src/io/formats/index.ts:175, src/io/formats/index.ts:189",
+    "category": "A",
+    "ko": "문단·글자 서식 열기·편집·저장",
+    "en": "Open, edit and save paragraph and character formatting",
+    "zh": "打开、编辑和保存段落与字符格式",
+    "ja": "段落・文字書式を開いて編集・保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.hwpx.label": {
+    "file": "src/io/formats/index.ts:186",
+    "category": "A",
+    "ko": "한글 문서(HWPX)",
+    "en": "Hangul document (HWPX)",
+    "zh": "韩文文档（HWPX）",
+    "ja": "ハングル文書 (HWPX)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.doc": {
+    "file": "src/io/formats/index.ts:212",
+    "category": "A",
+    "ko": "텍스트·표 내용만 (읽기 후 DOCX로 저장)",
+    "en": "Text and table contents only (read, then save as DOCX)",
+    "zh": "仅文本和表格内容（读取后另存为 DOCX）",
+    "ja": "テキストと表の内容のみ (読み込み後 DOCX で保存)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.hwp.label": {
+    "file": "src/io/formats/index.ts:224",
+    "category": "A",
+    "ko": "한글 5.0 (HWP)",
+    "en": "Hangul 5.0 (HWP)",
+    "zh": "韩文 5.0（HWP）",
+    "ja": "ハングル 5.0 (HWP)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.hwp": {
+    "file": "src/io/formats/index.ts:227",
+    "category": "A",
+    "ko": "텍스트·표 내용만 (읽기 후 HWPX로 저장)",
+    "en": "Text and table contents only (read, then save as HWPX)",
+    "zh": "仅文本和表格内容（读取后另存为 HWPX）",
+    "ja": "テキストと表の内容のみ (読み込み後 HWPX で保存)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.md": {
+    "file": "src/io/formats/index.ts:240",
+    "category": "A",
+    "ko": "제목·목록·강조·코드·표를 서식으로 · MD로 저장",
+    "en": "Headings, lists, emphasis, code and tables as formatting · save as MD",
+    "zh": "标题、列表、强调、代码和表格转为格式 · 另存为 MD",
+    "ja": "見出し・リスト・強調・コード・表を書式として · MD で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.html": {
+    "file": "src/io/formats/index.ts:253",
+    "category": "A",
+    "ko": "본문·제목·목록·표를 문서로 · 원본 텍스트 편집 모드",
+    "en": "Body, headings, lists and tables as a document · source text editing mode",
+    "zh": "正文、标题、列表和表格转为文档 · 源文本编辑模式",
+    "ja": "本文・見出し・リスト・表を文書として · 元テキスト編集モード",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.epub.label": {
+    "file": "src/io/formats/index.ts:263",
+    "category": "A",
+    "ko": "EPUB 전자책",
+    "en": "EPUB e-book",
+    "zh": "EPUB 电子书",
+    "ja": "EPUB 電子書籍",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.epub": {
+    "file": "src/io/formats/index.ts:266",
+    "category": "A",
+    "ko": "장(chapter) 순서대로 본문·그림 · DOCX/PDF로 내보내기",
+    "en": "Text and images in chapter order · export to DOCX/PDF",
+    "zh": "按章节顺序显示正文和图片 · 导出为 DOCX/PDF",
+    "ja": "章の順に本文と画像 · DOCX/PDF に書き出し",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.xlsx.label": {
+    "file": "src/io/formats/index.ts:275",
+    "category": "A",
+    "ko": "Excel 통합 문서",
+    "en": "Excel workbook",
+    "zh": "Excel 工作簿",
+    "ja": "Excel ブック",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.xlsx": {
+    "file": "src/io/formats/index.ts:278",
+    "category": "A",
+    "ko": "시트별 표로 열기·셀 편집·XLSX/CSV 저장 (수식은 보존, 재계산 없음)",
+    "en": "Open each sheet as a table · edit cells · save as XLSX/CSV (formulas kept, not recalculated)",
+    "zh": "按工作表以表格打开 · 编辑单元格 · 保存为 XLSX/CSV（保留公式，不重新计算）",
+    "ja": "シートごとに表として開く · セル編集 · XLSX/CSV で保存 (数式は保持、再計算なし)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.xls": {
+    "file": "src/io/formats/index.ts:292",
+    "category": "A",
+    "ko": "셀 값 열기 (XLSX·CSV로 저장)",
+    "en": "Open cell values (save as XLSX or CSV)",
+    "zh": "打开单元格值（另存为 XLSX、CSV）",
+    "ja": "セルの値を開く (XLSX・CSV で保存)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.csv": {
+    "file": "src/io/formats/index.ts:310",
+    "category": "A",
+    "ko": "표로 열기·셀 편집·CSV 저장 (구분자·인코딩 유지)",
+    "en": "Open as a table · edit cells · save as CSV (delimiter and encoding kept)",
+    "zh": "以表格打开 · 编辑单元格 · 保存为 CSV（保留分隔符和编码）",
+    "ja": "表として開く · セル編集 · CSV で保存 (区切り文字とエンコーディングを保持)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.pptx": {
+    "file": "src/io/formats/index.ts:323",
+    "category": "A",
+    "ko": "슬라이드로 열기(텍스트·도형·그림·표·배경) · PPTX 저장",
+    "en": "Open as slides (text, shapes, images, tables, backgrounds) · save as PPTX",
+    "zh": "以幻灯片打开（文本、形状、图片、表格、背景）· 保存为 PPTX",
+    "ja": "スライドとして開く (テキスト・図形・画像・表・背景) · PPTX で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.ppt": {
+    "file": "src/io/formats/index.ts:336",
+    "category": "A",
+    "ko": "슬라이드별 텍스트만 (PPTX로 저장)",
+    "en": "Text of each slide only (save as PPTX)",
+    "zh": "仅各幻灯片的文本（另存为 PPTX）",
+    "ja": "スライドごとのテキストのみ (PPTX で保存)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.srt.label": {
+    "file": "src/io/formats/index.ts:346",
+    "category": "A",
+    "ko": "SRT 자막",
+    "en": "SRT subtitles",
+    "zh": "SRT 字幕",
+    "ja": "SRT 字幕",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.srt": {
+    "file": "src/io/formats/index.ts:349",
+    "category": "A",
+    "ko": "자막 목록(번호·시작·끝·자막) 표 편집 · SRT 저장",
+    "en": "Edit the subtitle list (number, start, end, text) as a table · save as SRT",
+    "zh": "以表格编辑字幕列表（编号、开始、结束、字幕）· 保存为 SRT",
+    "ja": "字幕リスト (番号・開始・終了・字幕) を表で編集 · SRT で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.txt.label": {
+    "file": "src/io/formats/index.ts:357",
+    "category": "A",
+    "ko": "텍스트",
+    "en": "Text",
+    "zh": "文本",
+    "ja": "テキスト",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.log.label": {
+    "file": "src/io/formats/index.ts:358",
+    "category": "A",
+    "ko": "로그",
+    "en": "Log",
+    "zh": "日志",
+    "ja": "ログ",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.json": {
+    "file": "src/io/formats/index.ts:359",
+    "category": "A",
+    "ko": "열 때 문법 검사·정렬 · 같은 형식 저장",
+    "en": "Syntax check and reformat on open · save in the same format",
+    "zh": "打开时检查语法并格式化 · 以相同格式保存",
+    "ja": "開くときに構文チェック・整形 · 同じ形式で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.xml": {
+    "file": "src/io/formats/index.ts:360",
+    "category": "A",
+    "ko": "열 때 문법 검사 · 같은 형식 저장",
+    "en": "Syntax check on open · save in the same format",
+    "zh": "打开时检查语法 · 以相同格式保存",
+    "ja": "開くときに構文チェック · 同じ形式で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.yaml": {
+    "file": "src/io/formats/index.ts:361",
+    "category": "A",
+    "ko": "열 때 기본 문법 검사 · 같은 형식 저장",
+    "en": "Basic syntax check on open · save in the same format",
+    "zh": "打开时进行基本语法检查 · 以相同格式保存",
+    "ja": "開くときに基本的な構文チェック · 同じ形式で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.bat.label": {
+    "file": "src/io/formats/index.ts:362",
+    "category": "A",
+    "ko": "배치 파일",
+    "en": "Batch file",
+    "zh": "批处理文件",
+    "ja": "バッチファイル",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.bat": {
+    "file": "src/io/formats/index.ts:362",
+    "category": "A",
+    "ko": "고정폭 편집 · 원래 인코딩(CP949 등)으로 저장",
+    "en": "Monospaced editing · save in the original encoding (CP949, etc.)",
+    "zh": "等宽编辑 · 以原编码（CP949 等）保存",
+    "ja": "等幅で編集 · 元のエンコーディング (CP949 など) で保存",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.code.label": {
+    "file": "src/io/formats/index.ts:363",
+    "category": "A",
+    "ko": "기타 코드·설정",
+    "en": "Other code and settings",
+    "zh": "其他代码和配置",
+    "ja": "その他のコード・設定",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.image.label": {
+    "file": "src/io/formats/index.ts:366",
+    "category": "A",
+    "ko": "이미지",
+    "en": "Image",
+    "zh": "图像",
+    "ja": "画像",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.image": {
+    "file": "src/io/formats/index.ts:369",
+    "category": "A",
+    "ko": "캔버스에 이미지로 배치 (WebView2 디코딩)",
+    "en": "Placed on the canvas as an image (WebView2 decoding)",
+    "zh": "作为图像放置到画布上（WebView2 解码）",
+    "ja": "キャンバスに画像として配置 (WebView2 でデコード)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.tiff": {
+    "file": "src/io/formats/index.ts:384",
+    "category": "A",
+    "ko": "기본 TIFF(무압축·LZW·PackBits·Deflate) 직접 디코딩 → 이미지",
+    "en": "Baseline TIFF (uncompressed, LZW, PackBits, Deflate) decoded directly → image",
+    "zh": "直接解码基本 TIFF（无压缩、LZW、PackBits、Deflate）→ 图像",
+    "ja": "基本 TIFF (無圧縮・LZW・PackBits・Deflate) を直接デコード → 画像",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.heic": {
+    "file": "src/io/formats/index.ts:392",
+    "category": "A",
+    "ko": "미지원 — WebView2에 HEVC 디코더가 없음 (JPG로 변환 후 열기)",
+    "en": "Not supported — WebView2 has no HEVC decoder (convert to JPG, then open)",
+    "zh": "不支持——WebView2 没有 HEVC 解码器（转换为 JPG 后打开）",
+    "ja": "非対応 — WebView2 に HEVC デコーダーがありません (JPG に変換してから開く)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.psd": {
+    "file": "src/io/formats/index.ts:402",
+    "category": "A",
+    "ko": "픽셀·텍스트·고급 개체 레이어(마스크 반영, 그룹 이름) 편집 → PSD로 다시 저장 (편집하지 않은 레이어·효과·조정·텍스트 정보는 원본 바이트 그대로)",
+    "en": "Edit pixel, text and Smart Object layers (masks applied, group names) → save back to PSD (unedited layers, effects, adjustments and text data keep their original bytes)",
+    "zh": "编辑像素、文本和智能对象图层（应用蒙版、组名称）→ 重新保存为 PSD（未编辑的图层、效果、调整和文本信息保留原始字节）",
+    "ja": "ピクセル・テキスト・スマートオブジェクトレイヤーを編集 (マスク反映、グループ名) → PSD で保存し直す (編集していないレイヤー・効果・調整・テキスト情報は元のバイトのまま)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.video.label": {
+    "file": "src/io/formats/index.ts:412",
+    "category": "A",
+    "ko": "동영상",
+    "en": "Video",
+    "zh": "视频",
+    "ja": "ビデオ",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.video": {
+    "file": "src/io/formats/index.ts:415",
+    "category": "A",
+    "ko": "캔버스·슬라이드쇼 재생, 트림·음소거, 프레임 캡처 (MP4/WebM, MOV는 코덱에 따라; AVI 대부분 불가)",
+    "en": "Playback on the canvas and in slideshows, trim, mute, frame capture (MP4/WebM; MOV depends on the codec; most AVI files do not work)",
+    "zh": "在画布和放映中播放、修剪、静音、截取帧（MP4/WebM；MOV 取决于编解码器；大多数 AVI 不可用）",
+    "ja": "キャンバスとスライドショーで再生、トリミング・ミュート、フレームキャプチャ (MP4/WebM、MOV はコーデック次第、AVI はほぼ不可)",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.audio.label": {
+    "file": "src/io/formats/index.ts:420",
+    "category": "A",
+    "ko": "오디오",
+    "en": "Audio",
+    "zh": "音频",
+    "ja": "オーディオ",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.format.level.audio": {
+    "file": "src/io/formats/index.ts:423",
+    "category": "A",
+    "ko": "캔버스·슬라이드쇼 재생, 트림·음소거",
+    "en": "Playback on the canvas and in slideshows, trim, mute",
+    "zh": "在画布和放映中播放、修剪、静音",
+    "ja": "キャンバスとスライドショーで再生、トリミング・ミュート",
+    "vars": [],
+    "note": "형식 목록 설명 — 지금 화면에 쓰이지 않음(결정 필요)"
+  },
+  "engine.filter.group.document": {
+    "file": "src/io/formats/index.ts:454",
+    "category": "A",
+    "ko": "문서 (PDF·Word·한글·EPUB·Markdown·HTML)",
+    "en": "Documents (PDF, Word, Hangul, EPUB, Markdown, HTML)",
+    "zh": "文档（PDF、Word、韩文、EPUB、Markdown、HTML）",
+    "ja": "文書 (PDF・Word・ハングル・EPUB・Markdown・HTML)",
+    "vars": []
+  },
+  "engine.filter.group.sheet": {
+    "file": "src/io/formats/index.ts:455",
+    "category": "A",
+    "ko": "표 (Excel·CSV)",
+    "en": "Spreadsheets (Excel, CSV)",
+    "zh": "表格（Excel、CSV）",
+    "ja": "表 (Excel・CSV)",
+    "vars": []
+  },
+  "engine.filter.group.slide": {
+    "file": "src/io/formats/index.ts:456",
+    "category": "A",
+    "ko": "슬라이드 (PowerPoint)",
+    "en": "Slides (PowerPoint)",
+    "zh": "幻灯片（PowerPoint）",
+    "ja": "スライド (PowerPoint)",
+    "vars": []
+  },
+  "engine.filter.group.text": {
+    "file": "src/io/formats/index.ts:457",
+    "category": "A",
+    "ko": "텍스트·코드 (TXT·JSON·XML·YAML·BAT·SRT…)",
+    "en": "Text and code (TXT, JSON, XML, YAML, BAT, SRT…)",
+    "zh": "文本和代码（TXT、JSON、XML、YAML、BAT、SRT…）",
+    "ja": "テキスト・コード (TXT・JSON・XML・YAML・BAT・SRT…)",
+    "vars": []
+  },
+  "engine.filter.group.image": {
+    "file": "src/io/formats/index.ts:458",
+    "category": "A",
+    "ko": "이미지 (PNG·JPG·PSD·TIFF…)",
+    "en": "Images (PNG, JPG, PSD, TIFF…)",
+    "zh": "图像（PNG、JPG、PSD、TIFF…）",
+    "ja": "画像 (PNG・JPG・PSD・TIFF…)",
+    "vars": []
+  },
+  "engine.filter.group.media": {
+    "file": "src/io/formats/index.ts:459",
+    "category": "A",
+    "ko": "동영상·오디오",
+    "en": "Video and audio",
+    "zh": "视频和音频",
+    "ja": "動画・音声",
+    "vars": [],
+    "note": "menu.filter.media와 같은 글 — 재사용 가능"
+  },
+  "engine.filter.all": {
+    "file": "src/io/formats/index.ts:462, src/io/platform.ts:82",
+    "category": "A",
+    "ko": "지원하는 모든 파일",
+    "en": "All supported files",
+    "zh": "所有支持的文件",
+    "ja": "対応しているすべてのファイル",
+    "vars": []
+  },
+  "engine.export.noTable": {
+    "file": "src/io/formats/index.ts:493",
+    "category": "A",
+    "ko": "표가 없습니다 — CSV·XLSX로 내보내려면 표(예: CSV/XLSX에서 연 페이지)가 있어야 합니다",
+    "en": "There is no table — exporting to CSV or XLSX needs a table (e.g. a page opened from CSV/XLSX)",
+    "zh": "没有表格——导出为 CSV、XLSX 需要表格（例如从 CSV/XLSX 打开的页面）。",
+    "ja": "表がありません — CSV・XLSX に書き出すには表 (例: CSV/XLSX から開いたページ) が必要です",
+    "vars": []
+  },
+  "engine.export.png.label": {
+    "file": "src/io/formats/index.ts:497",
+    "category": "A",
+    "ko": "PNG 이미지",
+    "en": "PNG image",
+    "zh": "PNG 图像",
+    "ja": "PNG 画像",
+    "vars": []
+  },
+  "engine.export.png.hint": {
+    "file": "src/io/formats/index.ts:497",
+    "category": "A",
+    "ko": "현재 페이지 · 2배",
+    "en": "Current page · 2×",
+    "zh": "当前页面 · 2 倍",
+    "ja": "現在のページ · 2 倍",
+    "vars": []
+  },
+  "engine.filter.png": {
+    "file": "src/io/formats/index.ts:497, src/io/platform.ts:87",
+    "category": "A",
+    "ko": "PNG 이미지",
+    "en": "PNG image",
+    "zh": "PNG 图像",
+    "ja": "PNG 画像",
+    "vars": []
+  },
+  "engine.export.pdf.label": {
+    "file": "src/io/formats/index.ts:498",
+    "category": "A",
+    "ko": "PDF 문서",
+    "en": "PDF document",
+    "zh": "PDF 文档",
+    "ja": "PDF 文書",
+    "vars": [],
+    "note": "engine.pdf.*·engine.pdf.edit.* 안내문이 이 이름을 인용한다 — 같은 번역을 쓴다"
+  },
+  "engine.export.pdf.hint": {
+    "file": "src/io/formats/index.ts:498",
+    "category": "A",
+    "ko": "모든 페이지 · 글자 선택·검색 가능",
+    "en": "All pages · text can be selected and searched",
+    "zh": "所有页面 · 文字可选择和搜索",
+    "ja": "すべてのページ · 文字の選択・検索が可能",
+    "vars": []
+  },
+  "engine.export.pdfImage.label": {
+    "file": "src/io/formats/index.ts:501",
+    "category": "A",
+    "ko": "PDF (이미지)",
+    "en": "PDF (image)",
+    "zh": "PDF（图像）",
+    "ja": "PDF (画像)",
+    "vars": []
+  },
+  "engine.export.pdfImage.hint": {
+    "file": "src/io/formats/index.ts:502",
+    "category": "A",
+    "ko": "모든 페이지 · 화면 그대로 그림으로",
+    "en": "All pages · as pictures, exactly as on screen",
+    "zh": "所有页面 · 按屏幕原样转为图片",
+    "ja": "すべてのページ · 画面どおりに画像として",
+    "vars": []
+  },
+  "engine.export.svg.label": {
+    "file": "src/io/formats/index.ts:508",
+    "category": "A",
+    "ko": "SVG 벡터",
+    "en": "SVG vector",
+    "zh": "SVG 矢量",
+    "ja": "SVG ベクター",
+    "vars": []
+  },
+  "engine.export.hint.currentPage": {
+    "file": "src/io/formats/index.ts:508",
+    "category": "A",
+    "ko": "현재 페이지",
+    "en": "Current page",
+    "zh": "当前页面",
+    "ja": "現在のページ",
+    "vars": []
+  },
+  "engine.export.docx.label": {
+    "file": "src/io/formats/index.ts:509",
+    "category": "A",
+    "ko": "Word 문서 (.docx)",
+    "en": "Word document (.docx)",
+    "zh": "Word 文档（.docx）",
+    "ja": "Word 文書 (.docx)",
+    "vars": []
+  },
+  "engine.export.hint.flowText": {
+    "file": "src/io/formats/index.ts:509, src/io/formats/index.ts:510",
+    "category": "A",
+    "ko": "텍스트 흐름 · 표",
+    "en": "Flowing text · tables",
+    "zh": "文本流 · 表格",
+    "ja": "テキストの流れ · 表",
+    "vars": []
+  },
+  "engine.filter.docx": {
+    "file": "src/io/formats/index.ts:509, src/io/platform.ts:85",
+    "category": "A",
+    "ko": "Word 문서",
+    "en": "Word document",
+    "zh": "Word 文档",
+    "ja": "Word 文書",
+    "vars": []
+  },
+  "engine.export.hwpx.label": {
+    "file": "src/io/formats/index.ts:510",
+    "category": "A",
+    "ko": "한글 문서 (.hwpx)",
+    "en": "Hangul document (.hwpx)",
+    "zh": "韩文文档（.hwpx）",
+    "ja": "ハングル文書 (.hwpx)",
+    "vars": []
+  },
+  "engine.filter.hwpx": {
+    "file": "src/io/formats/index.ts:510, src/io/platform.ts:86",
+    "category": "A",
+    "ko": "한글 문서(HWPX)",
+    "en": "Hangul document (HWPX)",
+    "zh": "韩文文档（HWPX）",
+    "ja": "ハングル文書 (HWPX)",
+    "vars": []
+  },
+  "engine.export.pptx.hint": {
+    "file": "src/io/formats/index.ts:514",
+    "category": "A",
+    "ko": "슬라이드 · 텍스트·도형·그림·표",
+    "en": "Slides · text, shapes, images, tables",
+    "zh": "幻灯片 · 文本、形状、图片、表格",
+    "ja": "スライド · テキスト・図形・画像・表",
+    "vars": []
+  },
+  "engine.export.xlsx.hint": {
+    "file": "src/io/formats/index.ts:522",
+    "category": "A",
+    "ko": "모든 표 · 시트별",
+    "en": "All tables · one sheet each",
+    "zh": "所有表格 · 每个表格一个工作表",
+    "ja": "すべての表 · シートごと",
+    "vars": []
+  },
+  "engine.filter.xlsx": {
+    "file": "src/io/formats/index.ts:522",
+    "category": "A",
+    "ko": "Excel 통합 문서",
+    "en": "Excel workbook",
+    "zh": "Excel 工作簿",
+    "ja": "Excel ブック",
+    "vars": []
+  },
+  "engine.export.csv.hint": {
+    "file": "src/io/formats/index.ts:523",
+    "category": "A",
+    "ko": "첫 번째 표",
+    "en": "First table",
+    "zh": "第一个表格",
+    "ja": "最初の表",
+    "vars": []
+  },
+  "engine.export.md.hint": {
+    "file": "src/io/formats/index.ts:524",
+    "category": "A",
+    "ko": "제목·목록·강조·표",
+    "en": "Headings, lists, emphasis, tables",
+    "zh": "标题、列表、强调、表格",
+    "ja": "見出し・リスト・強調・表",
+    "vars": []
+  },
+  "engine.export.html.hint": {
+    "file": "src/io/formats/index.ts:525",
+    "category": "A",
+    "ko": "본문 구조",
+    "en": "Document structure",
+    "zh": "正文结构",
+    "ja": "本文の構造",
+    "vars": []
+  },
+  "engine.export.txt.label": {
+    "file": "src/io/formats/index.ts:526",
+    "category": "A",
+    "ko": "텍스트 (.txt)",
+    "en": "Text (.txt)",
+    "zh": "文本（.txt）",
+    "ja": "テキスト (.txt)",
+    "vars": []
+  },
+  "engine.export.txt.hint": {
+    "file": "src/io/formats/index.ts:526",
+    "category": "A",
+    "ko": "모든 텍스트",
+    "en": "All text",
+    "zh": "所有文本",
+    "ja": "すべてのテキスト",
+    "vars": []
+  },
+  "engine.filter.txt": {
+    "file": "src/io/formats/index.ts:526",
+    "category": "A",
+    "ko": "텍스트",
+    "en": "Text",
+    "zh": "文本",
+    "ja": "テキスト",
+    "vars": []
+  },
+  "engine.export.srt.label": {
+    "file": "src/io/formats/index.ts:527",
+    "category": "A",
+    "ko": "SRT 자막 (.srt)",
+    "en": "SRT subtitles (.srt)",
+    "zh": "SRT 字幕（.srt）",
+    "ja": "SRT 字幕 (.srt)",
+    "vars": []
+  },
+  "engine.export.srt.hint": {
+    "file": "src/io/formats/index.ts:527",
+    "category": "A",
+    "ko": "자막 표",
+    "en": "Subtitle table",
+    "zh": "字幕表格",
+    "ja": "字幕の表",
+    "vars": []
+  },
+  "engine.filter.srt": {
+    "file": "src/io/formats/index.ts:527",
+    "category": "A",
+    "ko": "SRT 자막",
+    "en": "SRT subtitles",
+    "zh": "SRT 字幕",
+    "ja": "SRT 字幕",
+    "vars": []
+  },
+  "engine.export.psd.hint": {
+    "file": "src/io/formats/index.ts:531",
+    "category": "A",
+    "ko": "현재 페이지 · 레이어별 (PSD에서 연 페이지는 원본 레이어·효과 보존)",
+    "en": "Current page · one layer per object (pages opened from PSD keep their original layers and effects)",
+    "zh": "当前页面 · 按图层（从 PSD 打开的页面保留原始图层和效果）",
+    "ja": "現在のページ · レイヤーごと (PSD から開いたページは元のレイヤーと効果を保持)",
+    "vars": []
+  },
+  "engine.psd.saveNotesTitle": {
+    "file": "src/io/formats/index.ts:537",
+    "category": "A",
+    "ko": "PSD 저장 참고:",
+    "en": "Notes on saving the PSD:",
+    "zh": "PSD 保存提示：",
+    "ja": "PSD 保存の注意:",
+    "vars": []
+  },
+  "engine.common.saveConfirm": {
+    "file": "src/io/formats/index.ts:537",
+    "category": "A",
+    "ko": "저장할까요?",
+    "en": "Save anyway?",
+    "zh": "要保存吗？",
+    "ja": "保存しますか?",
+    "vars": []
+  },
+  "engine.export.sameFormat": {
+    "file": "src/io/formats/index.ts:562, src/io/formats/index.ts:573, src/io/formats/index.ts:588, src/io/formats/index.ts:597",
+    "category": "A",
+    "ko": "원래 형식으로 저장 (.{ext})",
+    "en": "Save in Original Format (.{ext})",
+    "zh": "以原格式保存（.{ext}）",
+    "ja": "元の形式で保存 (.{ext})",
+    "vars": [
+      "ext"
+    ]
+  },
+  "engine.export.same.hintAi": {
+    "file": "src/io/formats/index.ts:563",
+    "category": "A",
+    "ko": "고친 부분만 다시 씀 · 고치면 Illustrator 전용 데이터 제거",
+    "en": "Rewrites only the edited parts · editing removes the Illustrator-only data",
+    "zh": "仅重写修改部分 · 修改后会移除 Illustrator 专用数据",
+    "ja": "修正部分だけを書き直す · 修正すると Illustrator 専用データを削除",
+    "vars": []
+  },
+  "engine.export.same.hintPdf": {
+    "file": "src/io/formats/index.ts:563",
+    "category": "A",
+    "ko": "고친 부분만 다시 씀 · 나머지는 원본 바이트 그대로",
+    "en": "Rewrites only the edited parts · the rest keeps the original bytes",
+    "zh": "仅重写修改部分 · 其余保留原始字节",
+    "ja": "修正部分だけを書き直す · 残りは元のバイトのまま",
+    "vars": []
+  },
+  "engine.export.same.hintEncoding": {
+    "file": "src/io/formats/index.ts:574",
+    "category": "A",
+    "ko": "인코딩 {encoding} 유지",
+    "en": "Keeps the {encoding} encoding",
+    "zh": "保留 {encoding} 编码",
+    "ja": "エンコーディング {encoding} を保持",
+    "vars": [
+      "encoding"
+    ]
+  },
+  "engine.export.same.hintEol": {
+    "file": "src/io/formats/index.ts:574",
+    "category": "A",
+    "ko": "줄바꿈·인코딩 유지",
+    "en": "Keeps line endings and encoding",
+    "zh": "保留换行符和编码",
+    "ja": "改行とエンコーディングを保持",
+    "vars": []
+  },
+  "engine.text.saveWithProblems": {
+    "file": "src/io/formats/index.ts:581",
+    "category": "A",
+    "ko": "{format} 문법 문제가 있습니다:\n{problems}\n\n그래도 저장할까요?",
+    "en": "There are {format} syntax problems:\n{problems}\n\nSave anyway?",
+    "zh": "存在 {format} 语法问题：\n{problems}\n\n仍要保存吗？",
+    "ja": "{format} の構文に問題があります:\n{problems}\n\nそれでも保存しますか?",
+    "vars": [
+      "format",
+      "problems"
+    ]
+  },
+  "engine.export.same.hintPsd": {
+    "file": "src/io/formats/index.ts:588",
+    "category": "A",
+    "ko": "편집하지 않은 레이어·효과·텍스트·조정 레이어는 원본 바이트 그대로",
+    "en": "Unedited layers, effects, text and adjustment layers keep their original bytes",
+    "zh": "未编辑的图层、效果、文本和调整图层保留原始字节",
+    "ja": "編集していないレイヤー・効果・テキスト・調整レイヤーは元のバイトのまま",
+    "vars": []
+  },
+  "engine.export.saveAsOther": {
+    "file": "src/io/formats/index.ts:597",
+    "category": "A",
+    "ko": "{fmt} 형식으로 저장 (.{ext} 쓰기 미지원)",
+    "koOld": "${target.ext.toUpperCase()}로 저장 (.${ext}은 쓰기 미지원)",
+    "en": "Save as {fmt} (.{ext} cannot be written)",
+    "zh": "另存为 {fmt}（不支持写入 .{ext}）",
+    "ja": "{fmt} 形式で保存 (.{ext} は書き込み非対応)",
+    "vars": [
+      "ext",
+      "fmt"
+    ]
+  },
+  "engine.legacy.noWordStream": {
+    "file": "src/io/formats/legacy.ts:40",
+    "category": "A",
+    "ko": "WordDocument 스트림이 없습니다 — Word 97-2003 문서가 아닙니다",
+    "en": "No WordDocument stream — not a Word 97-2003 document",
+    "zh": "缺少 WordDocument 流——不是 Word 97-2003 文档。",
+    "ja": "WordDocument ストリームがありません — Word 97-2003 文書ではありません",
+    "vars": []
+  },
+  "engine.legacy.docEncrypted": {
+    "file": "src/io/formats/legacy.ts:42",
+    "category": "A",
+    "ko": "암호로 보호된 DOC 문서는 열 수 없습니다",
+    "en": "Password-protected DOC documents cannot be opened",
+    "zh": "无法打开受密码保护的 DOC 文档。",
+    "ja": "パスワードで保護された DOC 文書は開けません",
+    "vars": [],
+    "testsMatch": "암호 (REFUSAL_REASON)"
+  },
+  "engine.legacy.noTableStream": {
+    "file": "src/io/formats/legacy.ts:44",
+    "category": "A",
+    "ko": "Table 스트림이 없습니다",
+    "en": "No Table stream",
+    "zh": "缺少 Table 流。",
+    "ja": "Table ストリームがありません",
+    "vars": []
+  },
+  "engine.legacy.noPieceTable": {
+    "file": "src/io/formats/legacy.ts:50",
+    "category": "A",
+    "ko": "조각 표(piece table)를 찾지 못했습니다",
+    "en": "Could not find the piece table",
+    "zh": "找不到片段表（piece table）。",
+    "ja": "ピーステーブル (piece table) が見つかりませんでした",
+    "vars": []
+  },
+  "engine.legacy.docLimited": {
+    "file": "src/io/formats/legacy.ts:114",
+    "category": "A",
+    "ko": "DOC(구형 Word)은 텍스트와 표 내용만 가져옵니다 — 글꼴·그림·쪽 모양은 DOCX로 저장한 뒤 열어야 유지됩니다",
+    "en": "Only text and table contents are imported from DOC (legacy Word) — to keep fonts, images and page layout, save it as DOCX first and open that",
+    "zh": "DOC（旧版 Word）只导入文本和表格内容——如需保留字体、图片和页面格式，请先另存为 DOCX 再打开。",
+    "ja": "DOC (旧形式の Word) はテキストと表の内容のみ読み込みます — フォント・画像・ページ設定を保つには DOCX で保存してから開いてください",
+    "vars": []
+  },
+  "engine.legacy.noPptStream": {
+    "file": "src/io/formats/legacy.ts:126",
+    "category": "A",
+    "ko": "PowerPoint Document 스트림이 없습니다 — PowerPoint 97-2003 파일이 아닙니다",
+    "en": "No PowerPoint Document stream — not a PowerPoint 97-2003 file",
+    "zh": "缺少 PowerPoint Document 流——不是 PowerPoint 97-2003 文件。",
+    "ja": "PowerPoint Document ストリームがありません — PowerPoint 97-2003 ファイルではありません",
+    "vars": []
+  },
+  "engine.legacy.pptEncrypted": {
+    "file": "src/io/formats/legacy.ts:127",
+    "category": "A",
+    "ko": "암호로 보호된 PPT는 열 수 없습니다",
+    "en": "Password-protected PPT files cannot be opened",
+    "zh": "无法打开受密码保护的 PPT。",
+    "ja": "パスワードで保護された PPT は開けません",
+    "vars": [],
+    "testsMatch": "암호 (REFUSAL_REASON)"
+  },
+  "engine.legacy.pptLimited": {
+    "file": "src/io/formats/legacy.ts:162",
+    "category": "A",
+    "ko": "PPT(구형 PowerPoint)는 슬라이드별 텍스트만 가져옵니다 — 도형·그림·위치는 PPTX로 저장한 뒤 열어야 유지됩니다",
+    "en": "Only the text of each slide is imported from PPT (legacy PowerPoint) — to keep shapes, images and positions, save it as PPTX first and open that",
+    "zh": "PPT（旧版 PowerPoint）只导入各幻灯片的文本——如需保留形状、图片和位置，请先另存为 PPTX 再打开。",
+    "ja": "PPT (旧形式の PowerPoint) はスライドごとのテキストのみ読み込みます — 図形・画像・位置を保つには PPTX で保存してから開いてください",
+    "vars": []
+  },
+  "engine.legacy.noWorkbook": {
+    "file": "src/io/formats/legacy.ts:175",
+    "category": "A",
+    "ko": "Workbook 스트림이 없습니다 — Excel 97-2003 통합 문서가 아닙니다",
+    "en": "No Workbook stream — not an Excel 97-2003 workbook",
+    "zh": "缺少 Workbook 流——不是 Excel 97-2003 工作簿。",
+    "ja": "Workbook ストリームがありません — Excel 97-2003 ブックではありません",
+    "vars": []
+  },
+  "engine.legacy.biff5": {
+    "file": "src/io/formats/legacy.ts:176",
+    "category": "A",
+    "ko": "Excel 5.0/95(BIFF5) 형식은 지원하지 않습니다 — XLSX로 저장한 뒤 여세요",
+    "en": "The Excel 5.0/95 (BIFF5) format is not supported — save it as XLSX and open that",
+    "zh": "不支持 Excel 5.0/95（BIFF5）格式——请另存为 XLSX 后再打开。",
+    "ja": "Excel 5.0/95 (BIFF5) 形式には対応していません — XLSX で保存してから開いてください",
+    "vars": []
+  },
+  "engine.legacy.xlsEncrypted": {
+    "file": "src/io/formats/legacy.ts:184",
+    "category": "A",
+    "ko": "암호로 보호된 XLS는 열 수 없습니다",
+    "en": "Password-protected XLS files cannot be opened",
+    "zh": "无法打开受密码保护的 XLS。",
+    "ja": "パスワードで保護された XLS は開けません",
+    "vars": [],
+    "testsMatch": "암호 (REFUSAL_REASON)"
+  },
+  "engine.legacy.xlsLimited": {
+    "file": "src/io/formats/legacy.ts:353",
+    "category": "A",
+    "ko": "XLS(구형 Excel)는 셀 값만 가져옵니다(수식은 계산된 값으로) — 저장은 XLSX·CSV로 합니다",
+    "en": "Only cell values are imported from XLS (legacy Excel; formulas become their calculated values) — save as XLSX or CSV",
+    "zh": "XLS（旧版 Excel）只导入单元格值（公式以计算结果导入）——请保存为 XLSX、CSV。",
+    "ja": "XLS (旧形式の Excel) はセルの値のみ読み込みます (数式は計算結果として) — 保存は XLSX・CSV で行います",
+    "vars": []
+  },
+  "engine.legacy.notHwp5": {
+    "file": "src/io/formats/legacy.ts:385",
+    "category": "A",
+    "ko": "HWP 5.0 문서가 아닙니다 (HWP 3.x 이하 형식은 지원하지 않습니다)",
+    "en": "Not an HWP 5.0 document (HWP 3.x and earlier are not supported)",
+    "zh": "不是 HWP 5.0 文档（不支持 HWP 3.x 及更早的格式）。",
+    "ja": "HWP 5.0 文書ではありません (HWP 3.x 以前の形式には対応していません)",
+    "vars": []
+  },
+  "engine.legacy.noFileHeader": {
+    "file": "src/io/formats/legacy.ts:388",
+    "category": "A",
+    "ko": "FileHeader가 없습니다 — HWP 5.0 문서가 아닙니다",
+    "en": "No FileHeader — not an HWP 5.0 document",
+    "zh": "缺少 FileHeader——不是 HWP 5.0 文档。",
+    "ja": "FileHeader がありません — HWP 5.0 文書ではありません",
+    "vars": []
+  },
+  "engine.legacy.hwpEncrypted": {
+    "file": "src/io/formats/legacy.ts:390",
+    "category": "A",
+    "ko": "암호가 걸린 HWP 문서는 열 수 없습니다",
+    "en": "Password-protected HWP documents cannot be opened",
+    "zh": "无法打开设有密码的 HWP 文档。",
+    "ja": "パスワードが設定された HWP 文書は開けません",
+    "vars": [],
+    "testsMatch": "암호 (REFUSAL_REASON)"
+  },
+  "engine.legacy.hwpDistribution": {
+    "file": "src/io/formats/legacy.ts:391",
+    "category": "A",
+    "ko": "배포용 HWP 문서는 본문이 암호화되어 있어 열 수 없습니다",
+    "en": "Distribution HWP documents cannot be opened because their body text is encrypted",
+    "zh": "分发用 HWP 文档的正文已加密，无法打开。",
+    "ja": "配布用 HWP 文書は本文が暗号化されているため開けません",
+    "vars": [],
+    "testsMatch": "배포용"
+  },
+  "engine.legacy.noBodyText": {
+    "file": "src/io/formats/legacy.ts:394",
+    "category": "A",
+    "ko": "BodyText 구역이 없습니다",
+    "en": "No BodyText section",
+    "zh": "缺少 BodyText 区段。",
+    "ja": "BodyText セクションがありません",
+    "vars": []
+  },
+  "engine.legacy.hwpLimited": {
+    "file": "src/io/formats/legacy.ts:452",
+    "category": "A",
+    "ko": "HWP(한글 5.0)는 본문 텍스트와 표 내용만 가져옵니다 — 글자 모양·그림·쪽 모양은 HWPX로 저장한 뒤 열어야 유지됩니다",
+    "en": "Only body text and table contents are imported from HWP (Hangul 5.0) — to keep character formatting, images and page layout, save it as HWPX first and open that",
+    "zh": "HWP（韩文 5.0）只导入正文文本和表格内容——如需保留字符格式、图片和页面格式，请先另存为 HWPX 再打开。",
+    "ja": "HWP (ハングル 5.0) は本文テキストと表の内容のみ読み込みます — 文字書式・画像・ページ設定を保つには HWPX で保存してから開いてください",
+    "vars": []
+  },
+  "engine.media.noBrowser": {
+    "file": "src/io/formats/media.ts:27",
+    "category": "A",
+    "ko": "브라우저 환경이 아닙니다",
+    "en": "Not running in a browser",
+    "zh": "不是浏览器环境。",
+    "ja": "ブラウザー環境ではありません",
+    "vars": []
+  },
+  "engine.media.timeout": {
+    "file": "src/io/formats/media.ts:44",
+    "category": "A",
+    "ko": "시간이 초과되었습니다 — 이 형식을 해석하지 못했습니다",
+    "koOld": "시간 초과 — 이 형식을 해석하지 못했습니다",
+    "en": "Timed out — could not read this format",
+    "zh": "超时——无法解析此格式。",
+    "ja": "タイムアウトしました — この形式を解析できませんでした",
+    "vars": []
+  },
+  "engine.media.unsupportedCodec": {
+    "file": "src/io/formats/media.ts:47",
+    "category": "A",
+    "ko": "이 컨테이너/코덱은 내장 브라우저 엔진(WebView2)이 재생하지 못합니다",
+    "en": "The built-in browser engine (WebView2) cannot play this container/codec",
+    "zh": "内置浏览器引擎（WebView2）无法播放此容器/编解码器。",
+    "ja": "このコンテナー/コーデックは内蔵ブラウザーエンジン (WebView2) で再生できません",
+    "vars": [],
+    "testsMatch": "컨테이너|코덱 (screen.ts)"
+  },
+  "engine.media.error": {
+    "file": "src/io/formats/media.ts:47",
+    "category": "A",
+    "ko": "미디어 오류 {code}",
+    "en": "Media error {code}",
+    "zh": "媒体错误 {code}",
+    "ja": "メディアエラー {code}",
+    "vars": [
+      "code"
+    ]
+  },
+  "engine.media.noVideoTrack": {
+    "file": "src/io/formats/media.ts:52",
+    "category": "A",
+    "ko": "영상 트랙을 해석하지 못했습니다 (코덱 미지원 — 소리만 있는 파일이거나 H.265 등)",
+    "en": "Could not read the video track (unsupported codec — an audio-only file, H.265, etc.)",
+    "zh": "无法解析视频轨道（不支持的编解码器——可能是仅含音频的文件或 H.265 等）。",
+    "ja": "映像トラックを解析できませんでした (コーデック非対応 — 音声のみのファイルや H.265 など)",
+    "vars": []
+  },
+  "engine.pptx.skip.shapeNoPosition": {
+    "file": "src/io/formats/pptx.ts:414",
+    "category": "A",
+    "ko": "위치 없는 개체",
+    "en": "objects without a position",
+    "zh": "无位置的对象",
+    "ja": "位置のないオブジェクト",
+    "vars": [],
+    "note": "skip 사유는 집계 키 — 코드(예: shapeNoPosition)로 모으고 표시할 때 번역 권장"
+  },
+  "engine.default.line": {
+    "file": "src/io/formats/pptx.ts:423",
+    "category": "B",
+    "ko": "선",
+    "en": "Line",
+    "zh": "线条",
+    "ja": "線",
+    "vars": [],
+    "note": "shell.name.line과 같은 글"
+  },
+  "engine.default.shape": {
+    "file": "src/io/formats/pptx.ts:423",
+    "category": "B",
+    "ko": "도형",
+    "en": "Shape",
+    "zh": "形状",
+    "ja": "図形",
+    "vars": []
+  },
+  "engine.pptx.skip.shapeApprox": {
+    "file": "src/io/formats/pptx.ts:436",
+    "category": "A",
+    "ko": "도형 '{shape}' → 사각형 근사",
+    "en": "shape \"{shape}\" → approximated as a rectangle",
+    "zh": "形状“{shape}”→ 近似为矩形",
+    "ja": "図形「{shape}」→ 四角形で近似",
+    "vars": [
+      "shape"
+    ]
+  },
+  "engine.pptx.skip.pictureNoPosition": {
+    "file": "src/io/formats/pptx.ts:490",
+    "category": "A",
+    "ko": "위치 없는 그림",
+    "en": "pictures without a position",
+    "zh": "无位置的图片",
+    "ja": "位置のない画像",
+    "vars": []
+  },
+  "engine.default.picture": {
+    "file": "src/io/formats/pptx.ts:494",
+    "category": "B",
+    "ko": "그림",
+    "en": "Picture",
+    "zh": "图片",
+    "ja": "画像",
+    "vars": []
+  },
+  "engine.pptx.skip.linkedVideo": {
+    "file": "src/io/formats/pptx.ts:512",
+    "category": "A",
+    "ko": "연결된 동영상(외부 파일)",
+    "en": "linked videos (external files)",
+    "zh": "链接的视频（外部文件）",
+    "ja": "リンクされたビデオ (外部ファイル)",
+    "vars": []
+  },
+  "engine.pptx.skip.pictureFormat": {
+    "file": "src/io/formats/pptx.ts:518",
+    "category": "A",
+    "ko": "그림 형식 ({ext})",
+    "en": "picture format ({ext})",
+    "zh": "图片格式（{ext}）",
+    "ja": "画像形式 ({ext})",
+    "vars": [
+      "ext"
+    ]
+  },
+  "engine.pptx.skip.noPicture": {
+    "file": "src/io/formats/pptx.ts:518",
+    "category": "A",
+    "ko": "그림 없음",
+    "en": "missing pictures",
+    "zh": "缺少图片",
+    "ja": "画像なし",
+    "vars": []
+  },
+  "engine.pptx.skip.tableNoPosition": {
+    "file": "src/io/formats/pptx.ts:525",
+    "category": "A",
+    "ko": "위치 없는 표",
+    "en": "tables without a position",
+    "zh": "无位置的表格",
+    "ja": "位置のない表",
+    "vars": []
+  },
+  "engine.pptx.skip.chart": {
+    "file": "src/io/formats/pptx.ts:525",
+    "category": "A",
+    "ko": "차트·다이어그램",
+    "en": "charts and diagrams",
+    "zh": "图表和关系图",
+    "ja": "グラフ・図表",
+    "vars": []
+  },
+  "engine.pptx.notPptx": {
+    "file": "src/io/formats/pptx.ts:589",
+    "category": "A",
+    "ko": "ppt/presentation.xml이 없습니다 — PPTX 프레젠테이션이 아닙니다",
+    "en": "ppt/presentation.xml is missing — not a PPTX presentation",
+    "zh": "缺少 ppt/presentation.xml——不是 PPTX 演示文稿。",
+    "ja": "ppt/presentation.xml がありません — PPTX プレゼンテーションではありません",
+    "vars": []
+  },
+  "engine.default.backgroundPicture": {
+    "file": "src/io/formats/pptx.ts:653",
+    "category": "B",
+    "ko": "배경 그림",
+    "en": "Background picture",
+    "zh": "背景图片",
+    "ja": "背景画像",
+    "vars": []
+  },
+  "engine.default.hiddenSuffix": {
+    "file": "src/io/formats/pptx.ts:671",
+    "category": "B",
+    "ko": "(숨김)",
+    "koOld": " (숨김)",
+    "en": "(hidden)",
+    "zh": "（隐藏）",
+    "ja": "(非表示)",
+    "vars": [],
+    "note": "앞의 공백은 코드가 붙인다"
+  },
+  "engine.pptx.noSlides": {
+    "file": "src/io/formats/pptx.ts:674",
+    "category": "A",
+    "ko": "슬라이드가 없습니다",
+    "en": "There are no slides",
+    "zh": "没有幻灯片。",
+    "ja": "スライドがありません",
+    "vars": []
+  },
+  "engine.psd.corrupt": {
+    "file": "src/io/formats/psd.ts:156",
+    "category": "A",
+    "ko": "PSD 파일이 손상되었거나 지원하지 않는 구조입니다: {detail}",
+    "en": "The PSD file is damaged or has an unsupported structure: {detail}",
+    "zh": "PSD 文件已损坏或结构不受支持：{detail}",
+    "ja": "PSD ファイルが破損しているか、対応していない構造です: {detail}",
+    "vars": [
+      "detail"
+    ]
+  },
+  "engine.psd.part.data": {
+    "file": "src/io/formats/psd.ts:166",
+    "category": "A",
+    "ko": "데이터",
+    "en": "data",
+    "zh": "数据",
+    "ja": "データ",
+    "vars": []
+  },
+  "engine.psd.read.outOfRange": {
+    "file": "src/io/formats/psd.ts:167",
+    "category": "A",
+    "ko": "범위를 벗어난 읽기: {part} (위치 {pos}, 필요 {n}바이트, 끝 {end})",
+    "koOld": "${what}를 읽다가 범위를 벗어났습니다 (위치 ${this.o}, 필요 ${n}바이트, 끝 ${this.end})",
+    "en": "Read out of range: {part} (offset {pos}, needs {n} bytes, end {end})",
+    "zh": "读取超出范围：{part}（位置 {pos}，需要 {n} 字节，结尾 {end}）",
+    "ja": "範囲外の読み取り: {part} (位置 {pos}、必要 {n} バイト、終端 {end})",
+    "vars": [
+      "end",
+      "n",
+      "part",
+      "pos"
+    ]
+  },
+  "engine.psd.read.lengthTooLarge": {
+    "file": "src/io/formats/psd.ts:201",
+    "category": "A",
+    "ko": "길이 값이 너무 큽니다 (위치 {pos})",
+    "en": "Length value is too large (offset {pos})",
+    "zh": "长度值过大（位置 {pos}）",
+    "ja": "長さの値が大きすぎます (位置 {pos})",
+    "vars": [
+      "pos"
+    ]
+  },
+  "engine.psd.part.string": {
+    "file": "src/io/formats/psd.ts:205",
+    "category": "A",
+    "ko": "문자열",
+    "en": "string",
+    "zh": "字符串",
+    "ja": "文字列",
+    "vars": []
+  },
+  "engine.psd.read.blockOverrun": {
+    "file": "src/io/formats/psd.ts:252",
+    "category": "A",
+    "ko": "추가 정보 블록이 구역 끝을 넘습니다 (블록 '{key}', 길이 {n}, 위치 {pos})",
+    "koOld": "추가 정보 블록 '${key}'의 길이(${n})가 구역 끝을 넘습니다 (위치 ${bStart})",
+    "en": "An additional-information block runs past the end of its section (block \"{key}\", length {n}, offset {pos})",
+    "zh": "附加信息块超出区段末尾（块“{key}”，长度 {n}，位置 {pos}）",
+    "ja": "追加情報ブロックがセクションの終端を超えています (ブロック「{key}」、長さ {n}、位置 {pos})",
+    "vars": [
+      "key",
+      "n",
+      "pos"
+    ]
+  },
+  "engine.psd.read.badBounds": {
+    "file": "src/io/formats/psd.ts:299",
+    "category": "A",
+    "ko": "레이어 {i}: 경계 사각형이 잘못되었습니다",
+    "koOld": "레이어 ${i}의 경계 사각형이 잘못되었습니다",
+    "en": "Layer {i}: invalid bounding rectangle",
+    "zh": "图层 {i}：边界矩形无效",
+    "ja": "レイヤー {i}: 境界矩形が正しくありません",
+    "vars": [
+      "i"
+    ]
+  },
+  "engine.psd.read.badChannelCount": {
+    "file": "src/io/formats/psd.ts:301",
+    "category": "A",
+    "ko": "레이어 {i}: 채널 수가 비정상입니다 ({n})",
+    "koOld": "레이어 ${i}의 채널 수(${nch})가 비정상입니다",
+    "en": "Layer {i}: abnormal channel count ({n})",
+    "zh": "图层 {i}：通道数异常（{n}）",
+    "ja": "レイヤー {i}: チャンネル数が異常です ({n})",
+    "vars": [
+      "i",
+      "n"
+    ]
+  },
+  "engine.psd.read.noBlendSig": {
+    "file": "src/io/formats/psd.ts:305",
+    "category": "A",
+    "ko": "레이어 {i}: 혼합 모드 서명이 없습니다 (위치 {pos})",
+    "koOld": "레이어 ${i}의 혼합 모드 서명이 없습니다 (위치 ${r.o - 4})",
+    "en": "Layer {i}: missing blend mode signature (offset {pos})",
+    "zh": "图层 {i}：缺少混合模式签名（位置 {pos}）",
+    "ja": "レイヤー {i}: 描画モードのシグネチャがありません (位置 {pos})",
+    "vars": [
+      "i",
+      "pos"
+    ]
+  },
+  "engine.psd.part.layerExtra": {
+    "file": "src/io/formats/psd.ts:309",
+    "category": "A",
+    "ko": "레이어 추가 데이터",
+    "en": "layer extra data",
+    "zh": "图层附加数据",
+    "ja": "レイヤー追加データ",
+    "vars": []
+  },
+  "engine.psd.part.layerMask": {
+    "file": "src/io/formats/psd.ts:312",
+    "category": "A",
+    "ko": "레이어 마스크 데이터",
+    "en": "layer mask data",
+    "zh": "图层蒙版数据",
+    "ja": "レイヤーマスクデータ",
+    "vars": []
+  },
+  "engine.psd.part.blendRanges": {
+    "file": "src/io/formats/psd.ts:313",
+    "category": "A",
+    "ko": "혼합 범위",
+    "en": "blending ranges",
+    "zh": "混合范围",
+    "ja": "ブレンド範囲",
+    "vars": []
+  },
+  "engine.psd.part.channelImage": {
+    "file": "src/io/formats/psd.ts:348",
+    "category": "A",
+    "ko": "채널 이미지 데이터",
+    "en": "channel image data",
+    "zh": "通道图像数据",
+    "ja": "チャンネル画像データ",
+    "vars": []
+  },
+  "engine.psd.notPsd": {
+    "file": "src/io/formats/psd.ts:360",
+    "category": "A",
+    "ko": "PSD 파일이 아닙니다 (8BPS 서명 없음)",
+    "en": "Not a PSD file (no 8BPS signature)",
+    "zh": "不是 PSD 文件（没有 8BPS 签名）。",
+    "ja": "PSD ファイルではありません (8BPS シグネチャなし)",
+    "vars": []
+  },
+  "engine.psd.read.unknownVersion": {
+    "file": "src/io/formats/psd.ts:362",
+    "category": "A",
+    "ko": "알 수 없는 버전 {version}",
+    "en": "unknown version {version}",
+    "zh": "未知版本 {version}",
+    "ja": "不明なバージョン {version}",
+    "vars": [
+      "version"
+    ]
+  },
+  "engine.psd.read.channels": {
+    "file": "src/io/formats/psd.ts:368",
+    "category": "A",
+    "ko": "채널 수 {n}",
+    "en": "channel count {n}",
+    "zh": "通道数 {n}",
+    "ja": "チャンネル数 {n}",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.psd.read.imageSize": {
+    "file": "src/io/formats/psd.ts:369",
+    "category": "A",
+    "ko": "이미지 크기 {w}×{h}",
+    "en": "image size {w}×{h}",
+    "zh": "图像尺寸 {w}×{h}",
+    "ja": "画像サイズ {w}×{h}",
+    "vars": [
+      "h",
+      "w"
+    ]
+  },
+  "engine.psd.read.bitDepth": {
+    "file": "src/io/formats/psd.ts:370",
+    "category": "A",
+    "ko": "비트 깊이 {depth}",
+    "en": "bit depth {depth}",
+    "zh": "位深度 {depth}",
+    "ja": "ビット深度 {depth}",
+    "vars": [
+      "depth"
+    ]
+  },
+  "engine.psd.part.colorModeData": {
+    "file": "src/io/formats/psd.ts:371",
+    "category": "A",
+    "ko": "색상 모드 데이터",
+    "en": "color mode data",
+    "zh": "颜色模式数据",
+    "ja": "カラーモードデータ",
+    "vars": []
+  },
+  "engine.psd.part.imageResources": {
+    "file": "src/io/formats/psd.ts:372",
+    "category": "A",
+    "ko": "이미지 리소스",
+    "en": "image resources",
+    "zh": "图像资源",
+    "ja": "画像リソース",
+    "vars": []
+  },
+  "engine.psd.part.resourceName": {
+    "file": "src/io/formats/psd.ts:382",
+    "category": "A",
+    "ko": "리소스 이름",
+    "en": "resource name",
+    "zh": "资源名称",
+    "ja": "リソース名",
+    "vars": []
+  },
+  "engine.psd.part.resource": {
+    "file": "src/io/formats/psd.ts:385",
+    "category": "A",
+    "ko": "리소스 {id}",
+    "en": "resource {id}",
+    "zh": "资源 {id}",
+    "ja": "リソース {id}",
+    "vars": [
+      "id"
+    ]
+  },
+  "engine.psd.part.layerMaskInfo": {
+    "file": "src/io/formats/psd.ts:391",
+    "category": "A",
+    "ko": "레이어·마스크 정보",
+    "en": "layer and mask information",
+    "zh": "图层和蒙版信息",
+    "ja": "レイヤー・マスク情報",
+    "vars": []
+  },
+  "engine.psd.part.layerInfo": {
+    "file": "src/io/formats/psd.ts:401",
+    "category": "A",
+    "ko": "레이어 정보",
+    "en": "layer information",
+    "zh": "图层信息",
+    "ja": "レイヤー情報",
+    "vars": []
+  },
+  "engine.psd.part.globalMask": {
+    "file": "src/io/formats/psd.ts:409",
+    "category": "A",
+    "ko": "전역 레이어 마스크",
+    "en": "global layer mask",
+    "zh": "全局图层蒙版",
+    "ja": "グローバルレイヤーマスク",
+    "vars": []
+  },
+  "engine.psd.read.zipFailed": {
+    "file": "src/io/formats/psd.ts:458",
+    "category": "A",
+    "ko": "ZIP 압축 데이터를 풀 수 없습니다 ({error})",
+    "en": "Cannot decompress ZIP data ({error})",
+    "zh": "无法解压 ZIP 压缩数据（{error}）",
+    "ja": "ZIP 圧縮データを展開できません ({error})",
+    "vars": [
+      "error"
+    ]
+  },
+  "engine.psd.read.channelTooLarge": {
+    "file": "src/io/formats/psd.ts:499",
+    "category": "A",
+    "ko": "채널이 너무 큽니다 ({w}×{h})",
+    "en": "Channel is too large ({w}×{h})",
+    "zh": "通道过大（{w}×{h}）",
+    "ja": "チャンネルが大きすぎます ({w}×{h})",
+    "vars": [
+      "h",
+      "w"
+    ]
+  },
+  "engine.psd.read.channelShort": {
+    "file": "src/io/formats/psd.ts:503",
+    "category": "A",
+    "ko": "채널 데이터가 크기({w}×{h})에 비해 짧습니다",
+    "koOld": "채널 데이터가 ${w}×${h}에 비해 짧습니다",
+    "en": "Channel data is too short for its size ({w}×{h})",
+    "zh": "通道数据短于其尺寸（{w}×{h}）所需长度",
+    "ja": "チャンネルデータがサイズ ({w}×{h}) に対して短すぎます",
+    "vars": [
+      "h",
+      "w"
+    ]
+  },
+  "engine.psd.part.rleTable": {
+    "file": "src/io/formats/psd.ts:508, src/io/formats/psd.ts:549",
+    "category": "A",
+    "ko": "RLE 행 길이 표",
+    "en": "RLE row length table",
+    "zh": "RLE 行长度表",
+    "ja": "RLE 行長テーブル",
+    "vars": []
+  },
+  "engine.psd.read.rleShort": {
+    "file": "src/io/formats/psd.ts:510",
+    "category": "A",
+    "ko": "RLE 채널 데이터가 크기({w}×{h})에 비해 짧습니다",
+    "koOld": "RLE 채널 데이터가 ${w}×${h}에 비해 짧습니다",
+    "en": "RLE channel data is too short for its size ({w}×{h})",
+    "zh": "RLE 通道数据短于其尺寸（{w}×{h}）所需长度",
+    "ja": "RLE チャンネルデータがサイズ ({w}×{h}) に対して短すぎます",
+    "vars": [
+      "h",
+      "w"
+    ]
+  },
+  "engine.psd.read.rleRowOverrun": {
+    "file": "src/io/formats/psd.ts:516",
+    "category": "A",
+    "ko": "RLE 행이 채널 데이터 끝을 넘습니다 (행 {y})",
+    "koOld": "RLE 행 ${y}가 채널 데이터 끝을 넘습니다",
+    "en": "An RLE row runs past the end of the channel data (row {y})",
+    "zh": "RLE 行超出通道数据末尾（第 {y} 行）",
+    "ja": "RLE 行がチャンネルデータの終端を超えています (行 {y})",
+    "vars": [
+      "y"
+    ]
+  },
+  "engine.psd.read.zipShort": {
+    "file": "src/io/formats/psd.ts:524",
+    "category": "A",
+    "ko": "ZIP 채널 데이터가 크기({w}×{h})에 비해 짧습니다",
+    "koOld": "ZIP 채널 데이터가 ${w}×${h}에 비해 짧습니다",
+    "en": "ZIP channel data is too short for its size ({w}×{h})",
+    "zh": "ZIP 通道数据短于其尺寸（{w}×{h}）所需长度",
+    "ja": "ZIP チャンネルデータがサイズ ({w}×{h}) に対して短すぎます",
+    "vars": [
+      "h",
+      "w"
+    ]
+  },
+  "engine.psd.read.unknownCompression": {
+    "file": "src/io/formats/psd.ts:528, src/io/formats/psd.ts:570",
+    "category": "A",
+    "ko": "알 수 없는 압축 방식 {comp}",
+    "en": "unknown compression {comp}",
+    "zh": "未知压缩方式 {comp}",
+    "ja": "不明な圧縮方式 {comp}",
+    "vars": [
+      "comp"
+    ]
+  },
+  "engine.psd.read.compositeRleOverrun": {
+    "file": "src/io/formats/psd.ts:557",
+    "category": "A",
+    "ko": "합쳐진 이미지 RLE 행이 파일 끝을 넘습니다",
+    "en": "A composite image RLE row runs past the end of the file",
+    "zh": "合并图像的 RLE 行超出文件末尾",
+    "ja": "統合画像の RLE 行がファイルの終端を超えています",
+    "vars": []
+  },
+  "engine.psd.colorModeUnsupported": {
+    "file": "src/io/formats/psd.ts:726",
+    "category": "A",
+    "ko": "지원하지 않는 색상 모드입니다: {mode}",
+    "koOld": "색상 모드 ${mode}는 지원하지 않습니다",
+    "en": "Unsupported color mode: {mode}",
+    "zh": "不支持的颜色模式：{mode}",
+    "ja": "対応していないカラーモードです: {mode}",
+    "vars": [
+      "mode"
+    ]
+  },
+  "engine.psd.warn.cmyk": {
+    "file": "src/io/formats/psd.ts:823",
+    "category": "A",
+    "ko": "CMYK 문서는 잉크 값을 색 관리 없이 화면 색으로 바꿔 보여 줍니다 — Photoshop(작업 CMYK 프로필)·인쇄에서 보는 색과 다를 수 있습니다 (잉크 값은 저장 시 그대로)",
+    "en": "CMYK documents show their ink values converted to screen colors without color management, so colors may differ from Photoshop (working CMYK profile) and print (ink values are saved unchanged)",
+    "zh": "CMYK 文档的油墨值在无色彩管理的情况下转换为屏幕颜色显示，可能与 Photoshop（工作 CMYK 配置文件）及印刷中看到的颜色不同（保存时油墨值保持原样）。",
+    "ja": "CMYK 文書のインキ値はカラーマネジメントなしで画面の色に変換して表示します。Photoshop (作業用 CMYK プロファイル) や印刷で見る色と異なる場合があります (インキ値は保存時そのまま)",
+    "vars": [],
+    "testsMatch": "^CMYK 문서는 잉크 값을 색 관리 없이 (make-interop-kit, tests/psd/cmykNotice)"
+  },
+  "engine.psd.warn.cmykProfile": {
+    "file": "src/io/formats/psd.ts:822",
+    "category": "A",
+    "ko": "CMYK 문서에 들어 있는 색 프로필{name}을 적용하지 않고 잉크 값을 색 관리 없이 화면 색으로 바꿔 보여 줍니다 — Photoshop·인쇄에서 보는 색과 다를 수 있습니다 (잉크 값은 저장 시 그대로)",
+    "en": "The color profile{name} in this CMYK document is not applied: its ink values are shown without color management, so colors may differ from Photoshop and print (ink values are saved unchanged)",
+    "zh": "未应用此 CMYK 文档中嵌入的颜色配置文件{name}：油墨值在无色彩管理的情况下显示，可能与 Photoshop 及印刷中看到的颜色不同（保存时油墨值保持原样）。",
+    "ja": "この CMYK 文書に埋め込まれたカラープロファイル{name}は適用せず、インキ値をカラーマネジメントなしで表示します。Photoshop や印刷で見る色と異なる場合があります (インキ値は保存時そのまま)",
+    "vars": [
+      "name"
+    ],
+    "note": "name = \"('프로필 이름')\" 또는 빈 글(이름 없는 프로필)",
+    "testsMatch": "^CMYK 문서에 들어 있는 색 프로필 (make-interop-kit, tests/psd/cmykNotice)"
+  },
+  "engine.psd.warn.cmykDefault": {
+    "file": "src/io/formats/psd.ts:884",
+    "category": "A",
+    "ko": "프로필이 없는 CMYK 문서를 인쇄 표준(FOGRA39) 색으로 보여 줍니다 — Photoshop 작업 프로필(SWOP 등)과 조금 다를 수 있습니다 (잉크 값은 저장 시 그대로)",
+    "en": "This CMYK document has no color profile and is shown in print-standard (FOGRA39) colors — they may differ slightly from Photoshop's working profile (SWOP or another) (ink values are saved unchanged)",
+    "zh": "此 CMYK 文档没有颜色配置文件，按印刷标准 (FOGRA39) 颜色显示——可能与 Photoshop 工作配置文件（SWOP 等）略有不同（保存时油墨值保持原样）。",
+    "ja": "プロファイルのない CMYK 文書を印刷標準 (FOGRA39) の色で表示します。Photoshop の作業用プロファイル (SWOP など) と少し異なる場合があります (インキ値は保存時そのまま)",
+    "vars": [],
+    "testsMatch": "^프로필이 없는 CMYK 문서를 인쇄 표준 (make-interop-kit, tests/psd/cmykNotice, tests/psd/defaultCmyk)"
+  },
+  "engine.psd.warn.cmykProfileDefault": {
+    "file": "src/io/formats/psd.ts:883",
+    "category": "A",
+    "ko": "들어 있는 프로필{name}을 읽지 못해 기본 프로필(FOGRA39)로 보여 줍니다 — Photoshop·인쇄에서 보는 CMYK 색과 다를 수 있습니다 (잉크 값·프로필은 저장 시 그대로)",
+    "en": "The embedded profile{name} could not be read, so the default profile (FOGRA39) is used — CMYK colors may differ from Photoshop and print (ink values and the profile are saved unchanged)",
+    "zh": "无法读取嵌入的配置文件{name}，改用默认配置文件 (FOGRA39) 显示——可能与 Photoshop 及印刷中看到的 CMYK 颜色不同（保存时油墨值和配置文件保持原样）。",
+    "ja": "埋め込まれたプロファイル{name}を読み取れないため、既定のプロファイル (FOGRA39) で表示します。Photoshop や印刷で見る CMYK の色と異なる場合があります (インキ値とプロファイルは保存時そのまま)",
+    "vars": [
+      "name"
+    ],
+    "note": "name = \" '프로필 이름'\" 또는 빈 글(이름 없는 프로필). engine.psd.warn.cmyk·cmykProfile은 기본 프로필을 쓸 수 없을 때만(사실상 쓰이지 않음)",
+    "testsMatch": "^들어 있는 프로필 (make-interop-kit, tests/psd/cmykNotice, tests/psd/iccCmyk)"
+  },
+  "engine.psd.warn.cmykAdjust": {
+    "file": "src/io/formats/psd.ts:1251",
+    "category": "A",
+    "ko": "CMYK 문서의 조정 레이어 {n}개({kinds})는 Photoshop이 CMYK에서 쓰지 않는 종류라 근사해 그립니다 (저장 시 원본 그대로)",
+    "en": "{n} adjustment layers in this CMYK document ({kinds}) are of kinds Photoshop does not use in CMYK and are drawn approximately (saved unchanged)",
+    "zh": "此 CMYK 文档中的 {n} 个调整图层（{kinds}）属于 Photoshop 在 CMYK 中不使用的类型，将近似绘制（保存时保持原样）。",
+    "ja": "この CMYK 文書の調整レイヤー {n} 個 ({kinds}) は Photoshop が CMYK で使わない種類のため、近似して描画します (保存時は元のまま)",
+    "vars": [
+      "n",
+      "kinds"
+    ],
+    "note": "kinds = 흑백·노출·활기·색상 검색 중 해당 이름을 '·'로 이음 (같은 이름의 UI 조정 키로 번역)",
+    "testsMatch": "^CMYK 문서의 조정 레이어 (tests/psd/cmykNotice)"
+  },
+  "engine.psd.warn.cmykMixerSkipped": {
+    "file": "src/io/formats/psd.ts:1253",
+    "category": "A",
+    "ko": "CMYK 문서의 채널 혼합 조정 레이어 {n}개는 잉크(C·M·Y·K) 설정이 없어 화면에 그리지 않습니다 (저장 시 원본 그대로)",
+    "en": "{n} Channel Mixer adjustment layers in this CMYK document have no ink (C, M, Y, K) settings and are not drawn (saved unchanged)",
+    "zh": "此 CMYK 文档中的 {n} 个通道混合器调整图层没有油墨（C·M·Y·K）设置，不在屏幕上绘制（保存时保持原样）。",
+    "ja": "この CMYK 文書のチャンネルミキサー調整レイヤー {n} 個はインキ (C・M・Y・K) の設定がないため描画しません (保存時は元のまま)",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.psd.warn.duotone": {
+    "file": "src/io/formats/psd.ts:826",
+    "category": "A",
+    "ko": "듀오톤 문서는 잉크 색 없이 회색조로 보여 줍니다 (듀오톤 설정은 저장 시 그대로)",
+    "en": "Duotone documents are shown in grayscale without their ink colors (duotone settings are saved unchanged)",
+    "zh": "双色调文档以灰度显示，不含油墨颜色（双色调设置在保存时保持原样）。",
+    "ja": "ダブルトーン文書はインキの色なしでグレースケールで表示します (ダブルトーン設定は保存時そのまま)",
+    "vars": [],
+    "testsMatch": "듀오톤 문서는 (tests/psd/cmykNotice)"
+  },
+  "engine.psd.warn.multichannel": {
+    "file": "src/io/formats/psd.ts:827",
+    "category": "A",
+    "ko": "다중 채널 문서는 첫 채널만 회색조로 보여 줍니다",
+    "en": "Multichannel documents are shown as their first channel only, in grayscale",
+    "zh": "多通道文档仅以灰度显示第一个通道。",
+    "ja": "マルチチャンネル文書は最初のチャンネルのみグレースケールで表示します",
+    "vars": [],
+    "testsMatch": "다중 채널 문서는 (tests/psd/cmykNotice)"
+  },
+  "engine.psd.warn.spotChannels": {
+    "file": "src/io/formats/psd.ts:829",
+    "category": "A",
+    "ko": "별색 채널 {n}개는 화면·내보내기에 그리지 않습니다 (저장 시 그대로)",
+    "en": "{n} spot color channels are not drawn on screen or in exports (saved unchanged)",
+    "zh": "{n} 个专色通道不会在屏幕或导出中绘制（保存时保持原样）。",
+    "ja": "スポットカラーチャンネル {n} 個は画面・書き出しに描画しません (保存時はそのまま)",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.psd.warn.lab": {
+    "file": "src/io/formats/psd.ts:728",
+    "category": "A",
+    "ko": "Lab 문서는 RGB로 근사 변환해 보여 줍니다",
+    "en": "Lab documents are shown approximately converted to RGB",
+    "zh": "Lab 文档近似转换为 RGB 显示。",
+    "ja": "Lab 文書は RGB に近似変換して表示します",
+    "vars": []
+  },
+  "engine.psd.warn.16bit": {
+    "file": "src/io/formats/psd.ts:729",
+    "category": "A",
+    "ko": "16비트 문서는 8비트로 보여 줍니다 (편집하지 않은 레이어는 16비트 원본 그대로 저장)",
+    "en": "16-bit documents are shown at 8 bits (unedited layers are saved as the 16-bit originals)",
+    "zh": "16 位文档以 8 位显示（未编辑的图层按 16 位原样保存）。",
+    "ja": "16 ビット文書は 8 ビットで表示します (編集していないレイヤーは 16 ビットの元データのまま保存)",
+    "vars": [],
+    "testsMatch": "^16비트 문서는 8비트로 보여 줍니다 (make-interop-kit)"
+  },
+  "engine.psd.warn.32bit": {
+    "file": "src/io/formats/psd.ts:730",
+    "category": "A",
+    "ko": "32비트(HDR) 문서는 8비트로 근사해 보여 줍니다",
+    "en": "32-bit (HDR) documents are shown approximated at 8 bits",
+    "zh": "32 位（HDR）文档近似为 8 位显示。",
+    "ja": "32 ビット (HDR) 文書は 8 ビットに近似して表示します",
+    "vars": []
+  },
+  "engine.psd.warn.layerSkippedMemory": {
+    "file": "src/io/formats/psd.ts:799",
+    "category": "A",
+    "ko": "메모리 한도 때문에 레이어를 건너뛰었습니다: '{name}'",
+    "koOld": "레이어 '${name}'는 메모리 한도 때문에 건너뛰었습니다",
+    "en": "Skipped a layer because of the memory limit: \"{name}\"",
+    "zh": "因内存限制已跳过图层：“{name}”",
+    "ja": "メモリの上限のためレイヤーをスキップしました: 「{name}」",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.psd.warn.layerError": {
+    "file": "src/io/formats/psd.ts:812",
+    "category": "A",
+    "ko": "레이어 '{name}': {error}",
+    "en": "Layer \"{name}\": {error}",
+    "zh": "图层“{name}”：{error}",
+    "ja": "レイヤー「{name}」: {error}",
+    "vars": [
+      "error",
+      "name"
+    ]
+  },
+  "engine.psd.warn.compositeMemory": {
+    "file": "src/io/formats/psd.ts:821",
+    "category": "A",
+    "ko": "합쳐진 이미지({w}×{h})는 메모리 한도 때문에 읽지 않았습니다",
+    "en": "The composite image ({w}×{h}) was not read because of the memory limit",
+    "zh": "因内存限制未读取合并图像（{w}×{h}）。",
+    "ja": "統合画像 ({w}×{h}) はメモリの上限のため読み込みませんでした",
+    "vars": [
+      "h",
+      "w"
+    ]
+  },
+  "engine.psd.warn.compositeFailed": {
+    "file": "src/io/formats/psd.ts:830",
+    "category": "A",
+    "ko": "합쳐진 이미지를 읽지 못했습니다: {error}",
+    "en": "Could not read the composite image: {error}",
+    "zh": "无法读取合并图像：{error}",
+    "ja": "統合画像を読み込めませんでした: {error}",
+    "vars": [
+      "error"
+    ],
+    "testsMatch": "합쳐진 이미지를 읽지 못했 (not.toContain)"
+  },
+  "engine.default.layer": {
+    "file": "src/io/formats/psd.ts:923, src/io/formats/psdWrite.ts:1123",
+    "category": "B",
+    "ko": "레이어",
+    "en": "Layer",
+    "zh": "图层",
+    "ja": "レイヤー",
+    "vars": []
+  },
+  "engine.psd.compositeRendered": {
+    "file": "src/io/formats/psd.ts:938",
+    "category": "B",
+    "ko": "합쳐진 이미지 (Photoshop 렌더)",
+    "en": "Composite image (Photoshop render)",
+    "zh": "合并图像（Photoshop 渲染）",
+    "ja": "統合画像 (Photoshop レンダリング)",
+    "vars": []
+  },
+  "engine.psd.composite": {
+    "file": "src/io/formats/psd.ts:943",
+    "category": "B",
+    "ko": "합쳐진 이미지",
+    "en": "Composite image",
+    "zh": "合并图像",
+    "ja": "統合画像",
+    "vars": []
+  },
+  "engine.psd.noPixels": {
+    "file": "src/io/formats/psd.ts:950",
+    "category": "A",
+    "ko": "PSD에서 읽을 수 있는 픽셀이 없습니다",
+    "en": "There are no readable pixels in the PSD",
+    "zh": "PSD 中没有可读取的像素。",
+    "ja": "PSD に読み取れるピクセルがありません",
+    "vars": []
+  },
+  "engine.psd.note.adjustment": {
+    "file": "src/io/formats/psd.ts:958",
+    "category": "A",
+    "ko": "조정·채우기 레이어 {n}개",
+    "en": "adjustment/fill layers: {n}",
+    "zh": "调整/填充图层 {n} 个",
+    "ja": "調整・塗りつぶしレイヤー {n} 個",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.psd.note.clipping": {
+    "file": "src/io/formats/psd.ts:959",
+    "category": "A",
+    "ko": "클리핑 {n}개",
+    "en": "clipping: {n}",
+    "zh": "剪贴 {n} 个",
+    "ja": "クリッピング {n} 個",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.psd.note.textSmart": {
+    "file": "src/io/formats/psd.ts:960",
+    "category": "A",
+    "ko": "텍스트·고급 개체 {n}개(미리보기 픽셀)",
+    "en": "text/Smart Objects: {n} (preview pixels)",
+    "zh": "文本/智能对象 {n} 个（预览像素）",
+    "ja": "テキスト・スマートオブジェクト {n} 個 (プレビューピクセル)",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.psd.note.effects": {
+    "file": "src/io/formats/psd.ts:961",
+    "category": "A",
+    "ko": "레이어 효과 {n}개",
+    "en": "layer effects: {n}",
+    "zh": "图层效果 {n} 个",
+    "ja": "レイヤー効果 {n} 個",
+    "vars": [
+      "n"
+    ],
+    "testsMatch": "레이어 효과 1개 (psdWarnings.test)"
+  },
+  "engine.psd.warn.notDrawn": {
+    "file": "src/io/formats/psd.ts:962",
+    "category": "A",
+    "ko": "화면에 그대로 그리지 못하는 요소가 있습니다({notes}) — 저장 시 원본 그대로 유지됩니다. 정확한 모양은 숨겨 둔 '합쳐진 이미지' 레이어로 확인하세요",
+    "koOld": "${notes.join(\"·\")}는 화면에 그대로 그리지 못하지만 저장 시 원본 그대로 유지됩니다 — 정확한 모양은 숨겨 둔 '합쳐진 이미지' 레이어로 확인하세요",
+    "en": "Some elements cannot be drawn exactly on screen ({notes}) — they are kept unchanged when saving. Check the hidden \"Composite image\" layer for the exact look",
+    "zh": "部分元素无法在屏幕上按原样绘制（{notes}）——保存时将保持原样。请通过隐藏的“合并图像”图层查看准确外观。",
+    "ja": "画面上でそのまま描画できない要素があります ({notes}) — 保存時は元のまま保持されます。正確な見た目は非表示の「統合画像」レイヤーで確認してください",
+    "vars": [
+      "notes"
+    ],
+    "note": "notes는 engine.psd.note.*를 \"·\"로 이은 것"
+  },
+  "engine.psd.save.over4gb": {
+    "file": "src/io/formats/psdWrite.ts:93",
+    "category": "A",
+    "ko": "PSD 구역이 4GB를 넘습니다 — PSB(대형 문서)로 저장해야 합니다",
+    "en": "A PSD section exceeds 4 GB — it must be saved as PSB (large document)",
+    "zh": "PSD 区段超过 4GB——需要另存为 PSB（大型文档）。",
+    "ja": "PSD のセクションが 4GB を超えています — PSB (大きなドキュメント) で保存する必要があります",
+    "vars": []
+  },
+  "engine.psd.save.rleRowTooLong": {
+    "file": "src/io/formats/psdWrite.ts:171",
+    "category": "A",
+    "ko": "RLE 행이 너무 깁니다",
+    "en": "An RLE row is too long",
+    "zh": "RLE 行过长。",
+    "ja": "RLE 行が長すぎます",
+    "vars": []
+  },
+  "engine.psd.save.layerTooLarge": {
+    "file": "src/io/formats/psdWrite.ts:288, src/io/formats/psdWrite.ts:303",
+    "category": "A",
+    "ko": "레이어가 너무 큽니다: '{name}'",
+    "koOld": "레이어 '${n.name}'가 너무 큽니다",
+    "en": "Layer is too large: \"{name}\"",
+    "zh": "图层过大：“{name}”",
+    "ja": "レイヤーが大きすぎます: 「{name}」",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.psd.save.notPng": {
+    "file": "src/io/formats/psdWrite.ts:341",
+    "category": "A",
+    "ko": "PNG가 아닙니다",
+    "en": "Not a PNG",
+    "zh": "不是 PNG。",
+    "ja": "PNG ではありません",
+    "vars": []
+  },
+  "engine.psd.save.pngChunkTruncated": {
+    "file": "src/io/formats/psdWrite.ts:347",
+    "category": "A",
+    "ko": "PNG 청크가 잘렸습니다",
+    "en": "A PNG chunk is truncated",
+    "zh": "PNG 块被截断。",
+    "ja": "PNG チャンクが途中で切れています",
+    "vars": []
+  },
+  "engine.psd.save.pngUnsupported": {
+    "file": "src/io/formats/psdWrite.ts:352",
+    "category": "A",
+    "ko": "지원하지 않는 PNG 형식입니다",
+    "koOld": "지원하지 않는 PNG 형식",
+    "en": "Unsupported PNG format",
+    "zh": "不支持的 PNG 格式。",
+    "ja": "対応していない PNG 形式です",
+    "vars": []
+  },
+  "engine.psd.save.pngShort": {
+    "file": "src/io/formats/psdWrite.ts:367",
+    "category": "A",
+    "ko": "PNG 데이터가 부족합니다",
+    "en": "PNG data is incomplete",
+    "zh": "PNG 数据不足。",
+    "ja": "PNG データが不足しています",
+    "vars": []
+  },
+  "engine.psd.save.modeUnwritable": {
+    "file": "src/io/formats/psdWrite.ts:697",
+    "category": "A",
+    "ko": "색상 모드 {mode} / {depth}비트로는 쓸 수 없습니다",
+    "en": "Cannot write color mode {mode} / {depth}-bit",
+    "zh": "无法以颜色模式 {mode} / {depth} 位写入。",
+    "ja": "カラーモード {mode} / {depth} ビットでは書き込めません",
+    "vars": [
+      "depth",
+      "mode"
+    ]
+  },
+  "engine.psd.save.noSource": {
+    "file": "src/io/formats/psdWrite.ts:798",
+    "category": "A",
+    "ko": "원본 PSD 데이터를 찾지 못해 새 PSD로 저장했습니다 (효과·텍스트·조정 레이어 정보 없음)",
+    "en": "The original PSD data was not found, so a new PSD was saved (without effects, text or adjustment layer data)",
+    "zh": "找不到原始 PSD 数据，已另存为新的 PSD（不含效果、文本和调整图层信息）。",
+    "ja": "元の PSD データが見つからないため、新しい PSD として保存しました (効果・テキスト・調整レイヤーの情報なし)",
+    "vars": [],
+    "testsMatch": "원본 PSD (psd.test)"
+  },
+  "engine.psd.save.sourceUnreadable": {
+    "file": "src/io/formats/psdWrite.ts:804",
+    "category": "A",
+    "ko": "원본 PSD 구조를 다시 읽지 못해 새 PSD로 저장했습니다: {error}",
+    "en": "The original PSD structure could not be re-read, so a new PSD was saved: {error}",
+    "zh": "无法重新读取原始 PSD 结构，已另存为新的 PSD：{error}",
+    "ja": "元の PSD の構造を読み直せないため、新しい PSD として保存しました: {error}",
+    "vars": [
+      "error"
+    ],
+    "testsMatch": "원본 PSD (psd.test)"
+  },
+  "engine.psd.save.linkMismatch": {
+    "file": "src/io/formats/psdWrite.ts:807",
+    "category": "A",
+    "ko": "원본 PSD와 레이어 연결 정보가 맞지 않아 새 PSD로 저장했습니다",
+    "en": "The layer links do not match the original PSD, so a new PSD was saved",
+    "zh": "图层关联信息与原始 PSD 不一致，已另存为新的 PSD。",
+    "ja": "元の PSD とレイヤーの対応情報が一致しないため、新しい PSD として保存しました",
+    "vars": [],
+    "testsMatch": "원본 PSD (psd.test)"
+  },
+  "engine.psd.save.rasterizedName": {
+    "file": "src/io/formats/psdWrite.ts:827, src/io/formats/psdWrite.ts:1082",
+    "category": "B",
+    "ko": "{name} (래스터로 굳힘)",
+    "en": "{name} (rasterized)",
+    "zh": "{name}（已栅格化）",
+    "ja": "{name} (ラスタライズ済み)",
+    "vars": [
+      "name"
+    ],
+    "note": "PSD 파일 안에 저장되는 레이어 이름"
+  },
+  "engine.psd.save.droppedObjects": {
+    "file": "src/io/formats/psdWrite.ts:829, src/io/formats/psdWrite.ts:1206",
+    "category": "A",
+    "ko": "래스터로 바꿀 수 없어 빠진 개체 {n}개: {names}",
+    "en": "{n} objects were left out because they could not be rasterized: {names}",
+    "zh": "{n} 个对象因无法栅格化而被省略：{names}",
+    "ja": "ラスタライズできず省かれたオブジェクト {n} 個: {names}",
+    "vars": [
+      "n",
+      "names"
+    ],
+    "testsMatch": "빠진 개체 1개 (psd.test)"
+  },
+  "engine.psd.save.droppedObjects_one": {
+    "file": "src/io/formats/psdWrite.ts:829, src/io/formats/psdWrite.ts:1206",
+    "category": "A",
+    "ko": "래스터로 바꿀 수 없어 빠진 개체 {n}개: {names}",
+    "en": "{n} object was left out because it could not be rasterized: {names}",
+    "zh": "{n} 个对象因无法栅格化而被省略：{names}",
+    "ja": "ラスタライズできず省かれたオブジェクト {n} 個: {names}",
+    "vars": [
+      "n",
+      "names"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.psd.save.droppedObjects)"
+  },
+  "engine.psd.save.canvasResized": {
+    "file": "src/io/formats/psdWrite.ts:920",
+    "category": "A",
+    "ko": "캔버스 크기 변경({w0}×{h0} → {w1}×{h1})은 PSD에 반영하지 않고 원본 크기로 저장했습니다",
+    "en": "The canvas size change ({w0}×{h0} → {w1}×{h1}) was not applied to the PSD; it was saved at the original size",
+    "zh": "画布尺寸更改（{w0}×{h0} → {w1}×{h1}）未应用到 PSD，已按原始尺寸保存。",
+    "ja": "キャンバスサイズの変更 ({w0}×{h0} → {w1}×{h1}) は PSD に反映せず、元のサイズで保存しました",
+    "vars": [
+      "h0",
+      "h1",
+      "w0",
+      "w1"
+    ],
+    "testsMatch": "캔버스 크기 (photoshop-rules)"
+  },
+  "engine.psd.save.groupMarkersDropped": {
+    "file": "src/io/formats/psdWrite.ts:1031",
+    "category": "A",
+    "ko": "레이어 순서를 바꾸면서 짝이 맞지 않게 된 그룹 표시 {n}개를 빼고 저장했습니다 (레이어는 모두 남고 해당 그룹만 풀립니다)",
+    "en": "{n} group markers that no longer pair up after reordering layers were removed (all layers remain; only those groups are ungrouped)",
+    "zh": "已移除因调整图层顺序而不再成对的 {n} 个组标记后保存（所有图层均保留，仅解除相应的组）。",
+    "ja": "レイヤーの順序変更で対応が崩れたグループ表示 {n} 個を除いて保存しました (レイヤーはすべて残り、該当するグループだけが解除されます)",
+    "vars": [
+      "n"
+    ],
+    "testsMatch": "그룹 표시 (psdQa not.toContain)"
+  },
+  "engine.psd.save.groupMarkersDropped_one": {
+    "file": "src/io/formats/psdWrite.ts:1031",
+    "category": "A",
+    "ko": "레이어 순서를 바꾸면서 짝이 맞지 않게 된 그룹 표시 {n}개를 빼고 저장했습니다 (레이어는 모두 남고 해당 그룹만 풀립니다)",
+    "en": "{n} group marker that no longer pairs up after reordering layers was removed (all layers remain; only that group is ungrouped)",
+    "zh": "已移除因调整图层顺序而不再成对的 {n} 个组标记后保存（所有图层均保留，仅解除相应的组）。",
+    "ja": "レイヤーの順序変更で対応が崩れたグループ表示 {n} 個を除いて保存しました (レイヤーはすべて残り、該当するグループだけが解除されます)",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.psd.save.groupMarkersDropped)"
+  },
+  "engine.psd.save.cannotRewrite": {
+    "file": "src/io/formats/psdWrite.ts:1052",
+    "category": "A",
+    "ko": "이 PSD(색상 모드 {mode}, {depth}비트)는 레이어 픽셀·합쳐진 이미지를 다시 쓸 수 없습니다 — 편집 없이 저장하거나 Photoshop에서 RGB 8/16비트로 바꾸세요",
+    "en": "This PSD (color mode {mode}, {depth}-bit) cannot have its layer pixels or composite image rewritten — save it without edits, or convert it to RGB 8/16-bit in Photoshop",
+    "zh": "此 PSD（颜色模式 {mode}，{depth} 位）无法重写图层像素和合并图像——请不做编辑直接保存，或在 Photoshop 中转换为 RGB 8/16 位。",
+    "ja": "この PSD (カラーモード {mode}、{depth} ビット) はレイヤーのピクセルと統合画像を書き直せません — 編集せずに保存するか、Photoshop で RGB 8/16 ビットに変換してください",
+    "vars": [
+      "depth",
+      "mode"
+    ]
+  },
+  "engine.psd.save.masksMerged": {
+    "file": "src/io/formats/psdWrite.ts:1207",
+    "category": "A",
+    "ko": "픽셀을 고친 레이어 {n}개는 레이어 마스크를 픽셀에 합쳐 저장했습니다",
+    "en": "For {n} layers with edited pixels, the layer mask was merged into the pixels",
+    "zh": "{n} 个已修改像素的图层已将图层蒙版合并到像素中保存。",
+    "ja": "ピクセルを修正したレイヤー {n} 個は、レイヤーマスクをピクセルに統合して保存しました",
+    "vars": [
+      "n"
+    ],
+    "testsMatch": "마스크 (psd.test)"
+  },
+  "engine.psd.save.masksMerged_one": {
+    "file": "src/io/formats/psdWrite.ts:1207",
+    "category": "A",
+    "ko": "픽셀을 고친 레이어 {n}개는 레이어 마스크를 픽셀에 합쳐 저장했습니다",
+    "en": "For {n} layer with edited pixels, the layer mask was merged into the pixels",
+    "zh": "{n} 个已修改像素的图层已将图层蒙版合并到像素中保存。",
+    "ja": "ピクセルを修正したレイヤー {n} 個は、レイヤーマスクをピクセルに統合して保存しました",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.psd.save.masksMerged)"
+  },
+  "engine.psd.save.bgLockFixed": {
+    "file": "src/io/formats/psdWrite.ts:1208",
+    "category": "A",
+    "ko": "배경 잠금이 남아 있던 투명 레이어를 일반 레이어로 고쳐 저장했습니다 (Photoshop이 직접 쓰지 않는 조합)",
+    "en": "A transparent layer that still had the background lock was saved as a normal layer (a combination Photoshop does not write)",
+    "zh": "仍带有背景锁定的透明图层已改为普通图层保存（Photoshop 不会直接写入这种组合）。",
+    "ja": "背景のロックが残っていた透明レイヤーを通常のレイヤーに直して保存しました (Photoshop 自体は書き出さない組み合わせ)",
+    "vars": [],
+    "testsMatch": "배경 잠금 (photoshop-rules)"
+  },
+  "engine.psd.save.bgMoved": {
+    "file": "src/io/formats/psdWrite.ts:1209",
+    "category": "A",
+    "ko": "배경 레이어를 옮기거나 다른 레이어를 아래에 두어 일반 레이어(투명도 포함)로 저장했습니다",
+    "en": "The background layer was moved or has layers below it, so it was saved as a normal layer (with transparency)",
+    "zh": "背景图层已被移动或其下方有其他图层，已保存为普通图层（含透明度）。",
+    "ja": "背景レイヤーを移動したか下に別のレイヤーを置いたため、通常のレイヤー (透明度あり) として保存しました",
+    "vars": []
+  },
+  "engine.psd.save.cmykReinked": {
+    "file": "src/io/formats/psdWrite.ts:1725",
+    "category": "A",
+    "ko": "CMYK 문서에서 새로 넣었거나 픽셀을 고친 레이어 {n}개는 새 픽셀·바뀐 픽셀의 잉크(C·M·Y·K)를 화면 색에서 다시 나눠 저장했습니다 (검정 = 회색 성분) — 보이는 색은 같지만 그 픽셀의 원래 잉크 비율은 바뀝니다. 바뀌지 않은 픽셀과 고치지 않은 레이어의 잉크는 그대로입니다",
+    "en": "In {n} new or pixel-edited layers of this CMYK document, the inks (C, M, Y, K) of new and changed pixels were split again from their screen color (black = the gray part): the color looks the same, but those pixels' original ink proportions change. Unchanged pixels and unedited layers keep their inks",
+    "zh": "此 CMYK 文档中 {n} 个新增或已修改像素的图层，其新像素和已更改像素的油墨（C·M·Y·K）已根据屏幕颜色重新分解保存（黑色 = 灰色成分）：看到的颜色相同，但这些像素原有的油墨比例会改变。未更改的像素和未编辑的图层保留原有油墨。",
+    "ja": "この CMYK 文書で新しく追加またはピクセルを修正したレイヤー {n} 個は、新しいピクセル・変更したピクセルのインキ (C・M・Y・K) を画面の色から分け直して保存しました (墨 = グレー成分)。見た目の色は同じですが、そのピクセルの元のインキ比率は変わります。変更していないピクセルと編集していないレイヤーのインキはそのままです",
+    "vars": [
+      "n"
+    ],
+    "testsMatch": "잉크(C·M·Y·K)를 화면 색에서 다시 나눠 (tests/psd/cmykNotice)"
+  },
+  "engine.psd.save.rasterizedLayers": {
+    "file": "src/io/formats/psdWrite.ts:1210",
+    "category": "A",
+    "ko": "픽셀을 고친 텍스트·고급 개체·모양 레이어 {n}개는 래스터 레이어로 저장했습니다",
+    "en": "{n} text, Smart Object or shape layers with edited pixels were saved as raster layers",
+    "zh": "{n} 个已修改像素的文本、智能对象或形状图层已保存为栅格图层。",
+    "ja": "ピクセルを修正したテキスト・スマートオブジェクト・シェイプレイヤー {n} 個はラスターレイヤーとして保存しました",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.psd.save.rasterizedLayers_one": {
+    "file": "src/io/formats/psdWrite.ts:1210",
+    "category": "A",
+    "ko": "픽셀을 고친 텍스트·고급 개체·모양 레이어 {n}개는 래스터 레이어로 저장했습니다",
+    "en": "{n} text, Smart Object or shape layer with edited pixels was saved as a raster layer",
+    "zh": "{n} 个已修改像素的文本、智能对象或形状图层已保存为栅格图层。",
+    "ja": "ピクセルを修正したテキスト・スマートオブジェクト・シェイプレイヤー {n} 個はラスターレイヤーとして保存しました",
+    "vars": [
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.psd.save.rasterizedLayers)"
+  },
+  "engine.psd.save.linkedPruned": {
+    "file": "src/io/formats/psdWrite.ts:1300",
+    "category": "A",
+    "ko": "어떤 고급 개체도 쓰지 않는 연결 파일 데이터를 정리했습니다",
+    "en": "Removed linked-file data that no Smart Object uses",
+    "zh": "已清理没有任何智能对象使用的链接文件数据。",
+    "ja": "どのスマートオブジェクトも使っていないリンクファイルのデータを整理しました",
+    "vars": [],
+    "testsMatch": "연결 파일 (photoshop-rules)"
+  },
+  "engine.psd.save.checkFailed": {
+    "file": "src/io/formats/psdWrite.ts:1464",
+    "category": "A",
+    "ko": "PSD 저장 전 검사에서 문제가 발견되어 저장하지 않았습니다 (원본 파일은 그대로입니다): {problems}",
+    "en": "The pre-save PSD check found problems, so nothing was saved (the original file is unchanged): {problems}",
+    "zh": "PSD 保存前检查发现问题，未保存（原始文件保持不变）：{problems}",
+    "ja": "PSD 保存前のチェックで問題が見つかったため保存しませんでした (元のファイルはそのままです): {problems}",
+    "vars": [
+      "problems"
+    ],
+    "testsMatch": "연결 파일 (photoshop-rules toThrow)",
+    "note": "problems는 checkPsd 진단(D)을 \" / \"로 이은 것"
+  },
+  "engine.srt.header.number": {
+    "file": "src/io/formats/srt.ts:50",
+    "category": "B",
+    "ko": "번호",
+    "en": "No.",
+    "zh": "编号",
+    "ja": "番号",
+    "vars": []
+  },
+  "engine.srt.header.start": {
+    "file": "src/io/formats/srt.ts:50",
+    "category": "B",
+    "ko": "시작",
+    "en": "Start",
+    "zh": "开始",
+    "ja": "開始",
+    "vars": []
+  },
+  "engine.srt.header.end": {
+    "file": "src/io/formats/srt.ts:50",
+    "category": "B",
+    "ko": "끝",
+    "en": "End",
+    "zh": "结束",
+    "ja": "終了",
+    "vars": []
+  },
+  "engine.srt.header.text": {
+    "file": "src/io/formats/srt.ts:50",
+    "category": "B",
+    "ko": "자막",
+    "en": "Subtitle",
+    "zh": "字幕",
+    "ja": "字幕",
+    "vars": [],
+    "note": "SRT 내보내기는 열 위치(r[1]~r[3])로 읽으므로 머리글을 번역해도 안전"
+  },
+  "engine.srt.notSrt": {
+    "file": "src/io/formats/srt.ts:59",
+    "category": "A",
+    "ko": "SRT 자막 형식이 아닙니다 (시간 줄 '00:00:01,000 --> 00:00:02,000'을 찾지 못했습니다)",
+    "en": "Not an SRT subtitle file (no time line like \"00:00:01,000 --> 00:00:02,000\" was found)",
+    "zh": "不是 SRT 字幕格式（未找到“00:00:01,000 --> 00:00:02,000”形式的时间行）。",
+    "ja": "SRT 字幕の形式ではありません (「00:00:01,000 --> 00:00:02,000」のような時間の行が見つかりませんでした)",
+    "vars": []
+  },
+  "engine.srt.sheetName": {
+    "file": "src/io/formats/srt.ts:60",
+    "category": "B",
+    "ko": "자막",
+    "en": "Subtitles",
+    "zh": "字幕",
+    "ja": "字幕",
+    "vars": []
+  },
+  "engine.srt.badTimes": {
+    "file": "src/io/formats/srt.ts:85",
+    "category": "A",
+    "ko": "시간 형식이 잘못된 자막 줄: {rows}번 (형식 00:00:01,000)",
+    "en": "Subtitle rows with an invalid time: {rows} (format 00:00:01,000)",
+    "zh": "时间格式错误的字幕行：第 {rows} 行（格式 00:00:01,000）",
+    "ja": "時間の形式が正しくない字幕行: {rows} 番 (形式 00:00:01,000)",
+    "vars": [
+      "rows"
+    ],
+    "testsMatch": "3번 (tabular.test)"
+  },
+  "engine.text.xmlError": {
+    "file": "src/io/formats/text.ts:195",
+    "category": "A",
+    "ko": "XML 문법 오류입니다",
+    "koOld": "XML 문법 오류",
+    "en": "XML syntax error",
+    "zh": "XML 语法错误。",
+    "ja": "XML の構文エラーです",
+    "vars": []
+  },
+  "engine.text.noRoot": {
+    "file": "src/io/formats/text.ts:196",
+    "category": "A",
+    "ko": "루트 요소가 없습니다",
+    "en": "There is no root element",
+    "zh": "没有根元素。",
+    "ja": "ルート要素がありません",
+    "vars": []
+  },
+  "engine.text.yamlTab": {
+    "file": "src/io/formats/text.ts:223",
+    "category": "A",
+    "ko": "들여쓰기에 탭 문자를 쓸 수 없습니다",
+    "en": "Tab characters cannot be used for indentation",
+    "zh": "缩进中不能使用制表符。",
+    "ja": "インデントにタブ文字は使えません",
+    "vars": [],
+    "testsMatch": "탭 (text.test)"
+  },
+  "engine.text.yamlDuplicateKey": {
+    "file": "src/io/formats/text.ts:241",
+    "category": "A",
+    "ko": "같은 수준에 중복된 키가 있습니다: '{key}'",
+    "koOld": "같은 수준에 키 '${k}'가 중복됩니다",
+    "en": "Duplicate key at the same level: \"{key}\"",
+    "zh": "同一层级中有重复的键：“{key}”",
+    "ja": "同じ階層に重複したキーがあります: 「{key}」",
+    "vars": [
+      "key"
+    ],
+    "testsMatch": "중복 (text.test)"
+  },
+  "engine.text.unclosedQuote": {
+    "file": "src/io/formats/text.ts:275",
+    "category": "A",
+    "ko": "따옴표가 닫히지 않았습니다 ({quote})",
+    "koOld": "닫히지 않은 따옴표 (${q})",
+    "en": "Unclosed quotation mark ({quote})",
+    "zh": "引号未闭合（{quote}）。",
+    "ja": "引用符が閉じていません ({quote})",
+    "vars": [
+      "quote"
+    ],
+    "testsMatch": "따옴표 (text.test)"
+  },
+  "engine.text.unclosedBracket": {
+    "file": "src/io/formats/text.ts:276",
+    "category": "A",
+    "ko": "괄호가 닫히지 않았습니다 ([ 또는 {)",
+    "koOld": "닫히지 않은 [ 또는 {",
+    "en": "Unclosed bracket ([ or {)",
+    "zh": "括号未闭合（[ 或 {）。",
+    "ja": "括弧が閉じていません ([ または {)",
+    "vars": [],
+    "note": "글 안의 '{'는 자리표시가 아님 — t()의 /\\{(\\w+)\\}/에 걸리지 않는다"
+  },
+  "engine.text.unmatchedBracket": {
+    "file": "src/io/formats/text.ts:277",
+    "category": "A",
+    "ko": "짝이 없는 닫는 괄호가 있습니다 (] 또는 })",
+    "koOld": "짝이 없는 ] 또는 }",
+    "en": "Unmatched closing bracket (] or })",
+    "zh": "存在不成对的右括号（] 或 }）。",
+    "ja": "対応のない閉じ括弧があります (] または })",
+    "vars": []
+  },
+  "engine.tiff.notTiff": {
+    "file": "src/io/formats/tiff.ts:73",
+    "category": "A",
+    "ko": "TIFF 파일이 아닙니다",
+    "en": "Not a TIFF file",
+    "zh": "不是 TIFF 文件。",
+    "ja": "TIFF ファイルではありません",
+    "vars": []
+  },
+  "engine.tiff.bigTiff": {
+    "file": "src/io/formats/tiff.ts:77",
+    "category": "A",
+    "ko": "BigTIFF는 지원하지 않습니다",
+    "en": "BigTIFF is not supported",
+    "zh": "不支持 BigTIFF。",
+    "ja": "BigTIFF には対応していません",
+    "vars": []
+  },
+  "engine.tiff.noSize": {
+    "file": "src/io/formats/tiff.ts:109",
+    "category": "A",
+    "ko": "이미지 크기 태그가 없습니다",
+    "en": "The image size tags are missing",
+    "zh": "缺少图像尺寸标签。",
+    "ja": "画像サイズのタグがありません",
+    "vars": []
+  },
+  "engine.tiff.compression": {
+    "file": "src/io/formats/tiff.ts:110",
+    "category": "A",
+    "ko": "지원하지 않는 TIFF 압축 방식입니다: {code}{kind}",
+    "koOld": "TIFF 압축 방식 ${compression}${compression === 7 || compression === 6 ? \"(JPEG)\" : compression >= 2 && compression <= 4 ? \"(팩스)\" : \"\"}은 지원하지 않습니다",
+    "en": "Unsupported TIFF compression: {code}{kind}",
+    "zh": "不支持的 TIFF 压缩方式：{code}{kind}",
+    "ja": "対応していない TIFF 圧縮方式です: {code}{kind}",
+    "vars": [
+      "code",
+      "kind"
+    ],
+    "note": "kind = \"\" · \"(JPEG)\" · engine.tiff.fax"
+  },
+  "engine.tiff.fax": {
+    "file": "src/io/formats/tiff.ts:110",
+    "category": "A",
+    "ko": "(팩스)",
+    "en": "(fax)",
+    "zh": "（传真）",
+    "ja": "(ファクス)",
+    "vars": []
+  },
+  "engine.tiff.planar": {
+    "file": "src/io/formats/tiff.ts:111",
+    "category": "A",
+    "ko": "평면 분리(planar) TIFF는 지원하지 않습니다",
+    "en": "Planar (separated) TIFF is not supported",
+    "zh": "不支持平面分离（planar）TIFF。",
+    "ja": "プレーナー (planar) TIFF には対応していません",
+    "vars": []
+  },
+  "engine.tiff.fillOrder": {
+    "file": "src/io/formats/tiff.ts:112",
+    "category": "A",
+    "ko": "FillOrder 2 TIFF는 지원하지 않습니다",
+    "en": "FillOrder 2 TIFF is not supported",
+    "zh": "不支持 FillOrder 2 TIFF。",
+    "ja": "FillOrder 2 の TIFF には対応していません",
+    "vars": []
+  },
+  "engine.tiff.bits": {
+    "file": "src/io/formats/tiff.ts:114",
+    "category": "A",
+    "ko": "{bits}비트 TIFF는 지원하지 않습니다",
+    "en": "{bits}-bit TIFF is not supported",
+    "zh": "不支持 {bits} 位 TIFF。",
+    "ja": "{bits} ビットの TIFF には対応していません",
+    "vars": [
+      "bits"
+    ]
+  },
+  "engine.tiff.cmyk": {
+    "file": "src/io/formats/tiff.ts:115",
+    "category": "A",
+    "ko": "CMYK TIFF는 지원하지 않습니다",
+    "en": "CMYK TIFF is not supported",
+    "zh": "不支持 CMYK TIFF。",
+    "ja": "CMYK の TIFF には対応していません",
+    "vars": []
+  },
+  "engine.tiff.ycbcr": {
+    "file": "src/io/formats/tiff.ts:115",
+    "category": "A",
+    "ko": "YCbCr TIFF는 지원하지 않습니다",
+    "en": "YCbCr TIFF is not supported",
+    "zh": "不支持 YCbCr TIFF。",
+    "ja": "YCbCr の TIFF には対応していません",
+    "vars": []
+  },
+  "engine.xlsx.notXlsx": {
+    "file": "src/io/formats/xlsx.ts:100",
+    "category": "A",
+    "ko": "xl/workbook.xml이 없습니다 — XLSX 통합 문서가 아닙니다",
+    "en": "xl/workbook.xml is missing — not an XLSX workbook",
+    "zh": "缺少 xl/workbook.xml——不是 XLSX 工作簿。",
+    "ja": "xl/workbook.xml がありません — XLSX ブックではありません",
+    "vars": []
+  },
+  "engine.xlsx.noContent": {
+    "file": "src/io/formats/xlsx.ts:240",
+    "category": "A",
+    "ko": "내용이 있는 시트가 없습니다",
+    "en": "No sheet has any content",
+    "zh": "没有含内容的工作表。",
+    "ja": "内容のあるシートがありません",
+    "vars": []
+  },
+  "engine.xlsx.noTable": {
+    "file": "src/io/formats/xlsx.ts:295",
+    "category": "A",
+    "ko": "내보낼 표가 없습니다",
+    "en": "There is no table to export",
+    "zh": "没有可导出的表格。",
+    "ja": "書き出す表がありません",
+    "vars": []
+  },
+  "engine.office.notDocx": {
+    "file": "src/io/office.ts:452",
+    "category": "A",
+    "ko": "word/document.xml이 없습니다 — DOCX 파일이 아닙니다",
+    "en": "word/document.xml is missing — not a DOCX file",
+    "zh": "缺少 word/document.xml——不是 DOCX 文件。",
+    "ja": "word/document.xml がありません — DOCX ファイルではありません",
+    "vars": []
+  },
+  "engine.office.notHwpx": {
+    "file": "src/io/office.ts:518",
+    "category": "A",
+    "ko": "Contents/section*.xml이 없습니다 — HWPX 파일이 아닙니다",
+    "en": "Contents/section*.xml is missing — not an HWPX file",
+    "zh": "缺少 Contents/section*.xml——不是 HWPX 文件。",
+    "ja": "Contents/section*.xml がありません — HWPX ファイルではありません",
+    "vars": []
+  },
+  "engine.omw.notOmw": {
+    "file": "src/io/omw.ts:134",
+    "category": "A",
+    "ko": "Omniweave 파일이 아닙니다 (mimetype 불일치)",
+    "en": "Not an Omniweave file (mimetype mismatch)",
+    "zh": "不是 Omniweave 文件（mimetype 不匹配）。",
+    "ja": "Omniweave ファイルではありません (mimetype 不一致)",
+    "vars": []
+  },
+  "engine.omw.noSceneGraph": {
+    "file": "src/io/omw.ts:136",
+    "category": "A",
+    "ko": "scene_graph.cbor가 없습니다 — 손상된 .omw 파일입니다",
+    "koOld": "scene_graph.cbor가 없습니다 — 손상된 .omw 파일",
+    "en": "scene_graph.cbor is missing — the .omw file is damaged",
+    "zh": "缺少 scene_graph.cbor——.omw 文件已损坏。",
+    "ja": "scene_graph.cbor がありません — 破損した .omw ファイルです",
+    "vars": []
+  },
+  "engine.pw.pdfTitle": {
+    "file": "src/io/pdf.ts:68",
+    "category": "A",
+    "ko": "암호로 보호된 PDF",
+    "en": "Password-Protected PDF",
+    "zh": "受密码保护的 PDF",
+    "ja": "パスワードで保護された PDF",
+    "vars": []
+  },
+  "engine.pw.pdfMessage": {
+    "file": "src/io/pdf.ts:68",
+    "category": "A",
+    "ko": "PDF 열기 암호를 입력하세요",
+    "en": "Enter the password to open the PDF",
+    "zh": "请输入 PDF 打开密码",
+    "ja": "PDF を開くパスワードを入力してください",
+    "vars": []
+  },
+  "engine.pdf.needPassword": {
+    "file": "src/io/pdf.ts:84, src/io/pdfsurgeon/document.ts:29",
+    "category": "A",
+    "ko": "암호로 보호된 PDF입니다 — 열기 암호가 필요합니다",
+    "en": "This PDF is password-protected — an open password is required",
+    "zh": "此 PDF 受密码保护——需要打开密码。",
+    "ja": "パスワードで保護された PDF です — 開くためのパスワードが必要です",
+    "vars": [],
+    "testsMatch": "암호 (protection.test, surgeon.test)"
+  },
+  "engine.pdf.fallbackFontFailed": {
+    "file": "src/io/pdf.ts:324",
+    "category": "A",
+    "ko": "대체 글꼴을 불러오지 못했습니다 ({status})",
+    "en": "Could not load the fallback font ({status})",
+    "zh": "无法加载替代字体（{status}）。",
+    "ja": "代替フォントを読み込めませんでした ({status})",
+    "vars": [
+      "status"
+    ]
+  },
+  "engine.pdf.fallbackChars": {
+    "file": "src/io/pdf.ts:347",
+    "category": "A",
+    "ko": "원래 글꼴(서브셋)에 없는 글자 {n}종은 그 부분만 Pretendard로 넣었습니다: {chars}",
+    "koOld": "원래 글꼴(서브셋)에 없는 글자 ${r.fallbackChars.length}종(${r.fallbackChars.slice(0, 12).join(\"\")}${r.fallbackChars.length > 12 ? \"…\" : \"\"})은 그 부분만 Pretendard로 넣었습니다",
+    "en": "{n} characters missing from the original (subset) font were embedded in Pretendard for those parts only: {chars}",
+    "zh": "原字体（子集）中缺少的 {n} 种字符仅在相应部分改用 Pretendard 嵌入：{chars}",
+    "ja": "元のフォント (サブセット) にない {n} 種類の文字は、その部分だけ Pretendard で埋め込みました: {chars}",
+    "vars": [
+      "chars",
+      "n"
+    ],
+    "testsMatch": "Pretendard (fidelity.test)"
+  },
+  "engine.pdf.fallbackChars_one": {
+    "file": "src/io/pdf.ts:347",
+    "category": "A",
+    "ko": "원래 글꼴(서브셋)에 없는 글자 {n}종은 그 부분만 Pretendard로 넣었습니다: {chars}",
+    "en": "{n} character missing from the original (subset) font was embedded in Pretendard for that part only: {chars}",
+    "zh": "原字体（子集）中缺少的 {n} 种字符仅在相应部分改用 Pretendard 嵌入：{chars}",
+    "ja": "元のフォント (サブセット) にない {n} 種類の文字は、その部分だけ Pretendard で埋め込みました: {chars}",
+    "vars": [
+      "chars",
+      "n"
+    ],
+    "note": "n === 1일 때 쓰는 영어 단수형 (engine.pdf.fallbackChars)"
+  },
+  "engine.pdf.moreNotes": {
+    "file": "src/io/pdf.ts:349",
+    "category": "A",
+    "ko": "그 밖에 {n}건",
+    "en": "{n} more",
+    "zh": "另有 {n} 项",
+    "ja": "ほか {n} 件",
+    "vars": [
+      "n"
+    ]
+  },
+  "engine.pdf.sourceMissing": {
+    "file": "src/io/pdf.ts:362",
+    "category": "A",
+    "ko": "원본 PDF 페이지를 찾을 수 없습니다",
+    "en": "The original PDF page cannot be found",
+    "zh": "找不到原始 PDF 页面。",
+    "ja": "元の PDF ページが見つかりません",
+    "vars": []
+  },
+  "engine.pdf.otherEngineVersion": {
+    "file": "src/io/pdf.ts:374",
+    "category": "A",
+    "ko": "{name}: 다른 버전의 PDF 수술 엔진으로 승격된 페이지라 원래 형식 저장을 할 수 없습니다 — 'PDF 문서' 내보내기를 쓰세요",
+    "en": "{name}: this page was made editable by a different version of the PDF surgery engine, so it cannot be saved in its original format — use the PDF document export",
+    "zh": "{name}：此页面由其他版本的 PDF 手术引擎提升，无法以原格式保存——请使用“PDF 文档”导出。",
+    "ja": "{name}: 別のバージョンの PDF 手術エンジンで昇格したページのため、元の形式で保存できません — 「PDF 文書」の書き出しを使ってください",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.pdf.saveConfirm": {
+    "file": "src/io/pdf.ts:397",
+    "category": "A",
+    "ko": "{notes}\n\n이대로 저장할까요?",
+    "en": "{notes}\n\nSave as is?",
+    "zh": "{notes}\n\n要按此保存吗？",
+    "ja": "{notes}\n\nこのまま保存しますか?",
+    "vars": [
+      "notes"
+    ]
+  },
+  "engine.ai.noPdfContent": {
+    "file": "src/io/pdfsurgeon/ai.ts:79, src/io/pdfsurgeon/ai.ts:80",
+    "category": "A",
+    "ko": "PDF 호환 사본이 없는 Illustrator 파일입니다 — 이 파일에는 Illustrator만 읽을 수 있는 전용 데이터와 안내 문구 페이지만 들어 있어 오메가 그림을 열 수 없습니다. Illustrator에서 '다른 이름으로 저장 → Illustrator 옵션 → PDF 호환 파일 만들기'를 켜고 다시 저장한 뒤 여세요.",
+    "koOld": "PDF 호환 사본이 없는 Illustrator 파일입니다 — 이 파일에는 Illustrator만 읽을 수 있는 전용 데이터와 안내 문구 페이지만 들어 있어 오메가 그림을 열 수 없습니다. ",
+    "en": "This Illustrator file has no PDF-compatible copy — it contains only Illustrator-only data and a notice page, so Omniweave cannot open the artwork. In Illustrator, turn on Save As → Illustrator Options → Create PDF Compatible File, save again, and then open it.",
+    "zh": "此 Illustrator 文件没有 PDF 兼容副本——文件中只有 Illustrator 才能读取的专用数据和提示页面，Omniweave 无法打开其中的图稿。请在 Illustrator 中开启“另存为 → Illustrator 选项 → 创建 PDF 兼容文件”，重新保存后再打开。",
+    "ja": "PDF 互換コピーのない Illustrator ファイルです — このファイルには Illustrator だけが読める専用データと案内ページしか含まれていないため、Omniweave ではアートワークを開けません。Illustrator で「別名で保存 → Illustrator オプション → PDF 互換ファイルを作成」をオンにして保存し直してから開いてください。",
+    "vars": [],
+    "testsMatch": "PDF 호환 사본 (REFUSAL_REASON)",
+    "note": "두 리터럴을 이은 한 상수(AI_NO_PDF_CONTENT_MSG)"
+  },
+  "engine.ai.saveNote": {
+    "file": "src/io/pdfsurgeon/ai.ts:83, src/io/pdfsurgeon/ai.ts:84, src/io/pdfsurgeon/ai.ts:85",
+    "category": "A",
+    "ko": "Illustrator 파일(.ai)을 고쳐 저장하면, Illustrator가 우선 읽는 Illustrator 전용 데이터(PieceInfo)를 빼고 PDF 내용 기준으로 저장합니다. Illustrator에서 다시 열면 고친 내용이 보이지만, 레이어·그룹은 PDF 구조로 열리고 라이브 효과·심볼·아트보드 설정 같은 Illustrator 전용 정보는 복원되지 않습니다. 아무것도 고치지 않았으면 원본 파일 그대로 저장합니다.",
+    "koOld": "Illustrator 파일(.ai)을 고쳐 저장하면, Illustrator가 우선 읽는 Illustrator 전용 데이터(PieceInfo)를 빼고 PDF 내용 기준으로 저장합니다. ",
+    "en": "When you edit and save an Illustrator file (.ai), the Illustrator-only data (PieceInfo) that Illustrator reads first is removed and the file is saved from the PDF content. Reopened in Illustrator, your edits are visible, but layers and groups open as the PDF structure, and Illustrator-only information such as live effects, symbols and artboard settings is not restored. If nothing was edited, the original file is saved unchanged.",
+    "zh": "编辑并保存 Illustrator 文件（.ai）时，将去除 Illustrator 优先读取的专用数据（PieceInfo），以 PDF 内容为准保存。在 Illustrator 中重新打开时可以看到修改内容，但图层和组会按 PDF 结构打开，实时效果、符号、画板设置等 Illustrator 专用信息不会恢复。如果没有任何修改，将按原文件保存。",
+    "ja": "Illustrator ファイル (.ai) を修正して保存すると、Illustrator が優先して読む Illustrator 専用データ (PieceInfo) を除き、PDF の内容に基づいて保存します。Illustrator で開き直すと修正内容は表示されますが、レイヤーとグループは PDF の構造で開き、ライブエフェクト・シンボル・アートボード設定などの Illustrator 専用情報は復元されません。何も修正していない場合は元のファイルのまま保存します。",
+    "vars": [],
+    "note": "세 리터럴을 이은 한 상수(AI_SAVE_NOTE)"
+  },
+  "engine.pdf.wrongPassword": {
+    "file": "src/io/pdfsurgeon/decrypt.ts:13",
+    "category": "A",
+    "ko": "PDF 암호가 맞지 않습니다",
+    "en": "The PDF password is incorrect",
+    "zh": "PDF 密码不正确。",
+    "ja": "PDF のパスワードが正しくありません",
+    "vars": []
+  },
+  "engine.pdf.securityHandler": {
+    "file": "src/io/pdfsurgeon/decrypt.ts:110",
+    "category": "A",
+    "ko": "지원하지 않는 보안 처리기입니다: {name} (인증서 암호화 등)",
+    "koOld": "지원하지 않는 보안 처리기: ${nameOf(enc.get(\"Filter\")) ?? \"?\"} (인증서 암호화 등)",
+    "en": "Unsupported security handler: {name} (certificate encryption, etc.)",
+    "zh": "不支持的安全处理程序：{name}（证书加密等）",
+    "ja": "対応していないセキュリティハンドラーです: {name} (証明書による暗号化など)",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.pdf.noOU": {
+    "file": "src/io/pdfsurgeon/decrypt.ts:113",
+    "category": "A",
+    "ko": "암호 사전에 O/U 값이 없습니다",
+    "en": "The encryption dictionary has no O/U values",
+    "zh": "加密字典中没有 O/U 值。",
+    "ja": "暗号化辞書に O/U の値がありません",
+    "vars": []
+  },
+  "engine.pdf.noEncryptDict": {
+    "file": "src/io/pdfsurgeon/decrypt.ts:158",
+    "category": "A",
+    "ko": "암호화 사전을 찾을 수 없습니다",
+    "en": "The encryption dictionary cannot be found",
+    "zh": "找不到加密字典。",
+    "ja": "暗号化辞書が見つかりません",
+    "vars": []
+  },
+  "engine.pdf.pageDamaged": {
+    "file": "src/io/pdfsurgeon/document.ts:163",
+    "category": "A",
+    "ko": "페이지 {page} 객체가 손상되었습니다",
+    "en": "The object for page {page} is damaged",
+    "zh": "第 {page} 页的对象已损坏。",
+    "ja": "ページ {page} のオブジェクトが破損しています",
+    "vars": [
+      "page"
+    ]
+  },
+  "engine.pdf.edit.contentUnreadable": {
+    "file": "src/io/pdfsurgeon/elevate.ts:65",
+    "category": "A",
+    "ko": "페이지 콘텐츠를 읽을 수 없습니다: {error} — 원본 그대로 둡니다",
+    "en": "Cannot read the page content: {error} — left as is",
+    "zh": "无法读取页面内容：{error}——保留原样。",
+    "ja": "ページのコンテンツを読み取れません: {error} — 元のまま残します",
+    "vars": [
+      "error"
+    ],
+    "testsMatch": "읽을 수 없 (ai-robust)"
+  },
+  "engine.pdf.edit.tooManyPaths": {
+    "file": "src/io/pdfsurgeon/elevate.ts:81",
+    "category": "A",
+    "ko": "벡터 패스가 {n}개로 많아 배경으로 둡니다 (최대 {max}개)",
+    "en": "Too many vector paths ({n}); they are left in the background (maximum {max})",
+    "zh": "矢量路径多达 {n} 条，保留为背景（最多 {max} 条）。",
+    "ja": "ベクターパスが {n} 個と多いため背景として残します (最大 {max} 個)",
+    "vars": [
+      "max",
+      "n"
+    ]
+  },
+  "engine.default.pathN": {
+    "file": "src/io/pdfsurgeon/elevate.ts:257",
+    "category": "B",
+    "ko": "패스 {n}",
+    "koOld": "${p.layer ? p.layer + \" · \" : \"\"}패스 ${i + 1}",
+    "en": "Path {n}",
+    "zh": "路径 {n}",
+    "ja": "パス {n}",
+    "vars": [
+      "n"
+    ],
+    "note": "앞의 \"<레이어 이름> · \"는 코드가 붙인다"
+  },
+  "engine.pdf.edit.streamTooLarge": {
+    "file": "src/io/pdfsurgeon/filters.ts:15",
+    "category": "A",
+    "ko": "압축을 푼 스트림이 너무 큽니다({mb}MB 초과) — 손상되었거나 악의적인 데이터로 보고 원본 그대로 둡니다",
+    "en": "The decompressed stream is too large (over {mb} MB) — treated as damaged or malicious data and left as is",
+    "zh": "解压后的流过大（超过 {mb}MB）——视为损坏或恶意数据，保留原样。",
+    "ja": "展開したストリームが大きすぎます ({mb}MB 超) — 破損または悪意のあるデータとみなし、元のまま残します",
+    "vars": [
+      "mb"
+    ]
+  },
+  "engine.pdf.edit.filterUnsupported": {
+    "file": "src/io/pdfsurgeon/filters.ts:94",
+    "category": "A",
+    "ko": "지원하지 않는 필터입니다: {name}",
+    "koOld": "지원하지 않는 필터: ${f.name}",
+    "en": "Unsupported filter: {name}",
+    "zh": "不支持的过滤器：{name}",
+    "ja": "対応していないフィルターです: {name}",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.pdf.edit.flateFailed": {
+    "file": "src/io/pdfsurgeon/filters.ts:122",
+    "category": "A",
+    "ko": "Flate 압축을 풀지 못했습니다: {error}",
+    "koOld": "Flate 압축 해제 실패: ${(e as Error).message}",
+    "en": "Flate decompression failed: {error}",
+    "zh": "Flate 解压失败：{error}",
+    "ja": "Flate の展開に失敗しました: {error}",
+    "vars": [
+      "error"
+    ],
+    "testsMatch": "Flate (ai-robust)"
+  },
+  "engine.pdf.edit.badPredictor": {
+    "file": "src/io/pdfsurgeon/filters.ts:144",
+    "category": "A",
+    "ko": "예측자 매개변수가 잘못되었습니다",
+    "en": "Invalid predictor parameters",
+    "zh": "预测器参数无效。",
+    "ja": "予測子のパラメーターが正しくありません",
+    "vars": []
+  },
+  "engine.pdf.edit.tiffPredictor": {
+    "file": "src/io/pdfsurgeon/filters.ts:147",
+    "category": "A",
+    "ko": "TIFF 예측자는 8비트만 지원합니다",
+    "koOld": "TIFF 예측자(8비트 외) 미지원",
+    "en": "The TIFF predictor is supported for 8 bits only",
+    "zh": "TIFF 预测器仅支持 8 位。",
+    "ja": "TIFF 予測子は 8 ビットのみ対応しています",
+    "vars": []
+  },
+  "engine.pdf.edit.lzwDamaged": {
+    "file": "src/io/pdfsurgeon/filters.ts:261",
+    "category": "A",
+    "ko": "LZW 데이터가 손상되었습니다",
+    "koOld": "LZW 데이터 손상",
+    "en": "LZW data is damaged",
+    "zh": "LZW 数据已损坏。",
+    "ja": "LZW データが破損しています",
+    "vars": []
+  },
+  "engine.pdf.noStartxref": {
+    "file": "src/io/pdfsurgeon/incremental.ts:21",
+    "category": "A",
+    "ko": "startxref가 없는 PDF라 증분 저장을 할 수 없습니다",
+    "koOld": "startxref가 없는 PDF — 증분 저장을 할 수 없습니다",
+    "en": "The PDF has no startxref, so it cannot be saved incrementally",
+    "zh": "PDF 中没有 startxref，无法增量保存。",
+    "ja": "startxref がない PDF のため、増分保存できません",
+    "vars": []
+  },
+  "engine.pdf.badStartxref": {
+    "file": "src/io/pdfsurgeon/incremental.ts:23",
+    "category": "A",
+    "ko": "startxref 위치가 잘못되었습니다",
+    "en": "The startxref offset is invalid",
+    "zh": "startxref 位置无效。",
+    "ja": "startxref の位置が正しくありません",
+    "vars": []
+  },
+  "engine.pdf.noModify": {
+    "file": "src/io/pdfsurgeon/index.ts:65",
+    "category": "A",
+    "ko": "문서 작성자가 내용 수정을 허용하지 않은 PDF입니다(보안 권한) — 소유자 암호로 연 경우에만 고쳐 저장할 수 있습니다",
+    "en": "The author of this PDF does not allow changes (security permissions) — it can be edited and saved only when opened with the owner password",
+    "zh": "文档作者不允许修改此 PDF 的内容（安全权限）——只有使用所有者密码打开时才能修改并保存。",
+    "ja": "文書の作成者が内容の変更を許可していない PDF です (セキュリティ権限) — 所有者パスワードで開いた場合のみ修正して保存できます",
+    "vars": [],
+    "testsMatch": "수정을 허용하지 않은 (surgeon.test)"
+  },
+  "engine.pdf.edit.syntaxError": {
+    "file": "src/io/pdfsurgeon/interpret.ts:163",
+    "category": "A",
+    "ko": "콘텐츠 스트림 구문 오류({key}): {error} — 이 스트림은 원본 그대로 둡니다",
+    "en": "Content stream syntax error ({key}): {error} — this stream is left as is",
+    "zh": "内容流语法错误（{key}）：{error}——此流保留原样。",
+    "ja": "コンテンツストリームの構文エラー ({key}): {error} — このストリームは元のまま残します",
+    "vars": [
+      "error",
+      "key"
+    ],
+    "testsMatch": "구문 오류 (ai-robust, fuzz)"
+  },
+  "engine.pdf.edit.tooManyOps": {
+    "file": "src/io/pdfsurgeon/interpret.ts:167",
+    "category": "A",
+    "ko": "연산이 너무 많아({n}개) 분석을 건너뜁니다 ({key})",
+    "en": "Too many operators ({n}); analysis skipped ({key})",
+    "zh": "运算过多（{n} 个），跳过分析（{key}）。",
+    "ja": "演算子が多すぎるため ({n} 個) 解析をスキップします ({key})",
+    "vars": [
+      "key",
+      "n"
+    ]
+  },
+  "engine.pdf.edit.fontMissing": {
+    "file": "src/io/pdfsurgeon/interpret.ts:410",
+    "category": "A",
+    "ko": "글꼴 리소스 {name} 없음 ({key})",
+    "en": "Font resource {name} is missing ({key})",
+    "zh": "缺少字体资源 {name}（{key}）",
+    "ja": "フォントリソース {name} がありません ({key})",
+    "vars": [
+      "key",
+      "name"
+    ]
+  },
+  "engine.pdf.edit.formRecursion": {
+    "file": "src/io/pdfsurgeon/interpret.ts:541",
+    "category": "A",
+    "ko": "Form XObject 중첩이 너무 깊거나 순환합니다 ({key})",
+    "en": "Form XObject nesting is too deep or circular ({key})",
+    "zh": "Form XObject 嵌套过深或存在循环（{key}）。",
+    "ja": "Form XObject の入れ子が深すぎるか循環しています ({key})",
+    "vars": [
+      "key"
+    ],
+    "testsMatch": "순환|깊 (fuzz)"
+  },
+  "engine.pdf.edit.formDecodeFailed": {
+    "file": "src/io/pdfsurgeon/interpret.ts:548",
+    "category": "A",
+    "ko": "Form XObject 압축 해제 실패({key}): {error}",
+    "en": "Form XObject decompression failed ({key}): {error}",
+    "zh": "Form XObject 解压失败（{key}）：{error}",
+    "ja": "Form XObject の展開に失敗しました ({key}): {error}",
+    "vars": [
+      "error",
+      "key"
+    ]
+  },
+  "engine.pdf.edit.charsDropped": {
+    "file": "src/io/pdfsurgeon/write.ts:171",
+    "category": "A",
+    "ko": "'{chars}': 원래 글꼴과 대체 글꼴 모두에 없는 글자라 뺐습니다",
+    "en": "\"{chars}\": removed because these characters are in neither the original nor the fallback font",
+    "zh": "“{chars}”：原字体和替代字体中都没有这些字符，已删除。",
+    "ja": "「{chars}」: 元のフォントにも代替フォントにもない文字のため削除しました",
+    "vars": [
+      "chars"
+    ],
+    "testsMatch": "漢|😀 (qa.test)"
+  },
+  "engine.pdf.edit.imageFailed": {
+    "file": "src/io/pdfsurgeon/write.ts:199",
+    "category": "A",
+    "ko": "이미지 삽입 실패: {error}",
+    "en": "Image insertion failed: {error}",
+    "zh": "插入图像失败：{error}",
+    "ja": "画像の挿入に失敗しました: {error}",
+    "vars": [
+      "error"
+    ]
+  },
+  "engine.pdf.edit.noFallbackFont": {
+    "file": "src/io/pdfsurgeon/write.ts:340",
+    "category": "A",
+    "ko": "'{text}': 원래 글꼴에 없는 글자인데 대체 글꼴이 없어 뺐습니다",
+    "en": "\"{text}\": removed because the characters are not in the original font and there is no fallback font",
+    "zh": "“{text}”：原字体中没有这些字符且没有替代字体，已删除。",
+    "ja": "「{text}」: 元のフォントにない文字で代替フォントもないため削除しました",
+    "vars": [
+      "text"
+    ]
+  },
+  "engine.pdf.edit.opacityIgnored": {
+    "file": "src/io/pdfsurgeon/write.ts:445",
+    "category": "A",
+    "ko": "'{name}': 불투명도는 PDF 수술 저장에서 반영하지 않습니다",
+    "en": "\"{name}\": opacity is not applied when saving with PDF surgery",
+    "zh": "“{name}”：PDF 手术保存不应用不透明度。",
+    "ja": "「{name}」: 不透明度は PDF 手術での保存に反映されません",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.pdf.edit.objectUnsupported": {
+    "file": "src/io/pdfsurgeon/write.ts:480",
+    "category": "A",
+    "ko": "'{name}' ({type}): PDF 수술 저장은 이 개체를 쓰지 않습니다 — 'PDF 문서' 내보내기를 쓰세요",
+    "en": "\"{name}\" ({type}): PDF surgery save does not write this object — use the PDF document export",
+    "zh": "“{name}”（{type}）：PDF 手术保存不会写入此对象——请使用“PDF 文档”导出。",
+    "ja": "「{name}」({type}): PDF 手術での保存ではこのオブジェクトを書き込みません — 「PDF 文書」の書き出しを使ってください",
+    "vars": [
+      "name",
+      "type"
+    ]
+  },
+  "engine.pdf.edit.overlap": {
+    "file": "src/io/pdfsurgeon/write.ts:491",
+    "category": "A",
+    "ko": "편집 범위가 겹쳐 저장을 중단합니다",
+    "koOld": "겹치는 편집 범위 — 저장을 중단합니다",
+    "en": "Edited ranges overlap — saving stopped",
+    "zh": "编辑范围重叠，已中止保存。",
+    "ja": "編集範囲が重なっているため保存を中止します",
+    "vars": []
+  },
+  "engine.pdf.edit.verifyFailed": {
+    "file": "src/io/pdfsurgeon/write.ts:568",
+    "category": "A",
+    "ko": "편집한 도형을 다시 읽어 확인하지 못했습니다: {error}",
+    "en": "Could not re-read and verify the edited shapes: {error}",
+    "zh": "无法重新读取并确认已编辑的形状：{error}",
+    "ja": "編集した図形を読み直して確認できませんでした: {error}",
+    "vars": [
+      "error"
+    ]
+  },
+  "engine.pdf.edit.colorMismatch": {
+    "file": "src/io/pdfsurgeon/write.ts:576",
+    "category": "A",
+    "ko": "'{name}': 도형 편집을 써 넣었지만 다시 읽은 색이 달라 반영되지 않은 것으로 봅니다",
+    "en": "\"{name}\": the shape edit was written, but the color read back differs, so it is treated as not applied",
+    "zh": "“{name}”：已写入形状编辑，但重新读取的颜色不同，视为未生效。",
+    "ja": "「{name}」: 図形の編集を書き込みましたが、読み直した色が異なるため反映されていないとみなします",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.pdf.edit.rootNotIndirect": {
+    "file": "src/io/pdfsurgeon/write.ts:586",
+    "category": "A",
+    "ko": "페이지 트리 루트가 간접 객체가 아닙니다",
+    "en": "The page tree root is not an indirect object",
+    "zh": "页面树根不是间接对象。",
+    "ja": "ページツリーのルートが間接オブジェクトではありません",
+    "vars": []
+  },
+  "engine.pdf.edit.degenerateMatrix": {
+    "file": "src/io/pdfsurgeon/write.ts:655, src/io/pdfsurgeon/write.ts:680",
+    "category": "A",
+    "ko": "'{name}': 변환 행렬이 퇴화되어 원본을 유지합니다",
+    "en": "\"{name}\": the transform matrix is degenerate, so the original is kept",
+    "zh": "“{name}”：变换矩阵退化，保留原样。",
+    "ja": "「{name}」: 変換行列が退化しているため元のまま保持します",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.pdf.edit.cropIgnored": {
+    "file": "src/io/pdfsurgeon/write.ts:692",
+    "category": "A",
+    "ko": "페이지 자르기는 PDF 수술 저장(원래 형식)에 반영하지 않습니다 — 잘린 모양은 'PDF 문서' 내보내기로 저장하세요",
+    "en": "Page cropping is not applied when saving with PDF surgery (original format) — use the PDF document export to save the cropped look",
+    "zh": "页面裁剪不会应用到 PDF 手术保存（原格式）——如需保存裁剪后的外观，请使用“PDF 文档”导出。",
+    "ja": "ページの切り抜きは PDF 手術での保存 (元の形式) に反映されません — 切り抜いた見た目は「PDF 文書」の書き出しで保存してください",
+    "vars": []
+  },
+  "engine.pdf.fontLoadFailed": {
+    "file": "src/io/pdfVector.ts:129",
+    "category": "A",
+    "ko": "글꼴을 불러오지 못했습니다: {file} ({status})",
+    "en": "Could not load the font: {file} ({status})",
+    "zh": "无法加载字体：{file}（{status}）",
+    "ja": "フォントを読み込めませんでした: {file} ({status})",
+    "vars": [
+      "file",
+      "status"
+    ]
+  },
+  "engine.pdf.export.missingGlyphs": {
+    "file": "src/io/pdfVector.ts:779",
+    "category": "A",
+    "ko": "{name}: 글꼴(Pretendard)에 없는 글자 {chars} — {result}",
+    "koOld": "${n.name}: 글꼴(Pretendard)에 없는 글자 ${missing.slice(0, 12).join(\" \")}${missing.length > 12 ? \" …\" : \"\"} — ${invisible ? \"그림으로 넣고 글자는 검색용으로 남겼습니다\" : \"PDF에서 빈 네모로 보일 수 있습니다\"}",
+    "en": "{name}: characters not in the font (Pretendard): {chars} — {result}",
+    "zh": "{name}：字体（Pretendard）中没有的字符 {chars}——{result}",
+    "ja": "{name}: フォント (Pretendard) にない文字 {chars} — {result}",
+    "vars": [
+      "chars",
+      "name",
+      "result"
+    ],
+    "testsMatch": "漢 + 본문 (pdfVectorQa)"
+  },
+  "engine.pdf.export.glyphsAsImage": {
+    "file": "src/io/pdfVector.ts:779",
+    "category": "A",
+    "ko": "그림으로 넣고 글자는 검색용으로 남겼습니다",
+    "en": "embedded as an image, with the text kept for search",
+    "zh": "已作为图片嵌入，文字保留用于搜索",
+    "ja": "画像として埋め込み、文字は検索用に残しました",
+    "vars": []
+  },
+  "engine.pdf.export.glyphsAsBoxes": {
+    "file": "src/io/pdfVector.ts:779",
+    "category": "A",
+    "ko": "PDF에서 빈 네모로 보일 수 있습니다",
+    "en": "may appear as empty boxes in the PDF",
+    "zh": "在 PDF 中可能显示为空白方框",
+    "ja": "PDF で空の四角として表示される場合があります",
+    "vars": []
+  },
+  "engine.pdf.export.objectDropped": {
+    "file": "src/io/pdfVector.ts:806",
+    "category": "A",
+    "ko": "{name}: PDF로 내보낼 수 없어 빠졌습니다 ({type})",
+    "en": "{name}: left out because it cannot be exported to PDF ({type})",
+    "zh": "{name}：无法导出为 PDF，已省略（{type}）",
+    "ja": "{name}: PDF に書き出せないため省きました ({type})",
+    "vars": [
+      "name",
+      "type"
+    ]
+  },
+  "engine.default.untitled": {
+    "file": "src/io/pdfVector.ts:858",
+    "category": "B",
+    "ko": "제목 없음",
+    "en": "Untitled",
+    "zh": "无标题",
+    "ja": "無題",
+    "vars": [],
+    "note": "PDF 메타데이터 Title 대체값. shell.untitled와 같은 글 — 재사용 가능"
+  },
+  "engine.default.outlinePage": {
+    "file": "src/io/pdfVector.ts:883",
+    "category": "B",
+    "ko": "{page}쪽",
+    "en": "Page {page}",
+    "zh": "第 {page} 页",
+    "ja": "{page} ページ",
+    "vars": [
+      "page"
+    ],
+    "note": "PDF 책갈피(outline) 제목"
+  },
+  "engine.filter.images": {
+    "file": "src/io/platform.ts:83",
+    "category": "A",
+    "ko": "이미지",
+    "en": "Images",
+    "zh": "图像",
+    "ja": "画像",
+    "vars": [],
+    "note": "menu.filter.images(\"그림\")와 이름이 다름 — 맞출지 결정"
+  },
+  "engine.print.noPages": {
+    "file": "src/io/print.ts:37, src/io/print.ts:67, src/io/print.ts:252",
+    "category": "A",
+    "ko": "인쇄할 페이지가 없습니다",
+    "en": "There are no pages to print",
+    "zh": "没有可打印的页面。",
+    "ja": "印刷するページがありません",
+    "vars": []
+  },
+  "engine.print.badRange": {
+    "file": "src/io/print.ts:54",
+    "category": "A",
+    "ko": "잘못된 범위입니다: \"{part}\"",
+    "koOld": "잘못된 범위: \"${part}\"",
+    "en": "Invalid range: \"{part}\"",
+    "zh": "范围无效：“{part}”",
+    "ja": "範囲が正しくありません: 「{part}」",
+    "vars": [
+      "part"
+    ]
+  },
+  "engine.print.outOfRange": {
+    "file": "src/io/print.ts:57",
+    "category": "A",
+    "ko": "{part}: 페이지는 1~{total} 사이여야 합니다",
+    "en": "{part}: pages must be between 1 and {total}",
+    "zh": "{part}：页码必须在 1~{total} 之间",
+    "ja": "{part}: ページは 1〜{total} の範囲で指定してください",
+    "vars": [
+      "part",
+      "total"
+    ]
+  },
+  "engine.print.unreadableRange": {
+    "file": "src/io/print.ts:62",
+    "category": "A",
+    "ko": "알아볼 수 없는 범위입니다: \"{part}\" (예: 1-3, 5)",
+    "koOld": "알아볼 수 없는 범위: \"${part}\" (예: 1-3, 5)",
+    "en": "Cannot read the range: \"{part}\" (e.g. 1-3, 5)",
+    "zh": "无法识别的范围：“{part}”（例如：1-3, 5）",
+    "ja": "読み取れない範囲です: 「{part}」 (例: 1-3, 5)",
+    "vars": [
+      "part"
+    ]
+  },
+  "engine.print.noSuchPage": {
+    "file": "src/io/print.ts:64",
+    "category": "A",
+    "ko": "{page}쪽은 없습니다 (1~{total})",
+    "en": "There is no page {page} (1–{total})",
+    "zh": "没有第 {page} 页（1~{total}）",
+    "ja": "{page} ページはありません (1〜{total})",
+    "vars": [
+      "page",
+      "total"
+    ]
+  },
+  "engine.print.photoShrunk": {
+    "file": "src/io/print.ts:288",
+    "category": "A",
+    "ko": "{photo} 사진이 {paper} 용지보다 커서 용지에 맞게 줄였습니다",
+    "en": "The {photo} photo is larger than {paper} paper, so it was shrunk to fit",
+    "zh": "{photo} 照片大于 {paper} 纸张，已缩小以适合纸张。",
+    "ja": "{photo} の写真が {paper} の用紙より大きいため、用紙に合わせて縮小しました",
+    "vars": [
+      "paper",
+      "photo"
+    ],
+    "testsMatch": "줄였습니다 (print.test)",
+    "note": "photo·paper에는 doc.print.photo.* / doc.print.paperSize.*로 번역한 이름을 넣는다"
+  },
+  "engine.print.edgesClipped": {
+    "file": "src/io/print.ts:311",
+    "category": "A",
+    "ko": "용지보다 큰 페이지는 가장자리가 잘립니다",
+    "en": "Pages larger than the paper have their edges cut off",
+    "zh": "大于纸张的页面边缘会被裁掉。",
+    "ja": "用紙より大きいページは端が切れます",
+    "vars": [],
+    "testsMatch": "잘립니다 (print.test)"
+  },
+  "doc.print.title": {
+    "file": "src/io/print.ts:389",
+    "category": "A",
+    "ko": "인쇄",
+    "en": "Print",
+    "zh": "打印",
+    "ja": "印刷",
+    "vars": [],
+    "existingKey": true,
+    "note": "숨긴 iframe의 title"
+  },
+  "engine.print.frameNotReady": {
+    "file": "src/io/print.ts:397",
+    "category": "A",
+    "ko": "PDF 인쇄 창을 준비하지 못했습니다",
+    "en": "Could not prepare the PDF print window",
+    "zh": "无法准备 PDF 打印窗口。",
+    "ja": "PDF の印刷ウィンドウを準備できませんでした",
+    "vars": []
+  },
+  "engine.print.frameOpenFailed": {
+    "file": "src/io/print.ts:404",
+    "category": "A",
+    "ko": "인쇄 프레임을 열 수 없습니다",
+    "en": "Cannot open the print frame",
+    "zh": "无法打开打印框架。",
+    "ja": "印刷フレームを開けません",
+    "vars": []
+  },
+  "engine.tools.heic": {
+    "file": "src/io/tools/imageTools.ts:43",
+    "category": "A",
+    "ko": "HEIC는 이 앱의 내장 브라우저 엔진(WebView2)이 해독하지 못합니다 — 휴대폰 설정에서 '호환성 우선(JPG)'으로 찍거나 사진 앱에서 JPG로 내보내세요",
+    "en": "This app's built-in browser engine (WebView2) cannot decode HEIC — set your phone to \"Most Compatible\" (JPG) or export JPG from your photos app",
+    "zh": "本应用的内置浏览器引擎（WebView2）无法解码 HEIC——请在手机设置中选择“兼容性优先（JPG）”拍摄，或在照片应用中导出为 JPG。",
+    "ja": "このアプリの内蔵ブラウザーエンジン (WebView2) は HEIC をデコードできません — スマートフォンの設定で「互換性優先 (JPG)」で撮影するか、写真アプリで JPG に書き出してください",
+    "vars": []
+  },
+  "engine.tools.imageDecode": {
+    "file": "src/io/tools/imageTools.ts:55",
+    "category": "A",
+    "ko": "이미지를 해석하지 못했습니다 ({mime})",
+    "en": "Could not decode the image ({mime})",
+    "zh": "无法解析图像（{mime}）。",
+    "ja": "画像を解析できませんでした ({mime})",
+    "vars": [
+      "mime"
+    ]
+  },
+  "engine.tools.encodeFailed": {
+    "file": "src/io/tools/imageTools.ts:79",
+    "category": "A",
+    "ko": "인코딩에 실패했습니다",
+    "koOld": "인코딩 실패",
+    "en": "Encoding failed",
+    "zh": "编码失败。",
+    "ja": "エンコードに失敗しました",
+    "vars": []
+  },
+  "engine.tools.formatUnsupported": {
+    "file": "src/io/tools/imageTools.ts:80",
+    "category": "A",
+    "ko": "이 엔진은 {fmt} 저장을 지원하지 않습니다",
+    "en": "This engine cannot save {fmt}",
+    "zh": "此引擎不支持保存为 {fmt}。",
+    "ja": "このエンジンは {fmt} の保存に対応していません",
+    "vars": [
+      "fmt"
+    ]
+  },
+  "engine.tools.pageProgress": {
+    "file": "src/io/tools/imageTools.ts:134",
+    "category": "A",
+    "ko": "{page}쪽",
+    "en": "Page {page}",
+    "zh": "第 {page} 页",
+    "ja": "{page} ページ",
+    "vars": [
+      "page"
+    ]
+  },
+  "engine.tools.pageTooLarge": {
+    "file": "src/io/tools/imageTools.ts:140",
+    "category": "A",
+    "ko": "{page}쪽이 너무 커서 이 해상도로 그릴 수 없습니다 — 해상도를 낮추세요",
+    "en": "Page {page} is too large to render at this resolution — lower the resolution",
+    "zh": "第 {page} 页过大，无法以此分辨率绘制——请降低分辨率。",
+    "ja": "{page} ページが大きすぎてこの解像度では描画できません — 解像度を下げてください",
+    "vars": [
+      "page"
+    ]
+  },
+  "engine.tools.jpgFailed": {
+    "file": "src/io/tools/imageTools.ts:146",
+    "category": "A",
+    "ko": "JPG 인코딩에 실패했습니다",
+    "koOld": "JPG 인코딩 실패",
+    "en": "JPG encoding failed",
+    "zh": "JPG 编码失败。",
+    "ja": "JPG のエンコードに失敗しました",
+    "vars": []
+  },
+  "engine.tools.nothingToMerge": {
+    "file": "src/io/tools/pdfTools.ts:14",
+    "category": "A",
+    "ko": "합칠 PDF가 없습니다",
+    "en": "There are no PDFs to merge",
+    "zh": "没有可合并的 PDF。",
+    "ja": "結合する PDF がありません",
+    "vars": []
+  },
+  "engine.tools.pdfReadFailed": {
+    "file": "src/io/tools/pdfTools.ts:24",
+    "category": "A",
+    "ko": "{name}: PDF를 읽지 못했습니다 ({error})",
+    "en": "{name}: could not read the PDF ({error})",
+    "zh": "{name}：无法读取 PDF（{error}）",
+    "ja": "{name}: PDF を読み込めませんでした ({error})",
+    "vars": [
+      "error",
+      "name"
+    ]
+  },
+  "engine.tools.mergeProtected": {
+    "file": "src/io/tools/pdfTools.ts:26",
+    "category": "A",
+    "ko": "{name}: 암호로 보호된 PDF는 합칠 수 없습니다",
+    "en": "{name}: password-protected PDFs cannot be merged",
+    "zh": "{name}：受密码保护的 PDF 无法合并",
+    "ja": "{name}: パスワードで保護された PDF は結合できません",
+    "vars": [
+      "name"
+    ]
+  },
+  "engine.tools.compressProtected": {
+    "file": "src/io/tools/pdfTools.ts:67",
+    "category": "A",
+    "ko": "암호로 보호된 PDF는 압축할 수 없습니다",
+    "en": "Password-protected PDFs cannot be compressed",
+    "zh": "受密码保护的 PDF 无法压缩。",
+    "ja": "パスワードで保護された PDF は圧縮できません",
+    "vars": []
+  },
+  "engine.tools.progress.recompress": {
+    "file": "src/io/tools/pdfTools.ts:87",
+    "category": "A",
+    "ko": "이미지 재압축",
+    "en": "Recompressing images",
+    "zh": "重新压缩图像",
+    "ja": "画像を再圧縮",
+    "vars": []
+  },
+  "engine.tools.progress.save": {
+    "file": "src/io/tools/pdfTools.ts:127",
+    "category": "A",
+    "ko": "저장",
+    "en": "Saving",
+    "zh": "保存",
+    "ja": "保存",
+    "vars": []
+  },
+  "engine.tools.compressed": {
+    "file": "src/io/tools/pdfTools.ts:138",
+    "category": "A",
+    "ko": "{pct}% 줄었습니다",
+    "koOld": "${Math.round((1 - out.length / before) * 100)}% 줄었습니다${recompressed ? ` (이미지 ${recompressed}/${images}개 재압축)` : \"\"}",
+    "en": "Reduced by {pct}%",
+    "zh": "已减小 {pct}%",
+    "ja": "{pct}% 小さくなりました",
+    "vars": [
+      "pct"
+    ],
+    "note": "뒤의 \" (이미지 …)\"는 코드가 붙인다"
+  },
+  "engine.tools.recompressed": {
+    "file": "src/io/tools/pdfTools.ts:138",
+    "category": "A",
+    "ko": "(이미지 {done}/{total}개 재압축)",
+    "koOld": " (이미지 ${recompressed}/${images}개 재압축)",
+    "en": "({done}/{total} images recompressed)",
+    "zh": "（已重新压缩 {done}/{total} 张图像）",
+    "ja": "(画像 {done}/{total} 個を再圧縮)",
+    "vars": [
+      "done",
+      "total"
+    ]
+  },
+  "engine.tools.cannotShrinkOptimized": {
+    "file": "src/io/tools/pdfTools.ts:140",
+    "category": "A",
+    "ko": "더 줄일 수 없습니다 — 이미 최적화된 PDF이거나 이미지가 작아 재압축 효과가 없습니다 (원본 그대로)",
+    "en": "Cannot reduce further — the PDF is already optimized or its images are too small to benefit from recompression (original kept)",
+    "zh": "无法进一步减小——PDF 已经过优化，或图像太小，重新压缩没有效果（保留原文件）。",
+    "ja": "これ以上小さくできません — すでに最適化された PDF か、画像が小さく再圧縮の効果がありません (元のまま)",
+    "vars": [],
+    "testsMatch": "줄일 수 없습니다 (tools.test)"
+  },
+  "engine.tools.cannotShrinkNoImages": {
+    "file": "src/io/tools/pdfTools.ts:141",
+    "category": "A",
+    "ko": "더 줄일 수 없습니다 — 이미지가 없는 PDF는 글꼴·텍스트가 대부분이라 효과가 거의 없습니다 (원본 그대로)",
+    "en": "Cannot reduce further — a PDF without images is mostly fonts and text, so there is little to gain (original kept)",
+    "zh": "无法进一步减小——没有图像的 PDF 主要由字体和文本组成，几乎没有效果（保留原文件）。",
+    "ja": "これ以上小さくできません — 画像のない PDF はほとんどがフォントとテキストなので、効果はほぼありません (元のまま)",
+    "vars": [],
+    "testsMatch": "줄일 수 없습니다 (tools.test)"
+  },
+  "engine.tools.noImages": {
+    "file": "src/io/tools/pdfTools.ts:158",
+    "category": "A",
+    "ko": "이미지가 없습니다",
+    "en": "There are no images",
+    "zh": "没有图像。",
+    "ja": "画像がありません",
+    "vars": []
+  },
+  "engine.tools.needsConversion": {
+    "file": "src/io/tools/pdfTools.ts:167",
+    "category": "A",
+    "ko": "{name}: 변환이 필요한 형식입니다 ({mime})",
+    "koOld": "${img.name}: ${img.mime}은 변환이 필요합니다",
+    "en": "{name}: this format needs to be converted first ({mime})",
+    "zh": "{name}：此格式需要先转换（{mime}）",
+    "ja": "{name}: 変換が必要な形式です ({mime})",
+    "vars": [
+      "mime",
+      "name"
+    ],
+    "testsMatch": "변환 (tools.test)"
+  }
+}

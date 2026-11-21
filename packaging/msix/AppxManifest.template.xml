@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Omniweave MSIX manifest template. scripts/make-msix.mjs fills the dollar-sign places and writes
+     layout\AppxManifest.xml. Identity (Name, Publisher) = Partner Center › Product identity, kept in store_identity.json.
+     Display names and file-type names are ms-resource strings (resources.pri, ko-KR default, en-US, ja-JP, zh-CN). -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity Name="$NAME" Publisher="$PUBLISHER" Version="$VERSION" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>ms-resource:AppDisplayName</DisplayName>
+    <PublisherDisplayName>$PUBLISHER_DISPLAY_NAME</PublisherDisplayName>
+    <Description>ms-resource:AppDescription</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <!-- 10.0.19041 = Windows 10 2004; WebView2 (Evergreen) is part of Windows 11 and current Windows 10 -->
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="$MAX_TESTED" />
+  </Dependencies>
+
+  <!-- the first is the default language -->
+  <Resources>
+    <Resource Language="ko-KR" />
+    <Resource Language="en-US" />
+    <Resource Language="ja-JP" />
+    <Resource Language="zh-CN" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Omniweave" Executable="Omniweave\omniweave.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="ms-resource:AppDisplayName"
+        Description="ms-resource:AppDescription"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\Square71x71Logo.png"
+                         Square310x310Logo="Assets\Square310x310Logo.png" ShortName="Omniweave" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#151618" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- "Open with": the app reads the file named on its command line (src-tauri/src/lib.rs startup_file).
+             Declaring a type does not make Omniweave the default program; Windows asks the user. -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="omniweave.workspace">
+            <uap:DisplayName>ms-resource:FileTypeWorkspace</uap:DisplayName>
+            <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType ContentType="application/x-omniweave">.omw</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="omniweave.documents">
+            <uap:DisplayName>ms-resource:FileTypeDocuments</uap:DisplayName>
+            <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.docx</uap:FileType>
+              <uap:FileType>.doc</uap:FileType>
+              <uap:FileType>.hwpx</uap:FileType>
+              <uap:FileType>.hwp</uap:FileType>
+              <uap:FileType>.pptx</uap:FileType>
+              <uap:FileType>.ppt</uap:FileType>
+              <uap:FileType>.xlsx</uap:FileType>
+              <uap:FileType>.xls</uap:FileType>
+              <uap:FileType>.csv</uap:FileType>
+              <uap:FileType>.pdf</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="omniweave.graphics">
+            <uap:DisplayName>ms-resource:FileTypeGraphics</uap:DisplayName>
+            <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.psd</uap:FileType>
+              <uap:FileType>.ai</uap:FileType>
+              <uap:FileType>.svg</uap:FileType>
+              <uap:FileType>.dxf</uap:FileType>
+              <uap:FileType>.dwg</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

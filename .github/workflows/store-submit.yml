@@ -1,0 +1,88 @@
+# Microsoft Store: when a GitHub release is published, package the same build as MSIX and submit it to the Store.
+#
+# - Same build: the release's own Omniweave_X.Y.Z_x64-portable.exe (built and self-tested by release.yml) is packed by
+#   scripts/make-msix.mjs — nothing is rebuilt.
+# - Submitted with Microsoft's own Store CLI (msstore, set up by microsoft/setup-msstore-cli — pinned below): it
+#   creates a submission from the last published one, replaces the package and commits it.
+# - Skipped without the secrets (PARTNER_CENTER_TENANT_ID, _CLIENT_ID, _CLIENT_SECRET, _SELLER_ID —
+#   docs/STORE_AUTO_SUBMIT_GUIDE.md) and for pre-releases. The first Store submission is made by hand in Partner Center.
+# - The MSIX is also attached to the release as a build record (it is unsigned; the Store signs what it distributes).
+# - Run by hand (workflow_dispatch) with dry_run to check the credentials without submitting.
+name: Store submit
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag: { description: "release tag (vX.Y.Z)", required: true }
+      dry_run: { description: "check only, do not submit", type: boolean, default: true }
+permissions:
+  contents: write
+jobs:
+  submit:
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
+    runs-on: windows-latest
+    env:
+      PC_TENANT: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+      PC_CLIENT: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+      PC_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+      PC_SELLER: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+      STORE_APP_ID: 9NJJRCRMJ9F0 # Store ID (public)
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Secrets present?
+        id: gate
+        shell: pwsh
+        run: |
+          $ok = [bool]($env:PC_TENANT -and $env:PC_CLIENT -and $env:PC_SECRET -and $env:PC_SELLER)
+          if (-not $ok) { Write-Host "::notice::Store secrets not set — skipping the Store submission (docs/STORE_AUTO_SUBMIT_GUIDE.md)" }
+          "ok=$($ok.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - if: steps.gate.outputs.ok == 'true'
+        uses: actions/checkout@v4
+        with: { ref: "${{ env.TAG }}" }
+      - if: steps.gate.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - if: steps.gate.outputs.ok == 'true'
+        name: Release exe (the same build)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Force dl | Out-Null
+          gh release download $env:TAG -R "${{ github.repository }}" -p "*_x64-portable.exe" -p "SHA256SUMS.txt" -D dl
+          $exe = Get-ChildItem dl -Filter "*_x64-portable.exe" | Select-Object -First 1
+          $want = (Get-Content dl/SHA256SUMS.txt | Where-Object { $_ -match [regex]::Escape($exe.Name) }) -split '\s+' | Select-Object -First 1
+          $got = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
+          if ($want -ne $got) { throw "SHA-256 of $($exe.Name) does not match SHA256SUMS.txt" }
+          & $exe.FullName --selftest | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw "selftest failed" }
+          "EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - if: steps.gate.outputs.ok == 'true'
+        name: MSIX
+        shell: pwsh
+        run: |
+          python -m pip install --quiet pillow
+          $env:OMW_PYTHON = (Get-Command python).Source
+          node scripts/make-msix.mjs --exe $env:EXE --out release
+          "MSIX=$((Get-ChildItem release -Filter *.msix | Select-Object -First 1).FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - if: steps.gate.outputs.ok == 'true'
+        name: Attach the MSIX to the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload $env:TAG $env:MSIX -R "${{ github.repository }}" --clobber
+      - if: steps.gate.outputs.ok == 'true'
+        uses: microsoft/setup-msstore-cli@3b2ec9136230357ce9abc02b9d056626fb248d3f # v1 (Microsoft's Store CLI): the commit the v1 tag named on 2026-11-22
+      - if: steps.gate.outputs.ok == 'true'
+        name: Submit to the Microsoft Store
+        shell: pwsh
+        run: |
+          msstore reconfigure --tenantId $env:PC_TENANT --sellerId $env:PC_SELLER --clientId $env:PC_CLIENT --clientSecret $env:PC_SECRET
+          if ($LASTEXITCODE -ne 0) { throw "msstore reconfigure failed (check the PARTNER_CENTER_* secrets)" }
+          if ("${{ inputs.dry_run }}" -eq "true") {
+            msstore apps get $env:STORE_APP_ID   # credentials and app access only; nothing is submitted
+          } else {
+            msstore publish $env:MSIX --appId $env:STORE_APP_ID
+          }
+          if ($LASTEXITCODE -ne 0) { throw "msstore failed (exit $LASTEXITCODE)" }

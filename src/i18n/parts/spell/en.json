@@ -1,0 +1,13 @@
+{
+  "docmode.tab.review": "Review",
+  "spell.group": "Proofing",
+  "spell.toggle": "Check spelling",
+  "spell.toggleTip": "When you pause typing, misspelled words get a red wavy underline. It shows on screen only and never goes into saved, printed or exported files. The dictionaries are those of the language packs installed in Windows.",
+  "spell.web": "The browser version has no spell checker (use the Windows app).",
+  "spell.using": "Using Windows spell checking",
+  "spell.missing": "No spelling dictionary for: {langs}. Add the language in Windows Settings ▸ Time & language ▸ Language & region to check it.",
+  "spell.noSuggestions": "(No suggestions)",
+  "spell.ignoreAll": "Ignore All",
+  "spell.addToDictionary": "Add to Dictionary",
+  "spell.hist.replace": "Correct spelling"
+}

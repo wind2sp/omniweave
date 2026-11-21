@@ -1,0 +1,11 @@
+{
+  "psdtext.hist.edit": "글자 레이어 편집",
+  "psdtext.bar": "글자 레이어 편집 막대",
+  "psdtext.title": "글자 편집",
+  "psdtext.size": "크기",
+  "psdtext.color": "색",
+  "psdtext.apply": "적용",
+  "psdtext.applyHint": "Ctrl+Enter 또는 바깥 클릭",
+  "psdtext.cancel": "취소",
+  "psdtext.textLabel": "'{name}' 레이어의 글자"
+}

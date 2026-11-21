@@ -1,0 +1,11 @@
+{
+  "modeswitch.autoOn": "자동 — 지금 이 쪽은 '{mode}' 방식으로 편집합니다. 쪽을 옮기면 그 쪽 종류를 따릅니다",
+  "modeswitch.autoUses": "자동이 이 쪽에 쓰는 방식",
+  "modeswitch.pageIs": "이 쪽의 종류는 '{mode}'입니다 — 자동으로 두면 이 방식",
+  "modeswitch.pageCtx": "쪽",
+  "cmd.mode.AUTO": "작업 모드: 자동",
+  "cmd.mode.DOCUMENT": "작업 모드: 문서",
+  "cmd.mode.SLIDE": "작업 모드: 슬라이드",
+  "cmd.mode.IMAGE": "작업 모드: 이미지",
+  "cmd.mode.DESIGN": "작업 모드: 디자인"
+}

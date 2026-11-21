@@ -1,0 +1,15 @@
+{
+  "cmd.review.spelling": "拼写检查",
+  "cmd.format.paragraph": "段落",
+  "cmd.view.layersPanel": "图层面板",
+  "shortcuts.linkMissing": "Ctrl+K（插入超链接）尚不可用。命令搜索现在是 {search}。",
+  "shortcuts.context": "当前页的快捷键：{ctx}",
+  "shortcuts.ctx.WORD": "DOCX 文档",
+  "shortcuts.ctx.HWP": "HWP/HWPX 文档",
+  "shortcuts.ctx.PDF": "PDF",
+  "shortcuts.ctx.SLIDE": "幻灯片",
+  "shortcuts.ctx.IMAGE": "图像",
+  "shortcuts.ctx.DESIGN": "设计",
+  "shortcuts.ctx.SHEET": "工作表",
+  "shortcuts.ctx.CAD": "图纸"
+}

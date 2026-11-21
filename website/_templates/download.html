@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<!-- 이 파일은 build-i18n.mjs가 _templates/download.html + i18n/{{_lang}}.json으로 만든 결과입니다. 직접 고치지 말고 템플릿·번역 파일을 고친 뒤 다시 생성하세요. -->
+<html lang="{{_htmlLang}}" data-lang="{{_lang}}" data-root="{{_root}}" data-page="download">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{dl.title|a}}</title>
+<meta name="description" content="{{dl.description|a}}">
+<meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Omniweave">
+<meta property="og:locale" content="{{_ogLocale}}">
+<meta property="og:title" content="{{dl.ogTitle|a}}">
+<meta property="og:description" content="{{dl.ogDescription|a}}">
+{{_head}}
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{common.ogImageAlt|a}}">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="{{_root}}favicon.ico" sizes="any">
+<link rel="icon" href="{{_root}}favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="{{_root}}apple-touch-icon.png">
+<link rel="manifest" href="{{_root}}site.webmanifest">
+<link rel="preload" href="{{_root}}assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{_root}}assets/css/site.css?v={{_v}}">
+<script src="{{_root}}assets/js/lang.js?v={{_v}}"></script>
+</head>
+<body>
+<a class="skip" href="#main">{{common.skip}}</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="index.html" aria-label="{{common.homeAria|a}}">
+      <img src="{{_root}}assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>{{common.logoSub}}</span>
+    </a>
+    <nav class="nav-links" aria-label="{{common.navAria|a}}">
+      <a href="index.html#modules">{{common.nav.modules}}</a>
+      <a href="index.html#loom">{{common.nav.loom}}</a>
+      <a href="index.html#faq">{{common.nav.faq}}</a>
+      <a href="download.html" aria-current="page">{{common.nav.download}}</a>
+    </nav>
+    <div class="nav-r">
+{{_langmenu}}
+      <a class="btn btn-ghost btn-sm" href="index.html">{{common.nav.home}}</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<section class="dl-hero" aria-labelledby="dl-h">
+  <div class="wrap">
+    <img class="app" src="{{_root}}assets/img/icon-192.png" alt="" width="88" height="88">
+    <h1 id="dl-h">{{dl.h1}}</h1>
+    <p class="lead center-x">{{dl.sub}}</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg off" id="rec-btn" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        <span class="t">{{common.soon}}</span>
+      </a>
+    </div>
+    <p class="rec-sub" id="rec-sub" aria-live="polite">{{dl.recInit}}</p>
+
+    <div class="banner" data-when="unreleased" role="status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
+      <p>{{dl.banner}}</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="platforms" aria-labelledby="plat-h">
+  <div class="wrap">
+    <h2 class="h-sec" id="plat-h">{{dl.platH}}</h2>
+    <p class="lead">{{dl.platLead}}</p>
+
+    <div class="plats">
+      <article class="plat" data-os="win">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1.6"/><path d="M8.5 20.5h7M12 17v3.5"/></svg>
+          <h2>Windows 10 · 11</h2><span class="you" hidden>{{dl.thisPc}}</span>
+        </div>
+        <ul class="files">
+          <li class="file">
+            <div><b>{{dl.win.setup}} <span class="note-inline">{{dl.win.rec}}</span></b><code data-fname="winSetup">Omniweave_0.1.0_x64-setup.exe</code><p>{{dl.win.setupD}}</p></div>
+            <a class="btn btn-primary btn-sm off" data-dl="winSetup" data-on-text="{{common.get|a}}" data-off-text="{{common.soon|a}}" aria-disabled="true"><span class="t">{{common.soon}}</span></a>
+          </li>
+          <li class="file">
+            <div><b>{{dl.win.portable}}</b><code data-fname="winPortable">Omniweave_0.1.0_x64-portable.exe</code><p>{{dl.win.portableD}}</p></div>
+            <a class="btn btn-ghost btn-sm off" data-dl="winPortable" data-on-text="{{common.get|a}}" data-off-text="{{common.soon|a}}" aria-disabled="true"><span class="t">{{common.soon}}</span></a>
+          </li>
+        </ul>
+      </article>
+
+      <article class="plat" data-os="web">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3"/></svg>
+          <h2>{{dl.web.h}}</h2>
+        </div>
+        <p>{{dl.web.p}}</p>
+        <p data-when="demo" hidden><a class="btn btn-ghost btn-sm" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">{{dl.web.demo}}</span></a> <span class="note">{{dl.web.demoNote}}</span></p>
+        <div class="term">
+          <div class="term-h"><span>{{dl.web.term}}</span><button type="button" class="copy" data-copy="qs-web">{{common.copy}}</button></div>
+<pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
+cd omniweave
+npm i
+npm run dev</pre>
+        </div>
+        <p class="note" data-when="no-repo">{{dl.web.noRepo}}</p>
+      </article>
+
+      <article class="plat" data-os="mac">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="12" rx="1.6"/><path d="M1 19.5h22"/></svg>
+          <h2>macOS <span class="tag-exp">{{dl.exp}}</span></h2><span class="you" hidden>{{dl.thisMac}}</span>
+        </div>
+        <ul class="files">
+          <li class="file">
+            <div><b>{{dl.mac.dmg}}</b><code data-fname="macDmg">Omniweave_0.1.0_universal.dmg</code><p>{{dl.mac.dmgD}}</p></div>
+            <a class="btn btn-ghost btn-sm off" data-dl="macDmg" data-on-text="{{common.get|a}}" data-off-text="{{common.soon|a}}" aria-disabled="true"><span class="t">{{common.soon}}</span></a>
+          </li>
+        </ul>
+        <p>{{dl.mac.gate}}</p>
+      </article>
+
+      <article class="plat" data-os="linux">
+        <div class="plat-h">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12.5 15H17"/></svg>
+          <h2>Linux <span class="tag-exp">{{dl.exp}}</span></h2><span class="you" hidden>{{dl.thisPc}}</span>
+        </div>
+        <ul class="files">
+          <li class="file">
+            <div><b>AppImage (x86_64)</b><code data-fname="linuxAppImage">Omniweave_0.1.0_amd64.AppImage</code><p>{{dl.linux.d}}</p></div>
+            <a class="btn btn-ghost btn-sm off" data-dl="linuxAppImage" data-on-text="{{common.get|a}}" data-off-text="{{common.soon|a}}" aria-disabled="true"><span class="t">{{common.soon}}</span></a>
+          </li>
+        </ul>
+        <p>{{dl.linux.chmod}} <code>chmod +x Omniweave_*.AppImage</code></p>
+      </article>
+    </div>
+
+    <p class="note">{{dl.allReleases}} <a data-release-page hidden class="grad">{{dl.releasesLink}}</a><span data-when="unreleased">{{dl.releasesSoon}}</span></p>
+  </div>
+</section>
+
+<section class="sec alt" aria-label="{{dl.infoAria|a}}">
+  <div class="wrap">
+    <div class="info">
+
+      <div class="box" id="smartscreen">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M12 8v4.5M12 16h.01"/></svg>{{dl.ss.h}}</h2>
+        <p data-when="unsigned">{{dl.ss.unsigned}}</p>
+        <p data-when="signed" hidden>{{dl.ss.signed}}</p>
+        <ol>{{dl.ss.steps}}</ol>
+        <p>{{dl.ss.warn}}</p>
+      </div>
+
+      <div class="box" id="update">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v3.5h3.5M4 13a8 8 0 0 0 14.6 4.5M20 20v-3.5h-3.5"/></svg>{{dl.up.h}}</h2>
+        <div data-when="no-autoupdate">
+          <p>{{dl.up.manual}}</p>
+          <ol>{{dl.up.steps}}</ol>
+          <p>{{dl.up.portable}}</p>
+        </div>
+        <div data-when="autoupdate" hidden>
+          <p>{{dl.up.auto}}</p>
+          <p>{{dl.up.autoPortable}}</p>
+        </div>
+      </div>
+
+      <div class="box wide" id="checksum">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>{{dl.ck.h}}</h2>
+        <p>{{dl.ck.p1}} <a class="grad off-link" data-dl="checksums" data-on-text="SHA256SUMS.txt" data-off-text="SHA256SUMS.txt" aria-disabled="true"><span class="t">SHA256SUMS.txt</span></a>{{dl.ck.p2}}</p>
+        <div class="tabs" role="tablist" aria-label="{{dl.ck.tabsAria|a}}">
+          <button type="button" role="tab" id="t-win" aria-controls="p-win" aria-selected="true" data-os="win">Windows (PowerShell)</button>
+          <button type="button" role="tab" id="t-mac" aria-controls="p-mac" aria-selected="false" tabindex="-1" data-os="mac">macOS</button>
+          <button type="button" role="tab" id="t-lin" aria-controls="p-lin" aria-selected="false" tabindex="-1" data-os="linux">Linux</button>
+        </div>
+        <div class="term" id="p-win" role="tabpanel" aria-labelledby="t-win">
+          <div class="term-h"><span>{{dl.ck.inFolder}}</span><button type="button" class="copy" data-copy="ck-win">{{common.copy}}</button></div>
+<pre id="ck-win">Get-FileHash .\Omniweave_<span data-ver>0.1.0</span>_x64-setup.exe -Algorithm SHA256
+<span class="c"># {{dl.ck.winNote}}</span></pre>
+        </div>
+        <div class="term" id="p-mac" role="tabpanel" aria-labelledby="t-mac" hidden>
+          <div class="term-h"><span>{{dl.ck.inFolderTerm}}</span><button type="button" class="copy" data-copy="ck-mac">{{common.copy}}</button></div>
+<pre id="ck-mac">shasum -a 256 -c SHA256SUMS.txt --ignore-missing</pre>
+        </div>
+        <div class="term" id="p-lin" role="tabpanel" aria-labelledby="t-lin" hidden>
+          <div class="term-h"><span>{{dl.ck.inFolderTerm}}</span><button type="button" class="copy" data-copy="ck-lin">{{common.copy}}</button></div>
+<pre id="ck-lin">sha256sum -c SHA256SUMS.txt --ignore-missing</pre>
+        </div>
+        <p>{{dl.ck.unix}}</p>
+      </div>
+
+      <div class="box wide" id="requirements">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1.5V4M15 1.5V4M9 20v2.5M15 20v2.5M1.5 9H4M1.5 15H4M20 9h2.5M20 15h2.5"/></svg>{{dl.req.h}}</h2>
+        <table class="req">
+          <tbody>
+            <tr><th scope="row">{{dl.req.osH}}</th><td>{{dl.req.os}}</td></tr>
+            <tr><th scope="row">Microsoft Edge WebView2</th><td>{{dl.req.wv}}</td></tr>
+            <tr><th scope="row">{{dl.req.permH}}</th><td>{{dl.req.perm}}</td></tr>
+            <tr><th scope="row">{{dl.req.webH}}</th><td>{{dl.req.web}}</td></tr>
+            <tr><th scope="row">macOS · Linux</th><td>{{dl.req.other}}</td></tr>
+          </tbody>
+        </table>
+        <p class="note">{{dl.req.note}}</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="legal">
+      <p><strong>Omniweave ({{common.logoSub}})</strong> · <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later</span> · {{common.footer.license}}</p>
+      <p class="name-line">{{common.footer.nameLine}}</p>
+      <p><strong>{{common.footer.tmH}}</strong> {{dl.tm}}</p>
+      <p><a href="index.html">{{common.nav.home}}</a> · <a href="index.html#faq">FAQ</a> · <a href="index.html#name">{{common.footer.l5}}</a> · <a data-repo="" data-on-text="{{common.repoOn|a}}" data-off-text="{{common.footer.repoOff|a}}"><span class="t">{{common.footer.repoOff}}</span></a></p>
+    </div>
+  </div>
+</footer>
+
+<script type="application/json" id="i18n">{{_i18n}}</script>
+<script src="{{_root}}assets/js/site.js?v={{_v}}" defer></script>
+</body>
+</html>

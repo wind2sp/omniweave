@@ -1,0 +1,6 @@
+{
+  "statusbar.devInfo.title": "개발자 정보",
+  "statusbar.devInfo.show": "개발자 정보 보기",
+  "statusbar.devInfo.hint": "상태 표시줄에 화면 그리기 계기(타일·적중률·ms·fps·캐시)를 보여 줍니다.",
+  "statusbar.pageKindTip": "이 쪽의 종류와 크기 — 작업 모드 전환기의 밑줄과 같은 정보입니다"
+}

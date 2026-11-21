@@ -1,0 +1,15 @@
+{
+  "cmd.review.spelling": "맞춤법 검사",
+  "cmd.format.paragraph": "문단 모양",
+  "cmd.view.layersPanel": "레이어 패널",
+  "shortcuts.linkMissing": "Ctrl+K(하이퍼링크 넣기)는 아직 없습니다. 명령 검색은 이제 {search} 키입니다.",
+  "shortcuts.context": "지금 쪽의 단축키: {ctx}",
+  "shortcuts.ctx.WORD": "DOCX 문서",
+  "shortcuts.ctx.HWP": "HWP·HWPX 문서",
+  "shortcuts.ctx.PDF": "PDF",
+  "shortcuts.ctx.SLIDE": "슬라이드",
+  "shortcuts.ctx.IMAGE": "이미지",
+  "shortcuts.ctx.DESIGN": "디자인",
+  "shortcuts.ctx.SHEET": "시트",
+  "shortcuts.ctx.CAD": "도면"
+}

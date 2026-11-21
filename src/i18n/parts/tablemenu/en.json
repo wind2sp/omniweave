@@ -1,0 +1,12 @@
+{
+  "tablemenu.rowAbove": "Insert Rows Above",
+  "tablemenu.rowBelow": "Insert Rows Below",
+  "tablemenu.colLeft": "Insert Columns to the Left",
+  "tablemenu.colRight": "Insert Columns to the Right",
+  "tablemenu.deleteRows": "Delete Rows",
+  "tablemenu.deleteCols": "Delete Columns",
+  "tablemenu.deleteTable": "Delete Table",
+  "tablemenu.merge": "Merge Cells",
+  "tablemenu.split": "Split Cells",
+  "tablemenu.props": "Table Properties (Width, Shading, Borders)…"
+}

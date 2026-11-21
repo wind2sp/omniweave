@@ -1,0 +1,11 @@
+{
+  "modeswitch.autoOn": "Auto — this page is edited as {mode} now. Other pages follow their own kind",
+  "modeswitch.autoUses": "the way Auto edits this page",
+  "modeswitch.pageIs": "This is a {mode} page — Auto would edit it this way",
+  "modeswitch.pageCtx": "Page",
+  "cmd.mode.AUTO": "Work mode: Auto",
+  "cmd.mode.DOCUMENT": "Work mode: Document",
+  "cmd.mode.SLIDE": "Work mode: Slides",
+  "cmd.mode.IMAGE": "Work mode: Image",
+  "cmd.mode.DESIGN": "Work mode: Design"
+}

@@ -1,0 +1,11 @@
+{
+  "psdtext.hist.edit": "テキストレイヤーを編集",
+  "psdtext.bar": "テキストレイヤー編集バー",
+  "psdtext.title": "テキストを編集",
+  "psdtext.size": "サイズ",
+  "psdtext.color": "カラー",
+  "psdtext.apply": "適用",
+  "psdtext.applyHint": "Ctrl+Enter または外側をクリック",
+  "psdtext.cancel": "キャンセル",
+  "psdtext.textLabel": "レイヤー「{name}」のテキスト"
+}

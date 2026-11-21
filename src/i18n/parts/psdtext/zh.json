@@ -1,0 +1,11 @@
+{
+  "psdtext.hist.edit": "编辑文字图层",
+  "psdtext.bar": "文字图层编辑栏",
+  "psdtext.title": "编辑文字",
+  "psdtext.size": "大小",
+  "psdtext.color": "颜色",
+  "psdtext.apply": "应用",
+  "psdtext.applyHint": "Ctrl+Enter 或点击外部",
+  "psdtext.cancel": "取消",
+  "psdtext.textLabel": "图层“{name}”的文字"
+}

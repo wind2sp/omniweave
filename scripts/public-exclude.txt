@@ -1,0 +1,65 @@
+# What the public source tree leaves out (scripts/make-public-tree.mjs).
+#
+# The public repository starts from a plain copy of the tracked files with no git history; everything below stays only
+# in the private development repository. One pattern per line, matched against the repository-relative path:
+#   dir/            the folder and everything in it
+#   a/*.md, a/**    '*' = any characters except '/', '**' = anything
+#   !path           keep this path although a pattern (or the automatic rule below) leaves it out
+#   @needs-private-qa   the automatic rule: test files whose code reads the private QA material (qa/, docs/qa/), and
+#                   test files that import one of them. Without the material they cannot pass, so they are not copied.
+# A line's reason is the comment above it.
+
+# --- QA material and records (private repository only) ---
+# Reference files made by other programs, answer images, downloaded samples, generator scripts and the QA logs. The
+# material comes from licensed programs and from people's documents, and the logs name machines and folders.
+qa/
+# QA issue lists, inspection records and parity scores (docs/qa/README: kept with the material).
+docs/qa/
+# Test files that read the material stay public: without a qa/ folder vitest.config.mjs skips them (the same scan,
+# make-public-tree.mjs needsPrivateQa). The rule '@needs-private-qa' would leave them out instead.
+# AutoCAD reference tests whose default folder is the private shared folder of the QA PC (the DWG answers).
+tests/cad/acis.test.ts
+tests/cad/autocadDump.test.ts
+tests/cad/cadFuzz.test.ts
+tests/cad/refs.test.ts
+tests/cad/refsFinal.test.ts
+
+# --- internal operations documents ---
+# Week plan and work board of the departments: internal assignments, PC names and folders.
+docs/ROADMAP_WEEK.md
+docs/WORK_BOARD.md
+# Desktop sign-off record: test-channel (cloud share) releases and the QA PC.
+docs/DESKTOP_DONE.md
+# Launch checklist with unposted community drafts; published by hand when the time comes.
+docs/GITHUB_LAUNCH.md
+# Store notes that point at another project's local copy, and the step-by-step guide for the company's Partner
+# Center account. packaging/msix/README.md is the public how-to.
+docs/STORE_MSIX.md
+docs/STORE_SUBMIT_GUIDE.md
+# Internal release notes: the test channel, signing-key history, the QA PC's packaged-app trap; and the step-by-step
+# guide for making the public repository and its secrets (for the owner's account).
+docs/RELEASING_INTERNAL.md
+docs/GITHUB_PUBLISH_GUIDE.md
+docs/STORE_AUTO_SUBMIT_GUIDE.md
+# Design memos that study and compare other companies' programs (their screens, menus and behaviour), internal
+# requests and mock-ups. Only the technical design notes below stay public.
+docs/design/
+!docs/design/OCR.md
+!docs/design/INSTALLER_SIZE.md
+!docs/design/OFFICE_SURGEON.md
+!docs/design/LAYOUT_TRUTH.md
+!docs/design/DOC_FLOW.md
+!docs/design/RENDER_CRISPNESS.md
+!docs/design/IMAGE_UPSCALE.md
+# Legal review checklist for counsel (risk notes, not a public statement). TRADEMARKS.md and NOTICE are the public text.
+docs/legal/IP_CHECKLIST.md
+# CMYK profile licence study: names the development PCs in its working notes (the IP department scrubs it, then it can be public).
+docs/legal/CMYK_PROFILES.md
+# Social-media drafts and their generator (marketing material, not source).
+marketing/
+
+# --- test-channel tooling ---
+# Releases to the private cloud test channel; its settings live outside the repository.
+scripts/release-dropbox.mjs
+# CAD fidelity runner: reads the AutoCAD reference drawings kept in a private shared folder.
+scripts/fidelity-cad.mjs

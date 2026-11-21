@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<!-- 이 파일은 build-i18n.mjs가 _templates/index.html + i18n/{{_lang}}.json으로 만든 결과입니다. 직접 고치지 말고 템플릿·번역 파일을 고친 뒤 다시 생성하세요. -->
+<html lang="{{_htmlLang}}" data-lang="{{_lang}}" data-root="{{_root}}" data-page="index">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{index.title|a}}</title>
+<meta name="description" content="{{index.description|a}}">
+<meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Omniweave">
+<meta property="og:locale" content="{{_ogLocale}}">
+<meta property="og:title" content="{{index.ogTitle|a}}">
+<meta property="og:description" content="{{index.ogDescription|a}}">
+{{_head}}
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{common.ogImageAlt|a}}">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="{{_root}}favicon.ico" sizes="any">
+<link rel="icon" href="{{_root}}favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="{{_root}}apple-touch-icon.png">
+<link rel="manifest" href="{{_root}}site.webmanifest">
+<link rel="preload" href="{{_root}}assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{_root}}assets/css/site.css?v={{_v}}">
+<script src="{{_root}}assets/js/lang.js?v={{_v}}"></script>
+</head>
+<body>
+<a class="skip" href="#main">{{common.skip}}</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="index.html" aria-label="{{common.homeAria|a}}">
+      <img src="{{_root}}assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>{{common.logoSub}}</span>
+    </a>
+    <nav class="nav-links" aria-label="{{common.navAria|a}}">
+      <a href="#proof">{{common.nav.proof}}</a>
+      <a href="#modules">{{common.nav.modules}}</a>
+      <a href="#loom">{{common.nav.loom}}</a>
+      <a href="#omw">.omw</a>
+      <a href="#faq">{{common.nav.faq}}</a>
+      <a href="#oss">{{common.nav.oss}}</a>
+    </nav>
+    <div class="nav-r">
+{{_langmenu}}
+      <a class="btn btn-primary btn-sm" href="download.html">{{common.nav.download}}</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ───────── 히어로 ───────── -->
+<section class="hero" aria-labelledby="hero-h">
+  <div class="wrap">
+    <div class="hero-copy">
+      <div class="pills">
+        <span class="pill"><i></i><span data-when="unreleased">{{index.hero.pillSoon}}</span><span data-when="released" hidden>{{index.hero.pillOut}}</span></span>
+        <span class="pill">{{index.hero.pillFree}}</span>
+      </div>
+      <h1 id="hero-h">{{index.hero.h1a}}<span class="l2"><span class="grad">{{index.hero.h1b}}</span></span></h1>
+      <p class="lead">{{index.hero.lead}}</p>
+      <div class="btn-row">
+        <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="{{common.ctaOn|a}}" data-off-text="{{common.ctaOff|a}}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          <span class="t">{{common.ctaOff}}</span>
+        </a>
+        <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">{{index.hero.demo}}</span></a>
+        <a class="btn btn-ghost btn-lg" href="#proof" data-when="no-demo">{{index.hero.how}}</a>
+      </div>
+      <p class="dl-meta">{{index.hero.meta}}</p>
+      <div class="chips" aria-label="{{index.hero.chipsAria|a}}">
+        <span class="chip c-v">{{index.chips.raster}}</span><span class="chip c-t">{{index.chips.vector}}</span><span class="chip c-c">PDF</span><span class="chip c-b">DOCX</span><span class="chip c-o">HWPX</span><span class="chip c-p">{{index.chips.slides}}</span><span class="chip c-v">PSD</span>
+      </div>
+    </div>
+
+    <figure class="shot">
+      <div class="frame">
+        <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>Omniweave</span></div>
+        <div class="frame-body" data-shot="hero" data-alt="{{index.hero.shotAlt|a}}">
+          <div class="ph" role="img" aria-label="{{index.hero.phAria|a}}">
+            <div class="ph-tools"><b></b><b></b><b></b><b></b><b></b><b></b></div>
+            <div class="ph-stage">
+              <div class="ph-page"><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
+              <div class="ph-slide"></div>
+              <div class="ph-blob"></div>
+              <span class="ph-cap">{{index.hero.phCap}}</span>
+            </div>
+            <div class="ph-side"><u></u><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ───────── 증거 (실측·구현 상태) ───────── -->
+<section class="sec" id="proof" aria-labelledby="proof-h">
+  <div class="wrap">
+    <p class="eyebrow">{{index.proof.eyebrow}}</p>
+    <h2 class="h-sec" id="proof-h">{{index.proof.h2}}</h2>
+    <p class="lead">{{index.proof.lead}}</p>
+    <div class="metrics">
+      <div class="metric"><div class="v grad">6.1<small>MiB</small></div><div class="k">{{index.proof.size.k}}</div><div class="d">{{index.proof.size.d}}</div></div>
+      <div class="metric"><div class="v">65<small>/ 81</small></div><div class="k">{{index.proof.corpus.k}}</div><div class="d">{{index.proof.corpus.d}}</div></div>
+      <div class="metric"><div class="v">0<small>{{index.proof.local.unit}}</small></div><div class="k">{{index.proof.local.k}}</div><div class="d">{{index.proof.local.d}}</div></div>
+      <div class="metric"><div class="v">AES<small>-256</small></div><div class="k">{{index.proof.crypto.k}}</div><div class="d">{{index.proof.crypto.d}}</div></div>
+    </div>
+    <div class="common">
+      <div><h4>{{index.proof.formatsH}}</h4>{{index.proof.formats}}</div>
+      <div><h4>{{index.proof.historyH}}</h4>{{index.proof.history}}</div>
+      <div><h4>{{index.proof.toolsH}}</h4>{{index.proof.tools}}</div>
+    </div>
+    <div class="common">
+      <div><h4>{{index.proof.losslessH}}</h4>{{index.proof.lossless}}</div>
+      <div><h4>{{index.proof.signH}}</h4>{{index.proof.sign}}</div>
+      <div><h4>{{index.proof.uiH}}</h4>{{index.proof.ui}}</div>
+    </div>
+    <p class="bench-note">{{index.proof.note}}</p>
+  </div>
+</section>
+
+<!-- ───────── 문제 정의 ───────── -->
+<section class="sec alt" id="why" aria-labelledby="why-h">
+  <div class="wrap prob">
+    <div>
+      <p class="eyebrow">{{index.why.eyebrow}}</p>
+      <h2 class="h-sec" id="why-h">{{index.why.h2}}</h2>
+      <p class="lead">{{index.why.lead}}</p>
+      <div class="switch" aria-hidden="true">
+        <b>{{index.matrix.c1}}</b>→<b>{{index.matrix.c2}}</b>→<b>PDF</b>→<b>{{index.matrix.c4}}</b>→<b>{{index.matrix.c5}}</b>→<b>{{index.matrix.c6}}</b>→ …
+      </div>
+      <ul class="same">
+        <li><span class="c-v">1</span>{{index.why.s1}}</li>
+        <li><span class="c-t">2</span>{{index.why.s2}}</li>
+        <li><span class="c-c">3</span>{{index.why.s3}}</li>
+      </ul>
+      <p class="claim">{{index.why.claim}}</p>
+    </div>
+    <div class="matrix">
+      <table>
+        <caption>{{index.matrix.caption}}</caption>
+        <thead>
+          <tr><th scope="col"><span class="sr-only">{{index.matrix.task}}</span></th><th scope="col">{{index.matrix.h1}}</th><th scope="col">{{index.matrix.h2}}</th><th scope="col">PDF</th><th scope="col">{{index.matrix.h4}}</th><th scope="col">{{index.matrix.h5}}</th><th scope="col">{{index.matrix.h6}}</th></tr>
+        </thead>
+        <tbody>
+{{_matrix}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 6개 모듈 ───────── -->
+<section class="sec" id="modules" aria-labelledby="mod-h">
+  <div class="wrap">
+    <p class="eyebrow">{{index.mods.eyebrow}}</p>
+    <h2 class="h-sec" id="mod-h">{{index.mods.h2}}</h2>
+    <p class="lead">{{index.mods.lead}}</p>
+
+    <div class="mods">
+      <article class="mod c-v">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L12 15.6 8.4 12z"/><path d="M8.4 12C6 12 4.5 13.6 4.5 16c0 1.6-.8 2.6-1.5 3 3.7.9 8.6.2 9-3.4"/></svg></div>
+        <h3>{{index.mods.raster.name}}<small>{{index.mods.raster.like}}</small></h3>
+        <ul>{{index.mods.raster.items}}</ul>
+      </article>
+      <article class="mod c-t">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19C7 8 17 16 20 5"/><rect x="2.5" y="17.5" width="3" height="3" rx=".6"/><rect x="18.5" y="3.5" width="3" height="3" rx=".6"/><path d="M4 19l5-9M20 5l-6 3"/><circle cx="9" cy="10" r="1.2"/><circle cx="14" cy="8" r="1.2"/></svg></div>
+        <h3>{{index.mods.vector.name}}<small>{{index.mods.vector.like}}</small></h3>
+        <ul>{{index.mods.vector.items}}</ul>
+      </article>
+      <article class="mod c-c">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></svg></div>
+        <h3>PDF<small>{{index.mods.pdf.like}}</small></h3>
+        <ul>{{index.mods.pdf.items}}</ul>
+      </article>
+      <article class="mod c-b">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 11.5h8M8 15h5"/></svg></div>
+        <h3>Word<small>DOCX</small></h3>
+        <ul>{{index.mods.word.items}}</ul>
+      </article>
+      <article class="mod c-o">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.5 8.5h5c0 4-1.8 6.5-5 7.5M15.5 7v10M15.5 12h2"/></svg></div>
+        <h3>{{index.mods.hwpx.name}}<small>HWPX</small></h3>
+        <ul>{{index.mods.hwpx.items}}</ul>
+      </article>
+      <article class="mod c-p">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.8"/><path d="M12 16v4M8.5 20h7M10 8.2v4.6l4-2.3z"/></svg></div>
+        <h3>{{index.mods.slides.name}}<small>{{index.mods.slides.like}}</small></h3>
+        <ul>{{index.mods.slides.items}}</ul>
+      </article>
+    </div>
+
+    <div class="common">
+      <div><h4>{{index.common.allH}}</h4>{{index.common.all}}</div>
+      <div><h4>{{index.common.exportH}}</h4>PNG · PDF · SVG · DOCX · HWPX · PPTX · XLSX · CSV · Markdown · HTML · SRT · <code>.omw</code></div>
+      <div><h4>{{index.common.typoH}}</h4>{{index.common.typo}}</div>
+    </div>
+    <p class="note">{{index.mods.note}}</p>
+  </div>
+</section>
+
+<!-- ───────── Loom 엔진 ───────── -->
+<section class="sec alt" id="loom" aria-labelledby="loom-h">
+  <div class="wrap">
+    <div class="loom-grid">
+      <div>
+        <p class="eyebrow">{{index.loom.eyebrow}}</p>
+        <h2 class="h-sec" id="loom-h">{{index.loom.h2}}</h2>
+        <p class="lead">{{index.loom.lead}}</p>
+        <ul class="parts">
+          <li class="c-v"><b>Thread</b><span>{{index.loom.thread}}</span></li>
+          <li class="c-t"><b>Weave Cache</b><span>{{index.loom.weave}}</span></li>
+          <li class="c-c"><b>Shuttle Journal</b><span>{{index.loom.shuttle}}</span></li>
+          <li class="c-p"><b>{{index.loom.historyName}}</b><span>{{index.loom.history}}</span></li>
+        </ul>
+      </div>
+
+      <figure class="loom-viz">
+        <canvas id="loom-canvas" width="800" height="500" role="img" aria-label="{{index.loom.canvasAria|a}}"></canvas>
+        <div class="loom-ctl">
+          <p class="loom-stat" id="loom-stat" aria-live="polite">{{index.loom.statInit}}</p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost btn-sm" id="loom-paint">{{index.loom.paint}}</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="loom-undo" disabled aria-disabled="true">{{index.loom.undo}}</button>
+          </div>
+        </div>
+        <figcaption class="loom-legend">
+          <span class="c-c">{{index.loom.legendMiss}}</span><span class="c-t">{{index.loom.legendHit}}</span><span>{{index.loom.legendNote}}</span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <h3 class="sr-only">{{index.metrics.h}}</h3>
+    <div class="metrics">
+      <div class="metric"><div class="v grad">79.5<small>%</small></div><div class="k">{{index.metrics.m1k}}</div><div class="d">{{index.metrics.m1d}}</div></div>
+      <div class="metric"><div class="v">1.43<small>MiB</small></div><div class="k">{{index.metrics.m2k}}</div><div class="d">{{index.metrics.m2d}}</div></div>
+      <div class="metric"><div class="v">0.36–0.43<small>ms</small></div><div class="k">{{index.metrics.m3k}}</div><div class="d">{{index.metrics.m3d}}</div></div>
+      <div class="metric"><div class="v">0.09–0.18<small>ms</small></div><div class="k">{{index.metrics.m4k}}</div><div class="d">{{index.metrics.m4d}}</div></div>
+    </div>
+    <p class="bench-note">{{index.metrics.note}}</p>
+  </div>
+</section>
+
+<!-- ───────── .omw ───────── -->
+<section class="sec" id="omw" aria-labelledby="omw-h">
+  <div class="wrap">
+    <p class="eyebrow">{{index.omw.eyebrow}}</p>
+    <h2 class="h-sec" id="omw-h">{{index.omw.h2}}</h2>
+    <p class="lead">{{index.omw.lead}}</p>
+    <div class="omw">
+<pre class="tree" tabindex="0" aria-label="{{index.omw.treeAria|a}}"><span class="f">document.omw</span>
+├── <span class="f">mimetype</span>                    <span class="c">{{index.omw.t1}}</span>
+├── <span class="f">manifest.json</span>               <span class="c">{{index.omw.t2}}</span>
+├── <span class="k">scene_graph.cbor</span>            <span class="c">{{index.omw.t3}}</span>
+├── <span class="t">rasters/&lt;hash&gt;.raw</span>          <span class="c">{{index.omw.t4}}</span>
+├── <span class="t">assets/&lt;hash&gt;.&lt;ext&gt;</span>         <span class="c">{{index.omw.t5}}</span>
+├── <span class="f">slides/slide_deck.json</span>      <span class="c">{{index.omw.t6}}</span>
+├── <span class="f">slides/master_styles.json</span>   <span class="c">{{index.omw.t7}}</span>
+├── <span class="f">vectors/paths.json</span>          <span class="c">{{index.omw.t8}}</span>
+├── <span class="f">documents/document.xml</span>      <span class="c">{{index.omw.t9}}</span>
+└── <span class="f">documents/preview.txt</span>       <span class="c">{{index.omw.t10}}</span></pre>
+      <ul class="facts">
+        <li><h3>{{index.omw.f1h}}</h3><p>{{index.omw.f1}}</p></li>
+        <li><h3>{{index.omw.f2h}}</h3><p>{{index.omw.f2}}</p></li>
+        <li><h3>{{index.omw.f3h}}</h3><p>{{index.omw.f3}}</p></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── FAQ ───────── -->
+<section class="sec alt" id="faq" aria-labelledby="faq-h">
+  <div class="wrap center">
+    <p class="eyebrow">{{index.faq.eyebrow}}</p>
+    <h2 class="h-sec" id="faq-h">{{index.faq.h2}}</h2>
+    <p class="lead">{{index.faq.lead}}</p>
+  </div>
+  <div class="wrap">
+    <div class="faq">
+{{_faq}}
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 오픈소스 ───────── -->
+<section class="sec" id="oss" aria-labelledby="oss-h">
+  <div class="wrap oss">
+    <div>
+      <p class="eyebrow">{{index.oss.eyebrow}}</p>
+      <h2 class="h-sec" id="oss-h">{{index.oss.h2}}</h2>
+      <p class="lead">{{index.oss.lead}}</p>
+      <ul class="ways">
+        <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg><div><b>{{index.oss.w1h}}</b><span>{{index.oss.w1}}</span></div></li>
+        <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><div><b>{{index.oss.w2h}}</b><span>{{index.oss.w2}}</span></div></li>
+        <li class="c-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3 4.7-5"/></svg><div><b>{{index.oss.w3h}}</b><span>{{index.oss.w3}}</span></div></li>
+      </ul>
+      <div class="btn-row mt-28">
+        <a class="btn btn-primary" data-repo="" data-on-text="{{common.repoOn|a}}" data-off-text="{{common.repoOff|a}}" aria-disabled="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3-11 6.6"/></svg>
+          <span class="t">{{common.repoOff}}</span>
+        </a>
+        <a class="btn btn-ghost" data-repo="/blob/main/CONTRIBUTING.md" data-on-text="{{index.oss.contribOn|a}}" data-off-text="{{index.oss.contribOff|a}}" aria-disabled="true"><span class="t">{{index.oss.contribOff}}</span></a>
+      </div>
+    </div>
+    <div>
+      <div class="term">
+        <div class="term-h"><span>{{index.oss.termH}}</span><button type="button" class="copy" data-copy="qs">{{common.copy}}</button></div>
+<pre id="qs"><span class="c"># {{index.oss.qsNote}}</span>
+git clone https://github.com/wind2sp/omniweave.git
+cd omniweave
+npm i
+npm run dev      <span class="c"># {{index.oss.qsDev}}</span>
+npm test         <span class="c"># {{index.oss.qsTest}}</span>
+npm run bench    <span class="c"># {{index.oss.qsBench}}</span></pre>
+      </div>
+      <p class="road-h">{{index.oss.roadH}} <span class="note">{{index.oss.roadNote}}</span></p>
+      <ul class="road">{{index.oss.road}}</ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 이름 이야기 ───────── -->
+<section class="sec alt" id="name" aria-labelledby="name-h">
+  <div class="wrap">
+    <div class="name-story">
+      <div>
+        <p class="eyebrow">{{index.name.eyebrow}}</p>
+        <h2 class="h-sec" id="name-h">{{index.name.h2}}</h2>
+        <p class="lead">{{index.name.p1}}</p>
+        <p class="lead">{{index.name.p2}}</p>
+        <p class="name-quote">{{index.name.quote}}</p>
+      </div>
+      <dl class="say">
+        <div lang="ko"><dt>한국어</dt><dd><b>오메</b><span>[o.me]</span></dd></div>
+        <div lang="en"><dt>English</dt><dd><b>Oh-meh</b><span>/oʊ.meɪ/</span></dd></div>
+        <div lang="ja"><dt>日本語</dt><dd><b>オメ</b><span>ome</span></dd></div>
+        <div lang="zh-Hans"><dt>中文</dt><dd><b>欧梅</b><span>Ōuméi</span></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 다운로드 CTA ───────── -->
+<section class="cta" aria-labelledby="cta-h">
+  <div class="wrap">
+    <img src="{{_root}}assets/img/icon-192.png" alt="" width="72" height="72" loading="lazy">
+    <h2 id="cta-h">{{index.cta.h2a}}<br><span class="grad">{{index.cta.h2b}}</span></h2>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="{{common.ctaOn|a}}" data-off-text="{{common.ctaOff|a}}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        <span class="t">{{common.ctaOff}}</span>
+      </a>
+      <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">{{index.hero.demo}}</span></a>
+    </div>
+    <p class="dl-meta">{{index.cta.meta}}</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div>
+        <div class="brand"><img src="{{_root}}assets/img/logo-96.png" alt="" width="28" height="28" loading="lazy">Omniweave ({{common.logoSub}})</div>
+        <p class="mt-10">{{common.footer.tagline}}</p>
+        <p class="mt-10 name-line">{{common.footer.nameLine}}</p>
+      </div>
+      <div>
+        <h2>{{common.footer.exploreH}}</h2>
+        <ul><li><a href="#modules">{{common.footer.l1}}</a></li><li><a href="#loom">{{common.footer.l2}}</a></li><li><a href="#omw">{{common.footer.l3}}</a></li><li><a href="#faq">{{common.footer.l4}}</a></li><li><a href="#name">{{common.footer.l5}}</a></li><li><a href="download.html">{{common.nav.download}}</a></li></ul>
+      </div>
+      <div>
+        <h2>{{common.footer.projectH}}</h2>
+        <ul>
+          <li><a data-repo="" data-on-text="{{common.repoOn|a}}" data-off-text="{{common.footer.repoOff|a}}"><span class="t">{{common.footer.repoOff}}</span></a></li>
+          <li><a data-repo="/issues" data-on-text="{{common.footer.issuesOn|a}}" data-off-text="{{common.footer.issuesOff|a}}"><span class="t">{{common.footer.issuesOff}}</span></a></li>
+          <li><a data-repo="/blob/main/LICENSE" data-on-text="{{common.footer.licenseOn|a}}" data-off-text="{{common.footer.licenseOff|a}}"><span class="t">{{common.footer.licenseOff}}</span></a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <p><strong>{{common.footer.licenseH}}</strong> {{common.footer.license}} <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later</span></p>
+      <p><strong>{{common.footer.cleanH}}</strong> {{common.footer.clean}}</p>
+      <p><strong>{{common.footer.tmH}}</strong> {{common.footer.tm}}</p>
+      <p><strong>{{common.footer.ossH}}</strong> {{common.footer.oss}}</p>
+    </div>
+  </div>
+</footer>
+
+<script type="application/json" id="i18n">{{_i18n}}</script>
+<script src="{{_root}}assets/js/site.js?v={{_v}}" defer></script>
+<script src="{{_root}}assets/js/loom.js?v={{_v}}" defer></script>
+</body>
+</html>

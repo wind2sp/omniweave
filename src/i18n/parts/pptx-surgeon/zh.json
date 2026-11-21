@@ -1,0 +1,10 @@
+{
+  "engine.officeSurgeon.pptxShapeRewritten": "{n} 个形状除位置和文字外还有其他更改，将重新写入。来自版式的格式、链接以及 Omniweave 不读取的效果可能改变，这些形状的按段落动画将被省略",
+  "engine.officeSurgeon.pptxShapeRewritten_one": "{n} 个形状除位置和文字外还有其他更改，将重新写入。来自版式的格式、链接以及 Omniweave 不读取的效果可能改变，该形状的按段落动画将被省略",
+  "engine.officeSurgeon.pptxAnimRemoved": "将清理指向已删除对象的 {n} 个动画",
+  "engine.officeSurgeon.pptxAnimRemoved_one": "将清理指向已删除对象的 {n} 个动画",
+  "engine.officeSurgeon.pptxSlideRewritten": "幻灯片 {list}：尺寸不同或含有图层组，其形状将全部重新写入。这些幻灯片的动画和 Omniweave 不读取的对象将被省略",
+  "engine.officeSurgeon.pptxSlideRewritten_one": "幻灯片 {list}：尺寸不同或含有图层组，其形状将全部重新写入。该幻灯片的动画和 Omniweave 不读取的对象将被省略",
+  "engine.officeSurgeon.pptxLayoutCopied": "幻灯片 {list}：修改过的版式·母版背景图形将复制到幻灯片上（版式保持不变，仅在这些幻灯片上隐藏背景图形）",
+  "engine.officeSurgeon.pptxLayoutCopied_one": "幻灯片 {list}：修改过的版式·母版背景图形将复制到幻灯片上（版式保持不变，仅在该幻灯片上隐藏背景图形）"
+}

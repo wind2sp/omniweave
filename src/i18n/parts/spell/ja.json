@@ -1,0 +1,13 @@
+{
+  "docmode.tab.review": "校閲",
+  "spell.group": "文章校正",
+  "spell.toggle": "スペル チェック",
+  "spell.toggleTip": "入力を止めると、つづりの誤りに赤い波線が付きます。画面だけに表示され、保存・印刷・エクスポートしたファイルには入りません。辞書は Windows にインストールされている言語パックのものを使います。",
+  "spell.web": "ブラウザー版にはスペル チェックがありません（Windows アプリで使えます）。",
+  "spell.using": "Windows のスペル チェックを使用中",
+  "spell.missing": "次の言語にはスペル チェック辞書がありません: {langs}。Windows の設定 ▸ 時刻と言語 ▸ 言語と地域でその言語を追加すると、チェックできます。",
+  "spell.noSuggestions": "(候補なし)",
+  "spell.ignoreAll": "すべて無視",
+  "spell.addToDictionary": "辞書に追加",
+  "spell.hist.replace": "スペルの修正"
+}

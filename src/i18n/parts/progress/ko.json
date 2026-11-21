@@ -1,0 +1,8 @@
+{
+  "progress.cancel": "취소",
+  "progress.open": "{name} 여는 중…",
+  "progress.save": "저장하는 중…",
+  "progress.export": "{fmt} 파일로 내보내는 중…",
+  "progress.ocr": "글자 인식하는 중…",
+  "progress.matte": "배경 지우는 중…"
+}

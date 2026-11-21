@@ -1,0 +1,99 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Omniweave",
+  "version": "0.2.0",
+  "identifier": "app.omniweave.studio",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5199",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Omniweave (오메)",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "center": true,
+        "backgroundColor": "#151618",
+        "decorations": false,
+        "shadow": true,
+        "resizable": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "Omniweave",
+    "category": "GraphicsAndDesign",
+    "shortDescription": "래스터·벡터·PDF·DOCX·HWPX·슬라이드를 한 캔버스에서",
+    "copyright": "Copyright (C) 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "omw"
+        ],
+        "name": "Omniweave Workspace",
+        "description": "Omniweave 작업 파일",
+        "mimeType": "application/x-omniweave",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "languages": [
+          "Korean",
+          "English",
+          "SimpChinese",
+          "Japanese"
+        ],
+        "displayLanguageSelector": false,
+        "template": "./windows/installer.nsi",
+        "installerIcon": "./icons/icon.ico",
+        "installerHooks": "./windows/installer-hooks.nsh",
+        "installMode": "currentUser"
+      },
+      "signCommand": {
+        "cmd": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          "& (Get-Item -Path ../scripts/sign-windows.ps1, ../../../../../scripts/sign-windows.ps1 -ErrorAction SilentlyContinue)[0].FullName",
+          "%1"
+        ]
+      },
+      "digestAlgorithm": "sha256"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDREMUNFNjZEMUY5NzRFREEKUldUYVRwY2ZiZVljVFVEVmgrUEtCdUdKcGtBMlpWczhTaklPSlcxZWQ0bTYxcVpiaisvWkxSWnMK",
+      "endpoints": [
+        "https://github.com/wind2sp/omniweave/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

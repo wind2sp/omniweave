@@ -1,0 +1,9 @@
+{
+  "hwp5write.export.label": "HWP document (.hwp)",
+  "hwp5write.filter": "HWP document",
+  "hwp5write.err.notFromHwp": "This document was not opened from an HWP file, so it cannot be saved as HWP. Save it as HWPX instead.",
+  "hwp5write.err.noOriginal": "The original HWP file content was not found, so it cannot be saved as HWP. Save it as HWPX instead.",
+  "hwp5write.export.hint2": "The HWP file you opened with your text edits · documents with other edits (formatting, pictures …) are saved as HWPX",
+  "hwp5write.format.level2": "Opens paragraphs, character formats, tables and pictures · saved as HWP unedited or with text edits, as HWPX otherwise",
+  "hwp5write.err.otherEdit": "A document with edits other than text (character or paragraph formats, pictures, shapes, table layout, page setup, headers / footers, notes, comments or tracked changes) cannot be saved as HWP. Saving as HWPX keeps your edits and the original formatting."
+}

@@ -1,0 +1,6 @@
+{
+  "statusbar.devInfo.title": "Developer information",
+  "statusbar.devInfo.show": "Show developer information",
+  "statusbar.devInfo.hint": "Shows the rendering meter (tiles, hit rate, ms, fps, cache) in the status bar.",
+  "statusbar.pageKindTip": "Kind and size of this page — the same as the mark in the work mode switch"
+}

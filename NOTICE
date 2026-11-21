@@ -1,0 +1,58 @@
+Omniweave (오메)
+Copyright (C) 2026 NINEROW partners Co., Ltd. (나인로우파트너스(주)) and Omniweave contributors
+
+Director: 황경진 Kyeongjin Hwang
+Contact: wind2sp@9rowpar.com
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program (see the LICENSE file).  If not, see
+<https://www.gnu.org/licenses/>.
+
+SPDX-License-Identifier: GPL-3.0-or-later
+
+The Omniweave name and logo are trademarks. Under section 7(e) of the
+GNU GPL v3, the license does not grant any right to use them; see
+TRADEMARKS.md.
+
+Omniweave includes third-party software and fonts under their own
+licenses (MIT, Apache-2.0, BSD, ISC, Zlib, SIL OFL 1.1 and others),
+including Mozilla pdf.js (Apache-2.0) and the Pretendard font
+(SIL OFL 1.1). See THIRD_PARTY_NOTICES.md for the full list and
+license texts.
+
+Background removal bundles the U²-Netp model weights from U²-Net
+(Xuebin Qin et al., https://github.com/xuebinqin/U-2-Net, Apache-2.0),
+converted (BatchNorm folded, half precision with per-channel
+scales) to Omniweave's own format and run by
+Omniweave's own code (no third-party inference runtime).
+
+Text recognition (OCR) bundles the PP-OCRv5 mobile text detection and
+Korean recognition weights by the PaddlePaddle Authors (PaddleOCR,
+https://github.com/PaddlePaddle/PaddleOCR, Apache-2.0), converted
+(BatchNorm folded, 8-bit weights with per-channel scales) to Omniweave's
+own format and run by Omniweave's own code; the license text ships in
+models/ocr/LICENSE.
+
+Image upscale (AI) bundles the Real-ESRGAN compact models
+realesr-general-x4v3, realesr-general-wdn-x4v3 and realesr-animevideov3
+(Copyright (c) 2021, Xintao Wang; https://github.com/xinntao/Real-ESRGAN,
+BSD 3-Clause), converted (convolution + PReLU fused, half precision /
+8-bit weights) to Omniweave's own format and run by Omniweave's own code;
+the license text ships in models/sr/LICENSE.
+
+CMYK documents without a usable colour profile are shown through an
+altered, reduced version of the FOGRA39L Coated profile from the OpenICC /
+colord free profile set (Kai-Uwe Behrmann, Marti Maria, Photogamut,
+Graeme Gill, ColorSolutions; zlib licence), built on the FOGRA39L
+characterization data by Fogra (www.fogra.org); see
+src/assets/icc/LICENSE-FOGRA39L.txt and THIRD_PARTY_NOTICES.md.

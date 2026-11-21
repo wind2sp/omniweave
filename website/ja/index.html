@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<!-- 이 파일은 build-i18n.mjs가 _templates/index.html + i18n/ja.json으로 만든 결과입니다. 직접 고치지 말고 템플릿·번역 파일을 고친 뒤 다시 생성하세요. -->
+<html lang="ja" data-lang="ja" data-root="../" data-page="index">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Omniweave（オメ）— 原本を壊さないローカルの6-in-1エディター</title>
+<meta name="description" content="インストーラー約17 MB、ファイルをどこにもアップロードしない無料オープンソース（GPL-3.0）エディター。画像・ベクター（AI）・PDF・DOCX・HWPX・スライドとPSDを1つのキャンバスで開いて編集・保存します。">
+<meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Omniweave">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:title" content="Omniweave（オメ）— 原本を壊さないローカルの6-in-1エディター">
+<meta property="og:description" content="インストーラー約17 MB・ファイルはどこにも送らない・画像/ベクター/PDF/DOCX/HWPX/スライド/PSDを1つのキャンバスで。">
+<link rel="alternate" hreflang="ko" href="../index.html">
+<link rel="alternate" hreflang="en" href="../en/index.html">
+<link rel="alternate" hreflang="ja" href="../ja/index.html">
+<link rel="alternate" hreflang="zh-Hans" href="../zh/index.html">
+<link rel="alternate" hreflang="x-default" href="../index.html">
+<meta property="og:image" content="../assets/img/og-image.png">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Omniweave のロゴと「ファイル形式は出口にすぎない。編集はひとつのキャンバスで。」という一文。">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/site.css?v=5">
+<script src="../assets/js/lang.js?v=5"></script>
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="index.html" aria-label="Omniweave ホーム">
+      <img src="../assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>オメ</span>
+    </a>
+    <nav class="nav-links" aria-label="メインメニュー">
+      <a href="#proof">根拠</a>
+      <a href="#modules">モジュール</a>
+      <a href="#loom">Loom エンジン</a>
+      <a href="#omw">.omw</a>
+      <a href="#faq">FAQ</a>
+      <a href="#oss">オープンソース</a>
+    </nav>
+    <div class="nav-r">
+      <details class="lang">
+        <summary aria-label="言語を選択"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3"/></svg><span>日本語</span></summary>
+        <ul>
+          <li><a href="../index.html" hreflang="ko" lang="ko" data-setlang="ko">한국어</a></li>
+          <li><a href="../en/index.html" hreflang="en" lang="en" data-setlang="en">English</a></li>
+          <li><a href="../ja/index.html" hreflang="ja" lang="ja" data-setlang="ja" aria-current="true">日本語</a></li>
+          <li><a href="../zh/index.html" hreflang="zh-Hans" lang="zh-Hans" data-setlang="zh">简体中文</a></li>
+        </ul>
+      </details>
+      <a class="btn btn-primary btn-sm" href="download.html">ダウンロード</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ───────── 히어로 ───────── -->
+<section class="hero" aria-labelledby="hero-h">
+  <div class="wrap">
+    <div class="hero-copy">
+      <div class="pills">
+        <span class="pill"><i></i><span data-when="unreleased">v<span data-cfg="version">0.1.0</span> 公開準備中</span><span data-when="released" hidden>v<span data-cfg="version">0.1.0</span> 公開中</span></span>
+        <span class="pill">無料 · オープンソース（GPL-3.0）</span>
+      </div>
+      <h1 id="hero-h">原本を壊さない、<span class="l2"><span class="grad">ローカルの6-in-1エディター。</span></span></h1>
+      <p class="lead">インストーラーは約17 MB。ファイルはどこにもアップロードしません。画像・ベクター（AI）・PDF・DOCX・HWPX・スライド、そしてPSDまで——1つのキャンバスで開き、直し、必要な形式で保存します。</p>
+      <div class="btn-row">
+        <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="無料ダウンロード" data-off-text="ダウンロード · 近日公開">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          <span class="t">ダウンロード · 近日公開</span>
+        </a>
+        <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">インストールせずに今すぐ試す</span></a>
+        <a class="btn btn-ghost btn-lg" href="#proof" data-when="no-demo">実測結果を見る</a>
+      </div>
+      <p class="dl-meta">Windows 10·11・韓国語・英語・日本語・中国語UI・Webブラウザーで実行・macOS/Linuxは実験的</p>
+      <div class="chips" aria-label="対応形式">
+        <span class="chip c-v">ラスター</span><span class="chip c-t">ベクター</span><span class="chip c-c">PDF</span><span class="chip c-b">DOCX</span><span class="chip c-o">HWPX</span><span class="chip c-p">スライド</span><span class="chip c-v">PSD</span>
+      </div>
+    </div>
+
+    <figure class="shot">
+      <div class="frame">
+        <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>Omniweave</span></div>
+        <div class="frame-body" data-shot="hero" data-alt="Omniweave の実際の画面。ひとつのキャンバスにラスター・ベクター・ドキュメント・スライドのオブジェクトが並んでいます。">
+          <div class="ph" role="img" aria-label="アプリ画面のイメージ図。実際のスクリーンショットは準備中です。">
+            <div class="ph-tools"><b></b><b></b><b></b><b></b><b></b><b></b></div>
+            <div class="ph-stage">
+              <div class="ph-page"><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
+              <div class="ph-slide"></div>
+              <div class="ph-blob"></div>
+              <span class="ph-cap">スクリーンショット準備中</span>
+            </div>
+            <div class="ph-side"><u></u><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ───────── 증거 (실측·구현 상태) ───────── -->
+<section class="sec" id="proof" aria-labelledby="proof-h">
+  <div class="wrap">
+    <p class="eyebrow">言葉より根拠</p>
+    <h2 class="h-sec" id="proof-h">測ったものだけを。<br><em>できないことも一緒に。</em></h2>
+    <p class="lead">以下の数値はすべて実際に実行して得た値で、条件も併記しています。開発中のものは「実装中」と区別して示します。</p>
+    <div class="metrics">
+      <div class="metric"><div class="v grad">6.1<small>MiB</small></div><div class="k">インストーラーのサイズ</div><div class="d">Windows x64インストーラー 0.1.0 開発ビルド（10,239,987バイト）。描画にはWindows搭載のWebView2を使います。</div></div>
+      <div class="metric"><div class="v">65<small>/ 81</small></div><div class="k">実務サンプル81件を開いた結果</div><div class="d">成功65・部分8・失敗0・非対応の案内8。「部分」は旧形式DOC/HWP（本文と表のみ）、PSD（効果・調整を除く）などのケースです。</div></div>
+      <div class="metric"><div class="v">0<small>か所</small></div><div class="k">ファイルを送るサーバー</div><div class="d">開く・編集・保存・変換・クイックツールはすべてPC上で処理します。ネット接続は新バージョンの確認（GitHub Releases）のみに使います。</div></div>
+      <div class="metric"><div class="v">AES<small>-256</small></div><div class="k">暗号化文書は暗号化したまま保存</div><div class="d">PDF（AES-256）・DOCX/XLSX/PPTX（Office Agile）・.omw（AES-256-GCM）。編集後も再暗号化して保存し、再暗号化したOfficeファイルがMicrosoft Office 16で開けることを確認済みです。</div></div>
+    </div>
+    <div class="common">
+      <div><h4>40種類以上の拡張子</h4>ドキュメント・表・スライド・画像・PSD・ビデオ・オーディオ・電子書籍・テキスト・コード。形式ごとに対応範囲（完全・部分・案内）を表示します。</div>
+      <div><h4>履歴タイムライン</h4>開始時からのすべての操作を記録。任意の時点をプレビューして一度で戻れ、履歴は.omwに保存されます。</div>
+      <div><h4>クイックツール6種・ローカル</h4>PDF結合・圧縮・JPG変換、画像→PDF、写真の圧縮、JPG一括変換。アップロード型サイトを使わずPC上で処理します。</div>
+    </div>
+    <div class="common">
+      <div><h4>原本の無損失保存 <span class="note-inline">実装中</span></h4>目標：編集していない部分は原本のバイトのまま保存。PDF・PSDから実装中で、DOCX・HWPXはロードマップです。現在DOCX・HWPXで保存すると、理解した内容で新しく書き出します。</div>
+      <div><h4>コード署名</h4>現在のビルドはまだコード署名されていないため、初回起動時にSmartScreenの警告が出ることがあります。ダウンロードページにSHA-256での確認方法を記載しています。</div>
+      <div><h4>言語</h4>アプリの画面は韓国語・英語・日本語・中国語に対応しています。インストール時に選べ、環境設定でいつでも変更できます。このサイトも同じ4言語で閲覧できます。</div>
+    </div>
+    <p class="bench-note">サンプル結果は <code>test-corpus/REPORT.md</code> の件数のみを掲載しています（ファイルの内容・名前は公開しません）。インストーラーのサイズは開発ビルド時点のもので、リリースごとに変わる場合があります。</p>
+  </div>
+</section>
+
+<!-- ───────── 문제 정의 ───────── -->
+<section class="sec alt" id="why" aria-labelledby="why-h">
+  <div class="wrap prob">
+    <div>
+      <p class="eyebrow">つくった理由</p>
+      <h2 class="h-sec" id="why-h">ひとつの作業に、<br><em>アプリが6つ。</em></h2>
+      <p class="lead">画像編集、イラスト、PDF 編集、DOCX・HWPX 文書編集、プレゼン。同じロゴを6回コピーし、同じ段落を6通りのやり方で整え直していませんか。</p>
+      <div class="switch" aria-hidden="true">
+        <b>画像</b>→<b>イラスト</b>→<b>PDF</b>→<b>DOCX</b>→<b>HWPX</b>→<b>スライド</b>→ …
+      </div>
+      <ul class="same">
+        <li><span class="c-v">1</span>画像や文字を置いて</li>
+        <li><span class="c-t">2</span>図形や線を描いて</li>
+        <li><span class="c-c">3</span>選んだオブジェクトの位置・サイズ・色・不透明度・フォントを調整する</li>
+      </ul>
+      <p class="claim"><strong>名前は違っても、やっていることは同じです。</strong>「ページかレイヤーか」「ベクターかビットマップか」は、結局<strong>どんな形で保存するか</strong>の違いにすぎず、編集しているあいだは関係ありません。</p>
+    </div>
+    <div class="matrix">
+      <table>
+        <caption>手を動かしてやることは、6つのアプリでどれも同じ。違うのは機能の深さと保存形式です。</caption>
+        <thead>
+          <tr><th scope="col"><span class="sr-only">作業</span></th><th scope="col">画像</th><th scope="col">イラ<br>スト</th><th scope="col">PDF</th><th scope="col">DOCX</th><th scope="col">ハン<br>グル</th><th scope="col">スラ<br>イド</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">画像を置く</th><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td></tr>
+          <tr><th scope="row">文字・書式</th><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td></tr>
+          <tr><th scope="row">図形・線</th><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td></tr>
+          <tr><th scope="row">移動・拡大縮小・回転</th><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td></tr>
+          <tr><th scope="row">色・不透明度・重ね順</th><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td></tr>
+          <tr><th scope="row">元に戻す</th><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td><td><i></i><span class="sr-only">あり</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 6개 모듈 ───────── -->
+<section class="sec" id="modules" aria-labelledby="mod-h">
+  <div class="wrap">
+    <p class="eyebrow">6-in-1 モジュール</p>
+    <h2 class="h-sec" id="mod-h">6つの作業を、<br><em>ひとつのシーングラフで。</em></h2>
+    <p class="lead">ラスタータイル、ベジェパス、テキスト段落、表、PDFページ、画像・ビデオはすべて同じノードです。現在コードで実装済みのものだけを載せています。勝負どころは各形式をどこまで深く扱えるかです。</p>
+
+    <div class="mods">
+      <article class="mod c-v">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L12 15.6 8.4 12z"/><path d="M8.4 12C6 12 4.5 13.6 4.5 16c0 1.6-.8 2.6-1.5 3 3.7.9 8.6.2 9-3.4"/></svg></div>
+        <h3>ラスター<small>画像 · PSD</small></h3>
+        <ul><li>256pxタイルのブラシ・消しゴム（筆圧・硬さ・不透明度）</li><li><strong>PSD</strong>を開く：ピクセルレイヤー＋統合画像（効果・調整レイヤーを除く）</li><li>TIFF・WebP・AVIFなどの画像を開く</li></ul>
+      </article>
+      <article class="mod c-t">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19C7 8 17 16 20 5"/><rect x="2.5" y="17.5" width="3" height="3" rx=".6"/><rect x="18.5" y="3.5" width="3" height="3" rx=".6"/><path d="M4 19l5-9M20 5l-6 3"/><circle cx="9" cy="10" r="1.2"/><circle cx="14" cy="8" r="1.2"/></svg></div>
+        <h3>ベクター<small>ベクター · AI · SVG</small></h3>
+        <ul><li>ペン（ベジェハンドル）・ダイレクト選択・長方形・楕円</li><li>パスファインダー合体/型抜き/交差/中マド</li><li><strong>AI</strong>ファイルを開く（PDF互換で保存されたもの）</li></ul>
+      </article>
+      <article class="mod c-c">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></svg></div>
+        <h3>PDF<small>PDF 編集</small></h3>
+        <ul><li>ページ描画＋文字を行単位の<strong>編集可能なテキストオブジェクト</strong>に昇格</li><li>パスワード付きPDFを開いて再暗号化（AES-256）</li><li>クイックツール：結合・圧縮・JPG変換</li></ul>
+      </article>
+      <article class="mod c-b">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 11.5h8M8 15h5"/></svg></div>
+        <h3>Word<small>DOCX</small></h3>
+        <ul><li>DOCXの段落・文字書式を開いて保存</li><li>表オブジェクトの編集・DOCXで保存</li><li>旧形式DOCは本文と表の内容を取り込み</li></ul>
+      </article>
+      <article class="mod c-o">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.5 8.5h5c0 4-1.8 6.5-5 7.5M15.5 7v10M15.5 12h2"/></svg></div>
+        <h3>HWPX<small>HWPX</small></h3>
+        <ul><li>HWPXを開いて保存（公開OWPML構造に基づくクリーンルーム実装）</li><li>旧形式HWP（5.0）は本文と表の内容を取り込み</li><li>書記素・語節単位のハングル改行</li></ul>
+      </article>
+      <article class="mod c-p">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.8"/><path d="M12 16v4M8.5 20h7M10 8.2v4.6l4-2.3z"/></svg></div>
+        <h3>スライド<small>PPTX · PPT</small></h3>
+        <ul><li>PPTXを開いて保存（テキスト・図形・画像・表・背景）</li><li>マスター・切り替え FADE / SLIDE_LEFT / ZOOM</li><li>キーフレームアニメーション・全画面スライドショー</li></ul>
+      </article>
+    </div>
+
+    <div class="common">
+      <div><h4>どのオブジェクトにも同じ操作</h4>選択・移動・拡大縮小・回転、不透明度、描画モード、ロック・非表示、重ね順の変更、元に戻す。</div>
+      <div><h4>書き出し</h4>PNG · PDF · SVG · DOCX · HWPX · PPTX · XLSX · CSV · Markdown · HTML · SRT · <code>.omw</code></div>
+      <div><h4>韓国語の組版</h4><code>Intl.Segmenter</code> による書記素単位の改行でハングルの字母が分かれず、<code>keep-all</code> で語（分かち書き）単位に折り返します。</div>
+    </div>
+    <p class="note">読み込みには制限があります。まずは<a href="#faq" class="grad">正直な FAQ</a>をお読みください。</p>
+  </div>
+</section>
+
+<!-- ───────── Loom 엔진 ───────── -->
+<section class="sec alt" id="loom" aria-labelledby="loom-h">
+  <div class="wrap">
+    <div class="loom-grid">
+      <div>
+        <p class="eyebrow">Loom エンジン</p>
+        <h2 class="h-sec" id="loom-h">すべてに、<br><em>コンテンツアドレスを。</em></h2>
+        <p class="lead">ピクセルタイル・ノード・アセットのひとつひとつが 64 ビットのコンテンツアドレスを持ちます。画面表示も、保存も、元に戻すも、そのアドレスから決まります。</p>
+        <ul class="parts">
+          <li class="c-v"><b>Thread</b><span>256px のピクセルタイル・ノード・アセットのコンテンツアドレス。同じタイルはファイルに一度だけ保存され、開くときにハッシュを再計算して、壊れた断片だけをスキップします。</span></li>
+          <li class="c-t"><b>Weave Cache</b><span>画面タイルのキーは、その領域にかかる断片のアドレスのハッシュ。<strong>ダーティフラグもキャッシュ無効化のコードもない</strong>ので、「消したのに画面に残る」たぐいのバグが構造上起きません。</span></li>
+          <li class="c-c"><b>Shuttle Journal</b><span>初めて見る断片だけを IndexedDB に差分で記録。自動保存は軽く、異常終了しても復元できます。</span></li>
+          <li class="c-p"><b>イミュータブルな履歴</b><span>元に戻す＝不変のドキュメント参照の差し替え。ピクセルをコピーしないので、コストは文書のサイズに左右されません。</span></li>
+        </ul>
+      </div>
+
+      <figure class="loom-viz">
+        <canvas id="loom-canvas" width="800" height="500" role="img" aria-label="説明図：左は 40 枚の画面タイルのグリッド、右はタイルがほどけて紫・ティール・コーラルの3本の糸に織り上がる様子。グリッドをなぞると、触れたタイルだけが再描画されます。"></canvas>
+        <div class="loom-ctl">
+          <p class="loom-stat" id="loom-stat" aria-live="polite">グリッドをなぞってみてください。触れた画面タイルだけが再描画されます。</p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost btn-sm" id="loom-paint">ひと筆描く</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="loom-undo" disabled aria-disabled="true">元に戻す</button>
+          </div>
+        </div>
+        <figcaption class="loom-legend">
+          <span class="c-c">再描画（キーが変化）</span><span class="c-t">キャッシュヒット（以前のキーを再利用）</span><span>説明用の簡略図 · 実測値ではありません</span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <h3 class="sr-only">実測値</h3>
+    <div class="metrics">
+      <div class="metric"><div class="v grad">79.5<small>%</small></div><div class="k">タイルデータの重複排除</div><div class="d">合成 4K 文書 · タイル参照 205 → ユニーク 42</div></div>
+      <div class="metric"><div class="v">1.43<small>MiB</small></div><div class="k">.omw のファイルサイズ</div><div class="d">生 RGBA 51.3 MiB → 重複排除後 10.5 MiB → 保存</div></div>
+      <div class="metric"><div class="v">0.36–0.43<small>ms</small></div><div class="k">1フレーム分の画面キー計算</div><div class="d">1920×1080 · 画面タイル 40 枚 · ノード 31 個</div></div>
+      <div class="metric"><div class="v">0.09–0.18<small>ms</small></div><div class="k">元に戻す＋やり直し</div><div class="d">同じ 4K 文書のディープコピー（<code>structuredClone</code>）は 24–28 ms</div></div>
+    </div>
+    <p class="bench-note"><code>bench/loom.bench.ts</code>（Vitest bench、Node、DOM を使わないコードパス）で<strong>合成文書</strong>を計測した値で、実際の文書とは異なる場合があります。計測環境：Intel Core Ultra 5 125H、Windows 11、Node v24.13.1 · 2回実行した平均値の範囲（ほかの処理も動いていたためばらつき大）· 保存→読み込みの往復：破損 0 · 欠落 0 · ドキュメントのルートアドレス一致。描画（キャンバスへの描画）時間は含みません。アプリのステータスバーにある Loom メーターでリアルタイムに確認できます。再現：<code>npm run bench</code></p>
+  </div>
+</section>
+
+<!-- ───────── .omw ───────── -->
+<section class="sec" id="omw" aria-labelledby="omw-h">
+  <div class="wrap">
+    <p class="eyebrow">.omw 形式</p>
+    <h2 class="h-sec" id="omw-h">中身を覗ける、<em>ただの zip。</em></h2>
+    <p class="lead"><code>.omw</code>（Omniweave Workspace Package）は普通の zip コンテナです。同じタイルは一度だけ格納し、ほかのツールでも読めるコピーを一緒に入れています。</p>
+    <div class="omw">
+<pre class="tree" tabindex="0" aria-label=".omw パッケージの構成"><span class="f">document.omw</span>
+├── <span class="f">mimetype</span>                    <span class="c">"application/x-omniweave"（無圧縮・先頭）</span>
+├── <span class="f">manifest.json</span>               <span class="c">メタデータ、Loom ルートアドレス、ページ索引</span>
+├── <span class="k">scene_graph.cbor</span>            <span class="c">統合シーングラフ（ピクセルはタイルアドレス）</span>
+├── <span class="t">rasters/&lt;hash&gt;.raw</span>          <span class="c">重複排除済みの 256×256 RGBA タイル</span>
+├── <span class="t">assets/&lt;hash&gt;.&lt;ext&gt;</span>         <span class="c">画像・PDF・フォントの原本</span>
+├── <span class="f">slides/slide_deck.json</span>      <span class="c">スライドの順序・切り替え・アニメーション（コピー）</span>
+├── <span class="f">slides/master_styles.json</span>   <span class="c">スライドマスター（コピー）</span>
+├── <span class="f">vectors/paths.json</span>          <span class="c">ベクターノードの SVG パス（コピー）</span>
+├── <span class="f">documents/document.xml</span>      <span class="c">すべてのテキスト段落（コピー）</span>
+└── <span class="f">documents/preview.txt</span>       <span class="c">検索・インデックス用のプレーンテキスト</span></pre>
+      <ul class="facts">
+        <li><h3>開くたびに全件を再検証</h3><p>すべてのタイルとアセットのハッシュを再計算します。合わない断片はスキップして件数を知らせ、文書の残りは通常どおり開きます。</p></li>
+        <li><h3>開くのに使うのは2つだけ</h3><p>Omniweave が読むのは <code>scene_graph.cbor</code> とコンテンツアドレスの断片だけ。それ以外は、ほかのツール向けの<strong>参照用コピー</strong>です。</p></li>
+        <li><h3>Windows のファイル関連付け</h3><p>インストーラー版は <code>.omw</code> を Omniweave に関連付けます。ダブルクリックですぐに開けます。</p></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── FAQ ───────── -->
+<section class="sec alt" id="faq" aria-labelledby="faq-h">
+  <div class="wrap center">
+    <p class="eyebrow">よくある質問</p>
+    <h2 class="h-sec" id="faq-h"><em>正直な</em> FAQ</h2>
+    <p class="lead">まだ開発初期の段階です。できること・できないことを先にお伝えします。</p>
+  </div>
+  <div class="wrap">
+    <div class="faq">
+      <details>
+        <summary>既存のソフトを完全に置き換えますか？</summary>
+        <div class="a"><p>いいえ。目標は複数の形式を1か所で扱う<strong>統合エディター</strong>で、勝負どころは形式ごとの深さです。高度なフィルター、色分解、数式エディター、変更履歴などの専門機能は現在の対象外です。</p></div>
+      </details>
+      <details>
+        <summary>「原本を壊さない」とは具体的に？</summary>
+        <div class="a"><p>方針は<strong>編集していない部分を原本のまま保存する</strong>ことです。現状を正直に分けると：</p><ul><li><strong>実装中：</strong>PDF・PSDの原本保持保存。</li><li><strong>ロードマップ：</strong>DOCX・HWPXの原本保持（パススルー）保存。</li><li><strong>現在：</strong>DOCX・HWPXで保存すると、理解した内容（段落・文字書式・表オブジェクト）で新しい文書を書き出します。脚注やヘッダーなどは失われることがあります。</li><li>暗号化された文書は保存時に再暗号化します。</li></ul></div>
+      </details>
+      <details>
+        <summary>DOCX・HWPXは原本どおりに表示されますか？</summary>
+        <div class="a"><p><strong>段落・文字書式が中心</strong>です（配置、行間、フォント・サイズ・色、太字/斜体/下線）。次はまだ未対応か簡略化されます。</p><ul><li>DOCX・HWPX内の<strong>表</strong>はまだ表として取り込めず、段落に展開されます。</li><li>脚注・文末脚注、ヘッダー/フッター、ページ番号、スタイル継承、目次、変更履歴。</li><li>文書内の画像・図形・数式。</li><li>改ページはA4組版で再計算するため、原本と異なる場合があります。</li></ul></div>
+      </details>
+      <details>
+        <summary>PDFは編集できますか？</summary>
+        <div class="a"><p>ページはそのまま描画され、「テキスト昇格」で文字が<strong>行単位のテキストオブジェクト</strong>になり編集できます。元の文字は背景色の矩形で隠します。複雑な背景上の文字や段組・表の再配置はまだできません。</p><p>現行リリースのPDF書き出しはページを画像として埋め込む方式です。文字が生きたPDF書き出しは実装中です。</p></div>
+      </details>
+      <details>
+        <summary>PPTX・旧形式HWP・PSDはどこまで対応？</summary>
+        <div class="a"><ul><li><strong>PPTX：</strong>テキスト・図形・画像・表・背景をスライドとして開き、PPTXで保存します。EMFなど一部の画像形式は省略され、一部の図形は長方形で近似します。</li><li><strong>旧形式HWP・DOC・PPT：</strong>本文と表の内容（テキスト）のみ。書式や画像は元のソフトでHWPX・DOCX・PPTXに保存してから開いてください。</li><li><strong>PSD：</strong>ピクセルレイヤーと統合画像を開きます。レイヤー効果・調整レイヤー・テキストエンジンは対象外です。</li></ul></div>
+      </details>
+      <details>
+        <summary>本当にファイルをどこにもアップロードしませんか？</summary>
+        <div class="a"><p>はい。開く・編集・保存・変換・クイックツールはすべてPC上で処理し、自動保存ジャーナルもローカルに記録します。ネット接続は新バージョンの確認（GitHub Releases）のみで、このサイトにも追跡・解析スクリプトはありません。ソースが公開されているので確認できます。</p></div>
+      </details>
+      <details>
+        <summary>インストールせずに試せますか？</summary>
+        <div class="a"><p>同じアプリをWebブラウザーで実行できます。ブラウザーデモが公開されると、このページに「インストールせずに今すぐ試す」ボタンが表示されます。デモもファイルをサーバーに送らず、ブラウザー内で処理します。</p></div>
+      </details>
+      <details>
+        <summary>速いと聞きましたが、GPUを使っていますか？</summary>
+        <div class="a"><p>まだ<strong>Canvas 2D + TypeScript</strong>です。WebGPUレンダラーとRust/WASMコアはロードマップです。現在の利点は「変わった所だけ再描画・再保存する」Loom構造によるものです。主張する数値は<a href="#loom" class="grad">Loomエンジンの表</a>がすべてです。</p></div>
+      </details>
+      <details>
+        <summary>英語の画面はありますか？ macOS・Linuxは？</summary>
+        <div class="a"><p>はい。アプリのUIは韓国語・英語・日本語・中国語（簡体字）に対応しています。インストール時に言語を選べ、環境設定でいつでも変更できます。macOS・Linuxビルドは実機で確認するまで<strong>実験的</strong>と表示します。正式対応はWindows 10·11とWebブラウザーでの実行です。</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 오픈소스 ───────── -->
+<section class="sec" id="oss" aria-labelledby="oss-h">
+  <div class="wrap oss">
+    <div>
+      <p class="eyebrow">オープンソース · GPL-3.0</p>
+      <h2 class="h-sec" id="oss-h">一本ずつ、<br><em>一緒に織り上げませんか。</em></h2>
+      <p class="lead">Issue もプルリクエストも歓迎です。いちばん助かるのは<strong>実際のファイルで崩れる事例</strong>です。</p>
+      <ul class="ways">
+        <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg><div><b>崩れるファイルの報告</b><span>正しく開けない DOCX・HWPX・PDF を、機密情報を消したサンプルとして送ってください。</span></div></li>
+        <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><div><b>コードで貢献</b><span>TypeScript（strict）· React · Tauri 2。開発環境とコミットのルールは CONTRIBUTING.md にあります。</span></div></li>
+        <li class="c-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3 4.7-5"/></svg><div><b>クリーンルームの原則</b><span>他社のバイナリはリバースエンジニアリングせず、公開規格（ISO 32000、ECMA-376、KS X 6101）だけをもとに実装します。</span></div></li>
+      </ul>
+      <div class="btn-row mt-28">
+        <a class="btn btn-primary" data-repo="" data-on-text="GitHub リポジトリ" data-off-text="リポジトリ公開準備中" aria-disabled="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3-11 6.6"/></svg>
+          <span class="t">リポジトリ公開準備中</span>
+        </a>
+        <a class="btn btn-ghost" data-repo="/blob/main/CONTRIBUTING.md" data-on-text="コントリビューションガイド" data-off-text="コントリビューションガイド（公開後）" aria-disabled="true"><span class="t">コントリビューションガイド（公開後）</span></a>
+      </div>
+    </div>
+    <div>
+      <div class="term">
+        <div class="term-h"><span>ソースから実行 · Node.js 18 以上</span><button type="button" class="copy" data-copy="qs">コピー</button></div>
+<pre id="qs"><span class="c"># リポジトリが公開されたらすぐ使えます</span>
+git clone https://github.com/wind2sp/omniweave.git
+cd omniweave
+npm i
+npm run dev      <span class="c"># ブラウザーで起動</span>
+npm test         <span class="c"># ユニットテスト</span>
+npm run bench    <span class="c"># Loom ベンチマーク</span></pre>
+      </div>
+      <p class="road-h">これからの予定 <span class="note">（順序は変わることがあります）</span></p>
+      <ul class="road"><li>4言語UI（韓国語・英語・日本語・中国語） <span class="note-inline done">完了</span></li><li>原本の無損失保存 — PDF・PSD実装中</li><li>DOCX・HWPXの原本保持（パススルー）保存</li><li>DOCX・HWPXの表を表として取り込み</li><li>文字が生きたPDF書き出し — 実装中</li><li>コード署名済みインストーラー</li><li>WebGPUレンダラー・Rust/WASMコア</li><li>macOS・Linuxの正式対応</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 이름 이야기 ───────── -->
+<section class="sec alt" id="name" aria-labelledby="name-h">
+  <div class="wrap">
+    <div class="name-story">
+      <div>
+        <p class="eyebrow">名前の由来</p>
+        <h2 class="h-sec" id="name-h">なぜ<em>「オメ」</em>なの？</h2>
+        <p class="lead">「オメ！」は、韓国南西部・全羅道（チョルラド）の人が、驚いたり感心したりしたときに思わず口にする方言の感嘆詞です。日本語なら「わあ！」「あらまあ！」に近い言葉で、ほかの地方の韓国人にはちょっと新鮮に聞こえます。</p>
+        <p class="lead">そして <strong>Om</strong>niweave の頭文字でもあります（OM-niweave → オメ）。画像も文書も PDF もスライドも、ひとつのキャンバスで全部できると知ったときの、あの「わあ！」を名前に込めました。</p>
+        <p class="name-quote">「ファイルひとつで全部できるなんて、オメ！」</p>
+      </div>
+      <dl class="say">
+        <div lang="ko"><dt>한국어</dt><dd><b>오메</b><span>[o.me]</span></dd></div>
+        <div lang="en"><dt>English</dt><dd><b>Oh-meh</b><span>/oʊ.meɪ/</span></dd></div>
+        <div lang="ja"><dt>日本語</dt><dd><b>オメ</b><span>ome</span></dd></div>
+        <div lang="zh-Hans"><dt>中文</dt><dd><b>欧梅</b><span>Ōuméi</span></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 다운로드 CTA ───────── -->
+<section class="cta" aria-labelledby="cta-h">
+  <div class="wrap">
+    <img src="../assets/img/icon-192.png" alt="" width="72" height="72" loading="lazy">
+    <h2 id="cta-h">原本はそのまま、<br><span class="grad">編集は1か所で。</span></h2>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="無料ダウンロード" data-off-text="ダウンロード · 近日公開">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        <span class="t">ダウンロード · 近日公開</span>
+      </a>
+      <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">インストールせずに今すぐ試す</span></a>
+    </div>
+    <p class="dl-meta">v<span data-cfg="version">0.1.0</span> · Windows 10·11 · インストーラー約17 MB · 無料 · GPL-3.0</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="ft">
+      <div>
+        <div class="brand"><img src="../assets/img/logo-96.png" alt="" width="28" height="28" loading="lazy">Omniweave (オメ)</div>
+        <p class="mt-10">原本を壊さないローカルの6-in-1エディター。画像・ベクター・PDF・DOCX・HWPX・スライド、そしてPSDまで1つのキャンバスで。</p>
+        <p class="mt-10 name-line">「オメ」は、驚いたときに思わず口をついて出る韓国・全羅道（チョルラド）の方言の感嘆詞（「わあ！」「あらまあ！」）であり、<b>Om</b>niweave の頭文字でもあります。</p>
+      </div>
+      <div>
+        <h2>サイト内</h2>
+        <ul><li><a href="#modules">6-in-1 モジュール</a></li><li><a href="#loom">Loom エンジン</a></li><li><a href="#omw">.omw 形式</a></li><li><a href="#faq">正直な FAQ</a></li><li><a href="#name">名前の由来</a></li><li><a href="download.html">ダウンロード</a></li></ul>
+      </div>
+      <div>
+        <h2>プロジェクト</h2>
+        <ul>
+          <li><a data-repo="" data-on-text="GitHub リポジトリ" data-off-text="GitHub リポジトリ（公開準備中）"><span class="t">GitHub リポジトリ（公開準備中）</span></a></li>
+          <li><a data-repo="/issues" data-on-text="Issue・不具合報告" data-off-text="Issue（公開後）"><span class="t">Issue（公開後）</span></a></li>
+          <li><a data-repo="/blob/main/LICENSE" data-on-text="GPL-3.0 ライセンス全文" data-off-text="GPL-3.0 ライセンス"><span class="t">GPL-3.0 ライセンス</span></a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <p><strong>ライセンス</strong> GPL-3.0-or-later（GNU 一般公衆利用許諾書 第3版またはそれ以降）。本ソフトウェアは「現状のまま」提供され、いかなる保証もありません。 <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later</span></p>
+      <p><strong>クリーンルーム</strong> 他社の商用ソフトウェアのバイナリをリバースエンジニアリングすることはありません。公開規格と公開資料（ISO 32000 PDF、ECMA-376 Office Open XML、KS X 6101 HWPX/OWPML など）だけをもとに実装しています。</p>
+      <p><strong>商標</strong> Omniweave™ and the Omniweave logo are trademarks of the project's copyright holder. Microsoft, Windows, Word, Excel, PowerPoint, Office, WebView2 and Edge are trademarks of Microsoft Corporation. Adobe, Photoshop, Illustrator, Acrobat and PostScript are registered trademarks or trademarks of Adobe Inc. Hangul, Hancom and HWP are trademarks of Hancom Inc. AutoCAD, Autodesk and DXF are registered trademarks or trademarks of Autodesk, Inc. in the USA and other countries; "DWG" names the drawing file format. ACIS is a trademark of Spatial Corp. All other names are the property of their owners. Omniweave is not affiliated with, sponsored or endorsed by any of these companies; their names are used only to describe file compatibility.</p>
+      <p><strong>使用しているオープンソース</strong> pdf.js、pdf-lib、fflate、cbor-x、polygon-clipping、immer、zustand、React、Tauri。このサイトの欧文・ハングルは Pretendard（SIL Open Font License）で表示しています。</p>
+    </div>
+  </div>
+</footer>
+
+<script type="application/json" id="i18n">{"soon":"近日公開","preparing":"準備中","platformsBtn":"プラットフォーム別に見る","mobileMsg":"Omniweave はパソコン向けのデスクトップアプリです。Windows・macOS・Linux のパソコンでこのページを開いてください。","unknownMsg":"お使いの OS を判別できませんでした。下の一覧から選んでください。","dlFor":"{os} 版をダウンロード","installerSuffix":"（インストーラー）","experimentalBuild":"試験版","soonFor":"{os} 版 · 近日公開","prepFor":"{os} 版 · 準備中","notAvailable":"このプラットフォーム向けのファイルはまだありません。下の一覧をご確認ください。","firstRelease":"最初のリリース v{v} を準備しています。","copied":"コピーしました","locale":"ja-JP","loomStroke":"今回のストローク：\u003cspan class=\"m\">再描画した画面タイル {n} 枚\u003c/span> · \u003cspan class=\"h\">そのまま再利用 {r} 枚\u003c/span>（全 {t} 枚）","loomUndo":"元に戻す：以前のキーが復活し、\u003cspan class=\"h\">{n} 枚のタイルがキャッシュに即ヒット\u003c/span> · 再描画 0 枚"}</script>
+<script src="../assets/js/site.js?v=5" defer></script>
+<script src="../assets/js/loom.js?v=5" defer></script>
+</body>
+</html>

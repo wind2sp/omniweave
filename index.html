@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/app_small.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Omniweave (오메)</title>
+    <script>
+      // first paint in the viewer's theme (uiStore.ts persists it), so a light-theme start never flashes dark
+      try {
+        if (JSON.parse(localStorage.getItem("omniweave.ui.v1") || "{}").theme === "light") document.documentElement.dataset.theme = "light";
+      } catch (e) {}
+    </script>
+    <style>
+      /* start-up frame (docs/design/VISUAL_DESIGN.md §로딩·진행): the window's own colour at once; the mark and a
+         moving bar only if start-up takes longer than 0.4 s. React replaces #root's content on its first render. */
+      html, body { margin: 0; height: 100%; background: #151618; }
+      html[data-theme="light"], html[data-theme="light"] body { background: #e6e7e9; }
+      .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; opacity: 0; animation: boot-in 160ms 400ms ease-out forwards; }
+      .boot img { width: 48px; height: 48px; }
+      .boot i { position: relative; width: 120px; height: 3px; overflow: hidden; border-radius: 2px; background: rgba(127, 127, 127, 0.25); }
+      .boot i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; background: #2f6fdc; animation: boot-sweep 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+      @keyframes boot-in { to { opacity: 1; } }
+      @keyframes boot-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+      @media (prefers-reduced-motion: reduce) { .boot i::after { animation: none; width: 100%; opacity: 0.5; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"><div class="boot" role="progressbar" aria-label="Omniweave"><img src="/app_small.png" alt="" /><i></i></div></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

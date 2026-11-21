@@ -1,0 +1,21 @@
+node_modules/
+dist/
+release/
+src-tauri/target/
+src-tauri/gen/
+*.log
+test-corpus/*
+!test-corpus/README.md
+.claude/
+public/pdfjs/
+
+public/models/*
+# AI upscale models (Real-ESRGAN, BSD-3, converted by scripts/convert-esrgan.mjs) are in git: small, pinned
+!public/models/sr/
+# OCR models (PP-OCRv5 int8, Apache-2.0, converted by scripts/convert-ppocr.mjs) are in git too: 4.9 MB, pinned by
+# sha256 in tests/fixtures/ocr/models-manifest.json and checked by scripts/ocr-models.mjs on every build
+!public/models/ocr/
+qa/interop/.adobe-work/
+
+# Store trailer frames (marketing/video/store_trailer/make_trailer.py makes them again)
+marketing/video/store_trailer/frames/

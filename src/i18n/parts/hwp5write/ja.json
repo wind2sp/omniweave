@@ -1,0 +1,9 @@
+{
+  "hwp5write.export.label": "HWP 文書（.hwp）",
+  "hwp5write.filter": "HWP 文書",
+  "hwp5write.err.notFromHwp": "この文書は HWP ファイルから開いていないため、HWP で保存できません。HWPX で保存してください。",
+  "hwp5write.err.noOriginal": "元の HWP ファイルの内容が見つからないため、HWP で保存できません。HWPX で保存してください。",
+  "hwp5write.export.hint2": "開いた HWP ファイルに文字の編集だけを入れて保存 · 書式や画像などを編集した文書は HWPX で保存",
+  "hwp5write.format.level2": "段落・文字書式・表・画像を開く · 未編集または文字だけの編集は HWP、それ以外は HWPX で保存",
+  "hwp5write.err.otherEdit": "文字以外（文字・段落の書式、画像、図形、表の形、ページ設定、ヘッダー・フッター、脚注、コメント・変更履歴など）を編集した文書は HWP で保存できません。HWPX で保存すると、編集内容と元の書式がそのまま残ります。"
+}

@@ -1,0 +1,13 @@
+{
+  "docmode.tab.review": "审阅",
+  "spell.group": "校对",
+  "spell.toggle": "拼写检查",
+  "spell.toggleTip": "停止输入后，拼错的单词下方会出现红色波浪线。仅在屏幕上显示，不会写入保存、打印或导出的文件。词典使用 Windows 已安装语言包中的词典。",
+  "spell.web": "浏览器版本没有拼写检查（请使用 Windows 应用）。",
+  "spell.using": "正在使用 Windows 拼写检查",
+  "spell.missing": "以下语言没有拼写词典：{langs}。在 Windows 设置 ▸ 时间和语言 ▸ 语言和区域中添加该语言后即可检查。",
+  "spell.noSuggestions": "（无建议）",
+  "spell.ignoreAll": "全部忽略",
+  "spell.addToDictionary": "添加到词典",
+  "spell.hist.replace": "更正拼写"
+}

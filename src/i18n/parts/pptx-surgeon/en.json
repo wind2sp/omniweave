@@ -1,0 +1,10 @@
+{
+  "engine.officeSurgeon.pptxShapeRewritten": "{n} shapes changed in more than position and text and are written anew. Formatting from the layout, links and effects Omniweave doesn't read may change, and their by-paragraph animations are dropped",
+  "engine.officeSurgeon.pptxShapeRewritten_one": "{n} shape changed in more than position and text and is written anew. Formatting from the layout, links and effects Omniweave doesn't read may change, and its by-paragraph animations are dropped",
+  "engine.officeSurgeon.pptxAnimRemoved": "{n} animations of deleted objects are removed",
+  "engine.officeSurgeon.pptxAnimRemoved_one": "{n} animation of a deleted object is removed",
+  "engine.officeSurgeon.pptxSlideRewritten": "Slides {list}: a different size or layer groups, so their shapes are all written anew. Their animations and objects Omniweave doesn't read are left out",
+  "engine.officeSurgeon.pptxSlideRewritten_one": "Slide {list}: a different size or layer groups, so its shapes are all written anew. Its animations and objects Omniweave doesn't read are left out",
+  "engine.officeSurgeon.pptxLayoutCopied": "Slides {list}: the edited layout / master background graphics are copied onto the slides (the layout stays as it is; background graphics are hidden on these slides only)",
+  "engine.officeSurgeon.pptxLayoutCopied_one": "Slide {list}: the edited layout / master background graphics are copied onto the slide (the layout stays as it is; background graphics are hidden on this slide only)"
+}

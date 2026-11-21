@@ -1,0 +1,9 @@
+{
+  "hwp5write.export.label": "HWP 文档 (.hwp)",
+  "hwp5write.filter": "HWP 文档",
+  "hwp5write.err.notFromHwp": "此文档不是从 HWP 文件打开的，无法保存为 HWP。请保存为 HWPX。",
+  "hwp5write.err.noOriginal": "找不到原始 HWP 文件内容，无法保存为 HWP。请保存为 HWPX。",
+  "hwp5write.export.hint2": "在打开的 HWP 文件中只写入文字修改并保存 · 修改了格式、图片等的文档保存为 HWPX",
+  "hwp5write.format.level2": "打开段落、字符格式、表格和图片 · 未编辑或只改文字时保存为 HWP，其他情况保存为 HWPX",
+  "hwp5write.err.otherEdit": "修改了文字以外内容（字符或段落格式、图片、图形、表格结构、页面设置、页眉页脚、脚注、批注或修订等）的文档无法保存为 HWP。保存为 HWPX 可保留编辑内容和原始格式。"
+}

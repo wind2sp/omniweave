@@ -1,0 +1,6 @@
+{
+  "statusbar.devInfo.title": "开发者信息",
+  "statusbar.devInfo.show": "显示开发者信息",
+  "statusbar.devInfo.hint": "在状态栏显示渲染指标（图块、命中率、ms、fps、缓存）。",
+  "statusbar.pageKindTip": "此页的类型和尺寸 — 与工作模式切换器下划线的信息相同"
+}

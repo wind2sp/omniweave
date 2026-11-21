@@ -1,0 +1,10 @@
+{
+  "engine.officeSurgeon.pptxShapeRewritten": "{n} 個の図形は位置と文字以外も変わったため新しく書き込みます。レイアウトから受け継いだ書式・リンク・Omniweave が読み取らない効果が変わることがあり、その図形の段落別アニメーションは省かれます",
+  "engine.officeSurgeon.pptxShapeRewritten_one": "{n} 個の図形は位置と文字以外も変わったため新しく書き込みます。レイアウトから受け継いだ書式・リンク・Omniweave が読み取らない効果が変わることがあり、その図形の段落別アニメーションは省かれます",
+  "engine.officeSurgeon.pptxAnimRemoved": "削除したオブジェクトを対象とするアニメーション {n} 個を整理します",
+  "engine.officeSurgeon.pptxAnimRemoved_one": "削除したオブジェクトを対象とするアニメーション {n} 個を整理します",
+  "engine.officeSurgeon.pptxSlideRewritten": "スライド {list}：サイズが異なるかレイヤー グループがあるため、図形をすべて新しく書き込みます。そのスライドのアニメーションと Omniweave が読み取らないオブジェクトは省かれます",
+  "engine.officeSurgeon.pptxSlideRewritten_one": "スライド {list}：サイズが異なるかレイヤー グループがあるため、図形をすべて新しく書き込みます。そのスライドのアニメーションと Omniweave が読み取らないオブジェクトは省かれます",
+  "engine.officeSurgeon.pptxLayoutCopied": "スライド {list}：変更したレイアウト・マスターの背景グラフィックをスライドに移して書き込みます（レイアウトはそのまま、このスライドだけ背景グラフィックを非表示）",
+  "engine.officeSurgeon.pptxLayoutCopied_one": "スライド {list}：変更したレイアウト・マスターの背景グラフィックをスライドに移して書き込みます（レイアウトはそのまま、このスライドだけ背景グラフィックを非表示）"
+}

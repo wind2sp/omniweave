@@ -1,0 +1,70 @@
+FOGRA39 default CMYK profile — src/assets/icc/fogra39-default.icc (also embedded as src/core/image/defaultCmykIcc.ts)
+
+Source: FOGRA39L_coated.icc, "FOGRA39L Coated", from the OpenICC / colord free profile set
+  - colord: https://github.com/hughsie/colord  data/profiles/FOGRA39L_coated.iccprofile.xml
+    (profile source; last changed in commit 158fba0bc37d4cdcbd98d30e97b434ad033732f4, 2017-07-31)
+  - the .icc as built from that XML with colord's cd-create-profile and distributed by CTAN:
+    https://ctan.org/pkg/colorprofiles (https://mirrors.ctan.org/support/colorprofiles.zip, version 20181105)
+    FOGRA39L_coated.icc 121,368 bytes, SHA-256 b35713ef7eff09349d4c3249e5f377736d06d8a2671c54712971a3546bf17c57
+Characterization data: FOGRA39L by Fogra, www.fogra.org (ISO 12647-2:2004/Amd 1, paper type 1/2, coated).
+
+Licence: the profile's own copyright tag reads "This profile is free of known copyright restrictions", its metadata
+says License CC0, Debian's colord packaging lists data/profiles/* as CC0-1.0, and the CTAN package distributes it under
+the zlib/libpng licence below (the person who built the .icc waived all his rights in it).
+
+Altered: this is not the original profile. Omniweave removed the tags it does not use (gamt, clrt, arts, meta, dscm,
+dmnd, dmdd), resampled the shaper curves (128 / 256 entries), rounded the table values to 12 bits and rewrote the
+description and copyright tags (scripts/make-default-cmyk-icc.mjs). SHA-256 of the altered file:
+3aad9a55749fa56baa2a3d095d78e99473f4dcf439906b67e53973cb2c825d79 (84,960 bytes).
+
+------------------------------------------------------------------------------------------------------------------------
+
+FOGRA39L_coated
+Copyright:  Kai-Uwe Behrmann <www.behrmann.name>
+            Marti Maria <www.littlecms.com>
+            Photogamut <www.photogamut.org>
+            Graeme Gill <www.argyllcms.com>
+            ColorSolutions <www.basICColor.com>
+
+The zlib/libpng License
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+  claim that you wrote the original software. If you use this software
+  in a product, an acknowledgment in the product documentation would be
+  appreciated but is not required.
+
+  2. Altered source versions must be plainly marked as such, and must not be
+  misrepresented as being the original software.
+
+  3. This notice may not be removed or altered from any source
+  distribution.
+
+NO WARRANTY
+
+  BECAUSE THE DATA IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+FOR THE DATA, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
+OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+PROVIDE THE DATA "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED
+OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS
+TO THE QUALITY AND PERFORMANCE OF THE DATA IS WITH YOU.  SHOULD THE
+DATA PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,
+REPAIR OR CORRECTION.
+
+ IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+REDISTRIBUTE THE DATA AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,
+INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING
+OUT OF THE USE OR INABILITY TO USE THE DATA (INCLUDING BUT NOT LIMITED
+TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY
+YOU OR THIRD PARTIES OR A FAILURE OF THE DATA TO OPERATE WITH ANY OTHER
+PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.

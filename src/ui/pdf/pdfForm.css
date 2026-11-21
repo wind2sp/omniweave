@@ -1,0 +1,224 @@
+/* PDF form fields over the canvas (PdfFormLayer.tsx). The field tint is Acrobat's "highlight existing fields"
+   light blue on the white page in both themes (the page itself is white); focus uses the accent only. */
+.pdf-form-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pdf-field {
+  position: absolute;
+  pointer-events: auto;
+  background: rgba(64, 112, 240, 0.12);
+  border: 1px solid rgba(64, 112, 240, 0.35);
+  border-radius: var(--r-xs);
+  cursor: text;
+  outline: none;
+  transition: background var(--dur-1) ease;
+}
+.pdf-field.btnlike {
+  cursor: pointer;
+}
+.pdf-field.ro {
+  pointer-events: none;
+  background: transparent;
+  border-color: transparent;
+}
+.pdf-field:hover {
+  background: rgba(64, 112, 240, 0.2);
+}
+.pdf-field:focus-visible {
+  border: 2px solid var(--accent);
+}
+.pdf-field-edit {
+  position: absolute;
+  pointer-events: auto;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 4px;
+  border: 2px solid var(--accent);
+  border-radius: var(--r-xs);
+  background: #ffffff;
+  color: #1d1f24;
+  font-family: "Pretendard", "Malgun Gothic", sans-serif;
+  line-height: 1.2;
+  outline: none;
+  resize: none;
+  box-shadow: var(--shadow-pop);
+}
+textarea.pdf-field-edit {
+  padding-top: 2px;
+}
+select.pdf-field-edit[multiple] {
+  height: auto !important;
+  min-height: 100%;
+}
+
+/* comment tools (PdfAnnotLayer.tsx) */
+.pdf-annot-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 16;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pdf-annot-layer.active {
+  pointer-events: auto;
+}
+.pdf-mark-preview {
+  position: absolute;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.pdf-mark-preview.underline {
+  border-bottom: 2px solid;
+}
+.pdf-mark-preview.strike::after,
+.pdf-annot-chip.strike::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 1px);
+  border-top: 2px solid currentColor;
+}
+.pdf-annot-hit {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: var(--r-xs);
+}
+.pdf-annot-hit:hover,
+.pdf-annot-hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.pdf-annot-pop {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 2;
+  width: 240px;
+  padding: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--fs-ui);
+}
+.pdf-annot-pop-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+  font-weight: 600;
+}
+.pdf-annot-pop .swatch,
+.pdf-annot-chip {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-xs);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+.pdf-annot-chip {
+  background: var(--c);
+}
+.pdf-annot-chip.underline,
+.pdf-annot-chip.strike {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--c);
+  border-radius: 0;
+}
+.pdf-annot-chip.strike {
+  position: relative;
+  border-bottom: 0;
+  color: var(--c);
+}
+.pdf-annot-pop textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font: inherit;
+}
+.pdf-annot-pop-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+}
+
+/* signatures (SignDialog.tsx, PdfAnnotLayer.tsx) */
+.pdf-annot-hit.sign {
+  cursor: move;
+}
+.pdf-sign-handle {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-xs);
+  background: #ffffff;
+  cursor: nwse-resize;
+  opacity: 0;
+}
+.pdf-annot-hit.sign:hover .pdf-sign-handle,
+.pdf-annot-hit.sign:focus-visible .pdf-sign-handle {
+  opacity: 1;
+}
+.pdf-sign-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  background: var(--scrim);
+}
+.pdf-sign-dialog {
+  width: min(560px, calc(100vw - 32px));
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  color: var(--text);
+  box-shadow: var(--shadow-modal);
+  font-size: var(--fs-ui);
+}
+.pdf-sign-dialog h3 {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-title);
+}
+.pdf-sign-pad {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  margin-top: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: #ffffff;
+  touch-action: none;
+  cursor: crosshair;
+}
+.pdf-sign-hint {
+  margin: var(--sp-2) 0;
+  color: var(--text-2);
+}
+.pdf-sign-err {
+  margin: var(--sp-2) 0;
+  color: var(--danger);
+}
+.pdf-sign-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.pdf-sign-foot .grow {
+  flex: 1;
+}

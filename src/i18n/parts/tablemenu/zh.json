@@ -1,0 +1,12 @@
+{
+  "tablemenu.rowAbove": "在上方插入行",
+  "tablemenu.rowBelow": "在下方插入行",
+  "tablemenu.colLeft": "在左侧插入列",
+  "tablemenu.colRight": "在右侧插入列",
+  "tablemenu.deleteRows": "删除行",
+  "tablemenu.deleteCols": "删除列",
+  "tablemenu.deleteTable": "删除表格",
+  "tablemenu.merge": "合并单元格",
+  "tablemenu.split": "拆分单元格",
+  "tablemenu.props": "表格属性（宽度、底纹、边框）…"
+}
