@@ -29,7 +29,7 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            args: --bundles nsis
+            args: --bundles nsis --config src-tauri/tauri.ci.conf.json
           # - platform: macos-latest            # after a real-Mac check (signing + notarisation)
           #   args: --target universal-apple-darwin --bundles dmg
           # - platform: ubuntu-22.04            # after a real-Linux check
