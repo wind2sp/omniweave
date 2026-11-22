@@ -7,7 +7,7 @@
 // In the development repository qa/ is there and every test runs as before.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { mergeConfig } from "vitest/config";
+import { defineConfig, mergeConfig } from "vitest/config";
 import base from "./vite.config.ts";
 import { needsPrivateQa } from "./scripts/make-public-tree.mjs";
 
@@ -22,4 +22,5 @@ function walk(dir) {
 const skip = existsSync("qa") ? [] : needsPrivateQa(["tests", "scripts", "bench"].flatMap(walk), (f) => readFileSync(join(".", f), "utf8"), (f) => existsSync(f));
 if (skip.length && process.env.OMW_SHOW_SKIPPED) console.log(`no qa/: ${skip.length} test files skipped\n  ${skip.join("\n  ")}`);
 
-export default mergeConfig(base, { test: { exclude: skip } });
+// (vite.config.ts is a function of the mode: the phone app builds with --mode mobile)
+export default defineConfig((env) => mergeConfig(typeof base === "function" ? base(env) : base, { test: { exclude: skip } }));

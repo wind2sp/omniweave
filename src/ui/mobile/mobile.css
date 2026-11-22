@@ -1,0 +1,742 @@
+/* Phone shell (ui/mobile): thumb-reach bottom bar, 48 px touch targets, safe areas (notch, gesture bar).
+   Colours are the desktop tokens (styles.css :root), so light/dark follow the same theme. */
+.m-app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  color: var(--text);
+  font-size: 15px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-app button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.m-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+}
+.m-top h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: var(--fw-bold);
+}
+.m-logo {
+  width: 28px;
+  height: 28px;
+}
+.m-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+.m-main h2 {
+  margin: 22px 2px 10px;
+  font-size: 15px;
+  font-weight: var(--fw-strong);
+  color: var(--text-2);
+}
+.m-search {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  font-size: 15px;
+  user-select: text;
+}
+.m-search::placeholder {
+  color: var(--text-3);
+}
+.m-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.m-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 88px;
+  border-radius: 16px;
+  background: var(--bg-2) !important;
+  border: 1px solid var(--line-2) !important;
+  font-size: 15px;
+  font-weight: var(--fw-medium);
+}
+.m-action-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+.m-primary {
+  background: var(--accent, #2f6fdc) !important;
+  border-color: transparent !important;
+  color: var(--text-on-accent) !important;
+}
+.m-wide {
+  width: 100%;
+  min-height: 56px;
+  flex-direction: row;
+}
+.m-tools {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.m-tool {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--bg-1) !important;
+  border: 1px solid var(--line) !important;
+  text-align: left;
+  font-size: 14px;
+}
+.m-tool-icon {
+  width: 22px;
+  text-align: center;
+  font-size: 18px;
+  color: var(--accent, #2f6fdc);
+}
+.m-recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+}
+.m-recent li + li {
+  border-top: 1px solid var(--line);
+}
+.m-row {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 14px;
+  text-align: left;
+}
+.m-kind {
+  grid-row: span 2;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  background: var(--bg-3);
+  color: var(--text-2);
+}
+.m-kind-pdf {
+  background: #b8382f;
+  color: #fff;
+}
+.m-kind-img {
+  background: #2f8a5b;
+  color: #fff;
+}
+.m-kind-doc {
+  background: #2f6fdc;
+  color: #fff;
+}
+.m-kind-hwp {
+  background: #1f8fb0;
+  color: #fff;
+}
+.m-kind-ppt {
+  background: #c8622b;
+  color: #fff;
+}
+.m-kind-big {
+  width: 72px;
+  height: 72px;
+  font-size: 16px;
+  margin: 0 auto 12px;
+}
+.m-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+}
+.m-row-meta {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.m-empty {
+  padding: 18px 14px;
+  color: var(--text-3);
+  font-size: 14px;
+}
+.m-note {
+  margin: 20px 4px 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+  text-align: center;
+}
+.m-nav {
+  display: flex;
+  padding: 6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px);
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+}
+.m-nav button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.m-nav button span {
+  font-size: 20px;
+  line-height: 1.1;
+}
+.m-nav button.on {
+  color: var(--accent, #2f6fdc);
+}
+.m-nav button:disabled {
+  opacity: 0.4;
+}
+.m-about {
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.m-about h2 {
+  color: var(--text);
+}
+/* viewer */
+.m-viewer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.m-icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 22px;
+}
+.m-doc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px !important;
+}
+.m-received {
+  padding: 8px 16px;
+  font-size: 13px;
+  background: var(--bg-2);
+  color: var(--text-2);
+}
+.m-pages {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  background: var(--workspace, #18191b);
+  touch-action: pan-x pan-y;
+}
+.m-page-col {
+  min-width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.m-page {
+  position: relative;
+  width: 100%;
+  margin: 0 auto 10px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.m-page canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.m-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.m-pageno {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 12.5px;
+  pointer-events: none;
+}
+.m-unsupported {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.m-spinner,
+.m-busy i {
+  width: 28px;
+  height: 28px;
+  margin: 60px auto;
+  border-radius: 50%;
+  border: 3px solid var(--line-3);
+  border-top-color: var(--accent, #2f6fdc);
+  animation: m-spin 0.9s linear infinite;
+}
+.m-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  z-index: 10;
+}
+.m-busy i {
+  display: block;
+  margin: 0 0 8px;
+}
+.m-toast {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--bg-4);
+  color: var(--text);
+  font-size: 14px;
+  z-index: 11;
+}
+@keyframes m-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- shared controls ---- */
+.m-btn {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: var(--bg-2) !important;
+  border: 1px solid var(--line-2) !important;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: var(--fw-medium);
+}
+.m-btn-primary {
+  background: var(--accent) !important;
+  border-color: transparent !important;
+  color: var(--text-on-accent) !important;
+}
+.m-btn:disabled {
+  opacity: 0.45;
+}
+.m-btn-small {
+  min-height: 40px;
+  padding: 0 14px;
+  margin-left: auto;
+}
+.m-wide-btn {
+  width: 100%;
+  margin-top: 14px;
+}
+.m-field {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* 16 px: the WebView does not zoom into the field */
+  box-sizing: border-box;
+  user-select: text;
+}
+.m-select {
+  min-height: 44px;
+  max-width: 55%;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+}
+.m-app :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.m-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  background: var(--scrim);
+}
+.m-sheet {
+  width: 100%;
+  max-height: 90%;
+  overflow-y: auto;
+  padding: 18px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  border-radius: 18px 18px 0 0;
+  background: var(--bg-1);
+  box-shadow: var(--shadow-modal);
+  box-sizing: border-box;
+}
+.m-sheet h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.m-sheet-msg {
+  margin: 0 0 12px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.m-sheet-error {
+  margin: 0 0 10px;
+  color: var(--danger);
+  font-size: 14px;
+}
+.m-sheet-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.m-sheet-btns .m-btn {
+  flex: 1 1 120px;
+}
+.m-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.m-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 20px;
+  background: var(--bg-3) !important;
+  color: var(--text);
+  font-size: 14px;
+}
+/* ---- recent rows: open + remove ---- */
+.m-recent-row {
+  display: flex;
+  align-items: stretch;
+}
+.m-recent-row .m-row {
+  flex: 1;
+  min-width: 0;
+}
+.m-row-x {
+  color: var(--text-3);
+  font-size: 16px !important;
+}
+/* ---- viewer: search, hits, page counter ---- */
+.m-search-form {
+  flex: 1;
+  min-width: 0;
+}
+.m-search-in {
+  height: 42px;
+}
+.m-searchbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 16px;
+  background: var(--bg-2);
+  font-size: 14px;
+  color: var(--text-2);
+}
+.m-searchbar span {
+  flex: 1;
+}
+.m-hit {
+  position: absolute;
+  background: rgba(255, 196, 0, 0.38);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.m-page {
+  overflow: hidden;
+}
+button.m-pageno {
+  pointer-events: auto;
+  border: 0;
+  min-height: 36px;
+  font: inherit;
+  font-size: 13px;
+}
+/* ---- markup & scan: one page fitted between the bars ---- */
+.m-mk-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--workspace);
+}
+.m-mk-page {
+  position: relative;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+.m-mk-page canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.m-mk-svg,
+.m-scan-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  overflow: visible;
+}
+.m-mk-pen,
+.m-mk-hl {
+  cursor: crosshair;
+}
+.m-mk-text {
+  cursor: text;
+}
+.m-mk-colors {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+}
+.m-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50% !important;
+  border: 3px solid transparent !important;
+  box-shadow: 0 0 0 1px var(--line-3);
+}
+.m-swatch.on {
+  border-color: var(--bg-1) !important;
+  box-shadow: 0 0 0 3px var(--accent);
+}
+.m-mk-pages {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.m-mk-selbar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px;
+  background: var(--bg-2);
+}
+.m-nav button.on {
+  color: var(--accent);
+}
+.m-icon-btn:disabled {
+  opacity: 0.35;
+}
+.m-sig-pad {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 2;
+  border-radius: 12px;
+  background: #fff;
+  color: #111;
+  touch-action: none;
+  border: 1px solid var(--line-2);
+}
+.m-sig-list {
+  display: grid;
+  gap: 10px;
+}
+.m-sig-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-sig-pick {
+  flex: 1;
+  min-height: 72px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: #fff !important;
+  border: 1px solid var(--line-2) !important;
+  color: #111;
+}
+.m-sig-thumb {
+  display: block;
+  height: 56px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.m-scan-hint {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  background: var(--bg-2);
+}
+.m-scan-quad {
+  fill: rgba(47, 111, 220, 0.16);
+  stroke: #3a7ae6;
+  stroke-width: 2.5;
+}
+.m-scan-handle {
+  fill: rgba(255, 255, 255, 0.9);
+  stroke: #2f6fdc;
+  stroke-width: 4;
+  cursor: grab;
+}
+.m-scan-preview {
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+.m-seg {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+}
+.m-seg button {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.m-seg button.on {
+  background: var(--accent) !important;
+  color: var(--text-on-accent);
+}
+.m-settings {
+  margin: 18px 0;
+  border-radius: 12px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.m-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 14px;
+  color: var(--text);
+}
+.m-set-row + .m-set-row {
+  border-top: 1px solid var(--line);
+}
+/* large system font sizes (Settings ▸ Font size up to 200 %): labels wrap instead of overflowing */
+.m-nav button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+  padding: 2px 2px;
+}
+.m-action {
+  padding: 8px 4px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  min-height: 88px;
+  height: auto;
+}
+.m-tool {
+  padding: 8px 14px;
+  overflow-wrap: anywhere;
+}
+.m-row-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-spinner,
+  .m-busy i {
+    animation-duration: 3s;
+  }
+}
+.m-app button.m-pageno {
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+.m-kind-xls {
+  background: #1f7a4d;
+  color: #fff;
+}
+.m-kind-omw {
+  background: #6a4fe0;
+  color: #fff;
+}
+/* large system font sizes: the file-kind badge and tool icons grow with the text instead of overlapping it */
+.m-row {
+  grid-template-columns: auto 1fr;
+}
+.m-kind {
+  width: 3.6em;
+  height: 3.6em;
+  min-width: 40px;
+  min-height: 40px;
+  overflow: hidden;
+}
+.m-tool-icon {
+  flex: none;
+  width: auto;
+  min-width: 22px;
+}

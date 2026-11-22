@@ -83,20 +83,58 @@ export function webVersion(version: string): Plugin {
   };
 }
 
-export default defineConfig({
-  // relative asset paths: the same build runs in Tauri, at a site root, or under /app/ (browser demo)
-  base: "./",
-  plugins: [react(), sharedWorkers(), sniffGuard(), webVersion(PKG_VERSION), webPwa()],
-  clearScreen: false,
-  server: { port: 5199, strictPort: true },
-  build: {
-    target: "es2022",
-    chunkSizeWarningLimit: 2500,
-    // UI strings (all languages, src/i18n/**) in one chunk of their own that the app and workers share, instead of inside
-    // whichever shared chunk Rollup names (it was psdScore). Each string ships once. docs/design/INSTALLER_SIZE.md §12.
-    rollupOptions: { output: { manualChunks: (id: string) => (/[\\/]src[\\/]i18n[\\/]/.test(id) ? "i18n" : undefined) } },
-  },
-  // heavy crypto (PBKDF2 600k, AES-256 R6) runs slower when every file runs in parallel
-  // .claude/worktrees holds other departments' isolated checkouts — never run their tests here
-  test: { environment: "node", testTimeout: 90000, exclude: [...configDefaults.exclude, ".claude/**"] },
-} as any);
+/**
+ * The phone app's build (`vite build --mode mobile` → dist-mobile/, src-tauri/tauri.android.conf.json): the desktop
+ * editor is left out at build time (src/main.tsx: __OMW_MOBILE__), and the files the phone never loads are taken out
+ * of the output — the AI models (OCR is planned for a later phone release, upscaling is not on the phone), the
+ * UI-only Pretendard Medium / SemiBold faces (the phone falls back to Regular / Bold) and the web app's version.json.
+ * docs/MOBILE_PLAN.md §3.4.
+ */
+export const MOBILE_DROP = ["models", "fonts/Pretendard-Medium.woff2", "fonts/Pretendard-SemiBold.woff2", "version.json"];
+export function mobileTrim(): Plugin {
+  let outDir = "dist-mobile";
+  return {
+    name: "omw-mobile-trim",
+    apply: "build",
+    configResolved(c) {
+      outDir = c.build.outDir;
+    },
+    // always the phone layout at the real width; the start-up frame in the system's light / dark colour
+    transformIndexHtml(html) {
+      const out = html
+        .replace("var phoneApp = (", "var phoneApp = true || (")
+        .replace("</style>", "@media (prefers-color-scheme: light) { html, body { background: #f4f4f5; } }\n    </style>");
+      if (!out.includes("var phoneApp = true ||")) throw new Error("omw-mobile-trim: index.html changed, update the phone build's edits");
+      return out;
+    },
+    async closeBundle() {
+      const fsp = "node:fs/promises", pth = "node:path"; // (no Node types in this project: imported by name)
+      const { rm } = await import(/* @vite-ignore */ fsp);
+      const { resolve } = await import(/* @vite-ignore */ pth);
+      for (const p of MOBILE_DROP) await rm(resolve(outDir, p), { recursive: true, force: true });
+    },
+  };
+}
+
+export default defineConfig(({ mode }: { mode: string }) => {
+  const mobile = mode === "mobile";
+  return {
+    // relative asset paths: the same build runs in Tauri, at a site root, or under /app/ (browser demo)
+    base: "./",
+    define: { __OMW_MOBILE__: JSON.stringify(mobile) },
+    plugins: [react(), sharedWorkers(), sniffGuard(), ...(mobile ? [mobileTrim()] : [webVersion(PKG_VERSION), webPwa()])],
+    clearScreen: false,
+    server: { port: 5199, strictPort: true },
+    build: {
+      outDir: mobile ? "dist-mobile" : "dist",
+      target: "es2022",
+      chunkSizeWarningLimit: 2500,
+      // UI strings (all languages, src/i18n/**) in one chunk of their own that the app and workers share, instead of inside
+      // whichever shared chunk Rollup names (it was psdScore). Each string ships once. docs/design/INSTALLER_SIZE.md §12.
+      rollupOptions: { output: { manualChunks: (id: string) => (/[\\/]src[\\/]i18n[\\/]/.test(id) ? "i18n" : undefined) } },
+    },
+    // heavy crypto (PBKDF2 600k, AES-256 R6) runs slower when every file runs in parallel
+    // .claude/worktrees holds other departments' isolated checkouts — never run their tests here
+    test: { environment: "node", testTimeout: 90000, exclude: [...configDefaults.exclude, ".claude/**"] },
+  } as any;
+});

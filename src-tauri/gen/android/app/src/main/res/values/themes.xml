@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Omniweave: the frame behind the status bar, gesture bar and keyboard (MainActivity insets the page) matches the
+         page's top and bottom bars (mobile.css: bg-1 token). Light here, dark in values-night. -->
+    <style name="Theme.omniweave" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/omw_frame</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

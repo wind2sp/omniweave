@@ -1,22 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { fontsChanged, setMeasure } from "./core/text";
-import { useStore } from "./core/store";
-import { relabelStartDocument } from "./core/history";
 import { initLang } from "./i18n";
 import { installUiFonts } from "./io/pretendard";
-import { App } from "./ui/App";
+import { isMobile } from "./io/platform";
 import "./ui/styles.css";
 import { initPwa } from "./web/pwa";
-import { phoneViewerNow } from "./web/phone";
-import { PhoneViewer } from "./web/PhoneViewer";
 
 // browser only: offline service worker, install offer, files opened with the installed app (src/web/pwa.ts)
 initPwa();
-
-// a phone browser: the simple page viewer at the phone's width, not the desktop editor scaled down (web/phone.ts)
-const phone = phoneViewerNow();
-if (phone) document.documentElement.classList.add("wp-mode");
 
 // Real glyph metrics for the text engine (core/text.ts falls back to an estimate
 // outside the DOM). Installed before the first layout so cached layouts are correct.
@@ -41,13 +33,13 @@ async function loadFonts() {
 
 // a face that finishes loading later (another weight, a Korean subset, a font chosen in a document)
 // changes text metrics: drop measurements, laid-out text and painted tiles, then repaint
-if ("fonts" in document) {
+if (!__OMW_MOBILE__ && "fonts" in document && !isMobile) {
   let t: ReturnType<typeof setTimeout> | undefined;
   document.fonts.addEventListener("loadingdone", () => {
     clearTimeout(t);
     t = setTimeout(() => {
       fontsChanged();
-      void import("./ui/CanvasView").then(({ weave }) => {
+      void Promise.all([import("./ui/CanvasView"), import("./core/store")]).then(([{ weave }, { useStore }]) => {
         weave.clear();
         const st = useStore.getState();
         st.set({ view: { ...st.view } });
@@ -56,14 +48,23 @@ if ("fonts" in document) {
   });
 }
 
+// the phone app (Android/iOS, docs/MOBILE_PLAN.md §2) and the web app on a phone (io/platform.ts isMobile) get their own shell; the desktop editor is not loaded there
+// (the phone app's own build, vite --mode mobile, leaves the desktop editor out altogether: __OMW_MOBILE__). The phone
+// shows its first screen without waiting for the document fonts (its UI uses the system font until they are in;
+// documents wait for them before they are drawn, ui/mobile/MobileViewer.tsx).
+const phone = __OMW_MOBILE__ || isMobile;
+if (phone) void loadFonts();
 // UI language (saved choice → installer choice → OS language) is settled before the first paint
-Promise.all([loadFonts(), initLang()]).finally(() => {
+Promise.all([phone ? null : loadFonts(), initLang()]).finally(async () => {
   // the start-up document was made at module load in Korean: name its page / layer in the chosen language
-  relabelStartDocument();
-  createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-      {phone ? <PhoneViewer /> : <App />}
-    </StrictMode>,
+  if (!phone) (await import("./core/history")).relabelStartDocument();
+  const shell = phone ? import("./ui/mobile/MobileApp").then((m) => m.MobileApp) : import("./ui/App").then((m) => m.App);
+  void shell.then((Shell) =>
+    createRoot(document.getElementById("root")!).render(
+      <StrictMode>
+        <Shell />
+      </StrictMode>,
+    ),
   );
 });
 

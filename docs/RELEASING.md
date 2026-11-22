@@ -122,7 +122,13 @@ $env:CARGO_ENCODED_RUSTFLAGS = node scripts/rust-remap.mjs; npx tauri build
 함께 만들고(vite.config.ts `webVersion`), 앱이 시작 10초 뒤·6시간마다·탭으로 돌아올 때(30분 간격) `cache: "no-store"`로 읽어
 입구 스크립트가 다르면 제목 줄에 **"새로 고쳐서 업데이트"**를 띄웁니다(src/ui/shell/WebUpdate.tsx). 새 배포로 옛 지연 로딩 파일이
 사라져 기능을 못 불러오면(`vite:preloadError`) 같은 알림과 안내를 냅니다. 저장 안 한 내용은 새로 고친 뒤 자동 저장 복구로 돌아옵니다.
-아직 안 된 것: 옛 해시 파일 보존(Pages는 배포마다 사이트 전체를 바꿈), `minOmwReader`, `/app-beta/`.
+아직 안 된 것: 옛 해시 파일 보존(Pages는 배포마다 사이트 전체를 바꿈), `minOmwReader`.
+
+**`/app-beta/`(시험 채널, 2026-11-22):** Pages 워크플로가 `/app/`는 고정 커밋(`APP_RELEASE_REF`) 소스로, `/app-beta/`는
+푸시한 커밋 소스로 따로 빌드합니다. 그래서 소스를 공개 저장소에 올려도 정식 `/app/`는 바뀌지 않고, 정식 교체 = `APP_RELEASE_REF`를
+시험에서 확인한 커밋으로 바꾸기(정식 배포 결정 뒤). 서비스 워커 범위·manifest `id`는 각자 경로(`./`)라 겹치지 않고, 시험판 캐시 이름은
+`omwbeta-`로 시작해 정식 워커(다른 `omw-` 캐시를 지움)와 서로 지우지 않습니다(src/web/sw.js·pwa.ts `cachePrefix`).
+홈 화면 이름은 "Omniweave Beta". 같은 출처라 localStorage(설정)·IndexedDB(자동 저장 저널)는 두 채널이 함께 씁니다.
 
 **홈 화면 앱·오프라인(PWA, 2026-11-22):** iPhone은 App Store 대신 웹판을 사파리 '홈 화면에 추가'로 씁니다(제품 결정).
 웹 빌드(`OMW_WEB=1`, Pages 워크플로가 켬 — 데스크톱 빌드·설치본에는 하나도 안 들어감)가 `scripts/web-pwa.mjs`로

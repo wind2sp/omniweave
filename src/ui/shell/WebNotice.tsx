@@ -49,7 +49,7 @@ export function WebMobileNotice() {
       <p className="modal-text">{t("web.mobile.text")}</p>
       {isIOS() && <p className="modal-text">{t("web.mobile.iosMemory")}</p>}
       <div className="modal-actions">
-        {/* back to the phone page viewer (web/phone.ts) — this editor was chosen with "PC 화면으로 보기" */}
+        {/* back to the phone screen (ui/mobile, web/phone.ts) — this editor was chosen with "PC 화면으로 보기" */}
         <button type="button" className="btn" onClick={() => switchLayout(null)}>
           {t("webphone.phoneLayout")}
         </button>

@@ -44,13 +44,30 @@ jobs:
           rsync -a --exclude '_templates/' --exclude 'i18n/' --exclude 'build-i18n.mjs' \
                    --exclude 'README.txt' --exclude '.htaccess' website/ _site/
       # browser demo: the real app (web build) served at /app/ — "try it now, no install"
-      - name: Build the web app into /app
+      # Two channels (docs/RELEASING.md §웹판 업데이트): /app/ (release) is built from the pinned commit APP_RELEASE_REF,
+      # so a source push does not replace it; /app-beta/ (test) is built from this commit. Replacing the release web
+      # app = setting APP_RELEASE_REF to the commit tested at /app-beta/ (only when the release is decided).
+      - name: Build the release web app into /app (pinned commit)
         # OMW_WEB=1: manifest, home-screen icons and the offline service worker (scripts/web-pwa.mjs) — web build only
         env:
           OMW_WEB: "1"
+          APP_RELEASE_REF: 6f57252058830336ee59517d1c1bc0cce61f773c
         run: |
-          npx vite build --outDir _site/app --emptyOutDir
-          cp docs/demo/omniweave-demo.omw _site/app/demo.omw
+          git fetch --no-tags --depth 1 origin "$APP_RELEASE_REF"
+          git worktree add --detach "$RUNNER_TEMP/app-release" "$APP_RELEASE_REF"
+          cd "$RUNNER_TEMP/app-release"
+          npm ci
+          npx vite build --outDir "$GITHUB_WORKSPACE/_site/app" --emptyOutDir
+          cp docs/demo/omniweave-demo.omw "$GITHUB_WORKSPACE/_site/app/demo.omw"
+      - name: Build the test web app into /app-beta (this commit)
+        env:
+          OMW_WEB: "1"
+        run: |
+          node scripts/copy-pdfjs-assets.mjs
+          npx vite build --outDir _site/app-beta --emptyOutDir
+          cp docs/demo/omniweave-demo.omw _site/app-beta/demo.omw
+          # its own name on the home screen next to the release app (the manifest id and scope are already its own path)
+          node -e 'const f="_site/app-beta/manifest.webmanifest",fs=require("fs"),m=JSON.parse(fs.readFileSync(f,"utf8"));m.name="Omniweave Beta";m.short_name="Omniweave β";fs.writeFileSync(f,JSON.stringify(m,null,2))'
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

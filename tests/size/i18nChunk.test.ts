@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import config from "../../vite.config";
 
-const manualChunks = (config as any).build.rollupOptions.output.manualChunks as (id: string) => string | undefined;
+const manualChunks = ((typeof config === "function" ? (config as any)({ mode: "production", command: "build" }) : config) as any).build.rollupOptions.output.manualChunks as (id: string) => string | undefined;
 
 describe("i18n chunk", () => {
   it("puts every language file and the i18n module in the i18n chunk", () => {

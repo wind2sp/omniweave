@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBuildCommand": "npm run build:mobile",
+    "frontendDist": "../dist-mobile"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Omniweave",
+        "backgroundColor": "#151618"
+      }
+    ]
+  },
+  "bundle": {
+    "fileAssociations": [
+      { "ext": ["pdf"], "name": "PDF", "mimeType": "application/pdf", "role": "Viewer" },
+      { "ext": ["docx"], "name": "Word", "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "role": "Viewer" },
+      { "ext": ["pptx"], "name": "PowerPoint", "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "role": "Viewer" },
+      { "ext": ["xlsx"], "name": "Excel", "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "role": "Viewer" },
+      { "ext": ["hwpx"], "name": "HWPX", "mimeType": "application/hwp+zip", "role": "Viewer" },
+      { "ext": ["png", "jpg", "jpeg", "webp", "gif"], "name": "Image", "mimeType": "image/*", "role": "Viewer" },
+      { "ext": ["psd", "psb"], "name": "Photoshop", "mimeType": "image/vnd.adobe.photoshop", "role": "Editor" },
+      { "ext": ["ai"], "name": "Illustrator", "mimeType": "application/postscript", "role": "Editor" },
+      { "ext": ["ai"], "name": "Illustrator PDF", "mimeType": "application/illustrator", "role": "Editor" },
+      { "ext": ["dxf"], "name": "DXF", "mimeType": "image/vnd.dxf", "role": "Editor" },
+      { "ext": ["dwg"], "name": "DWG", "mimeType": "image/vnd.dwg", "role": "Editor" },
+      { "ext": ["svg"], "name": "SVG", "mimeType": "image/svg+xml", "role": "Editor" },
+      { "ext": ["omw"], "name": "Omniweave Workspace", "mimeType": "application/x-omniweave", "role": "Editor" }
+    ]
+  }
+}

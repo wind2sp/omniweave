@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <!-- mobile.css bg-1 token (light) -->
+    <color name="omw_frame">#FFF4F4F5</color>
+</resources>

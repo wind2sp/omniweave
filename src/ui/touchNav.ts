@@ -4,8 +4,8 @@
 // zoom and move it (and drop a stroke the first finger began); a tap still clicks; a double tap switches between the
 // fitted view and 2×. Pure: CanvasView feeds the pointers in and applies the steps (tests/touchNav.test.ts).
 //
-// The phone browser normally shows web/PhoneViewer.tsx instead (pages scrolled and zoomed by the browser itself);
-// the Android app's phone screen (ui/mobile, mobile branch) has its own viewer.
+// A phone (browser or app) normally shows the phone shell instead (ui/mobile, io/platform.ts isMobile), which has
+// its own viewer.
 
 export interface NavView {
   zoom: number;

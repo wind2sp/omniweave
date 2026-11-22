@@ -19,15 +19,17 @@
       } catch (e) {}
       // phones and small tablets (browser): the layout needs 960 px (.app min-width), so lay the page out 1024 px wide
       // and let the browser scale it to the screen instead of cutting it off; ui/shell/WebNotice.tsx says why
-      // phones (small touch screen) get the simple page viewer at their own width instead (src/web/phone.ts
-      // wantsPhoneViewer — the same test; "PC 화면으로 보기" = sessionStorage omniweave.web.layout "desktop")
+      // — except a phone: the phone app (Tauri on Android/iOS), the web app on a narrow touch screen and the
+      // ?mobile / ?phone preview show the phone shell (ui/mobile) at the real width, edge to edge. Keep this test the
+      // same as src/io/platform.ts isMobile ("PC 화면으로 보기" = sessionStorage omniweave.web.layout "desktop", web/phone.ts).
       try {
-        var q = location.search, phone = false;
-        try {
-          phone = !("__TAURI_INTERNALS__" in window) && !/[?&]desktop\b/.test(q) &&
-            (/[?&]phone\b/.test(q) || (sessionStorage.getItem("omniweave.web.layout") !== "desktop" && Math.min(screen.width, screen.height) < 600 && matchMedia("(pointer: coarse)").matches));
-        } catch (e) {}
-        if (!phone && (Math.min(screen.width, screen.height) < 600 || screen.width < 960))
+        var q = location.search, tauri = "__TAURI_INTERNALS__" in window, pcChoice = false, narrowTouch = false;
+        try { pcChoice = sessionStorage.getItem("omniweave.web.layout") === "desktop"; } catch (e) {}
+        try { narrowTouch = Math.min(screen.width, screen.height) < 600 && matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches; } catch (e) {}
+        var phoneApp = (tauri && /Android|iPhone|iPad/i.test(navigator.userAgent)) || /[?&](mobile|phone)\b/.test(q) ||
+          (!tauri && !/[?&]desktop\b/.test(q) && !pcChoice && narrowTouch);
+        if (phoneApp) document.querySelector('meta[name="viewport"]').setAttribute("content", "width=device-width, initial-scale=1.0, viewport-fit=cover");
+        else if (Math.min(screen.width, screen.height) < 600 || screen.width < 960)
           document.querySelector('meta[name="viewport"]').setAttribute("content", "width=1024, initial-scale=" + Math.min(1, screen.width / 1024).toFixed(3) + ", viewport-fit=cover");
       } catch (e) {}
     </script>

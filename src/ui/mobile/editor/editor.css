@@ -1,0 +1,363 @@
+/* Phone editor (ui/mobile/editor): the page on a desk, a bottom tool bar, sheets from the bottom, 48 px targets. */
+.m-editor {
+  display: flex;
+  flex-direction: column;
+  --m-ed-desk: #8a8f98;
+}
+:root[data-theme="dark"] .m-editor {
+  --m-ed-desk: #2a2d33;
+}
+.m-ed-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+  background: var(--m-ed-desk);
+}
+.m-ed-stage canvas {
+  display: block;
+}
+.m-ed-over {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.m-ed-selrect {
+  fill: none;
+  stroke: var(--accent, #2f6fdc);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+}
+.m-ed-handle {
+  fill: #fff;
+  stroke: var(--accent, #2f6fdc);
+  stroke-width: 2;
+}
+.m-ed-handle-ico {
+  font-size: 14px;
+  text-anchor: middle;
+  fill: var(--accent, #2f6fdc);
+}
+.m-ed-stem {
+  stroke: var(--accent, #2f6fdc);
+  stroke-width: 1.5;
+}
+.m-ed-ink {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.m-ed-ghost {
+  opacity: 0.45;
+  stroke: var(--accent, #2f6fdc);
+  stroke-width: 1;
+}
+.m-ed-rule {
+  stroke: #e5484d;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+.m-ed-fit {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  min-width: 56px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.55) !important;
+  color: #fff;
+  font-size: 13px;
+}
+.m-ed-bar {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.m-ed-bar button {
+  flex: 1 0 58px;
+  min-width: 58px;
+}
+.m-ed-save {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 40px;
+  padding: 0 14px;
+  margin-left: 2px;
+}
+.m-ed-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent, #2f6fdc);
+  vertical-align: middle;
+}
+.m-ed-pagebar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+}
+.m-ed-pageno {
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+.m-ed-selbar {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 124px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 5;
+}
+.m-ed-selbar .m-chip {
+  pointer-events: auto;
+  min-height: 44px;
+  box-shadow: var(--shadow-modal);
+}
+.m-ed-danger {
+  color: var(--danger) !important;
+}
+.m-ed-measure {
+  position: absolute;
+  left: 50%;
+  top: 70px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 14px;
+  border-radius: 22px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  z-index: 5;
+}
+.m-ed-scrim {
+  z-index: 15;
+}
+.m-ed-sheet {
+  max-height: 72%;
+}
+.m-ed-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.m-ed-sheet-head h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-ed-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.m-tool.on {
+  border-color: var(--accent, #2f6fdc) !important;
+}
+.m-ed-row {
+  display: grid;
+  grid-template-columns: 6.5em 1fr 3.5em;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-size: 14px;
+}
+.m-ed-row input[type="range"] {
+  width: 100%;
+  height: 32px;
+}
+.m-ed-row output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.m-ed-row select {
+  grid-column: span 2;
+}
+.m-ed-h3 {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.m-ed-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.m-ed-swatch {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--line-2) !important;
+  overflow: hidden;
+}
+.m-ed-swatch.on {
+  outline: 3px solid var(--accent, #2f6fdc);
+  outline-offset: 2px;
+}
+.m-ed-swatch-s {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+}
+.m-ed-none {
+  background: linear-gradient(135deg, transparent 46%, #e5484d 46%, #e5484d 54%, transparent 54%), var(--bg-0) !important;
+}
+.m-ed-custom {
+  background: conic-gradient(#e5484d, #f5a524, #30a46c, #2f6fdc, #8e4ec6, #e5484d);
+}
+.m-ed-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+.m-ed-layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.m-ed-layers li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+.m-ed-layers li.on {
+  background: var(--bg-3);
+}
+.m-ed-layers li.off .m-ed-lname {
+  opacity: 0.5;
+}
+.m-ed-layers li.m-ed-in {
+  padding-left: 18px;
+}
+.m-ed-group .m-ed-lname {
+  font-weight: var(--fw-strong);
+}
+.m-ed-eye {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 17px;
+  color: var(--text-2);
+}
+.m-ed-lname {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  overflow: hidden;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.m-ed-lname small,
+.m-ed-why {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.m-ed-layer-color {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+.m-ed-targets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.m-ed-targets .m-tool {
+  width: 100%;
+}
+.m-ed-targets .m-tool:disabled {
+  opacity: 0.5;
+}
+/* the text being typed: above the keyboard (bottom follows the visual viewport) */
+.m-ed-textsheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  box-shadow: var(--shadow-modal);
+}
+.m-ed-fmt {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  align-items: center;
+}
+.m-ed-fmt .m-chip {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 40px;
+}
+.m-ed-textrow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.m-ed-textarea {
+  flex: 1;
+  resize: none;
+  font-size: 16px; /* 16 px: no zoom-on-focus in mobile browsers */
+  line-height: 1.4;
+  user-select: text;
+}
+/* sheets */
+.m-ed-sheetwrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.m-ed-cellbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
+}
+.m-ed-cellbar .m-field {
+  flex: 1;
+  font-size: 16px;
+  user-select: text;
+}
+.m-ed-addr {
+  min-width: 3.2em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  font-size: 14px;
+}

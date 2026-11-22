@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the app's own cache is shared: finished files waiting for the share sheet (stage/) and the scan photo (scan/) -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+  <cache-path name="cache" path="." />
+</paths>

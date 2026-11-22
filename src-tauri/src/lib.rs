@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+#[cfg(any(mobile, test))]
+mod mobile;
+#[cfg(desktop)]
 mod portable;
 mod spell;
 
@@ -187,6 +190,7 @@ fn update_qa_allowed(debug: bool, identifier: &str) -> bool {
 /// Updater self-check (`omniweave.exe --update-check`): asks the configured update endpoint exactly like the app
 /// does and writes what it saw (current version, remote version, decision or error) to
 /// %TEMP%/omniweave-update-check.txt, then exits. Lets QA test the update channel without clicking the UI.
+#[cfg(desktop)]
 fn update_check(app: &tauri::AppHandle) {
     use tauri_plugin_updater::UpdaterExt;
     if store_package() {
@@ -283,6 +287,7 @@ pub fn run() {
     // portable self-update, before anything else (no window, no plugins): the downloaded `<name>.new.exe` puts
     // itself in place of the old exe and starts it (src/portable.rs)
     let args: Vec<String> = std::env::args().collect();
+    #[cfg(desktop)]
     if args.iter().any(|a| a == "--finish-update") {
         std::process::exit(portable::finish_update(&args));
     }
@@ -291,6 +296,7 @@ pub fn run() {
         std::process::exit(selftest(&ctx));
     }
     // leftovers of a finished portable update (`.new.exe`, `.exe.old`); the old process may still be closing
+    #[cfg(desktop)]
     if let Ok(exe) = std::env::current_exe() {
         std::thread::spawn(move || {
             if is_portable() && !store_package() {
@@ -300,30 +306,73 @@ pub fn run() {
             }
         });
     }
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init());
+    #[cfg(mobile)]
+    let builder = builder.plugin(mobile::init());
+    // desktop: the app's own updater, restart, portable self-update; on Android/iOS the store updates the app
+    // (docs/MOBILE_PLAN.md §3.2), so those plugins and commands are not built there
+    #[cfg(desktop)]
+    let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![startup_files, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, portable::portable_update_download, portable::portable_update_finish, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore])
+        .invoke_handler(tauri::generate_handler![startup_files, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, portable::portable_update_download, portable::portable_update_finish, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore]);
+    #[cfg(mobile)]
+    let builder = builder.manage(OpenedFiles::default()).invoke_handler(tauri::generate_handler![opened_files, mobile::share_bytes, mobile::content_name, mobile::scan_photo, mobile::stage_put, mobile::share_staged, mobile::save_staged, mobile::persist_uri, mobile::can_write_uri, startup_files, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore]);
+    builder
         .setup(|app| {
-            use tauri::Manager;
-            if update_qa_env(&app.config().identifier) {
-                // QA run: out of sight but not hidden (a hidden WebView2 may hold its page back)
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.set_skip_taskbar(true);
-                    let _ = w.set_position(tauri::PhysicalPosition::new(-30000, -30000));
-                }
-            }
-            if std::env::args().any(|a| a == "--update-check") {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.hide();
-                }
-                update_check(app.handle());
-            }
+            #[cfg(desktop)]
+            desktop_setup(app);
+            #[cfg(mobile)]
+            let _ = app;
             Ok(())
         })
-        .run(ctx)
-        .expect("error while running Omniweave");
+        .build(ctx)
+        .expect("error while running Omniweave")
+        .run(|_app, _event| {
+            // Android/iOS: a file shared to the app or opened with it ("Open with", ACTION_VIEW / ACTION_SEND, iOS
+            // "Open in") arrives here, also at a cold start; the phone shell asks for it (opened_files) and is told
+            // when more come (event "opened-files")
+            #[cfg(mobile)]
+            if let tauri::RunEvent::Opened { urls } = _event {
+                use tauri::{Emitter, Manager};
+                let list: Vec<String> = urls.iter().map(|u| u.to_string()).collect();
+                _app.state::<OpenedFiles>().0.lock().unwrap().extend(list.iter().cloned());
+                let _ = _app.emit("opened-files", list);
+            }
+        });
+}
+
+/// Files handed to the mobile app by other apps, not yet taken by the UI (content:// or file:// URLs).
+#[cfg(mobile)]
+#[derive(Default)]
+struct OpenedFiles(std::sync::Mutex<Vec<String>>);
+
+/// The files other apps handed over since the last call (the phone shell opens each); empty on desktop.
+#[cfg(mobile)]
+#[tauri::command]
+fn opened_files(state: tauri::State<OpenedFiles>) -> Vec<String> {
+    std::mem::take(&mut *state.0.lock().unwrap())
+}
+
+/// Desktop-only start-up: the QA window placement and the `--update-check` self-check.
+#[cfg(desktop)]
+fn desktop_setup(app: &mut tauri::App) {
+    use tauri::Manager;
+    if update_qa_env(&app.config().identifier) {
+        // QA run: out of sight but not hidden (a hidden WebView2 may hold its page back)
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.set_skip_taskbar(true);
+            let _ = w.set_position(tauri::PhysicalPosition::new(-30000, -30000));
+        }
+    }
+    if std::env::args().any(|a| a == "--update-check") {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.hide();
+        }
+        update_check(app.handle());
+    }
 }

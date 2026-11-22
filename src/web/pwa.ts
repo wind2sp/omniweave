@@ -73,9 +73,17 @@ function watch(r: ServiceWorkerRegistration) {
 
 /** `?sw=off`: support escape hatch — remove the worker and every cache of this app, then load from the network. */
 async function switchOff(): Promise<void> {
+  // only this channel's worker and caches: /app/ and /app-beta/ share the origin (docs/RELEASING.md §웹판 업데이트)
+  const scope = new URL("./", location.href).href;
   const regs = await navigator.serviceWorker.getRegistrations().catch(() => []);
-  await Promise.all(regs.map((r) => r.unregister()));
-  if ("caches" in window) for (const k of await caches.keys()) if (k.startsWith("omw-")) await caches.delete(k);
+  await Promise.all(regs.filter((r) => r.scope === scope).map((r) => r.unregister()));
+  const prefix = cachePrefix(scope);
+  if ("caches" in window) for (const k of await caches.keys()) if (k.startsWith(prefix)) await caches.delete(k);
+}
+
+/** Cache name prefix of the worker at `scope`: "omwbeta-" for the test channel (…/app-beta/), else "omw-" (sw.js). */
+export function cachePrefix(scope: string): string {
+  return /\/app-beta\/$/.test(new URL(scope).pathname) ? "omwbeta-" : "omw-";
 }
 
 /** Called once at start-up (main.tsx). */

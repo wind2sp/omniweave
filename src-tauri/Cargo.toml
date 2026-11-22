@@ -19,9 +19,14 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-opener = "2"
+# OS name and locale: picks the mobile shell and the UI language on Android/iOS (docs/MOBILE_PLAN.md §3.2)
+tauri-plugin-os = "2"
+# Desktop only: the app's own updater and the portable self-update. On Android/iOS the store updates the app
+# (docs/MOBILE_PLAN.md §3.2; App Store 2.5.2), so none of this is built there.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
-tauri-plugin-opener = "2"
 # Portable exe self-update (src/portable.rs): download, SHA-256 and minisign check. All of these are already in the
 # tree through tauri-plugin-updater, pinned here to the versions Cargo.lock has, with no extra features (no new crates;
 # rustls "ring" = the crypto provider the tree already builds, installed before the download client is made).

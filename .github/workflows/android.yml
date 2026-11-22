@@ -1,0 +1,97 @@
+# Android app (docs/MOBILE_PLAN.md §4): tests, then the Play bundle (AAB, arm64-v8a + armeabi-v7a) and an APK for
+# side-loading tests, kept as build artifacts. Runs only on a `mobile-v*` tag or by hand (Actions ▸ Android ▸ Run
+# workflow), not on every push, to save the included Actions minutes (~15–25 min per run on ubuntu-latest).
+#
+# Signing: with the four ANDROID_UPLOAD_* secrets set, the release AAB / APK are signed with the Play *upload* key
+# (Play App Signing keeps the app signing key). Without them the AAB is built unsigned — nothing here creates a key.
+#   ANDROID_UPLOAD_KEYSTORE_B64   base64 of the upload keystore (.jks)
+#   ANDROID_UPLOAD_STORE_PASSWORD keystore password
+#   ANDROID_UPLOAD_KEY_ALIAS      key alias
+#   ANDROID_UPLOAD_KEY_PASSWORD   key password
+# Uploading to Play is not done here (first upload by hand in Play Console; docs/PLAY_LISTING.md).
+name: Android
+on:
+  workflow_dispatch:
+    inputs:
+      tests:
+        description: "Run the tests first"
+        type: boolean
+        default: true
+  push:
+    tags: ["mobile-v*"]
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  NDK_VERSION: "29.0.14206865"
+  TAURI_CLI: "@tauri-apps/cli@2.12.4"
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "aarch64-linux-android,armv7-linux-androideabi" }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: "src-tauri -> target", cache-on-failure: true }
+      - name: Android SDK parts (platform 36, build-tools, NDK r29 for 16 KB pages)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.1.0" "ndk;${NDK_VERSION}" > /dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+      - run: npm ci
+
+      - name: Tests (types, unit tests, Rust)
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.tests }}
+        run: |
+          npx tsc --noEmit
+          # updateFlow mocks fail on ubuntu (ci.yml note); the desktop updater is not part of the phone app
+          npx vitest run --exclude "**/updateFlow*"
+          sudo apt-get update -qq && sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev > /dev/null
+          cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Upload key (only when the secrets are set)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+          STORE_PW: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEY_PW: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "no upload key: the AAB is built unsigned"; exit 0; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          {
+            echo "ANDROID_UPLOAD_KEYSTORE=$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_UPLOAD_STORE_PASSWORD=$STORE_PW"
+            echo "ANDROID_UPLOAD_KEY_ALIAS=$KEY_ALIAS"
+            echo "ANDROID_UPLOAD_KEY_PASSWORD=$KEY_PW"
+          } >> "$GITHUB_ENV"
+
+      - name: Build AAB (Play) and APK (arm64-v8a + armeabi-v7a)
+        run: |
+          npx --yes "$TAURI_CLI" android build --ci --aab --apk --target aarch64 armv7
+
+      - name: Check 16 KB page alignment and size
+        run: |
+          APK=$(ls src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk | head -1)
+          "$ANDROID_HOME/build-tools/36.1.0/zipalign" -c -P 16 -v 4 "$APK" > /dev/null && echo "16 KB alignment OK"
+          ls -l src-tauri/gen/android/app/build/outputs/bundle/universalRelease/*.aab "$APK"
+
+      - name: Remove the upload key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omniweave-android-${{ github.ref_name }}-${{ github.run_number }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            src-tauri/gen/android/app/build/outputs/bundle/universalRelease/*.aab
+            src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+            src-tauri/gen/android/app/build/outputs/mapping/universalRelease/mapping.txt

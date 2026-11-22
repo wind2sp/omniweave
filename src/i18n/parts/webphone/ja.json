@@ -1,15 +1,4 @@
 {
-  "webphone.open": "開く",
-  "webphone.openFile": "ファイルを開く",
-  "webphone.share": "共有",
-  "webphone.back": "戻る",
-  "webphone.close": "閉じる",
-  "webphone.notice": "スマートフォン専用画面を準備中です。今は表示のみできます。編集はパソコンで行ってください。",
-  "webphone.startTitle": "スマートフォンで文書を見る",
-  "webphone.startText": "PDF・Word・ハングル・PowerPoint・Excel・Photoshop・Illustrator・CAD・画像ファイルを開けます。指でスクロール、2本指で拡大、ダブルタップで大きく表示します。",
   "webphone.desktop": "パソコン用画面で見る",
-  "webphone.phoneLayout": "スマートフォン画面に戻る",
-  "webphone.opening": "開いています…",
-  "webphone.openingName": "{name} を開いています…",
-  "webphone.openFailed": "{name} を開けませんでした"
+  "webphone.phoneLayout": "スマートフォン画面に戻る"
 }

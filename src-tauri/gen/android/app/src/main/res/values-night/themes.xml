@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Omniweave: dark frame behind the status bar, gesture bar and keyboard (mobile.css: bg-1 token dark) -->
+    <style name="Theme.omniweave" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/omw_frame</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

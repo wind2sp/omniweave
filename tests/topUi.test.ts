@@ -291,7 +291,8 @@ describe("the 88 px ribbon (QA 2026-11-21)", () => {
 
 describe("the window (issue 4)", () => {
   const conf = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
-  const caps = JSON.parse(readFileSync("src-tauri/capabilities/default.json", "utf8"));
+  // window buttons and dragging are desktop-only permissions (capabilities/desktop.json; not on Android/iOS)
+  const caps = JSON.parse(readFileSync("src-tauri/capabilities/desktop.json", "utf8"));
   it("has no Windows title bar and stays resizable; its own buttons may minimise, maximise, close and drag", () => {
     const w = conf.app.windows[0];
     expect(w.decorations).toBe(false);

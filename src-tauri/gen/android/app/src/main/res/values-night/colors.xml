@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- mobile.css bg-1 token (dark) -->
+    <color name="omw_frame">#FF1C1D20</color>
+</resources>

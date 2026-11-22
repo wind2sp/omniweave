@@ -3,7 +3,7 @@
 // one entry here plus its module in src/io/formats/.
 
 import type { AssetRef, OmwDocument, Page } from "../../core/types";
-import type { Filter, OpenedFile } from "../platform";
+import { setRegistryExts, type Filter, type OpenedFile } from "../platform";
 import { decryptHwpx, isEncryptedHwpx } from "../crypto/hwpx";
 import { rememberSecret, withPassword } from "../crypto/session";
 import { exportDocx, exportHwpx, parseDocxFlow, parseHwpxFlow, type OfficeImportReport, type OfficeItem } from "../office";
@@ -660,6 +660,7 @@ export function formatForExt(ext: string): FormatDef | undefined {
 }
 
 export const ALL_EXTS = FORMATS.flatMap((f) => f.exts);
+setRegistryExts(ALL_EXTS);
 
 export function openFilters(): Filter[] {
   const groups: [string, FormatGroup[]][] = [
@@ -1037,6 +1038,21 @@ export const EXPORTS: ExportDef[] = [
       extensions: ["srt"],
     },
     run: async (d) => exportSrt(d.pages),
+  },
+  {
+    // a drawing page as DXF R12 (layers, lines / polylines, texts; cad/dxfWrite.ts) — an export, never "the original
+    // format": a DXF / DWG opened here keeps its original as an asset, and a rewrite would drop hatches, blocks, dimensions
+    id: "dxf",
+    get label() {
+      return t("dxfwrite.export.label");
+    },
+    get hint() {
+      return t("dxfwrite.export.hint");
+    },
+    ext: "dxf",
+    filter: { name: "DXF", extensions: ["dxf"] },
+    fileName: (d, p) => (p.source?.cad ? baseName(p.source.name) : pageFileStem(d, p)),
+    run: async (_d, p) => (await import("./cad/dxfWrite")).writeDxf(p).bytes,
   },
   {
     id: "psd",

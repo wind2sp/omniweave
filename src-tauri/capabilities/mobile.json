@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Phone app only: back on the home screen closes the app (ui/mobile/back.ts)",
+  "platforms": ["android", "iOS"],
+  "windows": ["main"],
+  "permissions": ["core:app:allow-exit"]
+}

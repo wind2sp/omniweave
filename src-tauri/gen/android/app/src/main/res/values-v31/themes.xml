@@ -1,0 +1,11 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Android 12+ splash screen: the app icon on the app's frame colour (light / dark from values-night-v31) -->
+    <style name="Theme.omniweave" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/omw_frame</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowSplashScreenBackground">@color/omw_frame</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
+    </style>
+</resources>

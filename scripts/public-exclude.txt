@@ -61,5 +61,12 @@ marketing/
 # --- test-channel tooling ---
 # Releases to the private cloud test channel; its settings live outside the repository.
 scripts/release-dropbox.mjs
+# Phone app plan and Play listing working notes (internal schedule and decisions; the store text is published in Play),
+# and the phone end-to-end / screenshot runners (they drive the development PC's emulator and work folders).
+docs/MOBILE_PLAN.md
+docs/PLAY_LISTING.md
+scripts/mobile-edit-e2e.mjs
+scripts/mobile-shots.mjs
+scripts/mobile-touch-e2e.mjs
 # CAD fidelity runner: reads the AutoCAD reference drawings kept in a private shared folder.
 scripts/fidelity-cad.mjs

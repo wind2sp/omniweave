@@ -140,6 +140,12 @@ function onDevicePixels(ctx: Ctx, n: VectorNode): CrispPath | null {
 type Decoded = ImageBitmap | HTMLImageElement;
 const images = new Map<string, Decoded | "loading" | "error">();
 
+/** Drop every decoded picture (the phone viewer closing a document, ui/mobile/openDoc.ts). */
+export function dropDecodedImages(): void {
+  for (const v of images.values()) if (typeof v === "object" && "close" in v) (v as ImageBitmap).close();
+  images.clear();
+}
+
 /** Decode an image asset (render/picDecode.ts: SVG stays vector, EMF / WMF are played into SVG). */
 const decodeAsset = decodePicture;
 

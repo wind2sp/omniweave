@@ -1,10 +1,95 @@
 // File access that works the same in the browser and in the Tauri desktop shell.
 
 import { t } from "../i18n";
-import { ALL_EXTS } from "./formats";
 import { isIOS } from "../web/device";
+import { PHONE_LAYOUT_KEY } from "../web/phone";
+// (no static import of the format registry here: the phone app shows its first screen without loading the whole
+// engine — formats/index.ts hands its extension list over when it loads, setRegistryExts)
+let registryExts: string[] = [];
+/** called by io/formats/index.ts with every extension it opens */
+export function setRegistryExts(exts: string[]) {
+  registryExts = exts;
+}
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/** OS of the Tauri shell from tauri-plugin-os ("windows", "android", "ios", …), read from the value the plugin
+ *  injects before the page loads (what `@tauri-apps/plugin-os` platform() returns, without the extra package);
+ *  null in a browser. */
+export function osPlatform(): string | null {
+  if (typeof window === "undefined") return null;
+  const os = (window as any).__TAURI_OS_PLUGIN_INTERNALS__;
+  return os && typeof os.platform === "string" ? os.platform : null;
+}
+
+/** The Android/iOS app (Tauri mobile): the phone shell (ui/mobile) instead of the desktop editor, no in-app
+ *  updater, files through the system picker and share sheet (docs/MOBILE_PLAN.md §3.2). `?mobile` previews the
+ *  phone shell in a desktop browser or window (development and screenshots). */
+export const isMobile: boolean = (() => {
+  if (typeof window === "undefined") return false;
+  const os = osPlatform();
+  if (os === "android" || os === "ios") return true;
+  if (isTauri && typeof navigator !== "undefined" && /Android|iPhone|iPad/i.test(navigator.userAgent)) return true;
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.has("mobile") || q.has("phone")) return true;
+    // `?desktop` keeps the desktop editor on any screen
+    if (q.has("desktop") || isTauri) return false;
+  } catch {
+    /* no URL */
+  }
+  // "PC 화면으로 보기" (the phone shell's settings; web/phone.ts switchLayout): the desktop editor for this visit
+  if (desktopChosen()) return false;
+  // the web app on a phone (iPhone Safari, Android Chrome, a home-screen app): a narrow touch screen gets the same
+  // phone screen as the Android app — tablets and touch laptops keep the desktop editor
+  return narrowTouchScreen();
+})();
+
+function desktopChosen(): boolean {
+  try {
+    return sessionStorage.getItem(PHONE_LAYOUT_KEY) === "desktop";
+  } catch {
+    return false;
+  }
+}
+
+/** A phone-sized touch screen: coarse pointer, no fine one, the short side under 600 CSS px. */
+export function narrowTouchScreen(): boolean {
+  if (typeof window === "undefined" || typeof matchMedia !== "function") return false;
+  try {
+    const coarse = matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches;
+    const short = Math.min(window.screen?.width ?? window.innerWidth, window.screen?.height ?? window.innerHeight);
+    return coarse && short > 0 && short < 600;
+  } catch {
+    return false;
+  }
+}
+
+/** Tauri on Android/iOS: picked files are content:// (Android) or security-scoped URLs, not paths. */
+const nativeMobile = isTauri && isMobile;
+
+/** Name of a picked file; on Android a content:// URI often carries only an id, so the provider is asked. */
+async function pickedName(p: string): Promise<string> {
+  if (nativeMobile && p.startsWith("content://")) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const n = await invoke<string | null>("content_name", { uri: p });
+      if (n) return n;
+    } catch {}
+  }
+  return displayName(p);
+}
+
+/** File name for a picked path or URI. Android's picker returns content://…/document/primary%3ADownload%2Fa.pdf
+ *  (the name is the last segment once decoded) or an opaque id (…/document/msf%3A31), which has no name. */
+export function displayName(p: string): string {
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(p)) return p.split(/[\\/]/).pop()!;
+  let last = p.split("/").pop() ?? p;
+  try {
+    last = decodeURIComponent(last);
+  } catch {}
+  return last.split(/[\\/:]/).pop() || "file";
+}
 
 export interface OpenedFile {
   name: string;
@@ -24,7 +109,7 @@ export async function openFiles(filters: Filter[], multiple = false): Promise<Op
     const sel = await open({ multiple, filters });
     if (!sel) return [];
     const paths = Array.isArray(sel) ? sel : [sel];
-    return Promise.all(paths.map(async (p) => ({ name: p.split(/[\\/]/).pop()!, path: p, bytes: await readFile(p) })));
+    return Promise.all(paths.map(async (p) => ({ name: await pickedName(p), path: p, bytes: await readFile(p) })));
   }
   return new Promise((resolve) => {
     const input = document.createElement("input");
@@ -50,6 +135,11 @@ export async function saveFile(suggested: string, bytes: Uint8Array | string, fi
     const { writeFile, rename } = await import("@tauri-apps/plugin-fs");
     const path = existingPath ?? (await save({ defaultPath: suggested, filters }));
     if (!path) return null;
+    // Android/iOS: the picker hands back a document URI the app may write but not rename into: write it directly
+    if (nativeMobile) {
+      await writeFile(path, data);
+      return path;
+    }
     // atomic save: write a sibling temp file, then rename over the target
     const tmp = path + ".omw-tmp";
     await writeFile(tmp, data);
@@ -125,7 +215,7 @@ export async function shareFile(name: string, data: Uint8Array, nav: any = typeo
 export const FILTERS = {
   omw: { get name() { return t("engine.filter.omw"); }, extensions: ["omw"] },
   /** every extension in the format registry (src/io/formats/index.ts) */
-  any: { get name() { return t("engine.filter.any"); }, extensions: ALL_EXTS },
+  any: { get name() { return t("engine.filter.any"); }, get extensions() { return registryExts; } },
   images: { get name() { return t("engine.filter.images"); }, extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] },
   pdf: { name: "PDF", extensions: ["pdf"] },
   docx: { get name() { return t("engine.filter.docx"); }, extensions: ["docx"] },

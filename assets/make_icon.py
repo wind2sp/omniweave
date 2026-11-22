@@ -193,6 +193,63 @@ def web_icons(dest: str) -> int:
     return n
 
 
+DENSITIES = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
+
+
+def square_bg(size: int) -> Image.Image:
+    """The tile's gradient without the rounded corners (adaptive icon background, Play icon: the launcher / store masks it)."""
+    grad = Image.new("RGB", (1, 256))
+    for y in range(256):
+        grad.putpixel((0, y), lerp(BG_TOP, BG_BOT, y / 255))
+    return grad.resize((size, size)).convert("RGBA")
+
+
+def ring_on(size: int, frac: float, detailed: bool = True) -> Image.Image:
+    """The woven ring on a transparent square, its outer edge `frac` of the side across (centred)."""
+    outer = 2 * (0.285 + 0.115 / 2 + 0.115 * 0.28 / 2) if detailed else 2 * (0.30 + 0.17 / 2 + 0.17 * 0.28 / 2)
+    n = max(1, round(size * frac / outer))
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    out.alpha_composite(woven_ring(n, detailed), ((size - n) // 2, (size - n) // 2))
+    return out
+
+
+def android_assets(res: str) -> int:
+    """Android launcher icons (src-tauri/gen/android/app/src/main/res): adaptive foreground / background / monochrome
+    (108 dp; the ring stays inside the 66 dp circle every launcher mask keeps — 0.58 of the side), legacy square and
+    round icons (48 dp) for Android 7. The splash screen (values-v31) reuses the adaptive foreground."""
+    count = 0
+    for name, k in DENSITIES.items():
+        d = os.path.join(res, f"mipmap-{name}")
+        os.makedirs(d, exist_ok=True)
+        fg = round(108 * k)
+        ring_on(fg, 0.58).save(os.path.join(d, "ic_launcher_foreground.png"), optimize=True)
+        square_bg(fg).save(os.path.join(d, "ic_launcher_background.png"), optimize=True)
+        # themed icon (Android 13+): the launcher tints the shape, only the alpha counts
+        # (the bands and tiles only: the dark outline between the bands stays a gap, so the weave still shows)
+        r, g, b, a = ring_on(fg, 0.58).split()
+        lum = Image.merge("RGB", (r, g, b)).convert("L").point(lambda v: 255 if v > 70 else 0)
+        mono = Image.composite(a, Image.new("L", (fg, fg), 0), lum)
+        Image.merge("RGBA", (Image.new("L", (fg, fg), 255),) * 3 + (mono,)).save(os.path.join(d, "ic_launcher_monochrome.png"), optimize=True)
+        legacy = round(48 * k)
+        render(legacy).save(os.path.join(d, "ic_launcher.png"), optimize=True)
+        sq = square_bg(legacy * SS).resize((legacy, legacy), Image.LANCZOS)
+        sq.alpha_composite(ring_on(legacy, 0.74, legacy > 40))
+        mask = Image.new("L", (legacy * SS, legacy * SS), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, legacy * SS - 1, legacy * SS - 1], fill=255)
+        rnd = Image.new("RGBA", (legacy, legacy), (0, 0, 0, 0))
+        rnd.paste(sq, (0, 0), mask.resize((legacy, legacy), Image.LANCZOS))
+        rnd.save(os.path.join(d, "ic_launcher_round.png"), optimize=True)
+        count += 5
+    return count
+
+
+def play_icon(path: str) -> None:
+    """Google Play store icon: 512 × 512, full square (Play rounds the corners itself), no transparency."""
+    img = square_bg(512 * SS).resize((512, 512), Image.LANCZOS)
+    img.alpha_composite(ring_on(512, 0.74))
+    img.convert("RGB").save(path, optimize=True)
+
+
 def main():
     import sys
 
@@ -202,6 +259,13 @@ def main():
     web = os.path.join(HERE, "..", "src", "web", "icons")
     if len(sys.argv) == 2 and sys.argv[1] == "--web":
         print(f"web icons {web_icons(web)}")
+        return
+    if len(sys.argv) == 3 and sys.argv[1] == "--android":
+        print(f"android icons {android_assets(sys.argv[2])}")
+        return
+    if len(sys.argv) == 3 and sys.argv[1] == "--play-icon":
+        play_icon(sys.argv[2])
+        print("play icon written")
         return
     web_icons(web)
     master = render(1024)

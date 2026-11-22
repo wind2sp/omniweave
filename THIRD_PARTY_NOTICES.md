@@ -266,7 +266,7 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER
 DEALINGS IN THE FONT SOFTWARE.
 ```
 
-## Rust crates (desktop app, `src-tauri/Cargo.lock`)
+## Rust crates (desktop and phone app, `src-tauri/Cargo.lock`)
 
 514 crates. Licenses read from the local cargo registry. Not every crate is compiled on every platform; the lock file lists all targets.
 
@@ -401,6 +401,7 @@ DEALINGS IN THE FONT SOFTWARE.
 | gdkx11 | 0.18.2 | UNKNOWN ⚠ |  |
 | gdkx11-sys | 0.18.2 | UNKNOWN ⚠ |  |
 | generic-array | 0.14.7 | MIT | https://github.com/fizyk20/generic-array.git |
+| gethostname | 1.1.0 | Apache-2.0 | https://codeberg.org/swsnr/gethostname.rs.git |
 | getrandom | 0.2.17 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
 | getrandom | 0.3.4 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
 | getrandom | 0.4.3 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
@@ -518,6 +519,7 @@ DEALINGS IN THE FONT SOFTWARE.
 | openssl-probe | 0.2.2 | UNKNOWN ⚠ |  |
 | option-ext | 0.2.0 | MPL-2.0 | https://github.com/soc/option-ext.git |
 | ordered-stream | 0.2.0 | UNKNOWN ⚠ |  |
+| os_info | 3.15.0 | MIT | https://github.com/stanislav-tkach/os_info |
 | osakit | 0.3.1 | UNKNOWN ⚠ |  |
 | pango | 0.18.3 | UNKNOWN ⚠ |  |
 | pango-sys | 0.18.0 | UNKNOWN ⚠ |  |
@@ -631,6 +633,7 @@ DEALINGS IN THE FONT SOFTWARE.
 | syn | 3.0.10 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn |
 | sync_wrapper | 1.0.2 | Apache-2.0 | https://github.com/Actyx/sync_wrapper |
 | synstructure | 0.14.0 | MIT | https://github.com/mystor/synstructure |
+| sys-locale | 0.3.2 | MIT OR Apache-2.0 | https://github.com/1Password/sys-locale |
 | system-configuration | 0.7.0 | UNKNOWN ⚠ |  |
 | system-configuration-sys | 0.6.0 | UNKNOWN ⚠ |  |
 | system-deps | 6.2.2 | UNKNOWN ⚠ |  |
@@ -646,6 +649,7 @@ DEALINGS IN THE FONT SOFTWARE.
 | tauri-plugin-dialog | 2.8.4 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-plugin-fs | 2.7.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-plugin-opener | 2.7.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
+| tauri-plugin-os | 2.4.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-plugin-process | 2.4.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-plugin-updater | 2.14.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-runtime | 2.12.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |

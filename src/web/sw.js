@@ -20,10 +20,19 @@ const BUILD = "__OMW_BUILD__";
 const PRECACHE = /* __OMW_PRECACHE__ */ [];
 const MODELS = "__OMW_MODELS__";
 
-const SHELL = "omw-shell-" + BUILD;
-const RUNTIME = "omw-run-" + BUILD;
-const MODEL_CACHE = "omw-models-" + MODELS;
+// Cache names are per origin, not per scope: the test channel (/app-beta/, docs/RELEASING.md §웹판 업데이트) uses
+// its own prefix so its worker and the release one (/app/, which deletes every other "omw-" cache) never drop each
+// other's caches.
+const PREFIX = cachePrefix(self.registration.scope);
+const SHELL = PREFIX + "shell-" + BUILD;
+const RUNTIME = PREFIX + "run-" + BUILD;
+const MODEL_CACHE = PREFIX + "models-" + MODELS;
 const OURS = [SHELL, RUNTIME, MODEL_CACHE];
+
+/** "omwbeta-" under …/app-beta/, else "omw-" (the same rule as src/web/pwa.ts cachePrefix) */
+function cachePrefix(scope) {
+  return /\/app-beta\/$/.test(new URL(scope).pathname) ? "omwbeta-" : "omw-";
+}
 
 const scopeUrl = (p) => new URL(p, self.registration.scope).href;
 
@@ -57,7 +66,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      for (const name of await caches.keys()) if (name.startsWith("omw-") && !OURS.includes(name)) await caches.delete(name);
+      for (const name of await caches.keys()) if (name.startsWith(PREFIX) && !OURS.includes(name)) await caches.delete(name);
       await self.clients.claim();
     })(),
   );

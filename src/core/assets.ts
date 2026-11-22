@@ -19,6 +19,11 @@ export function hasBlob(hash: string): boolean {
   return blobs.has(hash);
 }
 
+/** Forget every blob — the phone viewer (ui/mobile) when it closes a document; the desktop editor never calls it. */
+export function clearBlobs(): void {
+  blobs.clear();
+}
+
 export function makeAsset(bytes: Uint8Array, mime: string, name: string): AssetRef {
   const hash = putBlob(bytes);
   listeners.forEach((l) => l());
