@@ -210,6 +210,8 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       return
     }
     val words = args.words
+    // where each word starts in the line handed to the checker
+    val starts = words.runningFold(0) { at, w -> at + w.length + 1 }.dropLast(1)
     activity.runOnUiThread {
       try {
         val tsm = activity.getSystemService(android.content.Context.TEXT_SERVICES_MANAGER_SERVICE) as android.view.textservice.TextServicesManager
@@ -217,9 +219,15 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
         val listener = object : android.view.textservice.SpellCheckerSession.SpellCheckerSessionListener {
           override fun onGetSuggestions(results: Array<out android.view.textservice.SuggestionsInfo>?) = answer((results ?: arrayOf()).toList())
 
-          /** one sentence per word: its first (only) word's result */
-          override fun onGetSentenceSuggestions(results: Array<out android.view.textservice.SentenceSuggestionsInfo>?) =
-            answer((results ?: arrayOf()).map { if (it.suggestionsCount > 0) it.getSuggestionsInfoAt(0) else null })
+          /** the words as one line: each result found by where its word starts */
+          override fun onGetSentenceSuggestions(results: Array<out android.view.textservice.SentenceSuggestionsInfo>?) {
+            val byWord = arrayOfNulls<android.view.textservice.SuggestionsInfo>(words.size)
+            for (r in results ?: arrayOf()) for (k in 0 until r.suggestionsCount) {
+              val w = starts.indexOf(r.getOffsetAt(k))
+              if (w >= 0) byWord[w] = r.getSuggestionsInfoAt(k)
+            }
+            answer(byWord.toList())
+          }
 
           fun answer(infos: List<android.view.textservice.SuggestionsInfo?>) {
             val ret = app.tauri.plugin.JSObject()
@@ -249,7 +257,7 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
           return@runOnUiThread
         }
         // (the sentence form: current spell checkers such as Gboard answer it; the old per-word form came back empty)
-        session.getSentenceSuggestions(words.map { android.view.textservice.TextInfo(it) }.toTypedArray(), if (suggest) 8 else 1)
+        session.getSentenceSuggestions(arrayOf(android.view.textservice.TextInfo(words.joinToString(" "))), if (suggest) 8 else 1)
       } catch (e: Exception) {
         invoke.reject(e.message ?: e.toString())
       }
