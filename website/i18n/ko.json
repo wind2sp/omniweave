@@ -409,6 +409,7 @@
     "infoAria": "설치 안내",
     "ss": {
       "h": "“Windows의 PC 보호” 창이 뜨면",
+      "browser": "<strong>받을 때:</strong> Edge·Chrome이 “일반적으로 다운로드되지 않는 파일”이라며 막으면, 다운로드 목록에서 파일 옆 <strong>…</strong> 메뉴 → <strong>유지</strong>(Chrome은 <strong>계속</strong>)를 누르세요. 새 프로그램이라 아직 다운로드 수가 적어서 뜨는 경고입니다.",
       "unsigned": "지금 빌드는 <strong>코드 서명 전</strong>이라 Microsoft Defender SmartScreen이 처음 실행을 막을 수 있습니다. 파일이 이 페이지(GitHub Releases)에서 받은 것이고 아래 체크섬이 맞는다면:",
       "signed": "설치 파일은 코드 서명되어 있습니다. 그래도 SmartScreen 경고가 보이면 아래 순서로 실행할 수 있습니다.",
       "steps": [

@@ -409,6 +409,7 @@
     "infoAria": "安装说明",
     "ss": {
       "h": "如果出现“Windows 已保护你的电脑”",
+      "browser": "<strong>下载时:</strong>如果 Edge 或 Chrome 提示该文件“通常不会被下载”,请在下载列表中点击文件旁的 <strong>…</strong>,选择<strong>保留</strong>(Chrome:<strong>保留</strong>或<strong>仍然下载</strong>)。这是因为应用刚发布、下载次数还少。",
       "unsigned": "目前的版本<strong>尚未进行代码签名</strong>，Microsoft Defender SmartScreen 可能会阻止首次运行。如果文件是从本页面 (GitHub Releases) 下载，并且下方的校验值一致：",
       "signed": "安装程序已进行代码签名。如果 SmartScreen 仍然提示警告，可以按以下步骤运行：",
       "steps": [

@@ -409,6 +409,7 @@
     "infoAria": "インストールの案内",
     "ss": {
       "h": "「Windows によって PC が保護されました」と表示されたら",
+      "browser": "<strong>ダウンロード時:</strong> Edge や Chrome が「一般的にダウンロードされていません」と表示した場合は、ダウンロード一覧でファイルの <strong>…</strong> メニューから <strong>保存</strong>(Chrome は <strong>保存</strong> または <strong>続行</strong>)を選んでください。新しいアプリでダウンロード数がまだ少ないために表示される警告です。",
       "unsigned": "現在のビルドは<strong>まだコード署名されていない</strong>ため、Microsoft Defender SmartScreen が初回起動をブロックすることがあります。このページ（GitHub Releases）から入手したファイルで、下のチェックサムが一致していれば：",
       "signed": "インストーラーはコード署名済みです。それでも SmartScreen の警告が出る場合は、次の手順で実行できます。",
       "steps": [

@@ -409,6 +409,7 @@
     "infoAria": "Installation notes",
     "ss": {
       "h": "If you see “Windows protected your PC”",
+      "browser": "<strong>When downloading:</strong> if Edge or Chrome says the file “isn’t commonly downloaded”, open the download list, choose <strong>…</strong> next to the file and pick <strong>Keep</strong> (Chrome: <strong>Keep</strong> or <strong>Download anyway</strong>). The warning appears because the app is new and has few downloads yet.",
       "unsigned": "Current builds are <strong>not code-signed yet</strong>, so Microsoft Defender SmartScreen may block the first launch. If you downloaded the file from this page (GitHub Releases) and the checksum below matches:",
       "signed": "The installer is code-signed. If SmartScreen still shows a warning, you can run it like this:",
       "steps": [
