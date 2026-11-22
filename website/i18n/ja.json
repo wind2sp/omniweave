@@ -11,7 +11,7 @@
     "soon": "近日公開",
     "preparing": "準備中",
     "platformsBtn": "プラットフォーム別に見る",
-    "mobileMsg": "Omniweave はパソコン向けのデスクトップアプリです。Windows・macOS・Linux のパソコンでこのページを開いてください。",
+    "mobileMsg": "スマートフォンでは下の「スマートフォン」をご覧ください。Android は Google Play で近日公開、iPhone はウェブ版をホーム画面に追加して使えます。",
     "unknownMsg": "お使いの OS を判別できませんでした。下の一覧から選んでください。",
     "dlFor": "{os} 版をダウンロード",
     "installerSuffix": "（インストーラー）",
@@ -88,7 +88,8 @@
       "lead": "どんな形式もひとつのキャンバスで開いて編集。渡すときは元の形式で書き出すだけです。",
       "how": "画面を見る",
       "meta": "Windows 10 / 11 ・ インストーラー約 17 MB ・ 日本語、English、韓国語、中国語",
-      "demo": "Web ですぐ使う"
+      "demo": "Web ですぐ使う",
+      "mobile": "スマートフォン：Android は Google Play で近日公開・iPhone はウェブ版を「ホーム画面に追加」"
     },
     "flow": {
       "aria": "DOCX、HWPX、PPTX、XLSX、PDF、PSD、AI、DWG のファイルが Omniweave でひとつの .omw ファイルにまとまり、必要なときに DOCX、PDF、PNG などの元の形式へ書き出される図",
@@ -377,6 +378,13 @@
       "web": "最新の Chromium 系ブラウザー、Firefox、Safari",
       "other": "試験版のビルドです。実機で確認したうえで対応範囲を記載します。",
       "note": "初期リリースです。大切な文書は原本を別に保管してください。"
+    },
+    "mobile": {
+      "h": "スマートフォン",
+      "you": "このスマートフォン",
+      "android": "Google Play（近日公開）",
+      "ios": "Safari でウェブ版を開き、共有 →「ホーム画面に追加」",
+      "open": "ウェブ版を開く"
     }
   }
 }

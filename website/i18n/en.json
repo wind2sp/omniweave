@@ -11,7 +11,7 @@
     "soon": "Coming soon",
     "preparing": "Not yet available",
     "platformsBtn": "See all platforms",
-    "mobileMsg": "Omniweave is a desktop app. Open this page on a Windows, macOS or Linux computer.",
+    "mobileMsg": "On a phone, see 'Phone' below: Android is coming to Google Play, and on iPhone you can add the web app to your Home Screen.",
     "unknownMsg": "We couldn't detect your operating system. Please pick one below.",
     "dlFor": "Download for {os}",
     "installerSuffix": " (installer)",
@@ -88,7 +88,8 @@
       "lead": "Open anything on one canvas and edit it there. When it's time to send, export back to the original format.",
       "how": "Take the tour",
       "meta": "Windows 10 and 11 · about 17 MB installer · Korean, English, Japanese, Chinese",
-      "demo": "Use it on the web"
+      "demo": "Use it on the web",
+      "mobile": "On your phone: Android on Google Play soon · iPhone: add the web app to your Home Screen"
     },
     "flow": {
       "aria": "DOCX, HWPX, PPTX, XLSX, PDF, PSD, AI and DWG files flow into Omniweave and are kept as one .omw file, then exported back to formats such as DOCX, PDF and PNG when needed",
@@ -377,6 +378,13 @@
       "web": "A recent Chromium-based browser, Firefox or Safari",
       "other": "Experimental builds. We'll list what's supported once we've tested on real hardware.",
       "note": "This is an early release. Keep copies of important originals."
+    },
+    "mobile": {
+      "h": "Phone",
+      "you": "This phone",
+      "android": "Google Play (coming soon)",
+      "ios": "Open the web app in Safari, then Share → 'Add to Home Screen'",
+      "open": "Open web app"
     }
   }
 }

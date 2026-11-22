@@ -11,7 +11,7 @@
     "soon": "即将发布",
     "preparing": "暂未提供",
     "platformsBtn": "查看各平台文件",
-    "mobileMsg": "Omniweave 是桌面应用，请在 Windows、macOS 或 Linux 电脑上打开本页面。",
+    "mobileMsg": "在手机上请查看下方“手机”一项：Android 即将上架 Google Play，iPhone 可将网页版添加到主屏幕使用。",
     "unknownMsg": "无法识别你的操作系统，请在下方选择。",
     "dlFor": "下载 {os} 版",
     "installerSuffix": "（安装版）",
@@ -88,7 +88,8 @@
       "lead": "任何格式都在一块画布上打开和编辑。需要发送时，导出为原格式即可。",
       "how": "看看界面",
       "meta": "Windows 10、11 · 安装包约 17 MB · 简体中文、English、日本語、韩语",
-      "demo": "在网页上直接使用"
+      "demo": "在网页上直接使用",
+      "mobile": "手机：Android 即将上架 Google Play · iPhone 可将网页版“添加到主屏幕”"
     },
     "flow": {
       "aria": "DOCX、HWPX、PPTX、XLSX、PDF、PSD、AI、DWG 文件经 Omniweave 汇集成一个 .omw 文件，需要时再导出为 DOCX、PDF、PNG 等原格式的示意图",
@@ -377,6 +378,13 @@
       "web": "较新的 Chromium 内核浏览器、Firefox 或 Safari",
       "other": "实验性构建。在真机上验证后会在此注明支持范围。",
       "note": "这是早期版本，重要文档请另外保留原件。"
+    },
+    "mobile": {
+      "h": "手机",
+      "you": "本机",
+      "android": "Google Play（即将推出）",
+      "ios": "用 Safari 打开网页版，点按共享 →“添加到主屏幕”",
+      "open": "打开网页版"
     }
   }
 }

@@ -14,6 +14,7 @@
   "repoUrl": "https://github.com/wind2sp/omniweave",
   "releasePageUrl": "https://github.com/wind2sp/omniweave/releases/latest",
   "storeUrl": "",
+  "playUrl": "",
   "demoPublic": true,
   "demoUrl": "https://wind2sp.github.io/omniweave/app/",
   "downloadBase": "https://github.com/wind2sp/omniweave/releases/download/v{version}/",

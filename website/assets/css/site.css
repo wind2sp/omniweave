@@ -441,3 +441,8 @@ html:lang(ja) .hero h1,html:lang(ja) .h-sec,html:lang(ja) .cta h2,html:lang(ja) 
 .plat details.dev{margin-top:14px}
 .plat details.dev summary{cursor:pointer;color:var(--text-3);font-size:14px}
 .plat details.dev[open] summary{margin-bottom:10px}
+/* 다운로드 · 휴대폰: 한 줄 전체 폭, 넓은 화면에서는 Android·iPhone을 나란히 */
+.plat[data-os="mobile"]{grid-column:1/-1}
+@media (min-width:760px){.plat[data-os="mobile"] .files{grid-template-columns:1fr 1fr}}
+.dl-mobile{margin-top:4px}
+.dl-mobile a{color:inherit;text-decoration:underline;text-underline-offset:3px}

@@ -80,6 +80,8 @@ build-i18n.mjs        템플릿 + 번역 → 언어별 HTML 생성 (Node 18+, �
   "codeSigned"      설치 파일에 코드 서명을 하게 되면 true (SmartScreen 안내 문구가 바뀝니다)
   "storeUrl"        Microsoft Store 주소. 비워 두면 Store 버튼을 숨기고, https://apps.microsoft.com/detail/… 주소를 넣으면
                     홈·다운로드 페이지에 "Microsoft Store에서 받기" 글자 버튼이 나타납니다(공식 배지 그림은 쓰지 않음).
+  "playUrl"         Google Play 주소. 비어 있으면 다운로드 페이지 휴대폰 칸의 Android 버튼이 "곧 공개"로 꺼져 있고,
+                    https:// 주소를 넣으면 "Google Play" 버튼이 켜집니다.
 ※ 큰따옴표·쉼표가 하나라도 틀리면 페이지가 기본값("곧 공개")으로 돌아갑니다.
    올리기 전에 로컬에서 확인하세요:
        python -m json.tool config.json

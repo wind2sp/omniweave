@@ -11,7 +11,7 @@
     "soon": "곧 공개",
     "preparing": "준비 중",
     "platformsBtn": "플랫폼별 파일 보기",
-    "mobileMsg": "Omniweave는 PC용 데스크톱 앱입니다. Windows·macOS·Linux PC에서 이 페이지를 열어 주세요.",
+    "mobileMsg": "휴대폰에서는 아래 '휴대폰' 항목을 보세요. Android는 Google Play 출시 예정이고, iPhone은 웹판을 홈 화면에 추가해 쓸 수 있습니다.",
     "unknownMsg": "사용 중인 운영체제를 알아내지 못했습니다. 아래에서 골라 주세요.",
     "dlFor": "{os}용 다운로드",
     "installerSuffix": " (설치본)",
@@ -88,7 +88,8 @@
       "lead": "어떤 형식이든 한 캔버스에서 열고 고칩니다. 보낼 때는 원래 형식으로 내보내면 됩니다.",
       "how": "화면 둘러보기",
       "meta": "Windows 10, 11 · 설치 파일 약 17 MB · 한국어, English, 日本語, 中文",
-      "demo": "웹에서 바로 쓰기"
+      "demo": "웹에서 바로 쓰기",
+      "mobile": "휴대폰: Android는 Google Play 출시 예정 · iPhone은 웹판을 '홈 화면에 추가'"
     },
     "flow": {
       "aria": "DOCX, HWPX, PPTX, XLSX, PDF, PSD, AI, DWG 파일이 Omniweave에서 .omw 파일 하나로 모이고, 필요할 때 DOCX, PDF, PNG 같은 원래 형식으로 다시 나가는 그림",
@@ -377,6 +378,13 @@
       "web": "최신 Chromium 계열 브라우저, Firefox, Safari",
       "other": "실험적 빌드. 실제 기기에서 확인한 뒤 지원 범위를 적겠습니다.",
       "note": "초기 판입니다. 중요한 문서는 원본을 따로 보관해 주세요."
+    },
+    "mobile": {
+      "h": "휴대폰",
+      "you": "이 휴대폰",
+      "android": "Google Play (출시 예정)",
+      "ios": "사파리에서 웹판을 열고 공유 → '홈 화면에 추가'",
+      "open": "웹판 열기"
     }
   }
 }

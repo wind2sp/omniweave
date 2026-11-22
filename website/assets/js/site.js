@@ -73,6 +73,11 @@
       if (c.demoPublic) { a.href = isHttp(u) || u.charAt(0) === '/' ? u : ROOT + u; a.hidden = false; }
       else { a.removeAttribute('href'); a.hidden = true; }
     });
+    // Google Play 링크: config.json의 playUrl이 http(s) 주소면 켜지고, 비어 있으면 '곧 공개'로 꺼 둡니다.
+    $$('[data-play]').forEach(function (a) {
+      if (isHttp(c.playUrl)) { a.href = c.playUrl; a.removeAttribute('aria-disabled'); a.classList.remove('off'); a.querySelector('.t').textContent = 'Google Play'; }
+      else { a.removeAttribute('href'); a.setAttribute('aria-disabled', 'true'); a.classList.add('off'); }
+    });
     // Microsoft Store 링크: config.json의 storeUrl이 http(s) 주소일 때만 보입니다(공식 배지 그림은 쓰지 않음).
     $$('[data-store]').forEach(function (a) {
       if (isHttp(c.storeUrl)) { a.href = c.storeUrl; a.hidden = false; }
