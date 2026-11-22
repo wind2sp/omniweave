@@ -1,7 +1,7 @@
 {
   "_help": "홈페이지 설정. 수정 후 이 파일만 다시 올리면 됩니다. 자세한 설명은 README.txt [config.json] 참고.",
   "siteUrl": "",
-  "copyright": "© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later",
+  "copyright": "© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later · wind2sp@9rowpar.com",
   "version": "0.2.0",
   "released": true,
   "releaseDate": "2026-11-22",
