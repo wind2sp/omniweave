@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:mobile": "node scripts/copy-pdfjs-assets.mjs && tsc --noEmit && vite build --mode mobile",
+    "build:mobile": "node scripts/copy-pdfjs-assets.mjs && node scripts/ocr-models.mjs && tsc --noEmit && vite build --mode mobile",
     "preview": "vite preview",
     "test": "vitest run",
     "bench": "vitest bench --run",

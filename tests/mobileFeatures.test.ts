@@ -172,7 +172,8 @@ describe("file hand-off", () => {
   });
 
   it("builds the phone app without the desktop editor, the AI models or a network permission", () => {
-    expect(MOBILE_DROP).toContain("models");
+    // the phone app carries the on-device AI models (OCR, upscaling) like the installed program
+    expect(MOBILE_DROP).not.toContain("models");
     const conf = JSON.parse(readFileSync("src-tauri/tauri.android.conf.json", "utf8"));
     expect(conf.build.frontendDist).toBe("../dist-mobile");
     expect(conf.build.beforeBuildCommand).toBe("npm run build:mobile");

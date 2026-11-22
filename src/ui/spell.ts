@@ -37,6 +37,7 @@ interface SpellState {
 export const useSpell = create<SpellState>((set) => ({ on: readOn(), epoch: 0, missing: [], set: (p) => set(p) }));
 
 /** Spelling can run here at all (the Windows app; the browser has no checker). */
+/** the installed program's checker (src-tauri/src/spell.rs: Windows' own; on the Android app, the phone's) */
 export const spellAvailable = () => isTauri;
 
 export function setSpellOn(on: boolean) {

@@ -64,6 +64,8 @@ interface Props {
   /** a file made here, shown next in the viewer */
   onResult: (d: MobileDoc) => void;
   say: (msg: string) => void;
+  /** go on with this document in the desktop editor on the phone (every PC command), optionally running one there */
+  onDesk?: (command?: string) => void;
 }
 
 /** testing hook (debug builds, scripts/mobile-edit-e2e.mjs) */
@@ -71,7 +73,9 @@ export const editorHook: { current: any } = { current: null };
 /** where the page is on the screen now: page px → CSS px is (x · k + left + vx, y · k + top + vy) */
 const viewState: { current: { k: number; vx: number; vy: number; left: number; top: number; z: number } | null } = { current: null };
 
-export function MobileEditor({ doc, onClose, onResult, say }: Props) {
+export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
+  /** the document went on to the desktop editor: its pictures stay in the engine's memory when this closes */
+  const handedOver = useRef(false);
   const tr = useT();
   const [session, setSession] = useState<EditSession | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +113,7 @@ export function MobileEditor({ doc, onClose, onResult, say }: Props) {
     })();
     return () => {
       alive = false;
+      if (handedOver.current) return;
       void Promise.all([import("../../../core/assets"), import("../../../render/draw")]).then(([a, d]) => {
         a.clearBlobs();
         d.dropDecodedImages();
@@ -204,6 +209,20 @@ export function MobileEditor({ doc, onClose, onResult, say }: Props) {
         <button className="m-icon-btn" onClick={() => S().redo()} disabled={!canRedo} aria-label={tr("mobile.ed.redo")}>
           ↷
         </button>
+        {onDesk && (
+          <button
+            className="m-icon-btn m-ed-all"
+            disabled={!session}
+            onClick={() => {
+              handedOver.current = true;
+              onDesk();
+            }}
+            aria-label={tr("mobile.desk.allFeatures")}
+            title={tr("mobile.desk.allFeatures")}
+          >
+            ⋯
+          </button>
+        )}
         <button className="m-btn m-btn-primary m-ed-save" onClick={() => setSheet("save")} disabled={!session}>
           {tr("mobile.ed.save")}
         </button>

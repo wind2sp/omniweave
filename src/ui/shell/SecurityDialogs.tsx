@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { create } from "zustand";
-import { setPasswordAsker, type PasswordRequest } from "../../io/crypto/session";
+import { getPasswordAsker, setPasswordAsker, type PasswordAsker, type PasswordRequest } from "../../io/crypto/session";
 import { useT } from "../../i18n";
 import { Icon } from "./Icons";
 import { Modal } from "./Dialogs";
@@ -45,7 +45,11 @@ export function askProtection(req: ProtectRequest): Promise<ProtectChoice | null
   return new Promise((resolve) => show({ kind: "protect", req, resolve }));
 }
 
-setPasswordAsker(askPasswordDialog);
+// The masked dialog answers password questions while it is on screen (mounted below) — not merely because this module
+// was loaded: the phone screen loads desktop code (ui/actions.ts) for its own viewer and keeps its own question sheet
+// (ui/mobile/prompt.tsx), which a load-time install here used to replace with a dialog nobody could see, so a protected
+// file "cancelled" at once.
+let before: PasswordAsker | null = null;
 
 function close() {
   useSec.setState({ pending: null });
@@ -98,12 +102,18 @@ export function SecurityDialogs() {
   const [mode, setMode] = useState<"same" | "none" | "new">("same");
   const t = useT();
   useEffect(() => {
-    mounted++;
+    if (!mounted++) {
+      before = getPasswordAsker();
+      setPasswordAsker(askPasswordDialog);
+    }
     return () => {
       mounted--;
       if (!mounted) {
         useSec.getState().pending?.resolve(null);
         useSec.setState({ pending: null });
+        // hand the question back to whoever asked before (the phone's sheet)
+        if (getPasswordAsker() === askPasswordDialog && before) setPasswordAsker(before);
+        before = null;
       }
     };
   }, []);

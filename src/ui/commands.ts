@@ -223,6 +223,8 @@ export const COMMANDS: Command[] = [
   // background removal on the selected raster / image: one click (automatic type), or the refine dialog
   { id: "image.removeBackground", icon: "sparkle", when: () => !!imageTarget(), run: () => void removeBackgroundSelection() },
   { id: "image.upscale", icon: "image", dialog: true, when: () => !!imageTarget(), run: () => useImageUI.getState().set({ kind: "upscale" }) },
+  // text recognition (the PDF ribbon's 글자 인식 and the picture menu's), by name in command search too
+  { id: "image.ocr", icon: "search", dialog: true, when: () => !!imageTarget(), run: () => useImageUI.getState().set({ kind: "ocr" }) },
   { id: "image.removeBackgroundDialog", dialog: true, when: () => !!imageTarget(), run: () => useImageUI.getState().set({ kind: "matte" }) },
   // the image mode's 이미지 menu (UI_TOP_REDESIGN.md §3): crop the whole canvas (the toolbox's crop tool C with nothing
   // selected) and the canvas size (page setup of the image page)

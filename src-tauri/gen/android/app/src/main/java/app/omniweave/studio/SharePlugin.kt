@@ -38,6 +38,39 @@ class CopyArgs {
   lateinit var uri: String
 }
 
+@InvokeArg
+class SpellArgs {
+  lateinit var lang: String
+  var words: List<String> = listOf()
+}
+
+@InvokeArg
+class PrintArgs {
+  lateinit var path: String
+  var title: String? = null
+}
+
+/** A finished PDF streamed to the print service as it is (the pages were laid out by Omniweave). */
+class PdfFileAdapter(private val file: File, private val name: String) : android.print.PrintDocumentAdapter() {
+  override fun onLayout(oldAttributes: android.print.PrintAttributes?, newAttributes: android.print.PrintAttributes?, cancellationSignal: android.os.CancellationSignal?, callback: LayoutResultCallback, extras: android.os.Bundle?) {
+    if (cancellationSignal?.isCanceled == true) {
+      callback.onLayoutCancelled()
+      return
+    }
+    val info = android.print.PrintDocumentInfo.Builder(name).setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build()
+    callback.onLayoutFinished(info, true)
+  }
+
+  override fun onWrite(pages: Array<out android.print.PageRange>?, destination: android.os.ParcelFileDescriptor, cancellationSignal: android.os.CancellationSignal?, callback: WriteResultCallback) {
+    try {
+      file.inputStream().use { input -> java.io.FileOutputStream(destination.fileDescriptor).use { out -> input.copyTo(out, 1 shl 16) } }
+      callback.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+    } catch (e: Exception) {
+      callback.onWriteFailed(e.message)
+    }
+  }
+}
+
 @TauriPlugin
 class SharePlugin(private val activity: Activity) : Plugin(activity) {
   @Command
@@ -138,6 +171,89 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       ret.put("write", false)
     }
     invoke.resolve(ret)
+  }
+
+  /** Print a staged PDF with the system print service (network printers, "Save as PDF"). The WebView has no
+   *  window.print, so the PC program's 인쇄 makes its PDF and hands it over here. */
+  @Command
+  fun print(invoke: Invoke) {
+    try {
+      val args = invoke.parseArgs(PrintArgs::class.java)
+      val src = File(args.path)
+      val stage = File(activity.cacheDir, "stage").canonicalFile
+      if (!src.isFile || src.canonicalFile.parentFile != stage) {
+        invoke.reject("not a staged file")
+        return
+      }
+      val pm = activity.getSystemService(android.content.Context.PRINT_SERVICE) as android.print.PrintManager
+      val name = args.title ?: src.name
+      pm.print(name, PdfFileAdapter(src, name), android.print.PrintAttributes.Builder().build())
+      invoke.resolve()
+    } catch (e: Exception) {
+      invoke.reject(e.message ?: e.toString())
+    }
+  }
+
+  @Command
+  fun spellCheck(invoke: Invoke) = spell(invoke, false)
+
+  @Command
+  fun spellSuggest(invoke: Invoke) = spell(invoke, true)
+
+  /** Spelling with the phone's own spell checker (the keyboard's, Settings ▸ System ▸ Languages ▸ Spell checker):
+   *  { bad: [Boolean] } per word, or { suggestions: [String] } for words[0]; { unsupported: true } without one. */
+  private fun spell(invoke: Invoke, suggest: Boolean) {
+    val args = try {
+      invoke.parseArgs(SpellArgs::class.java)
+    } catch (e: Exception) {
+      invoke.reject(e.message ?: e.toString())
+      return
+    }
+    val words = args.words
+    activity.runOnUiThread {
+      try {
+        val tsm = activity.getSystemService(android.content.Context.TEXT_SERVICES_MANAGER_SERVICE) as android.view.textservice.TextServicesManager
+        var session: android.view.textservice.SpellCheckerSession? = null
+        val listener = object : android.view.textservice.SpellCheckerSession.SpellCheckerSessionListener {
+          override fun onGetSuggestions(results: Array<out android.view.textservice.SuggestionsInfo>?) = answer((results ?: arrayOf()).toList())
+
+          /** one sentence per word: its first (only) word's result */
+          override fun onGetSentenceSuggestions(results: Array<out android.view.textservice.SentenceSuggestionsInfo>?) =
+            answer((results ?: arrayOf()).map { if (it.suggestionsCount > 0) it.getSuggestionsInfoAt(0) else null })
+
+          fun answer(infos: List<android.view.textservice.SuggestionsInfo?>) {
+            val ret = app.tauri.plugin.JSObject()
+            if (suggest) {
+              val list = org.json.JSONArray()
+              infos.firstOrNull()?.let { s -> for (i in 0 until s.suggestionsCount) list.put(s.getSuggestionAt(i)) }
+              ret.put("suggestions", list)
+            } else {
+              val typo = android.view.textservice.SuggestionsInfo.RESULT_ATTR_LOOKS_LIKE_TYPO
+              val bad = words.indices.map { i -> infos.getOrNull(i)?.let { (it.suggestionsAttributes and typo) != 0 } ?: false }
+              // a checker without this language marks every word: say "no checker" instead of underlining all
+              // a checker that answered nothing about any word (no dictionary for the language yet): same
+              val silent = words.size >= 3 && infos.none { it != null && it.suggestionsAttributes != 0 }
+              if (silent || (words.size >= 6 && bad.count { it } * 10 >= words.size * 9)) ret.put("unsupported", true)
+              else ret.put("bad", org.json.JSONArray(bad))
+            }
+            session?.close()
+            invoke.resolve(ret)
+          }
+        }
+        session = tsm.newSpellCheckerSession(null, java.util.Locale.forLanguageTag(args.lang), listener, false)
+        if (session == null || words.isEmpty()) {
+          val ret = app.tauri.plugin.JSObject()
+          if (session == null) ret.put("unsupported", true) else ret.put("bad", org.json.JSONArray())
+          session?.close()
+          invoke.resolve(ret)
+          return@runOnUiThread
+        }
+        // (the sentence form: current spell checkers such as Gboard answer it; the old per-word form came back empty)
+        session.getSentenceSuggestions(words.map { android.view.textservice.TextInfo(it) }.toTypedArray(), if (suggest) 8 else 1)
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: e.toString())
+      }
+    }
   }
 
   private fun photoFile(): File = File(activity.cacheDir, "scan/photo.jpg")

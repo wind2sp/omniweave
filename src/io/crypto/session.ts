@@ -38,6 +38,10 @@ export function setPasswordAsker(fn: PasswordAsker) {
   asker = fn;
 }
 
+export function getPasswordAsker(): PasswordAsker {
+  return asker;
+}
+
 export function askPassword(req: PasswordRequest): Promise<string | null> {
   return asker(req);
 }

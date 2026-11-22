@@ -158,14 +158,27 @@ pub async fn spell_languages() -> Result<serde_json::Value, String> {
 
 /// For each word: true = misspelled. Err("unsupported") when Windows has no checker for `lang`.
 #[tauri::command]
-pub async fn spell_check(lang: String, words: Vec<String>) -> Result<serde_json::Value, String> {
-    run(Job::Check(lang, words)).await
+pub async fn spell_check<R: tauri::Runtime>(app: tauri::AppHandle<R>, lang: String, words: Vec<String>) -> Result<serde_json::Value, String> {
+    // the phone app: Android's own spell checker (the keyboard's), through SharePlugin.kt
+    #[cfg(target_os = "android")]
+    return crate::mobile::spell_android(&app, "spellCheck", lang, words);
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        run(Job::Check(lang, words)).await
+    }
 }
 
 /// Up to 8 suggestions for a misspelled word.
 #[tauri::command]
-pub async fn spell_suggest(lang: String, word: String) -> Result<serde_json::Value, String> {
-    run(Job::Suggest(lang, word)).await
+pub async fn spell_suggest<R: tauri::Runtime>(app: tauri::AppHandle<R>, lang: String, word: String) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    return crate::mobile::spell_android(&app, "spellSuggest", lang, vec![word]);
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        run(Job::Suggest(lang, word)).await
+    }
 }
 
 /// Add to the user's Windows dictionary for `lang` (사전에 추가).

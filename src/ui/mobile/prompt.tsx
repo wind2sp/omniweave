@@ -110,7 +110,22 @@ export function PromptHost() {
   );
 }
 
+let offered: string | null = null;
+/** The next password question (a first try, not a retry) is answered with `pw` without asking: the file the viewer
+ *  already unlocked, opened again by the editor. A wrong one falls back to asking. */
+export function offerPassword(pw: string | null) {
+  offered = pw;
+}
+
 /** io/crypto/session's password asker for the phone (installed by MobileApp). */
 export function phonePasswordAsker(tr: (k: string) => string) {
-  return (req: { title: string; message: string; retry?: boolean }) => ask({ title: req.title, message: req.message, password: true, error: req.retry ? tr("mobile.pwWrong") : undefined });
+  return (req: { title: string; message: string; retry?: boolean }) => {
+    if (offered != null && !req.retry) {
+      const pw = offered;
+      offered = null;
+      return Promise.resolve(pw);
+    }
+    offered = null;
+    return ask({ title: req.title, message: req.message, password: true, error: req.retry ? tr("mobile.pwWrong") : undefined });
+  };
 }

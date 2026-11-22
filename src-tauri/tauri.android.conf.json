@@ -26,6 +26,21 @@
       { "ext": ["dxf"], "name": "DXF", "mimeType": "image/vnd.dxf", "role": "Editor" },
       { "ext": ["dwg"], "name": "DWG", "mimeType": "image/vnd.dwg", "role": "Editor" },
       { "ext": ["svg"], "name": "SVG", "mimeType": "image/svg+xml", "role": "Editor" },
+      { "ext": ["hwp"], "name": "HWP", "mimeType": "application/x-hwp", "role": "Viewer" },
+      { "ext": ["hwp"], "name": "HWP (Hancom)", "mimeType": "application/vnd.hancom.hwp", "role": "Viewer" },
+      { "ext": ["hwp"], "name": "HWP (haansoft)", "mimeType": "application/haansofthwp", "role": "Viewer" },
+      { "ext": ["doc"], "name": "Word 97-2003", "mimeType": "application/msword", "role": "Viewer" },
+      { "ext": ["xls"], "name": "Excel 97-2003", "mimeType": "application/vnd.ms-excel", "role": "Viewer" },
+      { "ext": ["ppt",  "pps"], "name": "PowerPoint 97-2003", "mimeType": "application/vnd.ms-powerpoint", "role": "Viewer" },
+      { "ext": ["xlsm"], "name": "Excel (macros)", "mimeType": "application/vnd.ms-excel.sheet.macroEnabled.12", "role": "Viewer" },
+      { "ext": ["ppsx"], "name": "PowerPoint Show", "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.slideshow", "role": "Viewer" },
+      { "ext": ["csv"], "name": "CSV", "mimeType": "text/csv", "role": "Viewer" },
+      { "ext": ["csv"], "name": "CSV (comma-separated)", "mimeType": "text/comma-separated-values", "role": "Viewer" },
+      { "ext": ["epub"], "name": "EPUB", "mimeType": "application/epub+zip", "role": "Viewer" },
+      { "ext": ["md",  "markdown"], "name": "Markdown", "mimeType": "text/markdown", "role": "Viewer" },
+      { "ext": ["tif",  "tiff"], "name": "TIFF", "mimeType": "image/tiff", "role": "Viewer" },
+      { "ext": ["heic",  "heif"], "name": "HEIC", "mimeType": "image/heic", "role": "Viewer" },
+      { "ext": ["bmp"], "name": "BMP", "mimeType": "image/bmp", "role": "Viewer" },
       { "ext": ["omw"], "name": "Omniweave Workspace", "mimeType": "application/x-omniweave", "role": "Editor" }
     ]
   }

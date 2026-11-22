@@ -321,7 +321,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![startup_files, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, portable::portable_update_download, portable::portable_update_finish, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore]);
     #[cfg(mobile)]
-    let builder = builder.manage(OpenedFiles::default()).invoke_handler(tauri::generate_handler![opened_files, mobile::share_bytes, mobile::content_name, mobile::scan_photo, mobile::stage_put, mobile::share_staged, mobile::save_staged, mobile::persist_uri, mobile::can_write_uri, startup_files, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore]);
+    let builder = builder.manage(OpenedFiles::default()).invoke_handler(tauri::generate_handler![opened_files, mobile::share_bytes, mobile::content_name, mobile::scan_photo, mobile::stage_put, mobile::share_staged, mobile::save_staged, mobile::print_staged, mobile::persist_uri, mobile::can_write_uri, startup_files, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore]);
     builder
         .setup(|app| {
             #[cfg(desktop)]

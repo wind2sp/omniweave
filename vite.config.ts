@@ -84,13 +84,13 @@ export function webVersion(version: string): Plugin {
 }
 
 /**
- * The phone app's build (`vite build --mode mobile` → dist-mobile/, src-tauri/tauri.android.conf.json): the desktop
- * editor is left out at build time (src/main.tsx: __OMW_MOBILE__), and the files the phone never loads are taken out
- * of the output — the AI models (OCR is planned for a later phone release, upscaling is not on the phone), the
- * UI-only Pretendard Medium / SemiBold faces (the phone falls back to Regular / Bold) and the web app's version.json.
+ * The phone app's build (`vite build --mode mobile` → dist-mobile/, src-tauri/tauri.android.conf.json): the phone
+ * screen starts without the desktop editor (src/main.tsx: __OMW_MOBILE__); the desktop editor comes in only when
+ * "PC 기능 전체" is opened (ui/mobile/PhoneDesk.tsx), so the phone app does everything the installed program does —
+ * with the same on-device AI models (OCR, upscaling) and UI fonts. Only the web app's version.json is left out.
  * docs/MOBILE_PLAN.md §3.4.
  */
-export const MOBILE_DROP = ["models", "fonts/Pretendard-Medium.woff2", "fonts/Pretendard-SemiBold.woff2", "version.json"];
+export const MOBILE_DROP = ["version.json"];
 export function mobileTrim(): Plugin {
   let outDir = "dist-mobile";
   return {

@@ -152,7 +152,16 @@ function Toast() {
   );
 }
 
-export function App() {
+/** The desktop editor inside the phone shell (ui/mobile/PhoneDesk.tsx): the same crash-recovery offer, but no start-up
+ *  files of its own (the phone shell opens the file), and a way back to the phone screen. */
+export interface PhoneDeskMode {
+  /** runs once the editor is up: opens the phone's file (or keeps the document the phone editor already loaded) */
+  start: () => Promise<boolean | void>;
+  /** back to the phone screen */
+  onExit: () => void;
+}
+
+export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
   const presenting = useStore((s) => s.presenting);
   // a sheet page (표 계산) in the document edit mode is the Excel grid; in the other modes it is a page like any other
   const profileId = useProfile().id;
@@ -210,6 +219,17 @@ export function App() {
   const finishStartup = (restored: boolean) => {
     setRecovery(null);
     setReady(true);
+    if (phone) {
+      // the phone shell hands its file over (no start-up files, launch queue or demo of the desktop's own here)
+      void phone
+        .start()
+        .catch((e) => S().notify(String((e as Error)?.message ?? e)))
+        // (false: a command was asked for — its dialog, not the start screen)
+        .then((welcome) => {
+          if (!restored && welcome !== false && isPristine(S().doc)) useUI.getState().set({ welcome: true });
+        });
+      return;
+    }
     Promise.all([openStartupFile(), openDemoIfRequested(), openLaunchedFiles((f) => openInTab(f))])
       .catch(() => {})
       .finally(() => {
@@ -301,7 +321,7 @@ export function App() {
   }, []);
 
   return (
-    <div className="app" style={{ ["--left-w" as any]: `${Math.round(ui.leftW * uiK)}px`, ["--right-w" as any]: `${Math.round(ui.rightW * uiK)}px` }}>
+    <div className={cx("app", phone && "phone-desk-app")} style={{ ["--left-w" as any]: `${Math.round(ui.leftW * uiK)}px`, ["--right-w" as any]: `${Math.round(ui.rightW * uiK)}px` }}>
       <TopBar />
       <Ribbon />
       <main className="workspace">
@@ -394,8 +414,14 @@ export function App() {
           }}
         />
       )}
-      {!recovery && <WebMobileNotice />}
-      {!recovery && <WebInstallHint />}
+      {!recovery && !phone && <WebMobileNotice />}
+      {!recovery && !phone && <WebInstallHint />}
+      {phone && (
+        <button type="button" className="pd-exit" onClick={phone.onExit} aria-label={t("mobile.desk.exit")}>
+          <Icon name="close" size={16} />
+          <span>{t("mobile.desk.exitShort")}</span>
+        </button>
+      )}
       <PageOrganizer />
       <ToolsDialog />
       <SecurityDialogs />

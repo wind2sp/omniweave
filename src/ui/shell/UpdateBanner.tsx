@@ -16,7 +16,7 @@ import { create } from "zustand";
 import { version as PKG_VERSION } from "../../../package.json";
 import { useStore } from "../../core/store";
 import { t as tr, useT } from "../../i18n";
-import { isTauri } from "../../io/platform";
+import { isMobile, isTauri } from "../../io/platform";
 import { anyDirty, saveAllDirty } from "../tabs";
 import { Modal } from "./Dialogs";
 import { Icon } from "./Icons";
@@ -81,7 +81,8 @@ function offer(found: Found) {
  * that an update is already on its way, or why the check or the download failed.
  */
 export async function checkForUpdates(manual = false): Promise<void> {
-  if (!isTauri) return;
+  // the phone app is updated by its store (Play), never by this updater
+  if (!isTauri || isMobile) return;
   // Microsoft Store build: the Store updates the app (storeBuild.ts) — never ask the release server
   if (await storePackaged()) return;
   const cur = useUpdate.getState().st;
@@ -268,7 +269,7 @@ export function UpdatePill() {
   const t = useT();
 
   useEffect(() => {
-    if (!isTauri) return;
+    if (!isTauri || isMobile) return;
     let alive = true;
     // every start is recorded: the first line after an install shows the new version came up (docs/UPDATES.md)
     void runningVersion().then((v) => log(`start ${v}`));

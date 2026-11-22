@@ -66,6 +66,7 @@ scripts/release-dropbox.mjs
 docs/MOBILE_PLAN.md
 docs/PLAY_LISTING.md
 scripts/mobile-edit-e2e.mjs
+scripts/mobile-parity-e2e.mjs
 scripts/mobile-shots.mjs
 scripts/mobile-touch-e2e.mjs
 # CAD fidelity runner: reads the AutoCAD reference drawings kept in a private shared folder.

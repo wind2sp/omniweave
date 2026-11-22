@@ -251,6 +251,58 @@ pub async fn save_staged<R: Runtime>(app: tauri::AppHandle<R>, path: String, uri
     Err("not available on this platform".into())
 }
 
+#[derive(serde::Serialize)]
+struct PrintArgs {
+    path: String,
+    title: String,
+}
+
+/// Print a staged PDF with Android's print service (printers on the network, "Save as PDF"): the WebView has no
+/// window.print, so the PC program's 인쇄 hands its finished PDF here (io/print.ts printPdfBytes).
+#[tauri::command]
+pub async fn print_staged<R: Runtime>(app: tauri::AppHandle<R>, path: String, title: String) -> Result<(), String> {
+    let p = staged(&app, &path)?;
+    let _args = PrintArgs { path: p.to_string_lossy().into_owned(), title };
+    #[cfg(target_os = "android")]
+    {
+        app.state::<Share<R>>().0.run_mobile_plugin::<()>("print", _args).map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "android"))]
+    Err("not available on this platform".into())
+}
+
+#[derive(serde::Serialize)]
+struct SpellArgs {
+    lang: String,
+    words: Vec<String>,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct SpellReply {
+    bad: Option<Vec<bool>>,
+    suggestions: Option<Vec<String>>,
+    unsupported: Option<bool>,
+}
+
+/// Spelling on the phone (src/spell.rs's commands on Android): the system spell checker — the keyboard's — asked by
+/// SharePlugin.kt. "spellCheck" → one misspelled-or-not per word; "spellSuggest" → suggestions for words[0];
+/// Err("unsupported") when the phone has no checker for `lang` (the editor then says so, as on Windows).
+pub fn spell_android<R: Runtime>(app: &tauri::AppHandle<R>, cmd: &str, lang: String, words: Vec<String>) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    {
+        let r: SpellReply = app.state::<Share<R>>().0.run_mobile_plugin(cmd, SpellArgs { lang, words }).map_err(|e| e.to_string())?;
+        if r.unsupported == Some(true) {
+            return Err("unsupported".into());
+        }
+        Ok(if cmd == "spellCheck" { serde_json::json!(r.bad.unwrap_or_default()) } else { serde_json::json!(r.suggestions.unwrap_or_default()) })
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, cmd, SpellArgs { lang, words }, SpellReply::default().bad);
+        Err("unavailable".into())
+    }
+}
+
 /// Keep read access to a picked document across restarts (recent files); false when the provider does not allow it.
 #[tauri::command]
 pub async fn persist_uri<R: Runtime>(app: tauri::AppHandle<R>, uri: String) -> bool {

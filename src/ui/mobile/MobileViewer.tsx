@@ -22,6 +22,8 @@ interface Props {
   onSave: () => void;
   /** open the same file in the editor (formats the phone edits) */
   onEdit?: () => void;
+  /** open the file in the desktop editor on the phone (every PC command), optionally running one command there */
+  onDesk?: (command?: string) => void;
   /** a new file made here (marked-up PDF, a document turned into PDF): shown next, the original stays as it was */
   onResult: (d: MobileDoc) => void;
   say: (msg: string) => void;
@@ -150,7 +152,7 @@ function pagesSource(view: PagesView): PageSource {
   };
 }
 
-export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onResult, say }: Props) {
+export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onResult, say }: Props) {
   const tr = useT();
   const kind = viewKind(doc.name);
   const [zoom, setZoom] = useState(1);
@@ -165,11 +167,13 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onResult, s
   const [marks, setMarks] = useState<{ page: number; rects: { x: number; y: number; w: number; h: number }[] }[]>([]);
   const [markup, setMarkup] = useState(false);
   const [sizeTick, setSizeTick] = useState(0);
+  const [more, setMore] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
 
   useBackClose(true, onBack);
+  useBackClose(more, () => setMore(false));
   useBackClose(searching, () => {
     setSearching(false);
     setMatches(null);
@@ -371,6 +375,7 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onResult, s
               <PageView key={i} source={source} index={i} zoom={zoom} tick={sizeTick} onSeen={setCurrent} rects={marks.find((m) => m.page === i + 1)?.rects} />
             ))}
           {kind === "image" && <ImageView bytes={doc.bytes} name={doc.name} />}
+          {kind === "media" && <MediaView bytes={doc.bytes} name={doc.name} />}
           {kind === "other" && (
             <div className="m-unsupported">
               <div className="m-kind m-kind-big">{extOf(doc.name).toUpperCase() || "FILE"}</div>
@@ -378,6 +383,11 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onResult, s
                 {doc.name} · {formatBytes(doc.bytes.length)}
               </p>
               <p>{tr("mobile.notViewable")}</p>
+              {onDesk && (
+                <button className="m-btn m-btn-primary" onClick={() => onDesk()}>
+                  {tr("mobile.desk.openThis")}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -414,10 +424,70 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onResult, s
           <span aria-hidden>⤓︎</span>
           {tr("mobile.saveCopy")}
         </button>
+        {onDesk && (
+          <button onClick={() => setMore(true)} aria-haspopup="dialog">
+            <span aria-hidden>⋯</span>
+            {tr("mobile.desk.more")}
+          </button>
+        )}
       </nav>
+      {more && onDesk && (
+        <div className="m-sheet-scrim" onClick={() => setMore(false)}>
+          <div className="m-sheet m-more" role="dialog" aria-modal="true" aria-label={tr("mobile.desk.more")} onClick={(e) => e.stopPropagation()}>
+            <h2>{tr("mobile.desk.more")}</h2>
+            <p className="m-sheet-msg">{tr("mobile.desk.moreNote")}</p>
+            <div className="m-more-list">
+              {VIEWER_MORE.filter((x) => !x.pdfOnly || kind === "pdf").map((x) => (
+                <button
+                  key={x.label}
+                  className="m-row m-more-row"
+                  onClick={() => {
+                    setMore(false);
+                    onDesk(x.cmd || undefined);
+                  }}
+                >
+                  <span className="m-more-icon" aria-hidden>
+                    {x.icon}
+                  </span>
+                  <span className="m-row-name">{tr(x.label)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="m-sheet-btns">
+              <button type="button" className="m-btn" onClick={() => setMore(false)}>
+                {tr("mobile.close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+/** sound and video files: the browser's own player */
+function MediaView({ bytes, name }: { bytes: Uint8Array; name: string }) {
+  const url = useMemo(() => URL.createObjectURL(new Blob([bytes as BlobPart])), [bytes]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const audio = /\.(mp3|wav|ogg|oga|flac|aac|m4a|opus)$/i.test(name);
+  return audio ? <audio className="m-media" src={url} controls aria-label={name} /> : <video className="m-media" src={url} controls playsInline aria-label={name} />;
+}
+
+/** The rest of the PC program's commands for this file, each opening it in the desktop editor on the phone. */
+export const VIEWER_MORE: { cmd: string; icon: string; label: string; pdfOnly?: boolean }[] = [
+  { cmd: "", icon: "▦︎", label: "mobile.desk.allFeatures" },
+  { cmd: "edit.replace", icon: "⌕︎", label: "mobile.desk.replace" },
+  { cmd: "file.print", icon: "⎙︎", label: "mobile.desk.print" },
+  { cmd: "file.saveAs", icon: "⇄︎", label: "mobile.desk.saveAs" },
+  { cmd: "file.saveProtected", icon: "🔒︎", label: "mobile.desk.protect" },
+  { cmd: "page.organizer", icon: "▤︎", label: "mobile.desk.pages" },
+  { cmd: "image.ocr", icon: "Aa", label: "mobile.desk.ocr" },
+  // (a PDF's form fields are live as soon as it is open there: no command to run)
+  { cmd: "", icon: "☑︎", label: "mobile.desk.fillForm", pdfOnly: true },
+  { cmd: "text.editPdf", icon: "T", label: "mobile.desk.editPdf", pdfOnly: true },
+  { cmd: "review.newComment", icon: "✉︎", label: "mobile.desk.comment" },
+  { cmd: "tools.commandSearch", icon: "⋯", label: "mobile.desk.cmdSearch" },
+];
 
 function ImageView({ bytes, name }: { bytes: Uint8Array; name: string }) {
   const url = useMemo(() => URL.createObjectURL(new Blob([bytes as BlobPart])), [bytes]);

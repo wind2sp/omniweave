@@ -14,7 +14,8 @@ import { canvasRecompressor, compressImage, pdfToJpgs, sniffMime, toJpg, zipFile
 import { addRecent, clearRecent, expireRecent, fingerprint, loadRecent, removeRecent, type RecentItem } from "./recent";
 import { MobileViewer } from "./MobileViewer";
 import { persistUri, saveCopy, shareFile } from "./nativeFiles";
-import { PromptHost, phonePasswordAsker } from "./prompt";
+import { PromptHost, offerPassword, phonePasswordAsker } from "./prompt";
+import { IMAGE_EXTS, MEDIA_EXTS, PAGE_EXTS, knownPassword } from "./openDoc";
 import { ScanEditor, renderScanPage, scanPageFrom, type ScanPage } from "./scan";
 import { loadSignatures } from "./markup";
 import { useBackClose } from "./back";
@@ -23,6 +24,14 @@ import "./mobile.css";
 
 // the editor (and the engine's writers) load when a file is first edited, not with the home screen
 const MobileEditor = lazy(() => import("./editor/MobileEditor").then((m) => ({ default: m.MobileEditor })));
+// the desktop editor laid out for the phone ("PC 기능 전체"): only when asked for
+const PhoneDesk = lazy(() => import("./PhoneDesk").then((m) => ({ default: m.PhoneDesk })));
+
+/** What the desktop editor on the phone opens with: a file, or the phone editor's document (file null). */
+export interface DeskRequest {
+  file: OpenedFile | null;
+  command?: string | null;
+}
 
 export { mimeOf, shareFile } from "./nativeFiles";
 
@@ -40,11 +49,22 @@ export interface MobileDoc {
 
 let docSeq = 0;
 
+/** desktop commands offered on the tools tab (ui/commands.ts ids): they open in the desktop editor on the phone */
+const DESK_TOOLS: { cmd: string; icon: string; label: string }[] = [
+  { cmd: "tools.commandSearch", icon: "⌕︎", label: "mobile.desk.cmdSearch" },
+  { cmd: "quick.combine", icon: "⧉︎", label: "mobile.desk.combine" },
+  { cmd: "quick.to-jpg", icon: "▣︎", label: "mobile.desk.toJpg" },
+  { cmd: "file.new", icon: "＋", label: "mobile.desk.new" },
+  { cmd: "file.settings", icon: "⚙︎", label: "mobile.desk.settings" },
+];
+
 const PDF = [{ name: "PDF", extensions: ["pdf"] }];
 const IMAGES = [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }];
-const VIEWABLE = [{ name: "Documents", extensions: ["pdf", "png", "jpg", "jpeg", "webp", "gif", "docx", "pptx", "ppsx", "xlsx", "xlsm", "hwpx", "omw", "psd", "psb", "ai", "dxf", "dwg", "svg"] }];
+/** every format the desktop opens (io/formats), the phone too */
+const ALL_EXTS = [...new Set(["pdf", ...IMAGE_EXTS, ...PAGE_EXTS, ...MEDIA_EXTS, "psd", "psb", "ai", "dxf", "dwg", "svg", "zip"])];
+const VIEWABLE = [{ name: "Documents", extensions: ALL_EXTS.filter((e) => e !== "zip") }];
 
-const KNOWN = /\.(pdf|png|jpe?g|webp|gif|docx|pptx|ppsx|xlsx|xlsm|hwpx|omw|zip|psd|psb|ai|dxf|dwg|svg)$/i;
+const KNOWN = new RegExp(`\\.(${ALL_EXTS.join("|")})$`, "i");
 
 /** The type from the first bytes, for a file handed over without a usable name (a media id such as
  *  content://media/external/file/18). ZIP-based Office/HWPX files are told apart by their part names. */
@@ -59,6 +79,14 @@ export function sniffExt(bytes: Uint8Array): string | null {
   if (/^AC10[1-3]\d/.test(head(6))) return "dwg";
   if (/^\s*0\s*\r?\n\s*SECTION/.test(head(40)) || head(18) === "AutoCAD Binary DXF") return "dxf";
   if (head(5) === "%!PS-") return "ai";
+  // OLE compound files: 한글 (HWP 5), Word / Excel / PowerPoint 97-2003, by their stream names (UTF-16 in the directory)
+  if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) {
+    const names = new TextDecoder("latin1").decode(bytes.subarray(0, Math.min(bytes.length, 1 << 20))).replace(/\0/g, "");
+    if (names.includes("HwpSummaryInformation") || names.includes("FileHeader")) return "hwp";
+    if (names.includes("WordDocument")) return "doc";
+    if (names.includes("PowerPoint Document")) return "ppt";
+    if (names.includes("Workbook") || names.includes("Book")) return "xls";
+  }
   if (head(2) === "PK") {
     const text = new TextDecoder("latin1").decode(bytes.subarray(0, Math.min(bytes.length, 65536)));
     if (text.includes("application/hwp+zip") || text.includes("Contents/section")) return "hwpx";
@@ -128,9 +156,14 @@ export function MobileApp() {
   const [version, setVersion] = useState("");
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [scanPages, setScanPages] = useState<ScanPage[] | null>(null);
+  /** the desktop editor on the phone, while it is shown */
+  const [desk, setDesk] = useState<DeskRequest | null>(null);
   const scanInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => setPasswordAsker(phonePasswordAsker(t)), []);
+  const openDesk = useCallback((r: DeskRequest) => {
+    setDesk(r);
+  }, []);
   // back on another tab goes to the home tab first; on the home tab it leaves the app (Android's own behaviour)
   useBackClose(tab !== "home" && !doc && !editing && !scanPages, () => setTab("home"));
   useEffect(() => {
@@ -199,6 +232,29 @@ export function MobileApp() {
     return () => stop?.();
   }, [run, show, tr]);
 
+  // the browser: files opened with the installed web app (launch queue) and the example file of a ?demo link — the
+  // desktop editor's own start-up helpers (web/pwa.ts, ui/actions.ts), shown on the phone screen
+  useEffect(() => {
+    if (isTauri) return;
+    void import("../../web/pwa").then(({ openLaunchedFiles }) => openLaunchedFiles(async (f) => show({ name: f.name, bytes: f.bytes, origin: "received" }, null)));
+    let demo: string | null = null;
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.has("demo")) demo = q.get("demo") || "demo.omw";
+    } catch {}
+    if (!demo) return;
+    void run(tr("mobile.working"), async () => {
+      // only example files published with the app (same origin) — never an arbitrary URL from a link
+      const url = new URL(demo!, location.href);
+      if (url.origin !== location.origin) return;
+      const res = await fetch(url.href);
+      if (!res.ok) return;
+      show({ name: url.pathname.split("/").pop() || "omniweave-demo.omw", bytes: new Uint8Array(await res.arrayBuffer()), origin: "received" });
+    });
+    // once, at start-up
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // automated checks and store screenshots (scripts/mobile-shots.mjs over WebView debugging, debug builds only):
   // open bytes as if picked, start a scan from a photo. Nothing outside the page can call it in a release build.
   useEffect(() => {
@@ -210,6 +266,7 @@ export function MobileApp() {
       },
       tab: (id: Tab) => (setDoc(null), setEditing(null), setTab(id)),
       edit: (name: string, bytes: Uint8Array) => (setDoc(null), setEditing({ name, bytes, origin: "opened", key: ++docSeq })),
+      desk: (name?: string, bytes?: Uint8Array, command?: string) => setDesk({ file: name && bytes ? { name, path: null, bytes } : null, command }),
       editor: () => import("./editor/MobileEditor").then((m) => m.editorHook.current),
     };
   }, [show]);
@@ -370,6 +427,23 @@ export function MobileApp() {
     } catch {}
   };
 
+  if (desk)
+    return (
+      <Suspense fallback={<div className="m-spinner" role="progressbar" aria-label={tr("mobile.working")} />}>
+        <PhoneDesk
+          key={desk.file?.name ?? "store"}
+          file={desk.file}
+          command={desk.command}
+          onExit={() => {
+            setDesk(null);
+            // the phone editor's document went on in the desktop editor: the phone shows the file list again
+            if (!desk.file) setEditing(null);
+          }}
+        />
+        <PromptHost />
+      </Suspense>
+    );
+
   return (
     <div className="m-app">
       <input ref={scanInput} type="file" accept="image/*" capture="environment" multiple hidden onChange={onScanInput} />
@@ -386,7 +460,7 @@ export function MobileApp() {
         />
       ) : editing ? (
         <Suspense fallback={<div className="m-spinner" role="progressbar" aria-label={tr("mobile.working")} />}>
-          <MobileEditor key={editing.key} doc={editing} say={say} onClose={() => setEditing(null)} onResult={(d) => show(d)} />
+          <MobileEditor key={editing.key} doc={editing} say={say} onClose={() => setEditing(null)} onResult={(d) => show(d)} onDesk={(command) => openDesk({ file: null, command })} />
         </Suspense>
       ) : doc ? (
         <MobileViewer
@@ -395,7 +469,15 @@ export function MobileApp() {
           say={say}
           onBack={() => setDoc(null)}
           onResult={(d) => show(d)}
-          onEdit={canEdit(doc.name) ? () => setEditing(doc) : undefined}
+          onEdit={
+            canEdit(doc.name)
+              ? () => {
+                  offerPassword(knownPassword(doc.bytes));
+                  setEditing(doc);
+                }
+              : undefined
+          }
+          onDesk={(command) => openDesk({ file: { name: doc.name, path: doc.path ?? null, bytes: doc.bytes }, command })}
           onShare={() => void run(tr("mobile.share"), () => shareFile(doc.name, doc.bytes))}
           onSave={() =>
             void run(tr("mobile.saveCopy"), async () => {
@@ -433,6 +515,15 @@ export function MobileApp() {
                     {tr("mobile.newPdf")}
                   </button>
                 </div>
+                <button className="m-action m-wide m-desk-entry" onClick={() => openDesk({ file: null })}>
+                  <span className="m-action-icon" aria-hidden>
+                    ▦︎
+                  </span>
+                  <span>
+                    {tr("mobile.desk.open")}
+                    <small>{tr("mobile.desk.openNote")}</small>
+                  </span>
+                </button>
                 <h2>{tr("mobile.tools")}</h2>
                 {toolGrid}
                 <h2>{tr("mobile.recent")}</h2>
@@ -465,6 +556,17 @@ export function MobileApp() {
                   </span>
                   <span>{tr("mobile.scan.toPdf")}</span>
                 </button>
+                <h2>{tr("mobile.desk.allTools")}</h2>
+                <div className="m-tools">
+                  {DESK_TOOLS.map((x) => (
+                    <button key={x.cmd} className="m-tool" onClick={() => openDesk({ file: null, command: x.cmd })}>
+                      <span className="m-tool-icon" aria-hidden>
+                        {x.icon}
+                      </span>
+                      <span>{tr(x.label)}</span>
+                    </button>
+                  ))}
+                </div>
               </>
             )}
             {tab === "about" && (

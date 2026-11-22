@@ -369,7 +369,7 @@ export async function fileToPages(f: OpenedFile, opts: { asSource?: boolean } = 
   const fmt = formatForExt(opts.asSource && ext === "svg" ? "txt" : ext);
   if (!fmt?.open) throw new Error(t("doc.err.unsupported", { ext }));
   let officeSecret: string | null = null;
-  if (["docx", "xlsx", "pptx"].includes(ext) && isEncryptedOffice(f.bytes)) {
+  if (["docx", "xlsx", "xlsm", "pptx", "ppsx"].includes(ext) && isEncryptedOffice(f.bytes)) {
     const r0 = await withPassword({ title: t("doc.pw.officeTitle"), message: t("doc.pw.officeMessage", { name: f.name }) }, (pw) => decryptOffice(f.bytes, pw), (e) => (e as Error)?.message === "WRONG_PASSWORD");
     if (!r0) throw new Error(t("doc.pw.cancelled"));
     f = { ...f, bytes: r0.value };
@@ -461,7 +461,7 @@ export async function importFile(f: OpenedFile, opts: ImportOptions = {}): Promi
     }
     // password-protected Office documents: ask, decrypt in memory, remember only a session key
     let officeSecret: string | null = null;
-    if (["docx", "xlsx", "pptx"].includes(ext) && isEncryptedOffice(f.bytes)) {
+    if (["docx", "xlsx", "xlsm", "pptx", "ppsx"].includes(ext) && isEncryptedOffice(f.bytes)) {
       const r0 = await withPassword({ title: t("doc.pw.officeTitle"), message: t("doc.pw.officeMessage", { name: f.name }) }, (pw) => decryptOffice(f.bytes, pw), (e) => (e as Error)?.message === "WRONG_PASSWORD");
       if (!r0) {
         S().notify(t("doc.toast.openCancelled"));

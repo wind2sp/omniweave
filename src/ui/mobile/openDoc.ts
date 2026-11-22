@@ -8,10 +8,13 @@ import type { OmwDocument, Page } from "../../core/types";
 import { t } from "../../i18n";
 import { askPassword } from "../../io/crypto/session";
 
-export type ViewKind = "pdf" | "pages" | "image" | "other";
+export type ViewKind = "pdf" | "pages" | "image" | "media" | "other";
 
-export const PAGE_EXTS = ["docx", "hwpx", "pptx", "ppsx", "xlsx", "xlsm", "omw"];
+/** Everything the desktop's format registry opens into pages (io/formats): the phone shows the same files. */
+export const PAGE_EXTS = ["docx", "hwpx", "pptx", "ppsx", "xlsx", "xlsm", "omw", "hwp", "doc", "xls", "ppt", "pps", "csv", "tsv", "md", "markdown", "html", "htm", "xhtml", "epub", "srt", "tif", "tiff", "heic", "heif", "bmp", "ico", "avif"];
 export const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
+/** sound and video: played by the browser (the desktop places them on a slide) */
+export const MEDIA_EXTS = ["mp3", "wav", "ogg", "oga", "flac", "aac", "m4a", "opus", "mp4", "m4v", "webm", "mov", "ogv", "mkv", "avi"];
 
 /** Formats the phone opens for editing (editor/MobileEditor). */
 export const EDIT_EXTS = ["pdf", "ai", "docx", "hwpx", "pptx", "xlsx", "xlsm", "psd", "psb", "dxf", "dwg", "svg", "omw"];
@@ -29,6 +32,7 @@ export function viewKind(name: string): ViewKind {
   if (ext === "pdf") return "pdf";
   if (IMAGE_EXTS.includes(ext)) return "image";
   if (PAGE_EXTS.includes(ext)) return "pages";
+  if (MEDIA_EXTS.includes(ext)) return "media";
   return "other";
 }
 
@@ -54,26 +58,22 @@ export async function openPages(name: string, bytes: Uint8Array): Promise<PagesV
       const r = await withPassword({ title: t("doc.pw.omwTitle"), message: t("doc.pw.omwMessage", { name }) }, (pw) => decryptOmw(bytes, pw), (e) => (e as Error)?.message === "WRONG_PASSWORD");
       if (!r) throw new Error(t("mobile.pwCancelled"));
       b = r.value;
+      byBytes.set(bytes, r.password);
     }
     doc = (await import("../../io/omw")).unpackOmw(b).doc;
   } else {
-    const { formatForExt } = await import("../../io/formats");
-    const fmt = formatForExt(ext);
-    if (!fmt?.open) throw new Error(t("mobile.unsupported"));
-    let f = { name, path: null as string | null, bytes };
-    let decrypted = false;
-    if (["docx", "xlsx", "xlsm", "pptx", "ppsx"].includes(ext)) {
-      const { decryptOffice, isEncryptedOffice } = await import("../../io/crypto/office");
-      if (isEncryptedOffice(bytes)) {
-        const { withPassword } = await import("../../io/crypto/session");
-        const r = await withPassword({ title: t("doc.pw.officeTitle"), message: t("doc.pw.officeMessage", { name }) }, (pw) => decryptOffice(bytes, pw), (e) => (e as Error)?.message === "WRONG_PASSWORD");
-        if (!r) throw new Error(t("mobile.pwCancelled"));
-        f = { ...f, bytes: r.value };
-        decrypted = true;
-      }
+    // the desktop's own "open" (ui/actions.ts fileToPages): every registry format, the same password questions for
+    // protected Office / HWPX files (answered on the phone's sheet), pictures as a page of their own
+    const { fileToPages } = await import("../actions");
+    const r = await fileToPages({ name, path: null, bytes }).catch((e: Error) => {
+      if (e?.message === t("doc.pw.cancelled")) throw new Error(t("mobile.pwCancelled"));
+      throw e;
+    });
+    const sid = r.pages.map((p) => p.source?.protection?.secretId).find(Boolean);
+    if (sid) {
+      const pw = (await import("../../io/crypto/session")).getSecret(sid);
+      if (pw) byBytes.set(bytes, pw);
     }
-    // a viewer never saves back: questions the importer would ask (e.g. reformat JSON) get "no"
-    const r = await fmt.open(f, { confirm: () => false, decrypted });
     doc = newDocument(name.replace(/\.[^.]+$/, ""));
     doc.pages = r.pages ?? [];
     doc.assets = r.assets ?? {};
@@ -101,6 +101,10 @@ export async function openPages(name: string, bytes: Uint8Array): Promise<PagesV
 const passwords = new WeakMap<object, string>();
 /** the password an open PDF was unlocked with, or null */
 export const pdfPassword = (doc: object): string | null => passwords.get(doc) ?? null;
+/** the password the viewer opened these very bytes with (memory only, gone with the file): the editor and the
+ *  desktop editor on the phone try it first instead of asking again */
+const byBytes = new WeakMap<Uint8Array, string>();
+export const knownPassword = (bytes: Uint8Array): string | null => byBytes.get(bytes) ?? null;
 
 /** pdf.js document with the password asked through the phone's dialog (up to 5 tries). */
 export async function openPdf(bytes: Uint8Array, name: string) {
@@ -119,7 +123,7 @@ export async function openPdf(bytes: Uint8Array, name: string) {
   try {
     const doc = await task.promise;
     // kept in memory with the open document only: a marked-up copy is protected again with it (markup.tsx)
-    if (password != null) passwords.set(doc, password);
+    if (password != null) passwords.set(doc, password), byBytes.set(bytes, password);
     return doc;
   } catch (e: any) {
     if (e?.name === "PasswordException" || /destroyed|Worker was destroyed|Loading aborted/i.test(String(e?.message))) throw new Error(t("mobile.pwCancelled"));

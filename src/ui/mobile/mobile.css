@@ -740,3 +740,158 @@ button.m-pageno {
   width: auto;
   min-width: 22px;
 }
+
+/* ── home: the desktop editor on the phone ── */
+.m-desk-entry {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  text-align: left;
+  min-height: 64px;
+}
+.m-desk-entry > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 600;
+}
+.m-desk-entry small {
+  font-weight: 400;
+  font-size: 0.8em;
+  opacity: 0.75;
+}
+/* viewer: "더보기" — the PC program's commands for this file */
+.m-more {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.m-more-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+.m-app .m-more-row {
+  grid-template-columns: 40px 1fr;
+  min-height: 52px;
+  align-items: center;
+}
+.m-more-icon {
+  font-size: 20px;
+  text-align: center;
+}
+.m-media {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  margin: 24px 0;
+  background: #000;
+}
+
+/* ── the desktop editor laid out for a phone (PhoneDesk.tsx, html.phone-desk) ──
+   The installed program's own screen: one column the width of the phone; the title / menu / ribbon rows scroll
+   sideways; the side panels open over the page; the desktop's UI-size token makes every control larger for fingers. */
+html.phone-desk {
+  --ui-scale: 1.2 !important;
+}
+html.phone-desk body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html.phone-desk .app {
+  min-width: 0;
+  width: 100%;
+}
+html.phone-desk .titlebar,
+html.phone-desk .tabrow,
+html.phone-desk .ribbon {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+html.phone-desk .titlebar::-webkit-scrollbar,
+html.phone-desk .tabrow::-webkit-scrollbar,
+html.phone-desk .ribbon::-webkit-scrollbar {
+  display: none;
+}
+html.phone-desk .titlebar > *,
+html.phone-desk .tabrow > *,
+html.phone-desk .ribbon > * {
+  flex-shrink: 0;
+}
+html.phone-desk .title-drag {
+  display: none;
+}
+html.phone-desk .workspace {
+  position: relative;
+}
+html.phone-desk .workspace > .dock {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 60;
+  width: min(88vw, 360px) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+html.phone-desk .workspace > .dock-left {
+  left: 0;
+}
+html.phone-desk .workspace > .dock-right {
+  right: 0;
+}
+html.phone-desk .splitter {
+  display: none;
+}
+html.phone-desk .modal-backdrop {
+  padding: 8px;
+}
+html.phone-desk .modal {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+}
+html.phone-desk .menu-pop {
+  max-width: calc(100vw - 8px);
+  max-height: calc(100dvh - 80px);
+  overflow-y: auto;
+}
+html.phone-desk .pd-exit {
+  position: fixed;
+  z-index: 1400;
+  right: 10px;
+  bottom: calc(var(--h-status) + 10px + env(safe-area-inset-bottom, 0px));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+/* the 파일 (backstage) screen: its command column above its pane, the whole screen scrolls */
+html.phone-desk .backstage {
+  flex-direction: column;
+  overflow-y: auto;
+}
+html.phone-desk .bs-nav {
+  width: 100%;
+  flex: none;
+  overflow: visible;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+}
+html.phone-desk .bs-main {
+  flex: none;
+  padding: 16px 12px 96px;
+  overflow: visible;
+}

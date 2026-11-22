@@ -388,7 +388,78 @@ function cleanup() {
  * (blob URL) and the built-in PDF viewer (Chromium / WebView2) prints it.
  * Resolves once the dialog has been asked for; rejects when the engine cannot print PDFs inline.
  */
-export function printPdfBytes(bytes: Uint8Array): Promise<void> {
+export async function printPdfBytes(bytes: Uint8Array): Promise<void> {
+  const { isMobile, isTauri } = await import("./platform");
+  // the Android app: the WebView cannot print, Android's print service can (printers, "Save as PDF")
+  if (isTauri && isMobile) return printWithSystem(bytes);
+  // a phone browser has no built-in PDF viewer to print from: the pages go out as pictures in a page of their own
+  if (isMobile) return printPagesAsPictures(bytes);
+  return printInFrame(bytes);
+}
+
+async function printWithSystem(bytes: Uint8Array): Promise<void> {
+  const [{ stage }, { invoke }] = await Promise.all([import("../ui/mobile/nativeFiles"), import("@tauri-apps/api/core")]);
+  await invoke("print_staged", { path: await stage("omniweave-print.pdf", bytes), title: t("doc.print.title") });
+}
+
+/** The PDF's pages drawn (pdf.js, 200 dpi) into a hidden page with one picture per sheet, and that page printed. */
+async function printPagesAsPictures(bytes: Uint8Array): Promise<void> {
+  cleanup();
+  const { pdfjsLib } = await import("./pdfjsLoader");
+  const lib = await pdfjsLib();
+  const pdf = await lib.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
+  const urls: { url: string; w: number; h: number }[] = [];
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const vp1 = page.getViewport({ scale: 1 });
+      const k = Math.min(200 / 72, Math.sqrt(12_000_000 / (vp1.width * vp1.height)));
+      const vp = page.getViewport({ scale: k });
+      const c = document.createElement("canvas");
+      c.width = Math.ceil(vp.width);
+      c.height = Math.ceil(vp.height);
+      const ctx = c.getContext("2d")!;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+      if (blob) urls.push({ url: URL.createObjectURL(blob), w: vp1.width, h: vp1.height });
+    }
+  } finally {
+    void pdf.destroy();
+  }
+  const sheets = urls.map((u) => `<section style="width:${u.w}pt;height:${u.h}pt;page-break-after:always;break-after:page"><img src="${u.url}" style="width:100%;height:100%;display:block"></section>`).join("");
+  const first = urls[0];
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${t("doc.print.title")}</title><style>@page{margin:0;${first ? `size:${first.w}pt ${first.h}pt;` : ""}}html,body{margin:0;padding:0}</style></head><body>${sheets}</body></html>`;
+  const f = document.createElement("iframe");
+  frame = f;
+  f.setAttribute("aria-hidden", "true");
+  f.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;";
+  document.body.appendChild(f);
+  await new Promise<void>((resolve, reject) => {
+    const doc = f.contentDocument;
+    if (!doc) return reject(new Error(t("engine.print.frameOpenFailed")));
+    doc.open();
+    doc.write(html);
+    doc.close();
+    const imgs = Array.from(doc.images);
+    void Promise.all(imgs.map((im) => (im.complete ? null : new Promise((r) => ((im.onload = r), (im.onerror = r)))))).then(() => {
+      try {
+        f.contentWindow!.focus();
+        f.contentWindow!.print();
+        resolve();
+      } catch (e) {
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
+      setTimeout(() => {
+        if (frame === f) cleanup();
+        for (const u of urls) URL.revokeObjectURL(u.url);
+      }, 10 * 60 * 1000);
+    });
+  });
+}
+
+function printInFrame(bytes: Uint8Array): Promise<void> {
   cleanup();
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
   frameUrl = url;
