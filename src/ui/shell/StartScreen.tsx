@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboa
 import type { PageKind } from "../../core/types";
 import { t as tr, useLang, useT } from "../../i18n";
 import { isTauri } from "../../io/platform";
-import { newFileFromPage, openAndRemember, openAny, openRecentFile } from "../actions";
+import { newFileFromPage, openAndRemember, openAny, openRecentFile, openSample } from "../actions";
 import { cx } from "./controls";
 import { Modal } from "./Dialogs";
 import { Icon, LogoMark, type IconName } from "./Icons";
@@ -316,7 +316,8 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
 
   const navItems: { id: View; icon: IconName; label: string; count?: number }[] = [
     { id: "home", icon: "pages", label: t("start.nav.home") },
-    { id: "recent", icon: "clock", label: t("start.nav.recent"), count: recent.length || undefined },
+    // the browser keeps no recent files (no paths), so the web start screen leaves the entry out
+    ...(isTauri || recent.length ? [{ id: "recent" as View, icon: "clock" as IconName, label: t("start.nav.recent"), count: recent.length || undefined }] : []),
     ...CATEGORIES.map((c) => ({ id: c as View, icon: CAT_ICON[c], label: t(`start.cat.${c}`), count: TEMPLATES.filter((x) => x.cat === c).length })),
     { id: "custom", icon: "transform", label: t("start.nav.custom") },
   ];
@@ -494,16 +495,42 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
             </span>
             <kbd>Ctrl+O</kbd>
           </button>
-          <button type="button" className={cx("hero-card", view === "recent" && "on")} onClick={() => (setQ(""), setView("recent"))}>
-            <span className="hero-ico">
-              <Icon name="clock" size={20} />
-            </span>
-            <span className="hero-text">
-              <b>{t("start.hero.recent")}</b>
-              <small>{last ? t("start.hero.recentSub", { n: recent.length, name: last.name }) : t("start.hero.recentNone")}</small>
-            </span>
-          </button>
+          {isTauri || recent.length ? (
+            <button type="button" className={cx("hero-card", view === "recent" && "on")} onClick={() => (setQ(""), setView("recent"))}>
+              <span className="hero-ico">
+                <Icon name="clock" size={20} />
+              </span>
+              <span className="hero-text">
+                <b>{t("start.hero.recent")}</b>
+                <small>{last ? t("start.hero.recentSub", { n: recent.length, name: last.name }) : t("start.hero.recentNone")}</small>
+              </span>
+            </button>
+          ) : (
+            // browser: no recent files to show — the sample workspace published with the app instead
+            <button
+              type="button"
+              className="hero-card"
+              onClick={() => {
+                onClose();
+                void openSample();
+              }}
+            >
+              <span className="hero-ico">
+                <Icon name="sparkle" size={20} />
+              </span>
+              <span className="hero-text">
+                <b>{t("web.start.sample")}</b>
+                <small>{t("web.start.sampleSub")}</small>
+              </span>
+            </button>
+          )}
         </div>
+        {!isTauri && (
+          <p className="start-web-note">
+            <Icon name="shield" size={13} />
+            <span>{t("web.start.privacy")}</span>
+          </p>
+        )}
 
         <div className="start-main">
           <nav className="start-nav" aria-label={t("start.nav.label")} onKeyDown={navKeys}>

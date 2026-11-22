@@ -179,6 +179,30 @@ export function startRunOnce(): boolean {
   return (runStart ??= startRun());
 }
 
+const RUN_LOCK = "omniweave-run";
+
+/**
+ * Browser tabs share localStorage and the journal: a second tab of the app finds the first tab's running mark and
+ * its autosaves, which are no crash and must not be offered back or cleared. Every page holds a shared Web Lock while
+ * it lives; true when another page already held it at startup (no Web Locks: false, as before).
+ */
+export async function otherPagesOpen(locks: any = (globalThis as any).navigator?.locks): Promise<boolean> {
+  if (!locks?.query || !locks?.request) return false;
+  try {
+    const q = await locks.query();
+    const held = (q?.held ?? []).some((l: { name?: string }) => l.name === RUN_LOCK);
+    // held until this page goes away
+    locks.request(RUN_LOCK, { mode: "shared" }, () => new Promise<void>(() => {})).catch(() => {});
+    return held;
+  } catch {
+    return false;
+  }
+}
+
+let othersOnce: Promise<boolean> | null = null;
+/** otherPagesOpen once per page load (a second call would find this page's own lock — the startRunOnce case). */
+export const otherPagesOpenOnce = () => (othersOnce ??= otherPagesOpen());
+
 /**
  * A normal end (quit, window closed or update installed — after the "save changes?" answer, 저장 안 함 included):
  * nothing is left to recover. The mark goes at once (synchronous), the journal right after.

@@ -98,6 +98,18 @@ export async function openDemoIfRequested() {
   }
 }
 
+/** Browser start screen "예시 열기": the sample workspace published next to the app (demo.omw), in a tab of its own. */
+export async function openSample() {
+  try {
+    const res = await fetch(new URL("demo.omw", location.href).href);
+    if (!res.ok) throw new Error(String(res.status));
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    await withProgress(t("progress.open", { name: "omniweave-demo.omw" }), () => openInTab({ name: "omniweave-demo.omw", path: null, bytes }));
+  } catch {
+    S().notify(t("web.start.sampleFailed"));
+  }
+}
+
 /**
  * Desktop: open the files the app was launched with (double-click, Windows "Open with", files dropped on the exe,
  * CLI arguments), each in its own tab, in order. One that cannot be read does not stop the others.

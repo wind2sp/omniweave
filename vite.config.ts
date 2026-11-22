@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { version as PKG_VERSION } from "./package.json";
 
 /** How src/core/{image,fidelity}/run.ts start their worker (dev server: Vite's own worker handling). */
 export const WORKER_CALL = 'new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })';
@@ -63,10 +64,28 @@ export function sniffGuard(): Plugin {
   };
 }
 
+/**
+ * version.json next to index.html: the app version and the entry script of this build. The web app compares `build`
+ * with the entry script it runs and offers a reload when they differ (src/ui/shell/WebUpdate.tsx,
+ * docs/RELEASING.md §웹판 업데이트). The desktop app does not read it.
+ */
+export function webVersion(version: string): Plugin {
+  return {
+    name: "omw-web-version",
+    apply: "build",
+    generateBundle(_opts, bundle) {
+      const entry = Object.values(bundle).find((o) => o.type === "chunk" && o.isEntry && o.name === "index");
+      if (!entry) return;
+      const build = entry.fileName.split("/").pop();
+      this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ version, build, date: new Date().toISOString() }, null, 2) + "\n" });
+    },
+  };
+}
+
 export default defineConfig({
   // relative asset paths: the same build runs in Tauri, at a site root, or under /app/ (browser demo)
   base: "./",
-  plugins: [react(), sharedWorkers(), sniffGuard()],
+  plugins: [react(), sharedWorkers(), sniffGuard(), webVersion(PKG_VERSION)],
   clearScreen: false,
   server: { port: 5199, strictPort: true },
   build: {

@@ -6,7 +6,7 @@ import { useHistory } from "../core/history";
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../core/store";
 import type { OmwDocument } from "../core/types";
-import { endRun, journalClear, journalList, journalPeek, journalRestore, journalSave, startRunOnce } from "../io/journal";
+import { endRun, journalClear, journalList, journalPeek, journalRestore, journalSave, otherPagesOpenOnce, startRunOnce } from "../io/journal";
 import { activeSessionId, claimTab, isPristineActive, newSession } from "../core/sessions";
 import { anyDirty, confirmAllSaved } from "./tabs";
 import { TabDialogs } from "./shell/TabDialogs";
@@ -20,6 +20,7 @@ import { Presenter } from "./Presenter";
 import { TooltipLayer, cx } from "./shell/controls";
 import { RecoveryDialog } from "./shell/Dialogs";
 import { StartScreen } from "./shell/StartScreen";
+import { WebMobileNotice } from "./shell/WebNotice";
 import { Icon } from "./shell/Icons";
 import { LeftDock } from "./shell/LeftDock";
 import { Ribbon, ToolBox } from "./shell/Ribbon";
@@ -187,8 +188,10 @@ export function App() {
     let cancelled = false;
     (async () => {
       // the recovery offer only after a run that did not end normally; a normal end leaves nothing (endRun)
-      const crashed = startRunOnce();
-      if (!crashed) await journalClear().catch(() => {});
+      // another browser tab of the app is open: its mark and autosaves are live, not left over from a crash
+      const others = await otherPagesOpenOnce();
+      const crashed = startRunOnce() && !others;
+      if (!crashed && !others) await journalClear().catch(() => {});
       const info = crashed ? await journalPeek().catch(() => null) : null;
       if (cancelled) return;
       if (info) setRecovery(info);
@@ -387,6 +390,7 @@ export function App() {
           }}
         />
       )}
+      {!recovery && <WebMobileNotice />}
       <PageOrganizer />
       <ToolsDialog />
       <SecurityDialogs />

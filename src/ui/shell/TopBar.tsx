@@ -23,6 +23,7 @@ import { ModeSwitch, type ModeSwitchForm } from "./ModeSwitch";
 import { useUI } from "./uiStore";
 import { ImageDialogs } from "./ImageDialog";
 import { UpdatePill, useUpdate } from "./UpdateBanner";
+import { WebUpdatePill } from "./WebUpdate";
 import { DocTabs } from "./DocTabs";
 import { isDrawing, undoDrawnPoint } from "../pathCanvas";
 import { KEY_TIPS, RIBBON_TABS, activeTab, isMenuSurface, useRibbonTab, useSurface, type Surface } from "../ribbonTabs";
@@ -66,6 +67,7 @@ export function TitleBar() {
       <div className="titlebar-end">
         <CommandSearch />
         <UpdatePill />
+        <WebUpdatePill />
         <IconBtn icon={ui.theme === "dark" ? "sun" : "moon"} tip={ui.theme === "dark" ? t("shell.themeLight") : t("shell.themeDark")} onClick={() => ui.set({ theme: ui.theme === "dark" ? "light" : "dark" })} />
       </div>
       <WindowControls />

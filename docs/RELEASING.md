@@ -118,6 +118,13 @@ $env:CARGO_ENCODED_RUSTFLAGS = node scripts/rust-remap.mjs; npx tauri build
 5. `/app/`(정식)과 `/app-beta/`(시험) 두 경로. 정식은 시험에서 확인한 빌드를 그대로 복사합니다.
 6. 서버의 `index.html`을 직전 판으로 바꾸면 즉시 되돌아갑니다.
 
+**지금 된 것(2026-11-22, GitHub Pages `/omniweave/app/`):** 빌드가 `version.json`(`version`·`build`=입구 스크립트 이름·`date`)을
+함께 만들고(vite.config.ts `webVersion`), 앱이 시작 10초 뒤·6시간마다·탭으로 돌아올 때(30분 간격) `cache: "no-store"`로 읽어
+입구 스크립트가 다르면 제목 줄에 **"새로 고쳐서 업데이트"**를 띄웁니다(src/ui/shell/WebUpdate.tsx). 새 배포로 옛 지연 로딩 파일이
+사라져 기능을 못 불러오면(`vite:preloadError`) 같은 알림과 안내를 냅니다. 저장 안 한 내용은 새로 고친 뒤 자동 저장 복구로 돌아옵니다.
+아직 안 된 것: 서비스 워커(오프라인·미리 받기), 옛 해시 파일 보존(Pages는 배포마다 사이트 전체를 바꿈), `minOmwReader`, `/app-beta/`.
+Pages는 모든 파일에 `Cache-Control: max-age=600`을 주고 헤더를 바꿀 수 없어서 1번의 `index.html` no-cache는 못 합니다(최대 10분 늦게 보임).
+
 ## .omw 형식 호환 정책
 
 **정식 배포 이후에는 어떤 버전에서도 .omw 파일이 '안 열리는' 일이 없어야 합니다.**

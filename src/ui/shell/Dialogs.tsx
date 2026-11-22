@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./Icons";
 import { cx } from "./controls";
 import { docTitle, useLang, useT } from "../../i18n";
+import { isTauri } from "../../io/platform";
 
 /** Date-format locale for each UI language. */
 const DATE_LOCALE = { ko: "ko-KR", en: "en-US", zh: "zh-CN", ja: "ja-JP" } as const;
@@ -69,7 +70,7 @@ export function RecoveryDialog({ info, onRestore, onDiscard }: { info: { savedAt
         <br />
         {t("shell.recover.lastSaved", { time: fmt })}
       </p>
-      <p className="modal-sub">{t("shell.recover.journal")}</p>
+      <p className="modal-sub">{t(isTauri ? "shell.recover.journal" : "web.recover.journal")}</p>
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" disabled={busy} onClick={onDiscard}>
           {t("shell.recover.startNew")}

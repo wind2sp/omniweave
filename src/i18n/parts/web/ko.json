@@ -1,0 +1,14 @@
+{
+  "web.update.reload": "새로 고쳐서 업데이트",
+  "web.update.tip": "새 버전 {version}",
+  "web.update.keep": "저장하지 않은 내용은 새로 고친 뒤 복구할 수 있습니다",
+  "web.update.stale": "새 버전이 배포되어 이 기능을 불러오지 못했습니다. 오른쪽 위 '새로 고쳐서 업데이트'를 눌러 주세요",
+  "web.start.sample": "예시 열기",
+  "web.start.sampleSub": "예시 작업 파일로 바로 둘러보기",
+  "web.start.sampleFailed": "예시 파일을 불러오지 못했습니다",
+  "web.start.privacy": "파일은 이 브라우저 안에서만 열고 저장합니다. 서버로 보내지 않습니다.",
+  "web.recover.journal": "탭을 닫거나 새로 고치기 직전까지 바꾼 내용을 이 브라우저에 보관해 두었습니다.",
+  "web.mobile.title": "작은 화면에서는 보기 위주로 쓰세요",
+  "web.mobile.text": "오메 웹판은 마우스와 키보드가 있는 PC 브라우저에서 편집하기 좋게 만들었습니다. 휴대폰에서는 화면이 작게 보이고 일부 기능이 불편할 수 있습니다.",
+  "web.mobile.ok": "계속"
+}

@@ -1,0 +1,14 @@
+{
+  "web.update.reload": "Reload to update",
+  "web.update.tip": "New version {version}",
+  "web.update.keep": "Unsaved changes can be recovered after the reload",
+  "web.update.stale": "A new version was published, so this feature couldn't load. Click 'Reload to update' at the top right",
+  "web.start.sample": "Open a sample",
+  "web.start.sampleSub": "Look around with a sample workspace",
+  "web.start.sampleFailed": "Couldn't load the sample file",
+  "web.start.privacy": "Files are opened and saved in this browser only — nothing is sent to a server.",
+  "web.recover.journal": "Changes made until the tab was closed or reloaded were kept in this browser.",
+  "web.mobile.title": "Best for viewing on small screens",
+  "web.mobile.text": "The Omniweave web app is made for editing in a desktop browser with a mouse and keyboard. On a phone the screen is shown small and some tools may be awkward to use.",
+  "web.mobile.ok": "Continue"
+}
