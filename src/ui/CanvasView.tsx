@@ -13,7 +13,8 @@ import { drawFidelity } from "./fidelity";
 import { addToDictionary, drawSpelling, ignoreAll, replaceWord, spellAt, suggestionsFor } from "./spell";
 import { PopMenu } from "./shell/DocTabs";
 import type { MenuItem } from "./shell/controls";
-import { importFile, nodesAt, setViewportSize, fitCurrent, placeImage } from "./actions";
+import { importFile, nodesAt, setViewportSize, fitCurrent, placeImage, viewIsFitted } from "./actions";
+import { TouchNav, applyStep, doubleTapView, isDoubleTap } from "./touchNav";
 import { CellEditor, useCellSel, type CellTarget } from "./CellEditor";
 import { pickForMenu, tableMenuItems } from "./tableMenu";
 import { useImageUI } from "./shell/imageMenu";
@@ -953,12 +954,17 @@ export function CanvasView() {
       const box = crisp.backing ? e?.devicePixelContentBoxSize?.[0] : undefined;
       const w = e ? e.contentRect.width : el.clientWidth, h = e ? e.contentRect.height : el.clientHeight;
       const pw = box ? box.inlineSize : Math.round(w * dpr), ph = box ? box.blockSize : Math.round(h * dpr);
-      size.current = { w, h, dpr };
+      // paint at the pixels the backing store really has: in a page the browser scales (phones and tablets lay the
+      // editor out 1024 px wide and zoom it to the screen, index.html) the device box is w × dpr × that zoom, not
+      // w × dpr — painting at devicePixelRatio there drew the page 1/zoom times too big, so only its top-left corner
+      // showed and nothing seemed to respond (2026-11-22, Android Chrome)
+      size.current = { w, h, dpr: box && w > 0 ? pw / w : dpr };
       for (const cv of [main.current!, over.current!]) {
         if (cv.width !== pw) cv.width = pw;
         if (cv.height !== ph) cv.height = ph;
       }
       setViewportSize(w, h);
+      if (viewIsFitted()) fitCurrent();
       invalidate();
     });
     try {
@@ -1261,7 +1267,79 @@ export function CanvasView() {
     setCellEdit({ nodeId: n.id, ...c });
   }
 
+  // ───────── fingers (ui/touchNav.ts): one finger moves the view with the select / hand tool, two always zoom ─────────
+  const touch = useRef(new TouchNav());
+  const tapDown = useRef<React.PointerEvent | null>(null);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  const replaying = useRef(false);
+
+  /** A finger went down: true when navigation takes it (the tool does not see it). */
+  function touchDown(e: React.PointerEvent): boolean {
+    if (e.pointerType !== "touch" || replaying.current) return false;
+    const tn = touch.current;
+    tn.down(e.pointerId, ...local(e));
+    const tool = S().tool;
+    if (tn.count === 1 && tool !== "select" && tool !== "hand" && !editingRef.current) return false; // the tool draws
+    if (tn.count >= 2 && drag.current) {
+      // a second finger: the stroke / drag the first one began is dropped, the fingers zoom instead
+      drag.current = null;
+      S().cancelGesture();
+      invalidate();
+    }
+    tn.navigating = true;
+    tapDown.current = tn.count === 1 ? e : null;
+    wrap.current!.setPointerCapture(e.pointerId);
+    return true;
+  }
+
+  function touchMove(e: React.PointerEvent): boolean {
+    const tn = touch.current;
+    if (e.pointerType !== "touch" || !tn.has(e.pointerId)) return false;
+    const st = tn.move(e.pointerId, ...local(e));
+    if (!tn.navigating || !st) return false;
+    if (tn.travel < 8 && tn.count === 1) return true; // still a tap
+    const v = S().view;
+    const el = wrap.current!;
+    // the document mode scrolls through its pages (docView) when one finger moves
+    if (st.f === 1 && docModeNow()) docWheel(-st.dx, -st.dy, el.clientWidth, el.clientHeight);
+    else S().set({ view: applyStep(v, st) });
+    return true;
+  }
+
+  function touchUp(e: React.PointerEvent): boolean {
+    const tn = touch.current;
+    if (e.pointerType !== "touch" || !tn.has(e.pointerId)) return false;
+    const nav = tn.navigating;
+    const tap = tn.up(e.pointerId);
+    if (!nav) return false;
+    const down = tapDown.current;
+    if (tap && down) {
+      tapDown.current = null;
+      const [x, y] = local(e);
+      if (isDoubleTap(lastTap.current, e.timeStamp, e.clientX, e.clientY) && !editingRef.current) {
+        // double tap: fit ↔ 2× about the tapped point
+        lastTap.current = null;
+        const before = S().view;
+        fitCurrent();
+        const to = doubleTapView(before, S().view.zoom, x, y);
+        if (to) S().set({ view: to });
+        return true;
+      }
+      lastTap.current = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+      // a tap clicks as the mouse would (select, caret, buttons on the canvas)
+      replaying.current = true;
+      try {
+        onPointerDown(down);
+        onPointerUp(e);
+      } finally {
+        replaying.current = false;
+      }
+    }
+    return true;
+  }
+
   function onPointerDown(e: React.PointerEvent) {
+    if (touchDown(e)) return;
     if (editingRef.current) {
       // slides: a press on another text box while typing ends this one and types there (one click, not two)
       if (e.button === 0 && !e.shiftKey && currentEditMode() === "SLIDE" && currentPage()?.kind === "SLIDE") {
@@ -1282,7 +1360,11 @@ export function CanvasView() {
       return;
     }
     const el = wrap.current!;
-    el.setPointerCapture(e.pointerId);
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* a finger's tap replayed after it lifted (touchUp): nothing to capture */
+    }
     // docView: a press on a page above / below the current one (document mode) makes it current first
     if (e.button === 0) pickPageAt(...local(e), el.clientHeight);
     const s = S();
@@ -1541,6 +1623,7 @@ export function CanvasView() {
   }
 
   function onPointerMove(e: React.PointerEvent) {
+    if (touchMove(e)) return;
     const [sx, sy] = local(e);
     let p = screenToPage(sx, sy);
     cursor.current = p;
@@ -1728,6 +1811,7 @@ export function CanvasView() {
   }
 
   function onPointerUp(e: React.PointerEvent) {
+    if (touchUp(e)) return;
     const d = drag.current;
     drag.current = null;
     const s = S();
@@ -1860,6 +1944,7 @@ export function CanvasView() {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={(e) => void (e.pointerType === "touch" && touch.current.up(e.pointerId))}
       onPointerLeave={() => {
         cadCanvas()?.leave();
         if (A().cursor) A().set({ cursor: null });

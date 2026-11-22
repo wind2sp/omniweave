@@ -8,9 +8,15 @@ import { installUiFonts } from "./io/pretendard";
 import { App } from "./ui/App";
 import "./ui/styles.css";
 import { initPwa } from "./web/pwa";
+import { phoneViewerNow } from "./web/phone";
+import { PhoneViewer } from "./web/PhoneViewer";
 
 // browser only: offline service worker, install offer, files opened with the installed app (src/web/pwa.ts)
 initPwa();
+
+// a phone browser: the simple page viewer at the phone's width, not the desktop editor scaled down (web/phone.ts)
+const phone = phoneViewerNow();
+if (phone) document.documentElement.classList.add("wp-mode");
 
 // Real glyph metrics for the text engine (core/text.ts falls back to an estimate
 // outside the DOM). Installed before the first layout so cached layouts are correct.
@@ -56,7 +62,7 @@ Promise.all([loadFonts(), initLang()]).finally(() => {
   relabelStartDocument();
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <App />
+      {phone ? <PhoneViewer /> : <App />}
     </StrictMode>,
   );
 });

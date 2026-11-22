@@ -1,0 +1,15 @@
+{
+  "webphone.open": "打开",
+  "webphone.openFile": "打开文件",
+  "webphone.share": "分享",
+  "webphone.back": "返回",
+  "webphone.close": "关闭",
+  "webphone.notice": "手机专用界面正在准备中。目前只能查看，请在电脑上编辑。",
+  "webphone.startTitle": "在手机上查看文档",
+  "webphone.startText": "可打开 PDF、Word、韩文、PowerPoint、Excel、Photoshop、Illustrator、CAD 和图片文件。手指滑动浏览，双指缩放，双击放大。",
+  "webphone.desktop": "使用电脑版界面",
+  "webphone.phoneLayout": "切换到手机界面",
+  "webphone.opening": "正在打开…",
+  "webphone.openingName": "正在打开 {name}…",
+  "webphone.openFailed": "无法打开 {name}"
+}

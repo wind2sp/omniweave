@@ -1,0 +1,15 @@
+{
+  "webphone.open": "Open",
+  "webphone.openFile": "Open a file",
+  "webphone.share": "Share",
+  "webphone.back": "Back",
+  "webphone.close": "Close",
+  "webphone.notice": "A phone screen is on the way. For now you can view files here — edit them on a computer.",
+  "webphone.startTitle": "View documents on your phone",
+  "webphone.startText": "Open PDF, Word, Hangul, PowerPoint, Excel, Photoshop, Illustrator, CAD and picture files. Swipe to scroll, pinch to zoom, double-tap to enlarge.",
+  "webphone.desktop": "Use the computer layout",
+  "webphone.phoneLayout": "Phone layout",
+  "webphone.opening": "Opening…",
+  "webphone.openingName": "Opening {name}…",
+  "webphone.openFailed": "Couldn't open {name}"
+}

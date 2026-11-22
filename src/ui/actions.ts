@@ -59,10 +59,18 @@ const tn = (key: string, n: number, vars: Record<string, string | number> = {}) 
 export function fitView(viewW: number, viewH: number) {
   const page = currentPage();
   if (!page) return;
-  if (docFitHook?.(page, viewW, viewH)) return;
-  const zoom = Math.min((viewW - 80) / page.width, (viewH - 80) / page.height, 4);
-  S().set({ view: { zoom, panX: (viewW - page.width * zoom) / 2, panY: (viewH - page.height * zoom) / 2 } });
+  if (!docFitHook?.(page, viewW, viewH)) {
+    const zoom = Math.min((viewW - 80) / page.width, (viewH - 80) / page.height, 4);
+    S().set({ view: { zoom, panX: (viewW - page.width * zoom) / 2, panY: (viewH - page.height * zoom) / 2 } });
+  }
+  lastFit = S().view;
 }
+
+/** the view fitView set last: while it is still the view (nobody moved or zoomed since), a canvas that changes size
+ *  fits again — a file opened before the panels around the canvas settled (touch screens: the 1024 px layout grows
+ *  the canvas after the first fit) no longer stays cut off */
+let lastFit: unknown = null;
+export const viewIsFitted = () => lastFit !== null && S().view === lastFit;
 
 /** Fit in the document edit mode (page width, top of the page; ui/docView.ts) — a hook, so this module needs no view code. */
 let docFitHook: ((page: Page, viewW: number, viewH: number) => boolean) | null = null;

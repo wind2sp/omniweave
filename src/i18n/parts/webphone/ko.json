@@ -1,0 +1,15 @@
+{
+  "webphone.open": "열기",
+  "webphone.openFile": "파일 열기",
+  "webphone.share": "공유",
+  "webphone.back": "뒤로",
+  "webphone.close": "닫기",
+  "webphone.notice": "휴대폰 전용 화면을 준비하고 있습니다. 지금은 보기만 할 수 있어요 — 편집은 PC에서 해 주세요.",
+  "webphone.startTitle": "휴대폰에서 문서 보기",
+  "webphone.startText": "PDF·Word·한글·PowerPoint·Excel·Photoshop·Illustrator·CAD·그림 파일을 열어 볼 수 있습니다. 손가락으로 넘기고, 두 손가락으로 확대하고, 두 번 눌러 크게 보세요.",
+  "webphone.desktop": "PC 화면으로 보기",
+  "webphone.phoneLayout": "휴대폰 화면으로",
+  "webphone.opening": "여는 중…",
+  "webphone.openingName": "{name} 여는 중…",
+  "webphone.openFailed": "파일을 열지 못했습니다: {name}"
+}

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useT } from "../../i18n";
 import { isTauri } from "../../io/platform";
 import { isIOS, isStandalone } from "../../web/device";
+import { switchLayout } from "../../web/phone";
 import { Modal } from "./Dialogs";
 
 const KEY = "omniweave.web.mobileNotice";
@@ -48,6 +49,10 @@ export function WebMobileNotice() {
       <p className="modal-text">{t("web.mobile.text")}</p>
       {isIOS() && <p className="modal-text">{t("web.mobile.iosMemory")}</p>}
       <div className="modal-actions">
+        {/* back to the phone page viewer (web/phone.ts) — this editor was chosen with "PC 화면으로 보기" */}
+        <button type="button" className="btn" onClick={() => switchLayout(null)}>
+          {t("webphone.phoneLayout")}
+        </button>
         <button type="button" className="btn btn-primary" data-autofocus onClick={close}>
           {t("web.mobile.ok")}
         </button>
