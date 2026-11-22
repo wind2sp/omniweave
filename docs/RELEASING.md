@@ -124,7 +124,7 @@ $env:CARGO_ENCODED_RUSTFLAGS = node scripts/rust-remap.mjs; npx tauri build
 사라져 기능을 못 불러오면(`vite:preloadError`) 같은 알림과 안내를 냅니다. 저장 안 한 내용은 새로 고친 뒤 자동 저장 복구로 돌아옵니다.
 아직 안 된 것: 옛 해시 파일 보존(Pages는 배포마다 사이트 전체를 바꿈), `minOmwReader`, `/app-beta/`.
 
-**홈 화면 앱·오프라인(PWA, 2026-11-22):** iPhone은 App Store 대신 웹판을 사파리 '홈 화면에 추가'로 씁니다(대표님 결정).
+**홈 화면 앱·오프라인(PWA, 2026-11-22):** iPhone은 App Store 대신 웹판을 사파리 '홈 화면에 추가'로 씁니다(제품 결정).
 웹 빌드(`OMW_WEB=1`, Pages 워크플로가 켬 — 데스크톱 빌드·설치본에는 하나도 안 들어감)가 `scripts/web-pwa.mjs`로
 `manifest.webmanifest`·`icons/`(192·512·maskable·apple-touch-icon·iPhone 시작 그림, `assets/make_icon.py --web`)·`sw.js`를 만들고
 head에 iOS 태그를 넣습니다. 앱은 브라우저에서만 서비스 워커를 등록합니다(`src/web/pwa.ts`, Tauri·개발 서버·http는 안 함).
