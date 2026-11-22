@@ -437,3 +437,7 @@ html:lang(ja) .hero h1,html:lang(ja) .h-sec,html:lang(ja) .cta h2,html:lang(ja) 
   .tour-cap .one{font-size:17px}
 }
 @media (prefers-reduced-motion:reduce){.flow-lines path{animation:none}}
+/* 다운로드 · 웹에서 바로 쓰기: 소스 실행 안내는 개발자용으로 접어 둠 */
+.plat details.dev{margin-top:14px}
+.plat details.dev summary{cursor:pointer;color:var(--text-3);font-size:14px}
+.plat details.dev[open] summary{margin-bottom:10px}

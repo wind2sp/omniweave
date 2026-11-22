@@ -67,9 +67,10 @@ build-i18n.mjs        템플릿 + 번역 → 언어별 HTML 생성 (Node 18+, �
   "repoPublic"      false = GitHub 저장소 링크를 "공개 준비 중"으로 표시 / true = 저장소·이슈·기여 안내 링크 활성화
   "repoUrl"         저장소 주소
   "releasePageUrl"  "모든 릴리스" 링크 (released와 repoPublic이 모두 true일 때 표시)
-  "demoPublic"      false = "설치 없이 지금 써 보기"(브라우저 데모) 버튼을 숨김 (지금 상태)
-                    true  = 버튼 표시. GitHub Pages에 웹 앱이 /app/ 으로 실제 배포된 것을 확인한 뒤 켜세요.
-  "demoUrl"         데모 주소. 기본 "app/?demo" (사이트 기준 상대 경로, https://로 시작하면 그 주소 그대로)
+  "demoPublic"      false = "웹에서 바로 쓰기"(웹판) 버튼을 숨김
+                    true  = 버튼 표시 (지금 상태, 2026-11-22). 웹 앱이 실제 배포된 것을 확인한 뒤 켜세요.
+  "demoUrl"         웹판 주소. 지금 "https://wind2sp.github.io/omniweave/app/" (gdra에는 app/이 없어서 절대 주소).
+                    상대 경로("app/?demo")면 사이트 기준, https://로 시작하면 그 주소 그대로 새 탭에서 엽니다.
   "downloadBase"    파일을 받는 기본 주소. {version}이 버전으로 바뀝니다.
                     기본값: https://github.com/wind2sp/omniweave/releases/download/v{version}/
   "files"           각 파일 이름. enabled:false 로 두면 그 파일만 "준비 중"으로 표시됩니다.

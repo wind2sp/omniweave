@@ -32,8 +32,8 @@
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="manifest" href="../site.webmanifest">
 <link rel="preload" href="../assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../assets/css/site.css?v=6">
-<script src="../assets/js/lang.js?v=6"></script>
+<link rel="stylesheet" href="../assets/css/site.css?v=7">
+<script src="../assets/js/lang.js?v=7"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -112,18 +112,22 @@
       <article class="plat" data-os="web">
         <div class="plat-h">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3"/></svg>
-          <h2>Web browser (from source)</h2>
+          <h2>Use it on the web</h2>
         </div>
-        <p>With Node.js 18 or later, run it in your browser without installing.</p>
-        <p data-when="demo" hidden><a class="btn btn-ghost btn-sm" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Try it in your browser</span></a> <span class="note">Your files never leave the browser.</span></p>
-        <div class="term">
-          <div class="term-h"><span>Terminal</span><button type="button" class="copy" data-copy="qs-web">Copy</button></div>
-<pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
-cd omniweave
-npm i
-npm run dev</pre>
-        </div>
-        <p class="note" data-when="no-repo">These commands will work once the repository is public.</p>
+        <p>Work right in your browser, no install needed. Your files are processed on your own computer and never sent to a server.</p>
+        <p data-when="demo" hidden><a class="btn btn-primary btn-sm" data-demo target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Use it on the web</span></a></p>
+        <p class="note" data-when="demo" hidden>A few features, such as spell check and CAD external references, need the installed app.</p>
+        <details class="dev">
+          <summary>For developers: run from source (Node.js 18+)</summary>
+          <div class="term">
+            <div class="term-h"><span>Terminal</span><button type="button" class="copy" data-copy="qs-web">Copy</button></div>
+  <pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
+  cd omniweave
+  npm i
+  npm run dev</pre>
+          </div>
+          <p class="note" data-when="no-repo">These commands will work once the repository is public.</p>
+        </details>
       </article>
 
       <article class="plat" data-os="mac">
@@ -216,7 +220,7 @@ npm run dev</pre>
             <tr><th scope="row">Operating system</th><td>Windows 10 or 11 (64-bit, x64)</td></tr>
             <tr><th scope="row">Microsoft Edge WebView2</th><td>Built into Windows 11. On Windows 10 the installer downloads it if it's missing (internet required). The portable app runs only where WebView2 is already installed.</td></tr>
             <tr><th scope="row">Permissions</th><td>Installs for the current user, so no admin rights are needed.</td></tr>
-            <tr><th scope="row">Running in a browser</th><td>Node.js 18+, plus a recent Chromium-based browser, Firefox or Safari</td></tr>
+            <tr><th scope="row">Running in a browser</th><td>A recent Chromium-based browser, Firefox or Safari</td></tr>
             <tr><th scope="row">macOS · Linux</th><td>Experimental builds. We'll list what's supported once we've tested on real hardware.</td></tr>
           </tbody>
         </table>
@@ -259,6 +263,6 @@ npm run dev</pre>
 </footer>
 
 <script type="application/json" id="i18n">{"soon":"Coming soon","preparing":"Not yet available","platformsBtn":"See all platforms","mobileMsg":"Omniweave is a desktop app. Open this page on a Windows, macOS or Linux computer.","unknownMsg":"We couldn't detect your operating system. Please pick one below.","dlFor":"Download for {os}","installerSuffix":" (installer)","experimentalBuild":"experimental build","soonFor":"{os} · coming soon","prepFor":"{os} · not yet available","notAvailable":"There's no file for this platform yet. Please check the list below.","firstRelease":"The first release, v{v}, is on its way.","copied":"Copied","locale":"en-US","loomStroke":"This stroke: \u003cspan class=\"m\">screen tiles redrawn: {n}\u003c/span> · \u003cspan class=\"h\">reused as-is: {r}\u003c/span> (of {t})","loomUndo":"Undo: the old keys come back, so \u003cspan class=\"h\">instant cache hits: {n}\u003c/span> · tiles redrawn: 0"}</script>
-<script src="../assets/js/site.js?v=6" defer></script>
+<script src="../assets/js/site.js?v=7" defer></script>
 </body>
 </html>

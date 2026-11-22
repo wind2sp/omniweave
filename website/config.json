@@ -6,16 +6,16 @@
   "released": true,
   "releaseDate": "2026-11-22",
   "notes": [
-    "첫 공개 판: GitHub에서 설치본·포터블 배포, 새 판은 자동 업데이트",
-    "AI 업스케일(이미지 종류 자동 판단)·글자 인식(OCR)·배경 지우기 — 모두 내 PC에서 처리",
-    "DOCX·HWPX·XLSX·PPTX·PDF·PSD 원본 보존 저장, DOC·XLS·PPT·HWP·DWG·DXF 열기 확대, 화면 4개 언어"
+    "JPG·WebP로 내보내기(품질 선택, 사진 위치 정보는 지움)",
+    "내보낼 때 파일 이름이 두 번 붙던 문제 수정",
+    "Windows '연결 프로그램'에서 오메로 열기"
   ],
   "repoPublic": true,
   "repoUrl": "https://github.com/wind2sp/omniweave",
   "releasePageUrl": "https://github.com/wind2sp/omniweave/releases/latest",
   "storeUrl": "",
-  "demoPublic": false,
-  "demoUrl": "app/?demo",
+  "demoPublic": true,
+  "demoUrl": "https://wind2sp.github.io/omniweave/app/",
   "downloadBase": "https://github.com/wind2sp/omniweave/releases/download/v{version}/",
   "files": {
     "winSetup": {

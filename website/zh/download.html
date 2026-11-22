@@ -32,8 +32,8 @@
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="manifest" href="../site.webmanifest">
 <link rel="preload" href="../assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../assets/css/site.css?v=6">
-<script src="../assets/js/lang.js?v=6"></script>
+<link rel="stylesheet" href="../assets/css/site.css?v=7">
+<script src="../assets/js/lang.js?v=7"></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -112,18 +112,22 @@
       <article class="plat" data-os="web">
         <div class="plat-h">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3"/></svg>
-          <h2>网页浏览器（从源码）</h2>
+          <h2>在网页上直接使用</h2>
         </div>
-        <p>有 Node.js 18 及以上版本，即可免安装在浏览器中运行。</p>
-        <p data-when="demo" hidden><a class="btn btn-ghost btn-sm" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">在浏览器中试用</span></a> <span class="note">文件不会离开浏览器。</span></p>
-        <div class="term">
-          <div class="term-h"><span>终端</span><button type="button" class="copy" data-copy="qs-web">复制</button></div>
-<pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
-cd omniweave
-npm i
-npm run dev</pre>
-        </div>
-        <p class="note" data-when="no-repo">仓库公开后，上面的命令即可直接使用。</p>
+        <p>无需安装，直接在浏览器中工作。文件不会上传到服务器，只在你的电脑上处理。</p>
+        <p data-when="demo" hidden><a class="btn btn-primary btn-sm" data-demo target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">在网页上直接使用</span></a></p>
+        <p class="note" data-when="demo" hidden>拼写检查、CAD 外部参照等部分功能仅限安装版。</p>
+        <details class="dev">
+          <summary>开发者：从源码运行（Node.js 18 及以上）</summary>
+          <div class="term">
+            <div class="term-h"><span>终端</span><button type="button" class="copy" data-copy="qs-web">复制</button></div>
+  <pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
+  cd omniweave
+  npm i
+  npm run dev</pre>
+          </div>
+          <p class="note" data-when="no-repo">仓库公开后，上面的命令即可直接使用。</p>
+        </details>
       </article>
 
       <article class="plat" data-os="mac">
@@ -216,7 +220,7 @@ npm run dev</pre>
             <tr><th scope="row">操作系统</th><td>Windows 10、11（64 位，x64）</td></tr>
             <tr><th scope="row">Microsoft Edge WebView2</th><td>Windows 11 已内置。Windows 10 若没有，安装版会在安装时自动下载（需联网）。便携版只能在已安装 WebView2 的电脑上运行。</td></tr>
             <tr><th scope="row">安装权限</th><td>安装到当前用户，无需管理员权限。</td></tr>
-            <tr><th scope="row">在浏览器中运行</th><td>Node.js 18 及以上，以及较新的 Chromium 内核浏览器、Firefox 或 Safari</td></tr>
+            <tr><th scope="row">在浏览器中运行</th><td>较新的 Chromium 内核浏览器、Firefox 或 Safari</td></tr>
             <tr><th scope="row">macOS · Linux</th><td>实验性构建。在真机上验证后会在此注明支持范围。</td></tr>
           </tbody>
         </table>
@@ -259,6 +263,6 @@ npm run dev</pre>
 </footer>
 
 <script type="application/json" id="i18n">{"soon":"即将发布","preparing":"暂未提供","platformsBtn":"查看各平台文件","mobileMsg":"Omniweave 是桌面应用，请在 Windows、macOS 或 Linux 电脑上打开本页面。","unknownMsg":"无法识别你的操作系统，请在下方选择。","dlFor":"下载 {os} 版","installerSuffix":"（安装版）","experimentalBuild":"实验性版本","soonFor":"{os} 版 · 即将发布","prepFor":"{os} 版 · 暂未提供","notAvailable":"该平台暂时还没有安装文件，请查看下方列表。","firstRelease":"首个版本 v{v} 正在准备中。","copied":"已复制","locale":"zh-CN","loomStroke":"本次笔画：\u003cspan class=\"m\">重绘屏幕图块 {n} 个\u003c/span> · \u003cspan class=\"h\">直接复用 {r} 个\u003c/span>（共 {t} 个）","loomUndo":"撤销：旧的键重新出现，\u003cspan class=\"h\">{n} 个图块直接命中缓存\u003c/span> · 重绘 0 个"}</script>
-<script src="../assets/js/site.js?v=6" defer></script>
+<script src="../assets/js/site.js?v=7" defer></script>
 </body>
 </html>

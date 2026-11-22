@@ -99,15 +99,19 @@
           <h2>{{dl.web.h}}</h2>
         </div>
         <p>{{dl.web.p}}</p>
-        <p data-when="demo" hidden><a class="btn btn-ghost btn-sm" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">{{dl.web.demo}}</span></a> <span class="note">{{dl.web.demoNote}}</span></p>
-        <div class="term">
-          <div class="term-h"><span>{{dl.web.term}}</span><button type="button" class="copy" data-copy="qs-web">{{common.copy}}</button></div>
-<pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
-cd omniweave
-npm i
-npm run dev</pre>
-        </div>
-        <p class="note" data-when="no-repo">{{dl.web.noRepo}}</p>
+        <p data-when="demo" hidden><a class="btn btn-primary btn-sm" data-demo target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">{{dl.web.demo}}</span></a></p>
+        <p class="note" data-when="demo" hidden>{{dl.web.demoNote}}</p>
+        <details class="dev">
+          <summary>{{dl.web.dev}}</summary>
+          <div class="term">
+            <div class="term-h"><span>{{dl.web.term}}</span><button type="button" class="copy" data-copy="qs-web">{{common.copy}}</button></div>
+  <pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
+  cd omniweave
+  npm i
+  npm run dev</pre>
+          </div>
+          <p class="note" data-when="no-repo">{{dl.web.noRepo}}</p>
+        </details>
       </article>
 
       <article class="plat" data-os="mac">

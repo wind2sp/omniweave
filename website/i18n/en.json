@@ -88,7 +88,7 @@
       "lead": "Open anything on one canvas and edit it there. When it's time to send, export back to the original format.",
       "how": "Take the tour",
       "meta": "Windows 10 and 11 · about 17 MB installer · Korean, English, Japanese, Chinese",
-      "demo": "Try it in your browser"
+      "demo": "Use it on the web"
     },
     "flow": {
       "aria": "DOCX, HWPX, PPTX, XLSX, PDF, PSD, AI and DWG files flow into Omniweave and are kept as one .omw file, then exported back to formats such as DOCX, PDF and PNG when needed",
@@ -312,12 +312,13 @@
       "portableD": "A single exe that runs without installing. No file associations."
     },
     "web": {
-      "h": "Web browser (from source)",
-      "p": "With Node.js 18 or later, run it in your browser without installing.",
+      "h": "Use it on the web",
+      "p": "Work right in your browser, no install needed. Your files are processed on your own computer and never sent to a server.",
       "term": "Terminal",
       "noRepo": "These commands will work once the repository is public.",
-      "demo": "Try it in your browser",
-      "demoNote": "Your files never leave the browser."
+      "demo": "Use it on the web",
+      "demoNote": "A few features, such as spell check and CAD external references, need the installed app.",
+      "dev": "For developers: run from source (Node.js 18+)"
     },
     "mac": {
       "dmg": "Disk image (Universal)",
@@ -373,7 +374,7 @@
       "permH": "Permissions",
       "perm": "Installs for the current user, so no admin rights are needed.",
       "webH": "Running in a browser",
-      "web": "Node.js 18+, plus a recent Chromium-based browser, Firefox or Safari",
+      "web": "A recent Chromium-based browser, Firefox or Safari",
       "other": "Experimental builds. We'll list what's supported once we've tested on real hardware.",
       "note": "This is an early release. Keep copies of important originals."
     }

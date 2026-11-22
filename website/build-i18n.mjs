@@ -25,7 +25,7 @@ const LANGS = [
 ];
 const PAGES = ['index.html', 'download.html'];
 // CSS·JS를 고치면 이 숫자를 올리고 다시 생성하세요(브라우저 캐시 갱신용 ?v=).
-const ASSET_VERSION = '6';
+const ASSET_VERSION = '7';
 
 const config = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8'));
 const SITE_RAW = String(config.siteUrl || '').trim();
