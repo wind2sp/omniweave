@@ -1,4 +1,4 @@
-// node scripts/make-doc-sample.mjs — builds the Word/한글 feature sample (docs/design/WORD_HWP_FEATURES.md).
+// node scripts/make-doc-sample.mjs [--store [--lang ko|en|ja|zh]] — builds the Word/한글 feature sample (docs/design/WORD_HWP_FEATURES.md).
 //
 // The document is made in a real browser engine so text is measured and drawn with the same fonts the app uses:
 //   vite dev server (port 5206, in this process) + a middleware (/__docsample/*) + headless Edge/Chrome opening
@@ -15,7 +15,10 @@ import { basename, join } from "node:path";
 const ROOT = process.cwd();
 const store = process.argv.includes("--store");
 // --store: the Store-screenshot variant (no internal engine name, no usage numbers; scripts/doc-sample/build.ts STORE)
-const OUT = join(ROOT, store ? "qa/samples/store-sample" : "qa/samples/doc-features");
+// --lang ko|en|ja|zh (with --store): that UI language's text (scripts/doc-sample/text.ts) → qa/samples/store-sample/<lang>/
+const LANG = (() => { const i = process.argv.indexOf("--lang"); return i > 0 ? process.argv[i + 1] : "ko"; })();
+if (!["ko", "en", "ja", "zh"].includes(LANG)) throw new Error(`--lang ${LANG}: ko, en, ja, zh 중 하나`);
+const OUT = join(ROOT, store ? `qa/samples/store-sample/${LANG}` : "qa/samples/doc-features");
 const PORT = 5206;
 const headed = process.argv.includes("--headed");
 
@@ -78,7 +81,7 @@ if (!exe) {
   throw new Error("Edge/Chrome을 찾지 못했습니다 — FIDELITY_BROWSER 환경 변수로 경로를 지정하세요");
 }
 const profile = join(tmpdir(), `omniweave-docsample-${process.pid}`);
-const flags = [...(headed ? [] : ["--headless=new"]), "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--window-size=1400,1000", "--force-device-scale-factor=1", `--user-data-dir=${profile}`, `http://127.0.0.1:${PORT}/scripts/doc-sample/index.html${store ? "?store=1" : ""}`];
+const flags = [...(headed ? [] : ["--headless=new"]), "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--window-size=1400,1000", "--force-device-scale-factor=1", `--user-data-dir=${profile}`, `http://127.0.0.1:${PORT}/scripts/doc-sample/index.html${store ? `?store=1&lang=${LANG}` : ""}`];
 console.log("▶ 견본 만들기: 개발 서버 + 헤드리스 브라우저");
 const browser = spawn(exe, flags, { stdio: "ignore", windowsHide: true, detached: false });
 const limit = setTimeout(() => {

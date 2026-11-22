@@ -57,7 +57,7 @@ build-i18n.mjs        템플릿 + 번역 → 언어별 HTML 생성 (Node 18+, �
   "siteUrl"         사이트 전체 주소. 예) "https://omniweave.example/"  (비워 두면 상대 경로)
                     채우면 build-i18n.mjs가 hreflang·canonical·og:url·og:image를 전체 주소로 만듭니다.
                     → 바꾼 뒤에는 node build-i18n.mjs 를 실행하고 HTML을 다시 올리세요.
-  "copyright"       푸터 저작권 줄. 기본 "© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later" (모든 언어 페이지에 같은 문구)
+  "copyright"       푸터 저작권 줄. 회사명과 문의 메일(라이선스는 바로 아래 줄에 한 번만 나오므로 여기에는 넣지 않습니다) (모든 언어 페이지에 같은 문구)
   "version"         최신 버전 번호. 예) "0.1.0" → "0.1.1"
                     파일 이름·다운로드 주소의 {version} 자리에 자동으로 들어갑니다.
   "released"        false = 모든 다운로드 버튼이 "곧 공개"로 표시 (지금 상태)
@@ -77,26 +77,29 @@ build-i18n.mjs        템플릿 + 번역 → 언어별 HTML 생성 (Node 18+, �
                     name에 https://로 시작하는 전체 주소를 넣으면 downloadBase 대신 그 주소를 씁니다.
   "autoUpdate"      설치본에 자동 업데이트가 들어간 릴리스부터 true (다운로드 페이지 안내 문구가 바뀝니다)
   "codeSigned"      설치 파일에 코드 서명을 하게 되면 true (SmartScreen 안내 문구가 바뀝니다)
-  "screenshots.hero" 랜딩 첫 화면 스크린샷 경로. 예) "assets/img/hero.webp"
-                    비워 두면 "스크린샷 준비 중" 그림이 보입니다. 16:9 비율, 가로 1600~2200px을 권장합니다.
+  "storeUrl"        Microsoft Store 주소. 비워 두면 Store 버튼을 숨기고, https://apps.microsoft.com/detail/… 주소를 넣으면
+                    홈·다운로드 페이지에 "Microsoft Store에서 받기" 글자 버튼이 나타납니다(공식 배지 그림은 쓰지 않음).
 ※ 큰따옴표·쉼표가 하나라도 틀리면 페이지가 기본값("곧 공개")으로 돌아갑니다.
    올리기 전에 로컬에서 확인하세요:
        python -m json.tool config.json
 ※ config.json을 못 읽는 경우(파일을 더블클릭해 열었을 때 등)에도 페이지는 "곧 공개" 상태로 정상 표시됩니다.
 
 
-[스크린샷 넣기]
-1. 실제 앱 캡처(예: 저장소의 docs/images/hero.png)를 assets/img/hero.png 또는 .webp로 복사합니다.
-   (webp로 바꾸면 용량이 크게 줄어듭니다. Pillow가 있으면:
-    python -c "from PIL import Image; Image.open('hero.png').save('hero.webp', quality=86, method=6)")
-2. config.json의 "screenshots": { "hero": "assets/img/hero.webp" } 로 적고 함께 올립니다.
-
+[스크린샷]
+홈의 "화면 둘러보기"는 assets/img/shots/<언어>/<모드>.webp(1600×900)와 번호 테두리 위치 assets/img/shots/highlights.json을 씁니다.
+언어마다 그 언어로 쓴 시험 견본을 열어 찍고, 테두리 위치는 찍을 때 앱 화면에서 해당 버튼·패널의 위치를 읽어 정합니다.
+  1) 견본(저장소 루트에서): node scripts/make-doc-sample.mjs --store --lang ko   (en, ja, zh도)
+                           OMW_STORE_SAMPLES=1 npx vitest run scripts/make-store-samples.test.ts --dir scripts
+                           python packaging/msix/store_listing/make_store_samples.py
+  2) 찍기: npx vite build 후 node packaging/msix/store_listing/make_screenshots.mjs --out packaging/msix/store_listing/screenshots-next
+  3) 홈용 변환: python website/make-shots.py  →  node website/build-i18n.mjs
+테두리가 가리키는 부분은 make_screenshots.mjs의 SCENES.marks에서 바꿉니다.
 
 [공유 미리보기(og:image)]
 siteUrl이 비어 있으면 og:image가 상대 경로입니다. 카카오톡·페이스북 등 일부 서비스는 전체 주소만 읽으니,
 도메인이 정해지면 config.json의 "siteUrl"을 채우고 node build-i18n.mjs 를 실행하세요.
-og:title·description은 언어별로 다르고, 그림은 모든 언어가 같은 assets/img/og-image.png(한국어 문구)를 씁니다.
-그림 원본은 저장소 assets/brand/og-image.png (assets/brand/make_brand.py로 생성)입니다.
+og:title·description과 그림 모두 언어별입니다: assets/img/og-image.png(한국어), og-image-en/-ja/-zh.png.
+그림은 저장소 assets/brand/make_brand.py가 만듭니다(GitHub 소셜 프리뷰 docs/images/social-preview.png도 함께).
 
 
 [다국어]

@@ -4,22 +4,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Omniweave — a local 6-in-1 editor that doesn't break your originals</title>
-<meta name="description" content="A free, open-source (GPL-3.0) editor with a ~17 MB installer that never uploads your files. Open, edit and save raster, vector (AI), PDF, DOCX, HWPX, slides and PSD on one canvas.">
+<title>Omniweave — every document, one .omw file</title>
+<meta name="description" content="A free, open-source editor that opens DOCX, HWPX, PPTX, PDF, PSD and DWG on one canvas. Keep your work in a single open .omw file and export back to the original format when you share it.">
 <meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
 <meta name="color-scheme" content="dark light">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Omniweave">
 <meta property="og:locale" content="en_US">
-<meta property="og:title" content="Omniweave — a local 6-in-1 editor that doesn't break your originals">
-<meta property="og:description" content="~17 MB installer · your files never leave your PC · raster, vector, PDF, DOCX, HWPX, slides and PSD on one canvas.">
+<meta property="og:title" content="Omniweave — every document, one .omw file">
+<meta property="og:description" content="Open any format on one canvas and keep the work in one .omw file. Free and open source.">
 <link rel="alternate" hreflang="ko" href="../index.html">
 <link rel="alternate" hreflang="en" href="../en/index.html">
 <link rel="alternate" hreflang="ja" href="../ja/index.html">
 <link rel="alternate" hreflang="zh-Hans" href="../zh/index.html">
 <link rel="alternate" hreflang="x-default" href="../index.html">
-<meta property="og:image" content="../assets/img/og-image.png">
+<meta property="og:image" content="../assets/img/og-image-en.png">
 <meta property="og:locale:alternate" content="ko_KR">
 <meta property="og:locale:alternate" content="ja_JP">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -32,8 +32,8 @@
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="manifest" href="../site.webmanifest">
 <link rel="preload" href="../assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../assets/css/site.css?v=5">
-<script src="../assets/js/lang.js?v=5"></script>
+<link rel="stylesheet" href="../assets/css/site.css?v=6">
+<script src="../assets/js/lang.js?v=6"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -44,10 +44,9 @@
       <img src="../assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>Ome</span>
     </a>
     <nav class="nav-links" aria-label="Main menu">
-      <a href="#proof">Proof</a>
-      <a href="#modules">Modules</a>
-      <a href="#loom">Loom engine</a>
       <a href="#omw">.omw</a>
+      <a href="#tour">Tour</a>
+      <a href="#proof">Numbers</a>
       <a href="#faq">FAQ</a>
       <a href="#oss">Open source</a>
     </nav>
@@ -68,326 +67,350 @@
 
 <main id="main">
 
-<!-- ───────── 히어로 ───────── -->
+<!-- ───────── 히어로: 목표(.omw 하나로) ───────── -->
 <section class="hero" aria-labelledby="hero-h">
   <div class="wrap">
     <div class="hero-copy">
       <div class="pills">
-        <span class="pill"><i></i><span data-when="unreleased">v<span data-cfg="version">0.1.0</span> coming soon</span><span data-when="released" hidden>v<span data-cfg="version">0.1.0</span> is out</span></span>
-        <span class="pill">Free · open source (GPL-3.0)</span>
+        <span class="pill live"><i></i><span data-when="unreleased">v<span data-cfg="version">0.2.0</span> coming soon</span><span data-when="released" hidden>v<span data-cfg="version">0.2.0</span> is out</span></span>
+        <span class="pill">Free · open source · GPL-3.0</span>
       </div>
-      <h1 id="hero-h">A local 6-in-1 editor<span class="l2"><span class="grad">that doesn't break your originals.</span></span></h1>
-      <p class="lead">A ~17 MB installer. Your files are never uploaded anywhere. Raster, vector (AI), PDF, DOCX, HWPX, slides — and PSD — open, edit and save them on one canvas.</p>
+      <h1 id="hero-h">Files arrive in every format.<span class="l2"><span class="grad">Your work lives in one .omw.</span></span></h1>
+      <p class="lead">Open anything on one canvas and edit it there. When it's time to send, export back to the original format.</p>
       <div class="btn-row">
         <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="Download free" data-off-text="Download · coming soon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
           <span class="t">Download · coming soon</span>
         </a>
-        <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Try it now — no install</span></a>
-        <a class="btn btn-ghost btn-lg" href="#proof" data-when="no-demo">See the measurements</a>
+        <a class="btn btn-ghost btn-lg" data-store hidden rel="noopener">Get it from Microsoft Store</a>
+        <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Try it in your browser</span></a>
+        <a class="btn btn-ghost btn-lg" href="#tour" data-when="no-demo">Take the tour</a>
       </div>
-      <p class="dl-meta">Windows 10·11 · UI in Korean, English, Japanese and Chinese · runs in the browser · macOS and Linux builds are experimental</p>
-      <div class="chips" aria-label="Supported formats">
-        <span class="chip c-v">Raster</span><span class="chip c-t">Vector</span><span class="chip c-c">PDF</span><span class="chip c-b">DOCX</span><span class="chip c-o">HWPX</span><span class="chip c-p">Slides</span><span class="chip c-v">PSD</span>
-      </div>
+      <p class="dl-meta">Windows 10 and 11 · about 17 MB installer · Korean, English, Japanese, Chinese</p>
     </div>
 
-    <figure class="shot">
-      <div class="frame">
-        <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>Omniweave</span></div>
-        <div class="frame-body" data-shot="hero" data-alt="Omniweave in action — raster, vector, document and slide objects on one canvas.">
-          <div class="ph" role="img" aria-label="Placeholder illustration of the app — real screenshot coming soon.">
-            <div class="ph-tools"><b></b><b></b><b></b><b></b><b></b><b></b></div>
-            <div class="ph-stage">
-              <div class="ph-page"><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
-              <div class="ph-slide"></div>
-              <div class="ph-blob"></div>
-              <span class="ph-cap">Real screenshot coming soon</span>
-            </div>
-            <div class="ph-side"><u></u><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
-          </div>
-        </div>
-      </div>
+    <figure class="flow" aria-labelledby="flow-cap">
+      <svg class="flow-h" viewBox="0 0 960 360" role="img" aria-label="DOCX, HWPX, PPTX, XLSX, PDF, PSD, AI and DWG files flow into Omniweave and are kept as one .omw file, then exported back to formats such as DOCX, PDF and PNG when needed">
+        <g class="flow-lines" fill="none">
+          <path d="M150 40 C290 40 300 180 404 180"/><path d="M150 100 C290 100 300 180 404 180"/><path d="M150 160 C290 160 300 180 404 180"/><path d="M150 220 C290 220 300 180 404 180"/>
+          <path d="M150 280 C290 280 300 180 404 180"/><path d="M150 340 C290 340 300 180 404 180"/>
+          <path d="M556 180 H632"/>
+          <path d="M748 180 C800 180 800 110 832 110"/><path d="M748 180 C800 180 800 180 832 180"/><path d="M748 180 C800 180 800 250 832 250"/>
+        </g>
+        <g class="flow-in" font-size="16" font-weight="700" text-anchor="middle">
+          <g class="fb c-b"><rect x="14" y="20" width="62" height="40" rx="9"/><text x="45" y="45">DOCX</text></g>
+          <g class="fb c-o"><rect x="84" y="20" width="66" height="40" rx="9"/><text x="117" y="45">HWPX</text></g>
+          <g class="fb c-c"><rect x="14" y="80" width="62" height="40" rx="9"/><text x="45" y="105">PPTX</text></g>
+          <g class="fb c-t"><rect x="84" y="80" width="66" height="40" rx="9"/><text x="117" y="105">XLSX</text></g>
+          <g class="fb c-c"><rect x="14" y="140" width="62" height="40" rx="9"/><text x="45" y="165">PDF</text></g>
+          <g class="fb c-v"><rect x="84" y="140" width="66" height="40" rx="9"/><text x="117" y="165">PSD</text></g>
+          <g class="fb c-o"><rect x="14" y="200" width="62" height="40" rx="9"/><text x="45" y="225">AI</text></g>
+          <g class="fb c-p"><rect x="84" y="200" width="66" height="40" rx="9"/><text x="117" y="225">SVG</text></g>
+          <g class="fb c-t"><rect x="14" y="260" width="62" height="40" rx="9"/><text x="45" y="285">DWG</text></g>
+          <g class="fb c-b"><rect x="84" y="260" width="66" height="40" rx="9"/><text x="117" y="285">DXF</text></g>
+          <g class="fb fb-more"><rect x="14" y="320" width="136" height="36" rx="9"/><text x="82" y="343">…</text></g>
+        </g>
+        <g class="flow-app">
+          <rect x="404" y="104" width="152" height="152" rx="26"/>
+          <image href="../assets/img/logo-96.png" x="448" y="124" width="64" height="64"/>
+          <text x="480" y="220" font-size="17" font-weight="700" text-anchor="middle">Omniweave</text>
+          <text class="sub" x="480" y="240" font-size="12.5" text-anchor="middle">one canvas</text>
+        </g>
+        <g class="flow-omw">
+          <path class="file" d="M640 102 h80 l28 28 v128 a8 8 0 0 1-8 8 h-100 a8 8 0 0 1-8-8 v-148 a8 8 0 0 1 8-8z"/>
+          <path class="fold" d="M720 102 v20 a8 8 0 0 0 8 8 h20"/>
+          <text x="690" y="196" font-size="30" font-weight="700" text-anchor="middle">.omw</text>
+          <text class="sub" x="690" y="222" font-size="12.5" text-anchor="middle">zip</text>
+        </g>
+        <g class="flow-out" font-size="15" font-weight="700" text-anchor="middle">
+          <g class="fb fb-out"><rect x="832" y="92" width="112" height="36" rx="9"/><text x="888" y="115">DOCX · HWPX</text></g>
+          <g class="fb fb-out"><rect x="832" y="162" width="112" height="36" rx="9"/><text x="888" y="185">PDF · PPTX</text></g>
+          <g class="fb fb-out"><rect x="832" y="232" width="112" height="36" rx="9"/><text x="888" y="255">PNG · SVG</text></g>
+        </g>
+      </svg>
+      <svg class="flow-v" viewBox="0 0 360 520" role="img" aria-label="DOCX, HWPX, PPTX, XLSX, PDF, PSD, AI and DWG files flow into Omniweave and are kept as one .omw file, then exported back to formats such as DOCX, PDF and PNG when needed">
+        <g class="flow-lines" fill="none">
+          <path d="M45 104 C45 150 180 140 180 184"/><path d="M135 104 C135 150 180 140 180 184"/><path d="M225 104 C225 150 180 140 180 184"/><path d="M315 104 C315 150 180 140 180 184"/>
+          <path d="M180 300 V330"/>
+          <path d="M180 452 C180 476 70 466 70 484"/><path d="M180 452 V484"/><path d="M180 452 C180 476 290 466 290 484"/>
+        </g>
+        <g class="flow-in" font-size="15" font-weight="700" text-anchor="middle">
+          <g class="fb c-b"><rect x="8" y="12" width="74" height="38" rx="9"/><text x="45" y="36">DOCX</text></g>
+          <g class="fb c-o"><rect x="98" y="12" width="74" height="38" rx="9"/><text x="135" y="36">HWPX</text></g>
+          <g class="fb c-c"><rect x="188" y="12" width="74" height="38" rx="9"/><text x="225" y="36">PPTX</text></g>
+          <g class="fb c-t"><rect x="278" y="12" width="74" height="38" rx="9"/><text x="315" y="36">XLSX</text></g>
+          <g class="fb c-c"><rect x="8" y="62" width="74" height="38" rx="9"/><text x="45" y="86">PDF</text></g>
+          <g class="fb c-v"><rect x="98" y="62" width="74" height="38" rx="9"/><text x="135" y="86">PSD</text></g>
+          <g class="fb c-o"><rect x="188" y="62" width="74" height="38" rx="9"/><text x="225" y="86">AI</text></g>
+          <g class="fb c-t"><rect x="278" y="62" width="74" height="38" rx="9"/><text x="315" y="86">DWG</text></g>
+        </g>
+        <g class="flow-app">
+          <rect x="110" y="184" width="140" height="116" rx="24"/>
+          <image href="../assets/img/logo-96.png" x="156" y="196" width="48" height="48"/>
+          <text x="180" y="266" font-size="16" font-weight="700" text-anchor="middle">Omniweave</text>
+          <text class="sub" x="180" y="286" font-size="12" text-anchor="middle">one canvas</text>
+        </g>
+        <g class="flow-omw">
+          <path class="file" d="M140 330 h62 l22 22 v92 a8 8 0 0 1-8 8 h-76 a8 8 0 0 1-8-8 v-106 a8 8 0 0 1 8-8z"/>
+          <path class="fold" d="M202 330 v14 a8 8 0 0 0 8 8 h14"/>
+          <text x="178" y="400" font-size="26" font-weight="700" text-anchor="middle">.omw</text>
+          <text class="sub" x="178" y="422" font-size="12" text-anchor="middle">zip</text>
+        </g>
+        <g class="flow-out" font-size="13" font-weight="700" text-anchor="middle">
+          <g class="fb fb-out"><rect x="16" y="484" width="108" height="32" rx="9"/><text x="70" y="505">DOCX · HWPX</text></g>
+          <g class="fb fb-out"><rect x="130" y="484" width="100" height="32" rx="9"/><text x="180" y="505">PDF · PPTX</text></g>
+          <g class="fb fb-out"><rect x="236" y="484" width="108" height="32" rx="9"/><text x="290" y="505">PNG · SVG</text></g>
+        </g>
+      </svg>
+      <figcaption id="flow-cap">
+        <ol class="flow-steps">
+          <li><b>Open</b><span>files as you received them</span></li>
+          <li><b>Keep</b><span>all the work in one .omw</span></li>
+          <li><b>Export</b><span>back to the original format</span></li>
+        </ol>
+        <p class="goal"><span class="goal-tag">Goal</span>make .omw a shared working file anyone can read and write</p>
+      </figcaption>
     </figure>
   </div>
 </section>
 
-<!-- ───────── 증거 (실측·구현 상태) ───────── -->
+<!-- ───────── 화면 둘러보기 (실제 화면 + 하이라이트) ───────── -->
+<section class="sec" id="tour" aria-labelledby="tour-h">
+  <div class="wrap">
+    <p class="eyebrow">Tour</p>
+    <h2 class="h-sec" id="tour-h">One app.<br><em>Just switch modes.</em></h2>
+    <p class="lead">Every screen below is the real app. Pick a tab.</p>
+
+    <div class="tour-tabs" role="tablist" aria-label="Editing modes">
+      <button type="button" role="tab" id="tt-doc" aria-controls="tp-doc" aria-selected="true" class="c-b">Document</button>
+      <button type="button" role="tab" id="tt-slides" aria-controls="tp-slides" aria-selected="false" tabindex="-1" class="c-c">Slides</button>
+      <button type="button" role="tab" id="tt-image" aria-controls="tp-image" aria-selected="false" tabindex="-1" class="c-v">Image</button>
+      <button type="button" role="tab" id="tt-design" aria-controls="tp-design" aria-selected="false" tabindex="-1" class="c-p">Design</button>
+      <button type="button" role="tab" id="tt-pdf" aria-controls="tp-pdf" aria-selected="false" tabindex="-1" class="c-o">PDF</button>
+      <button type="button" role="tab" id="tt-drawing" aria-controls="tp-drawing" aria-selected="false" tabindex="-1" class="c-t">Drawing</button>
+    </div>
+
+    <div class="tour-panel c-b" id="tp-doc" role="tabpanel" aria-labelledby="tt-doc">
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/en/document.webp" width="1600" height="900" alt="Document mode in the real app: heading outline on the left, a sample report in the middle, page setup on the right." decoding="async">
+        <span class="hl mb" style="--x:67.6%;--y:3.7%;--w:20.5%;--h:2.4%" data-n="1"></span>
+        <span class="hl" style="--x:0.3%;--y:22.2%;--w:11.8%;--h:25.9%" data-n="2"></span>
+        <span class="hl ml" style="--x:85.5%;--y:18.1%;--w:14.5%;--h:25.4%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">DOCX · HWPX · DOC · HWP</p><p class="one">A document editor with a heading outline and page setup</p><ol class="hl-list"><li>Mode switcher</li><li>Heading outline</li><li>Page size and margins</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-c" id="tp-slides" role="tabpanel" aria-labelledby="tt-slides" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/en/slides.webp" width="1600" height="900" alt="Slides mode in the real app: slide list on the left and a slide with a title and shapes in the middle." loading="lazy" decoding="async">
+        <span class="hl" style="--x:0.3%;--y:18.7%;--w:11.8%;--h:40.1%" data-n="1"></span>
+        <span class="hl ml" style="--x:85.5%;--y:40.7%;--w:14.5%;--h:10.2%" data-n="2"></span>
+        <span class="hl ml mb" style="--x:95%;--y:3.6%;--w:4.5%;--h:2.6%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">PPTX · PPT</p><p class="one">Masters, transitions and a full-screen slide show</p><ol class="hl-list"><li>Slide list</li><li>Transitions</li><li>Present</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-v" id="tp-image" role="tabpanel" aria-labelledby="tt-image" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/en/image.webp" width="1600" height="900" alt="Image mode in the real app: PSD layer list on the left and a picture made of overlapping layers in the middle." loading="lazy" decoding="async">
+        <span class="hl" style="--x:2.3%;--y:18.2%;--w:11.8%;--h:25.9%" data-n="1"></span>
+        <span class="hl" style="--x:2.4%;--y:14.4%;--w:5.8%;--h:2.6%" data-n="2"></span>
+        <span class="hl" style="--x:0.2%;--y:10.9%;--w:1.6%;--h:49.3%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">PSD · PNG · JPG · WebP</p><p class="one">Open PSD layers as they are and keep editing</p><ol class="hl-list"><li>Layers</li><li>Blend modes</li><li>Drawing tools</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-p" id="tp-design" role="tabpanel" aria-labelledby="tt-design" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/en/design.webp" width="1600" height="900" alt="Design mode in the real app showing linear and radial gradient shapes from an AI file." loading="lazy" decoding="async">
+        <span class="hl" style="--x:2.3%;--y:14.4%;--w:11.8%;--h:15.2%" data-n="1"></span>
+        <span class="hl" style="--x:0.2%;--y:10.9%;--w:1.6%;--h:35.7%" data-n="2"></span>
+        <span class="hl ml" style="--x:86.1%;--y:20.3%;--w:13.3%;--h:5.6%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">AI · SVG</p><p class="one">Shapes and gradients from AI files, kept intact</p><ol class="hl-list"><li>Pages</li><li>Pen and shape tools</li><li>Size presets</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-o" id="tp-pdf" role="tabpanel" aria-labelledby="tt-pdf" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/en/pdf.webp" width="1600" height="900" alt="PDF mode in the real app with text editing, page, comment and signature tools along the top." loading="lazy" decoding="async">
+        <span class="hl mb" style="--x:0.3%;--y:6.9%;--w:12.3%;--h:7.4%" data-n="1"></span>
+        <span class="hl mb" style="--x:12.6%;--y:6.9%;--w:15%;--h:7.4%" data-n="2"></span>
+        <span class="hl mb" style="--x:27.6%;--y:6.9%;--w:23.1%;--h:7.4%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">PDF</p><p class="one">Turn text into editable objects and fix it in place</p><ol class="hl-list"><li>Edit text</li><li>Organize pages</li><li>Comments, forms, signatures</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-t" id="tp-drawing" role="tabpanel" aria-labelledby="tt-drawing" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/en/drawing.webp" width="1600" height="900" alt="Drawing mode in the real app: drawing layer list on the left and lines of different weights in the middle." loading="lazy" decoding="async">
+        <span class="hl" style="--x:0.3%;--y:22.1%;--w:12.2%;--h:26.6%" data-n="1"></span>
+        <span class="hl mb" style="--x:12.2%;--y:6.7%;--w:25.2%;--h:7.8%" data-n="2"></span>
+        <span class="hl" style="--x:13.1%;--y:93.9%;--w:71.7%;--h:2.8%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">DWG · DXF</p><p class="one">Import drawings and edit their layers and lines</p><ol class="hl-list"><li>Drawing layers</li><li>Modify commands</li><li>Command line</li></ol></div>
+    </div>
+    <p class="note">The files on screen are sample files made for testing.</p>
+  </div>
+</section>
+
+<!-- ───────── .omw: 열린 형식 + 목표 ───────── -->
+<section class="sec alt" id="omw" aria-labelledby="omw-h">
+  <div class="wrap">
+    <p class="eyebrow">The .omw format</p>
+    <h2 class="h-sec" id="omw-h">A working file<br><em>that isn't locked up.</em></h2>
+    <p class="lead">A file everyone can use has to be one everyone can open. So .omw has been open from day one.</p>
+    <ul class="open-facts">
+      <li class="c-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v2M12 7v2M12 11v2M10.5 15h3v3h-3z"/></svg><b>Just a zip</b><span>Open it with any archive tool and look inside, unless it's password-protected.</span></li>
+      <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6v6H4zM14 13h6v6h-6zM7 11v4a2 2 0 0 0 2 2h5M17 13V9a2 2 0 0 0-2-2h-5"/></svg><b>Documented layout</b><span>What goes where inside the package is written down and public.</span></li>
+      <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><b>GPL open source</b><span>The code that reads and writes .omw is there for anyone to study and reuse.</span></li>
+    </ul>
+    <p class="goal goal-wide"><span class="goal-tag">Goal</span>Today Omniweave is the only app that opens .omw. The goal is a common format that other tools read and write too.</p>
+    <details class="more">
+      <summary>Show the package layout</summary>
+<pre class="tree" tabindex="0" aria-label=".omw package layout"><span class="f">document.omw</span>
+├── <span class="f">mimetype</span>                    <span class="c">format marker (first entry, stored)</span>
+├── <span class="f">manifest.json</span>               <span class="c">metadata and page index</span>
+├── <span class="k">scene_graph.cbor</span>            <span class="c">the full editable content</span>
+├── <span class="t">rasters/&lt;hash&gt;.raw</span>          <span class="c">deduplicated 256×256 pixel tiles</span>
+├── <span class="t">assets/&lt;hash&gt;.&lt;ext&gt;</span>         <span class="c">original images, PDFs and fonts</span>
+├── <span class="f">slides/slide_deck.json</span>      <span class="c">slide order and transitions (copy)</span>
+├── <span class="f">vectors/paths.json</span>          <span class="c">vector paths (copy)</span>
+├── <span class="f">documents/document.xml</span>      <span class="c">document paragraphs (copy)</span>
+└── <span class="f">documents/preview.txt</span>       <span class="c">plain text for search</span></pre>
+      <p class="note">Omniweave reads only scene_graph.cbor and the content pieces; the copies are there for other tools. Every piece is re-hashed on open, and only damaged pieces are skipped.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ───────── 숫자 ───────── -->
 <section class="sec" id="proof" aria-labelledby="proof-h">
   <div class="wrap">
-    <p class="eyebrow">Proof, not adjectives</p>
-    <h2 class="h-sec" id="proof-h">Only what we measured.<br><em>And what doesn't work yet.</em></h2>
-    <p class="lead">Every number below comes from an actual run, with its conditions. Work that is still in progress is marked “in progress”.</p>
+    <p class="eyebrow">By the numbers</p>
+    <h2 class="h-sec" id="proof-h">Only what we measured.</h2>
     <div class="metrics">
-      <div class="metric"><div class="v grad">6.1<small>MiB</small></div><div class="k">Installer size</div><div class="d">Windows x64 installer, 0.1.0 development build (10,239,987 bytes). Rendering uses WebView2, which ships with Windows.</div></div>
-      <div class="metric"><div class="v">65<small>/ 81</small></div><div class="k">Opened 81 real-world sample files</div><div class="d">65 succeeded · 8 partial · 0 failed · 8 unsupported with an explanation. “Partial” means cases like legacy DOC/HWP (text and tables only) or PSD (effects and adjustments excluded).</div></div>
-      <div class="metric"><div class="v">0<small>servers</small></div><div class="k">Servers your files are sent to</div><div class="d">Opening, editing, saving, converting and the quick tools all run on your PC. The network is used only to check for new versions (GitHub Releases).</div></div>
-      <div class="metric"><div class="v">AES<small>-256</small></div><div class="k">Encrypted documents stay encrypted</div><div class="d">PDF (AES-256) · DOCX/XLSX/PPTX (Office Agile) · .omw (AES-256-GCM). Edited files are re-encrypted on save; re-encrypted Office files were verified to open in Microsoft Office 16.</div></div>
+      <div class="metric"><div class="v grad">17<small>MB</small></div><div class="k">Installer</div><div class="d">AI models included, Windows x64</div></div>
+      <div class="metric"><div class="v">0<small>/ 91</small></div><div class="k">Files that failed to open</div><div class="d">91 real-world samples checked</div></div>
+      <div class="metric"><div class="v">0<small>B</small></div><div class="k">Bytes changed on an unedited save</div><div class="d">Untouched files stay identical</div></div>
+      <div class="metric"><div class="v">0<small></small></div><div class="k">Servers your files go to</div><div class="d">AI features run on your PC too</div></div>
     </div>
-    <div class="common">
-      <div><h4>40+ file extensions</h4>Documents, spreadsheets, slides, images, PSD, video, audio, e-books, text and code. Each format states its support level (full, partial, or an explanation).</div>
-      <div><h4>History timeline</h4>Every command since you started is recorded. Preview any point and jump back in one step; the history is saved inside the .omw.</div>
-      <div><h4>6 quick tools · local</h4>Merge PDFs, shrink PDFs, PDF→JPG, images→PDF, shrink photos, batch JPG conversion — processed on your PC instead of an upload website.</div>
-    </div>
-    <div class="common">
-      <div><h4>Lossless save of originals <span class="note-inline">in progress</span></h4>Goal: parts you didn't edit are saved byte-for-byte as in the original. In progress for PDF and PSD; DOCX and HWPX are on the roadmap. Today, saving DOCX/HWPX writes a new document from what Omniweave understood.</div>
-      <div><h4>Code signing</h4>Current builds are not code-signed yet, so SmartScreen may warn on first run. The download page explains how to verify files with SHA-256.</div>
-      <div><h4>Language</h4>The app UI is available in Korean, English, Japanese and Chinese: pick one in the installer and change it any time in Preferences. This website is available in the same four languages.</div>
-    </div>
-    <p class="bench-note">Sample results copy only the counts from <code>test-corpus/REPORT.md</code> (file contents and names are not published). Installer size is from a development build and may change per release.</p>
+    <details class="more">
+      <summary>How we measured, and the limits</summary>
+      <ul class="notes"><li>Installer: Omniweave_0.2.0_x64-setup.exe, 17,464,150 bytes (unsigned build). Sizes vary between releases.</li><li>Real-world samples: pre-release check on 2026-11-22. Every file ended as full, partial or explained (the app says why it can't open it). File names and contents stay private.</li><li>Byte-identical saves: confirmed on every DOCX, HWPX, XLSX, PPTX and PDF sample in the repository, and 259/259 for PSD.</li><li>The internet is used only to check for new versions (GitHub Releases).</li><li>Encrypted files (PDF AES-256, Office Agile, .omw AES-256-GCM) are encrypted again when you save.</li><li>This is an early release. Keep copies of important originals.</li></ul>
+    </details>
   </div>
 </section>
 
-<!-- ───────── 문제 정의 ───────── -->
-<section class="sec alt" id="why" aria-labelledby="why-h">
-  <div class="wrap prob">
-    <div>
-      <p class="eyebrow">Why we built it</p>
-      <h2 class="h-sec" id="why-h">One job.<br><em>Six programs.</em></h2>
-      <p class="lead">An image editor, an illustration tool, a PDF editor, two word processors (DOCX and HWPX), a slide app. You paste the same logo six times and re-fit the same paragraph six different ways.</p>
-      <div class="switch" aria-hidden="true">
-        <b>Image</b>→<b>Illustration</b>→<b>PDF</b>→<b>DOCX</b>→<b>HWPX</b>→<b>Slides</b>→ …
-      </div>
-      <ul class="same">
-        <li><span class="c-v">1</span>Place images and text</li>
-        <li><span class="c-t">2</span>Draw shapes and lines</li>
-        <li><span class="c-c">3</span>Tweak the position, size, color, opacity and font of whatever is selected</li>
-      </ul>
-      <p class="claim"><strong>Different names, same work.</strong> Pages or layers, vectors or bitmaps — in the end that only decides <strong>how the result is saved</strong>. It doesn't matter while you're editing.</p>
-    </div>
-    <div class="matrix">
-      <table>
-        <caption>What your hands actually do is the same in all six. What differs is feature depth and the file format.</caption>
-        <thead>
-          <tr><th scope="col"><span class="sr-only">Task</span></th><th scope="col">Image</th><th scope="col">Illus&shy;tration</th><th scope="col">PDF</th><th scope="col">DOCX</th><th scope="col">HWPX</th><th scope="col">Slides</th></tr>
-        </thead>
-        <tbody>
-          <tr><th scope="row">Place images</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
-          <tr><th scope="row">Text & styling</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
-          <tr><th scope="row">Shapes & lines</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
-          <tr><th scope="row">Move, resize, rotate</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
-          <tr><th scope="row">Color, opacity, order</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
-          <tr><th scope="row">Undo</th><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td><td><i></i><span class="sr-only">yes</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<!-- ───────── 6개 모듈 ───────── -->
-<section class="sec" id="modules" aria-labelledby="mod-h">
-  <div class="wrap">
-    <p class="eyebrow">6-in-1 modules</p>
-    <h2 class="h-sec" id="mod-h">Six kinds of work,<br><em>one scene graph.</em></h2>
-    <p class="lead">Raster tiles, Bézier paths, text paragraphs, tables, PDF pages, images and video are all the same kind of node. Only what is implemented in code today is listed. Depth per format is where we compete.</p>
-
-    <div class="mods">
-      <article class="mod c-v">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L12 15.6 8.4 12z"/><path d="M8.4 12C6 12 4.5 13.6 4.5 16c0 1.6-.8 2.6-1.5 3 3.7.9 8.6.2 9-3.4"/></svg></div>
-        <h3>Raster<small>Images · PSD</small></h3>
-        <ul><li>256 px tile brush and eraser (pressure, hardness, opacity)</li><li>Open <strong>PSD</strong>: pixel layers + composite (effects and adjustment layers excluded)</li><li>Open TIFF, WebP, AVIF and more</li></ul>
-      </article>
-      <article class="mod c-t">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19C7 8 17 16 20 5"/><rect x="2.5" y="17.5" width="3" height="3" rx=".6"/><rect x="18.5" y="3.5" width="3" height="3" rx=".6"/><path d="M4 19l5-9M20 5l-6 3"/><circle cx="9" cy="10" r="1.2"/><circle cx="14" cy="8" r="1.2"/></svg></div>
-        <h3>Vector<small>Vector · AI · SVG</small></h3>
-        <ul><li>Pen (Bézier handles), direct selection, rectangle, ellipse</li><li>Pathfinder unite/subtract/intersect/exclude</li><li>Open <strong>AI</strong> files (saved with PDF compatibility)</li></ul>
-      </article>
-      <article class="mod c-c">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></svg></div>
-        <h3>PDF<small>PDF editing</small></h3>
-        <ul><li>Render pages + elevate text into <strong>editable line-level text objects</strong></li><li>Open and re-encrypt password-protected PDFs (AES-256)</li><li>Quick tools: merge, shrink, convert to JPG</li></ul>
-      </article>
-      <article class="mod c-b">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 11.5h8M8 15h5"/></svg></div>
-        <h3>Word<small>DOCX</small></h3>
-        <ul><li>Open and save DOCX paragraph and character formatting</li><li>Edit table objects · save to DOCX</li><li>Legacy DOC: import body text and table contents</li></ul>
-      </article>
-      <article class="mod c-o">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.5 8.5h5c0 4-1.8 6.5-5 7.5M15.5 7v10M15.5 12h2"/></svg></div>
-        <h3>HWPX<small>HWPX</small></h3>
-        <ul><li>Open and save HWPX (clean-room, from the public OWPML structure)</li><li>Legacy HWP (5.0): import body text and table contents</li><li>Hangul line breaking by grapheme and eojeol</li></ul>
-      </article>
-      <article class="mod c-p">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.8"/><path d="M12 16v4M8.5 20h7M10 8.2v4.6l4-2.3z"/></svg></div>
-        <h3>Slides<small>PPTX · PPT</small></h3>
-        <ul><li>Open and save PPTX (text, shapes, pictures, tables, backgrounds)</li><li>Masters · transitions FADE / SLIDE_LEFT / ZOOM</li><li>Keyframe animation · full-screen slideshow</li></ul>
-      </article>
-    </div>
-
-    <div class="common">
-      <div><h4>The same for every object</h4>Select, move, resize, rotate, opacity, blend modes, lock and hide, reorder, undo.</div>
-      <div><h4>Export</h4>PNG · PDF · SVG · DOCX · HWPX · PPTX · XLSX · CSV · Markdown · HTML · SRT · <code>.omw</code></div>
-      <div><h4>Korean typesetting</h4>Line breaks by grapheme with <code>Intl.Segmenter</code>, so Hangul syllables never split, plus word-level <code>keep-all</code> wrapping.</div>
-    </div>
-    <p class="note">Import has limits — please read the <a href="#faq" class="grad">honest FAQ</a> first.</p>
-  </div>
-</section>
-
-<!-- ───────── Loom 엔진 ───────── -->
+<!-- ───────── Loom 엔진 (짧게 + 접기) ───────── -->
 <section class="sec alt" id="loom" aria-labelledby="loom-h">
   <div class="wrap">
     <div class="loom-grid">
       <div>
         <p class="eyebrow">Loom engine</p>
-        <h2 class="h-sec" id="loom-h">Everything gets<br><em>a content address.</em></h2>
-        <p class="lead">Every pixel tile, node and asset has its own 64-bit content address. The screen, saving and undo are all functions of those addresses.</p>
-        <ul class="parts">
-          <li class="c-v"><b>Thread</b><span>Content addresses for 256 px pixel tiles, nodes and assets. Identical tiles are stored once, and on open every hash is recomputed so only damaged pieces get skipped.</span></li>
-          <li class="c-t"><b>Weave Cache</b><span>A screen tile's key is the hash of the pieces that touch it. With <strong>no dirty flags and no invalidation code</strong>, “I erased it but it's still on screen” bugs simply can't happen by design.</span></li>
-          <li class="c-c"><b>Shuttle Journal</b><span>Writes only never-seen pieces to IndexedDB, incrementally. Autosave stays light, and you can recover after a crash.</span></li>
-          <li class="c-p"><b>Immutable history</b><span>Undo just swaps an immutable document reference. No pixels are copied, so its cost doesn't grow with document size.</span></li>
-        </ul>
+        <h2 class="h-sec" id="loom-h">Redraw and resave<br><em>only what changed.</em></h2>
+        <p class="lead">Every tile and object gets a content address, so identical pieces are stored once.</p>
+        <div class="metrics two">
+          <div class="metric"><div class="v grad">79.5<small>%</small></div><div class="k">Tile data deduplicated</div></div>
+          <div class="metric"><div class="v">0.18<small>ms</small></div><div class="k">Undo and redo</div></div>
+        </div>
+        <details class="more">
+          <summary>How it works and how we measured</summary>
+          <ul class="parts">
+            <li class="c-v"><b>Thread</b><span>64-bit content addresses for 256px tiles, objects and assets. A repeated tile is stored in the file only once.</span></li>
+            <li class="c-t"><b>Weave Cache</b><span>A screen tile's key is the hash of the pieces that touch it. There's no invalidation code, so stale pixels can't linger by design.</span></li>
+            <li class="c-c"><b>Shuttle Journal</b><span>Only new pieces are written to IndexedDB. Autosave stays light and you can recover after a crash.</span></li>
+            <li class="c-p"><b>Immutable history</b><span>Undo swaps a document reference instead of copying pixels.</span></li>
+          </ul>
+          <p class="bench-note">Measured with <code>npm run bench</code> (Vitest bench, Node) on a synthetic 4K document: 42 unique tiles out of 205 references, 51.3 MiB of raw pixels saved as a 1.43 MiB .omw, and undo plus redo in 0.09–0.18 ms (a deep copy of the same document takes 24–28 ms). Save and reopen: 0 damaged, 0 missing. Machine: Intel Core Ultra 5 125H, Windows 11, Node v24.13.1. Drawing time is not included.</p>
+        </details>
       </div>
 
       <figure class="loom-viz">
-        <canvas id="loom-canvas" width="800" height="500" role="img" aria-label="Illustration: a grid of 40 screen tiles on the left; on the right the tiles unravel into three threads — violet, teal and coral. Rubbing the grid redraws only the tiles you touch."></canvas>
+        <canvas id="loom-canvas" width="800" height="500" role="img" aria-label="Illustration: rub the tile grid and only the tiles you touch are redrawn."></canvas>
         <div class="loom-ctl">
-          <p class="loom-stat" id="loom-stat" aria-live="polite">Rub the grid. Only the screen tiles you touch get redrawn.</p>
+          <p class="loom-stat" id="loom-stat" aria-live="polite">Rub the grid. Only the tiles you touch are redrawn.</p>
           <div class="btn-row">
             <button type="button" class="btn btn-ghost btn-sm" id="loom-paint">Draw a stroke</button>
             <button type="button" class="btn btn-ghost btn-sm" id="loom-undo" disabled aria-disabled="true">Undo</button>
           </div>
         </div>
         <figcaption class="loom-legend">
-          <span class="c-c">Redrawn (key changed)</span><span class="c-t">Cache hit (old key reused)</span><span>Simplified illustration · not a measurement</span>
+          <span class="c-c">Redrawn</span><span class="c-t">Reused from cache</span><span>Illustration, not a measurement</span>
         </figcaption>
       </figure>
-    </div>
-
-    <h3 class="sr-only">Measurements</h3>
-    <div class="metrics">
-      <div class="metric"><div class="v grad">79.5<small>%</small></div><div class="k">Tile data deduplicated</div><div class="d">Synthetic 4K document · 205 tile refs → 42 unique</div></div>
-      <div class="metric"><div class="v">1.43<small>MiB</small></div><div class="k">.omw file size</div><div class="d">Raw RGBA 51.3 MiB → 10.5 MiB deduped → saved</div></div>
-      <div class="metric"><div class="v">0.36–0.43<small>ms</small></div><div class="k">Keys for a whole frame</div><div class="d">1920×1080 · 40 screen tiles · 31 nodes</div></div>
-      <div class="metric"><div class="v">0.09–0.18<small>ms</small></div><div class="k">Undo + redo</div><div class="d">A deep copy of the same 4K document (<code>structuredClone</code>) takes 24–28 ms</div></div>
-    </div>
-    <p class="bench-note">Measured with <code>bench/loom.bench.ts</code> (Vitest bench, Node, DOM-free code paths) on <strong>synthetic documents</strong>; real documents may differ. Machine: Intel Core Ultra 5 125H, Windows 11, Node v24.13.1 · range of means over two runs (other work was running, so variance is high) · save→open round trip: 0 corrupt · 0 missing · document root address matches. Rendering (canvas drawing) time is not included — the Loom meter in the app's status bar shows it live. Reproduce with <code>npm run bench</code>.</p>
-  </div>
-</section>
-
-<!-- ───────── .omw ───────── -->
-<section class="sec" id="omw" aria-labelledby="omw-h">
-  <div class="wrap">
-    <p class="eyebrow">.omw format</p>
-    <h2 class="h-sec" id="omw-h">Just a <em>zip you can open.</em></h2>
-    <p class="lead"><code>.omw</code> (Omniweave Workspace Package) is a plain zip container. Identical tiles go in once, along with copies other tools can read.</p>
-    <div class="omw">
-<pre class="tree" tabindex="0" aria-label="Structure of an .omw package"><span class="f">document.omw</span>
-├── <span class="f">mimetype</span>                    <span class="c">"application/x-omniweave" (stored, first entry)</span>
-├── <span class="f">manifest.json</span>               <span class="c">metadata, Loom root address, page index</span>
-├── <span class="k">scene_graph.cbor</span>            <span class="c">unified scene graph (pixels as tile addresses)</span>
-├── <span class="t">rasters/&lt;hash&gt;.raw</span>          <span class="c">deduplicated 256×256 RGBA tiles</span>
-├── <span class="t">assets/&lt;hash&gt;.&lt;ext&gt;</span>         <span class="c">original images, PDFs, fonts</span>
-├── <span class="f">slides/slide_deck.json</span>      <span class="c">slide order, transitions, animations (copy)</span>
-├── <span class="f">slides/master_styles.json</span>   <span class="c">slide masters (copy)</span>
-├── <span class="f">vectors/paths.json</span>          <span class="c">SVG paths of vector nodes (copy)</span>
-├── <span class="f">documents/document.xml</span>      <span class="c">every text paragraph (copy)</span>
-└── <span class="f">documents/preview.txt</span>       <span class="c">plain text for search and indexing</span></pre>
-      <ul class="facts">
-        <li><h3>Verified on every open</h3><p>Every tile and asset hash is recomputed. Pieces that don't match are skipped and counted, and the rest of the document opens normally.</p></li>
-        <li><h3>Only two things are needed to open it</h3><p>Omniweave reads just <code>scene_graph.cbor</code> and the content-addressed pieces. Everything else is a <strong>read-only copy</strong> for other tools.</p></li>
-        <li><h3>Windows file association</h3><p>The installer associates <code>.omw</code> with Omniweave, so a double-click opens it.</p></li>
-      </ul>
     </div>
   </div>
 </section>
 
 <!-- ───────── FAQ ───────── -->
-<section class="sec alt" id="faq" aria-labelledby="faq-h">
+<section class="sec" id="faq" aria-labelledby="faq-h">
   <div class="wrap center">
     <p class="eyebrow">FAQ</p>
-    <h2 class="h-sec" id="faq-h">The <em>honest</em> FAQ.</h2>
-    <p class="lead">We're in early development, so here is what works and what doesn't — up front.</p>
+    <h2 class="h-sec" id="faq-h">Questions</h2>
   </div>
   <div class="wrap">
     <div class="faq">
       <details>
-        <summary>Does it fully replace the existing programs?</summary>
-        <div class="a"><p>No. The goal is an <strong>integrated editor</strong> for many formats in one place, and depth per format is where we compete. Specialist features such as advanced filters, print separations, equation editors and track changes are out of scope today.</p></div>
+        <summary>Do I still need my other apps?</summary>
+        <div class="a"><p>Yes, for now. The aim is to handle many formats in one place; specialist features such as color separations or advanced filters are out of scope today.</p></div>
       </details>
       <details>
-        <summary>What exactly does “doesn't break your originals” mean?</summary>
-        <div class="a"><p>The direction is: <strong>parts you didn't edit are saved exactly as in the original</strong>. Honestly, today:</p><ul><li><strong>In progress:</strong> original-preserving save for PDF and PSD.</li><li><strong>Roadmap:</strong> original-preserving (pass-through) save for DOCX and HWPX.</li><li><strong>Today:</strong> saving to DOCX/HWPX writes a new document from what Omniweave understood (paragraphs, character formatting, table objects). Elements such as footnotes and headers can be lost.</li><li>Encrypted documents are re-encrypted when saved.</li></ul></div>
+        <summary>Will I lose anything when I save to another format?</summary>
+        <div class="a"><p>If something can't be carried over, Omniweave tells you what before it saves.</p></div>
       </details>
       <details>
-        <summary>Will DOCX/HWPX files look exactly like the original?</summary>
-        <div class="a"><p>Import is <strong>paragraph- and character-format centric</strong> (alignment, line spacing, font, size, color, bold/italic/underline). Not yet supported or simplified:</p><ul><li><strong>Tables</strong> inside DOCX/HWPX are not yet imported as tables; they flatten into paragraphs.</li><li>Footnotes/endnotes, headers/footers, page numbers, style inheritance, TOC, tracked changes.</li><li>Embedded pictures, shapes and equations.</li><li>Pagination is recomputed with A4 layout and may differ from the original.</li></ul></div>
+        <summary>How does someone without Omniweave open my .omw?</summary>
+        <div class="a"><p>Export to the original format, such as DOCX or PDF, and send that. Because .omw is a zip, the images and text copies inside can also be pulled out with other tools.</p></div>
       </details>
       <details>
-        <summary>Can I edit PDFs?</summary>
-        <div class="a"><p>Pages render as-is; “text elevation” turns the text into <strong>line-level text objects</strong> you can edit, covering the original glyphs with a background-colored rectangle. Text over complex backgrounds and reflowing columns or tables are not supported yet.</p><p>PDF export in the current release embeds each page as an image. Export with live text is in progress.</p></div>
-      </details>
-      <details>
-        <summary>How far do PPTX, legacy HWP and PSD go?</summary>
-        <div class="a"><ul><li><strong>PPTX:</strong> opens text, shapes, pictures, tables and backgrounds as slides and saves back to PPTX. Some picture formats such as EMF are skipped and some shapes are approximated as rectangles.</li><li><strong>Legacy HWP/DOC/PPT:</strong> body text and table contents only. For formatting and pictures, save as HWPX/DOCX/PPTX in the original program first.</li><li><strong>PSD:</strong> opens pixel layers and the composite image. Layer effects, adjustment layers and the text engine are excluded.</li></ul></div>
-      </details>
-      <details>
-        <summary>Are my files really never uploaded?</summary>
-        <div class="a"><p>Yes. Opening, editing, saving, converting and the quick tools all run on your PC, and the autosave journal is local. The network is used only to check for new versions (GitHub Releases), and this website has no tracking or analytics scripts. The source is open, so you can verify it.</p></div>
-      </details>
-      <details>
-        <summary>Can I try it without installing?</summary>
-        <div class="a"><p>The same app runs in a web browser. When the browser demo goes public, a “Try it now — no install” button appears on this page. The demo also processes files inside your browser, without sending them to a server.</p></div>
-      </details>
-      <details>
-        <summary>Is it GPU-accelerated?</summary>
-        <div class="a"><p>Not yet — it is <strong>Canvas 2D + TypeScript</strong>. A WebGPU renderer and a Rust/WASM core are on the roadmap. Today's speed comes from Loom's “repaint and re-save only what changed” structure. The <a href="#loom" class="grad">Loom table</a> is everything we claim.</p></div>
-      </details>
-      <details>
-        <summary>Is there an English UI? What about macOS and Linux?</summary>
-        <div class="a"><p>Yes. The app UI comes in Korean, English, Japanese and Simplified Chinese: pick one in the installer and change it any time in Preferences. macOS and Linux builds are marked <strong>experimental</strong> until verified on real machines. Officially supported: Windows 10·11 and running in the browser.</p></div>
+        <summary>Will every file open correctly?</summary>
+        <div class="a"><p>Each format is labeled full, partial or explained. Some PSD effects and some PPTX shapes are drawn as close approximations, and files that can't be opened, such as HEIC photos, come with a reason. Please report files that don't open well.</p></div>
       </details>
     </div>
   </div>
 </section>
 
 <!-- ───────── 오픈소스 ───────── -->
-<section class="sec" id="oss" aria-labelledby="oss-h">
+<section class="sec alt" id="oss" aria-labelledby="oss-h">
   <div class="wrap oss">
     <div>
       <p class="eyebrow">Open source · GPL-3.0</p>
-      <h2 class="h-sec" id="oss-h">One thread at a time —<br><em>weave it with us.</em></h2>
-      <p class="lead">Issues and pull requests are welcome. The most helpful thing of all: <strong>real files that break</strong>.</p>
+      <h2 class="h-sec" id="oss-h">Weave it with us.</h2>
+      <p class="lead">The most useful thing you can send is a file that doesn't open properly.</p>
       <ul class="ways">
-        <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg><div><b>Report files that break</b><span>Send DOCX, HWPX or PDF files that don't open correctly, with any sensitive content removed.</span></div></li>
-        <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><div><b>Contribute code</b><span>TypeScript (strict) · React · Tauri 2. Dev setup and commit rules are in CONTRIBUTING.md.</span></div></li>
-        <li class="c-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3 4.7-5"/></svg><div><b>Clean-room rule</b><span>No reverse engineering of third-party binaries — only public standards (ISO 32000, ECMA-376, KS X 6101).</span></div></li>
+        <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg><div><b>Report a file</b><span>A sample with sensitive content removed is enough.</span></div></li>
+        <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><div><b>Contribute code</b><span>TypeScript, React, Tauri 2. See CONTRIBUTING.md for the rules.</span></div></li>
       </ul>
       <div class="btn-row mt-28">
         <a class="btn btn-primary" data-repo="" data-on-text="GitHub repository" data-off-text="Repository going public soon" aria-disabled="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3-11 6.6"/></svg>
           <span class="t">Repository going public soon</span>
         </a>
-        <a class="btn btn-ghost" data-repo="/blob/main/CONTRIBUTING.md" data-on-text="How to contribute" data-off-text="Contributing (after launch)" aria-disabled="true"><span class="t">Contributing (after launch)</span></a>
+        <a class="btn btn-ghost" data-repo="/blob/main/CONTRIBUTING.md" data-on-text="Contributing guide" data-off-text="Contributing guide (after launch)" aria-disabled="true"><span class="t">Contributing guide (after launch)</span></a>
       </div>
     </div>
     <div>
       <div class="term">
         <div class="term-h"><span>Run from source · Node.js 18+</span><button type="button" class="copy" data-copy="qs">Copy</button></div>
-<pre id="qs"><span class="c"># Works as soon as the repository is public</span>
-git clone https://github.com/wind2sp/omniweave.git
+<pre id="qs">git clone https://github.com/wind2sp/omniweave.git
 cd omniweave
 npm i
 npm run dev      <span class="c"># run in the browser</span>
 npm test         <span class="c"># unit tests</span>
-npm run bench    <span class="c"># Loom benchmarks</span></pre>
+npm run bench    <span class="c"># Loom benchmark</span></pre>
       </div>
-      <p class="road-h">Coming next <span class="note">(order may change)</span></p>
-      <ul class="road"><li>UI in four languages (Korean, English, Japanese, Chinese) <span class="note-inline done">Done</span></li><li>Lossless save of originals — PDF and PSD in progress</li><li>Original-preserving (pass-through) save for DOCX/HWPX</li><li>Import DOCX/HWPX tables as tables</li><li>PDF export with live text — in progress</li><li>Code-signed installer</li><li>WebGPU renderer · Rust/WASM core</li><li>Official macOS and Linux support</li></ul>
     </div>
   </div>
 </section>
 
 <!-- ───────── 이름 이야기 ───────── -->
-<section class="sec alt" id="name" aria-labelledby="name-h">
+<section class="sec" id="name" aria-labelledby="name-h">
   <div class="wrap">
     <div class="name-story">
       <div>
         <p class="eyebrow">About the name</p>
         <h2 class="h-sec" id="name-h">Why <em>“Ome”</em>?</h2>
-        <p class="lead">“Ome!” (Oh-meh) is what people in Jeolla, in southwestern Korea, blurt out when something surprises or amazes them — the local way of saying “Oh my!” or “Wow!”. Even many Koreans from other regions know it only from friends or TV.</p>
-        <p class="lead">It's also the first letters of <strong>Om</strong>niweave (OM-niweave → Ome). The name holds that little gasp you let out the first time you see images, documents, PDFs and slides all working on one canvas.</p>
-        <p class="name-quote">“All of it, in one file? Ome!”</p>
+        <p class="lead">“Ome!” (oh-meh) is what people in Korea's Jeolla region blurt out when something surprises them. It's also the first letters of <strong>Om</strong>niweave.</p>
+        <p class="name-quote">“All of it in one file? Ome!”</p>
       </div>
       <dl class="say">
         <div lang="ko"><dt>한국어</dt><dd><b>오메</b><span>[o.me]</span></dd></div>
@@ -403,15 +426,16 @@ npm run bench    <span class="c"># Loom benchmarks</span></pre>
 <section class="cta" aria-labelledby="cta-h">
   <div class="wrap">
     <img src="../assets/img/icon-192.png" alt="" width="72" height="72" loading="lazy">
-    <h2 id="cta-h">Keep the original,<br><span class="grad">edit in one place.</span></h2>
+    <h2 id="cta-h">Whatever you received,<br><span class="grad">open it in Omniweave.</span></h2>
     <div class="btn-row">
       <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="Download free" data-off-text="Download · coming soon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
         <span class="t">Download · coming soon</span>
       </a>
-      <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Try it now — no install</span></a>
+      <a class="btn btn-ghost btn-lg" data-store hidden rel="noopener">Get it from Microsoft Store</a>
+      <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">Try it in your browser</span></a>
     </div>
-    <p class="dl-meta">v<span data-cfg="version">0.1.0</span> · Windows 10·11 · ~17 MB installer · free · GPL-3.0</p>
+    <p class="dl-meta">v<span data-cfg="version">0.2.0</span> · Free · GPL-3.0</p>
   </div>
 </section>
 
@@ -422,25 +446,25 @@ npm run bench    <span class="c"># Loom benchmarks</span></pre>
     <div class="ft">
       <div>
         <div class="brand"><img src="../assets/img/logo-96.png" alt="" width="28" height="28" loading="lazy">Omniweave (Ome)</div>
-        <p class="mt-10">A local 6-in-1 editor that doesn't break your originals. Raster, vector, PDF, DOCX, HWPX, slides — and PSD — on one canvas.</p>
-        <p class="mt-10 name-line">“Ome” (Oh-meh) is what people in Korea's Jeolla region blurt out when something amazes them — think “Oh my!” — and it's also the first letters of <b>Om</b>niweave.</p>
+        <p class="mt-10">A free, open-source editor that opens any format on one canvas and keeps the work in a single .omw file.</p>
       </div>
       <div>
         <h2>Explore</h2>
-        <ul><li><a href="#modules">6-in-1 modules</a></li><li><a href="#loom">Loom engine</a></li><li><a href="#omw">.omw format</a></li><li><a href="#faq">Honest FAQ</a></li><li><a href="#name">About the name</a></li><li><a href="download.html">Download</a></li></ul>
+        <ul><li><a href="index.html#omw">The .omw format</a></li><li><a href="index.html#tour">Tour</a></li><li><a href="index.html#loom">Loom engine</a></li><li><a href="index.html#faq">FAQ</a></li><li><a href="index.html#name">About the name</a></li><li><a href="download.html">Download</a></li></ul>
       </div>
       <div>
         <h2>Project</h2>
         <ul>
           <li><a data-repo="" data-on-text="GitHub repository" data-off-text="GitHub repository (going public soon)"><span class="t">GitHub repository (going public soon)</span></a></li>
           <li><a data-repo="/issues" data-on-text="Issues &amp; bug reports" data-off-text="Issues (after launch)"><span class="t">Issues (after launch)</span></a></li>
-          <li><a data-repo="/blob/main/LICENSE" data-on-text="Full GPL-3.0 license" data-off-text="GPL-3.0 license"><span class="t">GPL-3.0 license</span></a></li>
+          <li><a data-repo="/blob/main/LICENSE" data-on-text="License text" data-off-text="License text"><span class="t">License text</span></a></li>
         </ul>
       </div>
     </div>
     <div class="legal">
-      <p><strong>License</strong> GPL-3.0-or-later (GNU General Public License v3 or later). The software is provided “as is”, without warranty of any kind. <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later · wind2sp@9rowpar.com</span></p>
-      <p><strong>Clean room</strong> We never reverse-engineer binaries of commercial third-party software. Everything is built only from public standards and public documentation (ISO 32000 PDF, ECMA-376 Office Open XML, KS X 6101 HWPX/OWPML and others).</p>
+      <p><span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · wind2sp@9rowpar.com</span></p>
+      <p><strong>License</strong> GPL-3.0-or-later (GNU General Public License v3 or later). Provided “as is”, without warranty of any kind.</p>
+      <p><strong>Clean room</strong> No reverse engineering of other companies' software. Built only from public standards such as ISO 32000 (PDF), ECMA-376 (Office Open XML) and KS X 6101 (HWPX).</p>
       <p><strong>Trademarks</strong> Omniweave™ and the Omniweave logo are trademarks of the project's copyright holder. Microsoft, Windows, Word, Excel, PowerPoint, Office, WebView2 and Edge are trademarks of Microsoft Corporation. Adobe, Photoshop, Illustrator, Acrobat and PostScript are registered trademarks or trademarks of Adobe Inc. Hangul, Hancom and HWP are trademarks of Hancom Inc. AutoCAD, Autodesk and DXF are registered trademarks or trademarks of Autodesk, Inc. in the USA and other countries; "DWG" names the drawing file format. ACIS is a trademark of Spatial Corp. All other names are the property of their owners. Omniweave is not affiliated with, sponsored or endorsed by any of these companies; their names are used only to describe file compatibility.</p>
       <p><strong>Open source used</strong> pdf.js, pdf-lib, fflate, cbor-x, polygon-clipping, immer, zustand, React, Tauri. This site uses the Pretendard typeface (SIL Open Font License).</p>
     </div>
@@ -448,7 +472,7 @@ npm run bench    <span class="c"># Loom benchmarks</span></pre>
 </footer>
 
 <script type="application/json" id="i18n">{"soon":"Coming soon","preparing":"Not yet available","platformsBtn":"See all platforms","mobileMsg":"Omniweave is a desktop app. Open this page on a Windows, macOS or Linux computer.","unknownMsg":"We couldn't detect your operating system. Please pick one below.","dlFor":"Download for {os}","installerSuffix":" (installer)","experimentalBuild":"experimental build","soonFor":"{os} · coming soon","prepFor":"{os} · not yet available","notAvailable":"There's no file for this platform yet. Please check the list below.","firstRelease":"The first release, v{v}, is on its way.","copied":"Copied","locale":"en-US","loomStroke":"This stroke: \u003cspan class=\"m\">screen tiles redrawn: {n}\u003c/span> · \u003cspan class=\"h\">reused as-is: {r}\u003c/span> (of {t})","loomUndo":"Undo: the old keys come back, so \u003cspan class=\"h\">instant cache hits: {n}\u003c/span> · tiles redrawn: 0"}</script>
-<script src="../assets/js/site.js?v=5" defer></script>
-<script src="../assets/js/loom.js?v=5" defer></script>
+<script src="../assets/js/site.js?v=6" defer></script>
+<script src="../assets/js/loom.js?v=6" defer></script>
 </body>
 </html>

@@ -4,22 +4,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Omniweave（欧梅）— 不破坏原文件的本地 6 合 1 编辑器</title>
-<meta name="description" content="安装包约 17 MB、从不上传文件的免费开源 (GPL-3.0) 编辑器。在同一张画布上打开、编辑并保存位图、矢量 (AI)、PDF、DOCX、HWPX、幻灯片和 PSD。">
+<title>Omniweave（欧梅）— 所有文档，一个 .omw</title>
+<meta name="description" content="免费开源编辑器，在一块画布上打开并编辑 DOCX、HWPX、PPTX、PDF、PSD、DWG。工作保存在开放的 .omw 文件中，发送时再导出为原格式。">
 <meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
 <meta name="color-scheme" content="dark light">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Omniweave">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:title" content="Omniweave（欧梅）— 不破坏原文件的本地 6 合 1 编辑器">
-<meta property="og:description" content="安装包约 17 MB · 文件不上传到任何地方 · 位图/矢量/PDF/DOCX/HWPX/幻灯片/PSD 同一画布编辑。">
+<meta property="og:title" content="Omniweave（欧梅）— 所有文档，一个 .omw">
+<meta property="og:description" content="任何格式都在一块画布上打开，工作统一为一个 .omw。免费开源编辑器。">
 <link rel="alternate" hreflang="ko" href="../index.html">
 <link rel="alternate" hreflang="en" href="../en/index.html">
 <link rel="alternate" hreflang="ja" href="../ja/index.html">
 <link rel="alternate" hreflang="zh-Hans" href="../zh/index.html">
 <link rel="alternate" hreflang="x-default" href="../index.html">
-<meta property="og:image" content="../assets/img/og-image.png">
+<meta property="og:image" content="../assets/img/og-image-zh.png">
 <meta property="og:locale:alternate" content="ko_KR">
 <meta property="og:locale:alternate" content="en_US">
 <meta property="og:locale:alternate" content="ja_JP">
@@ -32,8 +32,8 @@
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="manifest" href="../site.webmanifest">
 <link rel="preload" href="../assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../assets/css/site.css?v=5">
-<script src="../assets/js/lang.js?v=5"></script>
+<link rel="stylesheet" href="../assets/css/site.css?v=6">
+<script src="../assets/js/lang.js?v=6"></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -44,10 +44,9 @@
       <img src="../assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>欧梅</span>
     </a>
     <nav class="nav-links" aria-label="主菜单">
-      <a href="#proof">证据</a>
-      <a href="#modules">功能模块</a>
-      <a href="#loom">Loom 引擎</a>
       <a href="#omw">.omw</a>
+      <a href="#tour">界面</a>
+      <a href="#proof">数据</a>
       <a href="#faq">常见问题</a>
       <a href="#oss">开源</a>
     </nav>
@@ -68,326 +67,350 @@
 
 <main id="main">
 
-<!-- ───────── 히어로 ───────── -->
+<!-- ───────── 히어로: 목표(.omw 하나로) ───────── -->
 <section class="hero" aria-labelledby="hero-h">
   <div class="wrap">
     <div class="hero-copy">
       <div class="pills">
-        <span class="pill"><i></i><span data-when="unreleased">v<span data-cfg="version">0.1.0</span> 即将发布</span><span data-when="released" hidden>v<span data-cfg="version">0.1.0</span> 已发布</span></span>
-        <span class="pill">免费 · 开源 (GPL-3.0)</span>
+        <span class="pill live"><i></i><span data-when="unreleased">v<span data-cfg="version">0.2.0</span> 即将发布</span><span data-when="released" hidden>v<span data-cfg="version">0.2.0</span> 已发布</span></span>
+        <span class="pill">免费 · 开源 · GPL-3.0</span>
       </div>
-      <h1 id="hero-h">不破坏原文件的<span class="l2"><span class="grad">本地 6 合 1 编辑器。</span></span></h1>
-      <p class="lead">安装包约 17 MB，文件不会上传到任何地方。位图、矢量 (AI)、PDF、DOCX、HWPX、幻灯片，还有 PSD——在同一张画布上打开、修改，并保存为需要的格式。</p>
+      <h1 id="hero-h">收到的文件五花八门，<span class="l2"><span class="grad">工作只需一个 .omw。</span></span></h1>
+      <p class="lead">任何格式都在一块画布上打开和编辑。需要发送时，导出为原格式即可。</p>
       <div class="btn-row">
         <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="免费下载" data-off-text="下载 · 即将发布">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
           <span class="t">下载 · 即将发布</span>
         </a>
-        <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">无需安装，立即试用</span></a>
-        <a class="btn btn-ghost btn-lg" href="#proof" data-when="no-demo">查看实测结果</a>
+        <a class="btn btn-ghost btn-lg" data-store hidden rel="noopener">从 Microsoft Store 获取</a>
+        <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">在浏览器中试用</span></a>
+        <a class="btn btn-ghost btn-lg" href="#tour" data-when="no-demo">看看界面</a>
       </div>
-      <p class="dl-meta">Windows 10·11 · 韩语/英语/日语/中文界面 · 可在浏览器中运行 · macOS/Linux 构建为实验性</p>
-      <div class="chips" aria-label="支持的格式">
-        <span class="chip c-v">位图</span><span class="chip c-t">矢量</span><span class="chip c-c">PDF</span><span class="chip c-b">DOCX</span><span class="chip c-o">HWPX</span><span class="chip c-p">幻灯片</span><span class="chip c-v">PSD</span>
-      </div>
+      <p class="dl-meta">Windows 10、11 · 安装包约 17 MB · 简体中文、English、日本語、韩语</p>
     </div>
 
-    <figure class="shot">
-      <div class="frame">
-        <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>Omniweave</span></div>
-        <div class="frame-body" data-shot="hero" data-alt="Omniweave 实际界面：位图、矢量、文档和幻灯片对象放在同一块画布上。">
-          <div class="ph" role="img" aria-label="应用界面示意图，真实截图即将补上。">
-            <div class="ph-tools"><b></b><b></b><b></b><b></b><b></b><b></b></div>
-            <div class="ph-stage">
-              <div class="ph-page"><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
-              <div class="ph-slide"></div>
-              <div class="ph-blob"></div>
-              <span class="ph-cap">真实截图即将补上</span>
-            </div>
-            <div class="ph-side"><u></u><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
-          </div>
-        </div>
-      </div>
+    <figure class="flow" aria-labelledby="flow-cap">
+      <svg class="flow-h" viewBox="0 0 960 360" role="img" aria-label="DOCX、HWPX、PPTX、XLSX、PDF、PSD、AI、DWG 文件经 Omniweave 汇集成一个 .omw 文件，需要时再导出为 DOCX、PDF、PNG 等原格式的示意图">
+        <g class="flow-lines" fill="none">
+          <path d="M150 40 C290 40 300 180 404 180"/><path d="M150 100 C290 100 300 180 404 180"/><path d="M150 160 C290 160 300 180 404 180"/><path d="M150 220 C290 220 300 180 404 180"/>
+          <path d="M150 280 C290 280 300 180 404 180"/><path d="M150 340 C290 340 300 180 404 180"/>
+          <path d="M556 180 H632"/>
+          <path d="M748 180 C800 180 800 110 832 110"/><path d="M748 180 C800 180 800 180 832 180"/><path d="M748 180 C800 180 800 250 832 250"/>
+        </g>
+        <g class="flow-in" font-size="16" font-weight="700" text-anchor="middle">
+          <g class="fb c-b"><rect x="14" y="20" width="62" height="40" rx="9"/><text x="45" y="45">DOCX</text></g>
+          <g class="fb c-o"><rect x="84" y="20" width="66" height="40" rx="9"/><text x="117" y="45">HWPX</text></g>
+          <g class="fb c-c"><rect x="14" y="80" width="62" height="40" rx="9"/><text x="45" y="105">PPTX</text></g>
+          <g class="fb c-t"><rect x="84" y="80" width="66" height="40" rx="9"/><text x="117" y="105">XLSX</text></g>
+          <g class="fb c-c"><rect x="14" y="140" width="62" height="40" rx="9"/><text x="45" y="165">PDF</text></g>
+          <g class="fb c-v"><rect x="84" y="140" width="66" height="40" rx="9"/><text x="117" y="165">PSD</text></g>
+          <g class="fb c-o"><rect x="14" y="200" width="62" height="40" rx="9"/><text x="45" y="225">AI</text></g>
+          <g class="fb c-p"><rect x="84" y="200" width="66" height="40" rx="9"/><text x="117" y="225">SVG</text></g>
+          <g class="fb c-t"><rect x="14" y="260" width="62" height="40" rx="9"/><text x="45" y="285">DWG</text></g>
+          <g class="fb c-b"><rect x="84" y="260" width="66" height="40" rx="9"/><text x="117" y="285">DXF</text></g>
+          <g class="fb fb-more"><rect x="14" y="320" width="136" height="36" rx="9"/><text x="82" y="343">…</text></g>
+        </g>
+        <g class="flow-app">
+          <rect x="404" y="104" width="152" height="152" rx="26"/>
+          <image href="../assets/img/logo-96.png" x="448" y="124" width="64" height="64"/>
+          <text x="480" y="220" font-size="17" font-weight="700" text-anchor="middle">Omniweave</text>
+          <text class="sub" x="480" y="240" font-size="12.5" text-anchor="middle">一块画布</text>
+        </g>
+        <g class="flow-omw">
+          <path class="file" d="M640 102 h80 l28 28 v128 a8 8 0 0 1-8 8 h-100 a8 8 0 0 1-8-8 v-148 a8 8 0 0 1 8-8z"/>
+          <path class="fold" d="M720 102 v20 a8 8 0 0 0 8 8 h20"/>
+          <text x="690" y="196" font-size="30" font-weight="700" text-anchor="middle">.omw</text>
+          <text class="sub" x="690" y="222" font-size="12.5" text-anchor="middle">zip</text>
+        </g>
+        <g class="flow-out" font-size="15" font-weight="700" text-anchor="middle">
+          <g class="fb fb-out"><rect x="832" y="92" width="112" height="36" rx="9"/><text x="888" y="115">DOCX · HWPX</text></g>
+          <g class="fb fb-out"><rect x="832" y="162" width="112" height="36" rx="9"/><text x="888" y="185">PDF · PPTX</text></g>
+          <g class="fb fb-out"><rect x="832" y="232" width="112" height="36" rx="9"/><text x="888" y="255">PNG · SVG</text></g>
+        </g>
+      </svg>
+      <svg class="flow-v" viewBox="0 0 360 520" role="img" aria-label="DOCX、HWPX、PPTX、XLSX、PDF、PSD、AI、DWG 文件经 Omniweave 汇集成一个 .omw 文件，需要时再导出为 DOCX、PDF、PNG 等原格式的示意图">
+        <g class="flow-lines" fill="none">
+          <path d="M45 104 C45 150 180 140 180 184"/><path d="M135 104 C135 150 180 140 180 184"/><path d="M225 104 C225 150 180 140 180 184"/><path d="M315 104 C315 150 180 140 180 184"/>
+          <path d="M180 300 V330"/>
+          <path d="M180 452 C180 476 70 466 70 484"/><path d="M180 452 V484"/><path d="M180 452 C180 476 290 466 290 484"/>
+        </g>
+        <g class="flow-in" font-size="15" font-weight="700" text-anchor="middle">
+          <g class="fb c-b"><rect x="8" y="12" width="74" height="38" rx="9"/><text x="45" y="36">DOCX</text></g>
+          <g class="fb c-o"><rect x="98" y="12" width="74" height="38" rx="9"/><text x="135" y="36">HWPX</text></g>
+          <g class="fb c-c"><rect x="188" y="12" width="74" height="38" rx="9"/><text x="225" y="36">PPTX</text></g>
+          <g class="fb c-t"><rect x="278" y="12" width="74" height="38" rx="9"/><text x="315" y="36">XLSX</text></g>
+          <g class="fb c-c"><rect x="8" y="62" width="74" height="38" rx="9"/><text x="45" y="86">PDF</text></g>
+          <g class="fb c-v"><rect x="98" y="62" width="74" height="38" rx="9"/><text x="135" y="86">PSD</text></g>
+          <g class="fb c-o"><rect x="188" y="62" width="74" height="38" rx="9"/><text x="225" y="86">AI</text></g>
+          <g class="fb c-t"><rect x="278" y="62" width="74" height="38" rx="9"/><text x="315" y="86">DWG</text></g>
+        </g>
+        <g class="flow-app">
+          <rect x="110" y="184" width="140" height="116" rx="24"/>
+          <image href="../assets/img/logo-96.png" x="156" y="196" width="48" height="48"/>
+          <text x="180" y="266" font-size="16" font-weight="700" text-anchor="middle">Omniweave</text>
+          <text class="sub" x="180" y="286" font-size="12" text-anchor="middle">一块画布</text>
+        </g>
+        <g class="flow-omw">
+          <path class="file" d="M140 330 h62 l22 22 v92 a8 8 0 0 1-8 8 h-76 a8 8 0 0 1-8-8 v-106 a8 8 0 0 1 8-8z"/>
+          <path class="fold" d="M202 330 v14 a8 8 0 0 0 8 8 h14"/>
+          <text x="178" y="400" font-size="26" font-weight="700" text-anchor="middle">.omw</text>
+          <text class="sub" x="178" y="422" font-size="12" text-anchor="middle">zip</text>
+        </g>
+        <g class="flow-out" font-size="13" font-weight="700" text-anchor="middle">
+          <g class="fb fb-out"><rect x="16" y="484" width="108" height="32" rx="9"/><text x="70" y="505">DOCX · HWPX</text></g>
+          <g class="fb fb-out"><rect x="130" y="484" width="100" height="32" rx="9"/><text x="180" y="505">PDF · PPTX</text></g>
+          <g class="fb fb-out"><rect x="236" y="484" width="108" height="32" rx="9"/><text x="290" y="505">PNG · SVG</text></g>
+        </g>
+      </svg>
+      <figcaption id="flow-cap">
+        <ol class="flow-steps">
+          <li><b>打开</b><span>收到什么就打开什么</span></li>
+          <li><b>汇集</b><span>工作都放进一个 .omw</span></li>
+          <li><b>导出</b><span>发送时还原为原格式</span></li>
+        </ol>
+        <p class="goal"><span class="goal-tag">目标</span>让 .omw 成为人人都能读写的通用工作文件</p>
+      </figcaption>
     </figure>
   </div>
 </section>
 
-<!-- ───────── 증거 (실측·구현 상태) ───────── -->
+<!-- ───────── 화면 둘러보기 (실제 화면 + 하이라이트) ───────── -->
+<section class="sec" id="tour" aria-labelledby="tour-h">
+  <div class="wrap">
+    <p class="eyebrow">界面导览</p>
+    <h2 class="h-sec" id="tour-h">一个应用，<br><em>切换模式即可。</em></h2>
+    <p class="lead">以下都是真实的应用界面，点选标签看看。</p>
+
+    <div class="tour-tabs" role="tablist" aria-label="编辑模式">
+      <button type="button" role="tab" id="tt-doc" aria-controls="tp-doc" aria-selected="true" class="c-b">文档</button>
+      <button type="button" role="tab" id="tt-slides" aria-controls="tp-slides" aria-selected="false" tabindex="-1" class="c-c">幻灯片</button>
+      <button type="button" role="tab" id="tt-image" aria-controls="tp-image" aria-selected="false" tabindex="-1" class="c-v">图像</button>
+      <button type="button" role="tab" id="tt-design" aria-controls="tp-design" aria-selected="false" tabindex="-1" class="c-p">设计</button>
+      <button type="button" role="tab" id="tt-pdf" aria-controls="tp-pdf" aria-selected="false" tabindex="-1" class="c-o">PDF</button>
+      <button type="button" role="tab" id="tt-drawing" aria-controls="tp-drawing" aria-selected="false" tabindex="-1" class="c-t">图纸</button>
+    </div>
+
+    <div class="tour-panel c-b" id="tp-doc" role="tabpanel" aria-labelledby="tt-doc">
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/zh/document.webp" width="1600" height="900" alt="文档模式的真实界面：左侧是标题列表，中间是示例报告，右侧是页面设置。" decoding="async">
+        <span class="hl mb" style="--x:71.2%;--y:3.7%;--w:17.5%;--h:2.4%" data-n="1"></span>
+        <span class="hl" style="--x:0.3%;--y:22.2%;--w:11.8%;--h:25.9%" data-n="2"></span>
+        <span class="hl ml" style="--x:85.5%;--y:18.1%;--w:14.5%;--h:25.4%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">DOCX · HWPX · DOC · HWP</p><p class="one">带标题导航和页面设置的文档编辑</p><ol class="hl-list"><li>切换模式</li><li>按标题导航</li><li>纸张大小与页边距</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-c" id="tp-slides" role="tabpanel" aria-labelledby="tt-slides" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/zh/slides.webp" width="1600" height="900" alt="幻灯片模式的真实界面：左侧是幻灯片列表，中间是带标题和形状的幻灯片。" loading="lazy" decoding="async">
+        <span class="hl" style="--x:0.3%;--y:18.7%;--w:11.8%;--h:40.1%" data-n="1"></span>
+        <span class="hl ml" style="--x:85.5%;--y:40.7%;--w:14.5%;--h:10.2%" data-n="2"></span>
+        <span class="hl ml mb" style="--x:96%;--y:3.6%;--w:3.5%;--h:2.6%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">PPTX · PPT</p><p class="one">母版、切换效果、幻灯片放映</p><ol class="hl-list"><li>幻灯片列表</li><li>切换效果</li><li>立即放映</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-v" id="tp-image" role="tabpanel" aria-labelledby="tt-image" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/zh/image.webp" width="1600" height="900" alt="图像模式的真实界面：左侧是 PSD 图层列表，中间是多个图层叠加的图像。" loading="lazy" decoding="async">
+        <span class="hl" style="--x:2.3%;--y:18.2%;--w:11.8%;--h:25.9%" data-n="1"></span>
+        <span class="hl" style="--x:2.4%;--y:14.4%;--w:5.8%;--h:2.6%" data-n="2"></span>
+        <span class="hl" style="--x:0.2%;--y:10.9%;--w:1.6%;--h:49.3%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">PSD · PNG · JPG · WebP</p><p class="one">原样打开 PSD 图层，继续编辑</p><ol class="hl-list"><li>图层</li><li>混合模式</li><li>绘图工具</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-p" id="tp-design" role="tabpanel" aria-labelledby="tt-design" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/zh/design.webp" width="1600" height="900" alt="设计模式的真实界面：打开了 AI 文件中的线性和径向渐变形状。" loading="lazy" decoding="async">
+        <span class="hl" style="--x:2.3%;--y:14.4%;--w:11.8%;--h:15.2%" data-n="1"></span>
+        <span class="hl" style="--x:0.2%;--y:10.9%;--w:1.6%;--h:35.7%" data-n="2"></span>
+        <span class="hl ml" style="--x:86.1%;--y:20.3%;--w:13.3%;--h:5.6%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">AI · SVG</p><p class="one">AI 文件中的形状和渐变原样保留</p><ol class="hl-list"><li>页面</li><li>钢笔与形状工具</li><li>尺寸预设</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-o" id="tp-pdf" role="tabpanel" aria-labelledby="tt-pdf" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/zh/pdf.webp" width="1600" height="900" alt="PDF 模式的真实界面：顶部有文字编辑、页面整理、批注和签名工具。" loading="lazy" decoding="async">
+        <span class="hl mb" style="--x:0.3%;--y:6.9%;--w:11.5%;--h:7.4%" data-n="1"></span>
+        <span class="hl mb" style="--x:11.9%;--y:6.9%;--w:11.8%;--h:7.4%" data-n="2"></span>
+        <span class="hl mb" style="--x:23.6%;--y:6.9%;--w:16.7%;--h:7.4%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">PDF</p><p class="one">把文字变成可编辑对象，直接修改</p><ol class="hl-list"><li>编辑文字</li><li>整理页面</li><li>批注、表单、签名</li></ol></div>
+    </div>
+
+    <div class="tour-panel c-t" id="tp-drawing" role="tabpanel" aria-labelledby="tt-drawing" hidden>
+      <figure class="hl-shot">
+        <img src="../assets/img/shots/zh/drawing.webp" width="1600" height="900" alt="图纸模式的真实界面：左侧是图纸图层列表，中间是不同线宽的线条。" loading="lazy" decoding="async">
+        <span class="hl" style="--x:0.3%;--y:22.1%;--w:12.2%;--h:26.6%" data-n="1"></span>
+        <span class="hl mb" style="--x:10.3%;--y:6.7%;--w:19.6%;--h:7.8%" data-n="2"></span>
+        <span class="hl" style="--x:13.1%;--y:93.9%;--w:71.7%;--h:2.8%" data-n="3"></span>
+      </figure>
+      <div class="tour-cap"><p class="fmt">DWG · DXF</p><p class="one">导入图纸，编辑图层和线条</p><ol class="hl-list"><li>图纸图层</li><li>修改命令</li><li>命令行</li></ol></div>
+    </div>
+    <p class="note">界面中的文件是为测试制作的示例。</p>
+  </div>
+</section>
+
+<!-- ───────── .omw: 열린 형식 + 목표 ───────── -->
+<section class="sec alt" id="omw" aria-labelledby="omw-h">
+  <div class="wrap">
+    <p class="eyebrow">.omw 格式</p>
+    <h2 class="h-sec" id="omw-h">不上锁的<br><em>工作文件。</em></h2>
+    <p class="lead">要成为到处通用的文件，首先得人人都能打开。所以 .omw 从一开始就是开放的。</p>
+    <ul class="open-facts">
+      <li class="c-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v2M12 7v2M12 11v2M10.5 15h3v3h-3z"/></svg><b>就是一个 zip</b><span>用任意解压工具都能打开查看内容，加了密码的文件除外。</span></li>
+      <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6v6H4zM14 13h6v6h-6zM7 11v4a2 2 0 0 0 2 2h5M17 13V9a2 2 0 0 0-2-2h-5"/></svg><b>结构公开</b><span>哪些内容放在哪个文件里，都有公开的文档说明。</span></li>
+      <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><b>GPL 开源</b><span>读写 .omw 的代码人人都可以查看、修改和复用。</span></li>
+    </ul>
+    <p class="goal goal-wide"><span class="goal-tag">目标</span>目前能打开 .omw 的只有 Omniweave。我们的目标是让它成为其他工具也能读写的通用格式。</p>
+    <details class="more">
+      <summary>查看包结构</summary>
+<pre class="tree" tabindex="0" aria-label=".omw 包结构"><span class="f">document.omw</span>
+├── <span class="f">mimetype</span>                    <span class="c">格式标识（第一项，不压缩）</span>
+├── <span class="f">manifest.json</span>               <span class="c">元数据和页面索引</span>
+├── <span class="k">scene_graph.cbor</span>            <span class="c">全部编辑内容</span>
+├── <span class="t">rasters/&lt;hash&gt;.raw</span>          <span class="c">去重后的 256×256 像素图块</span>
+├── <span class="t">assets/&lt;hash&gt;.&lt;ext&gt;</span>         <span class="c">图片、PDF、字体原件</span>
+├── <span class="f">slides/slide_deck.json</span>      <span class="c">幻灯片顺序与切换（只读副本）</span>
+├── <span class="f">vectors/paths.json</span>          <span class="c">矢量路径（只读副本）</span>
+├── <span class="f">documents/document.xml</span>      <span class="c">文档段落（只读副本）</span>
+└── <span class="f">documents/preview.txt</span>       <span class="c">用于搜索的纯文本</span></pre>
+      <p class="note">Omniweave 只读取 scene_graph.cbor 和各个数据块，副本是为其他工具准备的。每次打开都会重新校验所有数据块的哈希，只跳过损坏的部分。</p>
+    </details>
+  </div>
+</section>
+
+<!-- ───────── 숫자 ───────── -->
 <section class="sec" id="proof" aria-labelledby="proof-h">
   <div class="wrap">
-    <p class="eyebrow">用证据说话</p>
-    <h2 class="h-sec" id="proof-h">只写实测过的。<br><em>做不到的也一起写。</em></h2>
-    <p class="lead">以下数字都来自实际运行，并注明了条件。仍在开发中的内容另外标为“开发中”。</p>
+    <p class="eyebrow">用数据说话</p>
+    <h2 class="h-sec" id="proof-h">只写实测的数字。</h2>
     <div class="metrics">
-      <div class="metric"><div class="v grad">6.1<small>MiB</small></div><div class="k">安装包大小</div><div class="d">Windows x64 安装包 0.1.0 开发版（10,239,987 字节）。界面由 Windows 自带的 WebView2 绘制。</div></div>
-      <div class="metric"><div class="v">65<small>/ 81</small></div><div class="k">打开 81 个真实样本文件的结果</div><div class="d">成功 65 · 部分 8 · 失败 0 · 不支持并给出说明 8。“部分”指旧版 DOC/HWP（仅正文和表格）、PSD（不含效果和调整）等情况。</div></div>
-      <div class="metric"><div class="v">0<small>个</small></div><div class="k">接收你文件的服务器</div><div class="d">打开、编辑、保存、转换和快捷工具都在你的电脑上完成。网络只用于检查新版本 (GitHub Releases)。</div></div>
-      <div class="metric"><div class="v">AES<small>-256</small></div><div class="k">加密文档保存后仍是加密的</div><div class="d">PDF (AES-256) · DOCX/XLSX/PPTX (Office Agile) · .omw (AES-256-GCM)。编辑后重新加密保存；已确认重新加密的 Office 文件可在 Microsoft Office 16 中打开。</div></div>
+      <div class="metric"><div class="v grad">17<small>MB</small></div><div class="k">安装包</div><div class="d">含 AI 模型，Windows x64</div></div>
+      <div class="metric"><div class="v">0<small>/ 91</small></div><div class="k">打开失败</div><div class="d">检查了 91 个实际工作文件</div></div>
+      <div class="metric"><div class="v">0<small>B</small></div><div class="k">原样保存时改变的字节</div><div class="d">未编辑的文件与原件完全相同</div></div>
+      <div class="metric"><div class="v">0<small>处</small></div><div class="k">文件上传的服务器</div><div class="d">AI 处理也在本机完成</div></div>
     </div>
-    <div class="common">
-      <div><h4>40 多种扩展名</h4>文档、表格、幻灯片、图像、PSD、视频、音频、电子书、文本和代码。每种格式都会标明支持程度（完整、部分或说明）。</div>
-      <div><h4>历史时间线</h4>记录从开始以来的每一个操作。可预览任意时间点并一步回到那里，历史随 .omw 一起保存。</div>
-      <div><h4>6 个快捷工具 · 本地</h4>PDF 合并、压缩、转 JPG，图片转 PDF，照片压缩，JPG 批量转换——在你的电脑上处理，不必上传到网站。</div>
-    </div>
-    <div class="common">
-      <div><h4>原文件无损保存 <span class="note-inline">开发中</span></h4>目标：未修改的部分按原文件字节原样保存。PDF 和 PSD 正在实现，DOCX 和 HWPX 在路线图中。目前保存为 DOCX/HWPX 时，会根据已理解的内容重新生成文档。</div>
-      <div><h4>代码签名</h4>当前构建尚未进行代码签名，首次运行时可能出现 SmartScreen 警告。下载页面说明了如何用 SHA-256 校验文件。</div>
-      <div><h4>语言</h4>应用界面支持韩语、英语、日语和中文：安装时选择，之后可随时在“首选项”中更改。本网站同样提供这四种语言版本。</div>
-    </div>
-    <p class="bench-note">样本结果仅引用 <code>test-corpus/REPORT.md</code> 中的数量（不公开文件内容和名称）。安装包大小基于开发版，每次发布可能不同。</p>
+    <details class="more">
+      <summary>测量条件与局限</summary>
+      <ul class="notes"><li>安装包：Omniweave_0.2.0_x64-setup.exe，17,464,150 字节（未签名构建），每个版本可能不同。</li><li>实际工作文件：2026-11-22 发布前检查。结果均为成功、部分或提示（说明无法打开的原因）之一。不公开文件名和内容。</li><li>原样保存：仓库中的 DOCX、HWPX、XLSX、PPTX、PDF 样本全部通过，PSD 为 259/259。</li><li>联网只用于检查新版本 (GitHub Releases)。</li><li>加密文档（PDF AES-256、Office Agile、.omw AES-256-GCM）编辑后会重新加密保存。</li><li>这是早期版本，重要文档请另外保留原件。</li></ul>
+    </details>
   </div>
 </section>
 
-<!-- ───────── 문제 정의 ───────── -->
-<section class="sec alt" id="why" aria-labelledby="why-h">
-  <div class="wrap prob">
-    <div>
-      <p class="eyebrow">为什么要做它</p>
-      <h2 class="h-sec" id="why-h">做一件事，<br><em>要开六个软件。</em></h2>
-      <p class="lead">修图、插画、PDF 编辑、DOCX·HWPX 文档编辑、演示文稿。同一个标志复制六遍，同一段文字用六种方式反复排版。</p>
-      <div class="switch" aria-hidden="true">
-        <b>修图</b>→<b>插画</b>→<b>PDF</b>→<b>DOCX</b>→<b>HWPX</b>→<b>幻灯片</b>→ …
-      </div>
-      <ul class="same">
-        <li><span class="c-v">1</span>放上图片和文字</li>
-        <li><span class="c-t">2</span>画出形状和线条</li>
-        <li><span class="c-c">3</span>调整所选对象的位置、大小、颜色、不透明度和字体</li>
-      </ul>
-      <p class="claim"><strong>软件名字不同，做的事其实一样。</strong>“页面还是图层”“矢量还是位图”，说到底只是<strong>以什么形式保存</strong>的区别，编辑的时候并不重要。</p>
-    </div>
-    <div class="matrix">
-      <table>
-        <caption>在这六类软件里，你动手做的事情都一样；不同的只是功能深度和保存格式。</caption>
-        <thead>
-          <tr><th scope="col"><span class="sr-only">操作</span></th><th scope="col">修图</th><th scope="col">插画</th><th scope="col">PDF</th><th scope="col">DOCX</th><th scope="col">HWPX</th><th scope="col">幻灯<br>片</th></tr>
-        </thead>
-        <tbody>
-          <tr><th scope="row">放置图片</th><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td></tr>
-          <tr><th scope="row">文字与格式</th><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td></tr>
-          <tr><th scope="row">形状与线条</th><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td></tr>
-          <tr><th scope="row">移动·缩放·旋转</th><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td></tr>
-          <tr><th scope="row">颜色·不透明度·层级</th><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td></tr>
-          <tr><th scope="row">撤销</th><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td><td><i></i><span class="sr-only">有</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<!-- ───────── 6개 모듈 ───────── -->
-<section class="sec" id="modules" aria-labelledby="mod-h">
-  <div class="wrap">
-    <p class="eyebrow">六合一模块</p>
-    <h2 class="h-sec" id="mod-h">六种工作，<br><em>一张场景图。</em></h2>
-    <p class="lead">位图图块、贝塞尔路径、文本段落、表格、PDF 页面、图像和视频都是同一种节点。下面只列出目前代码中已实现的功能。真正的较量在于每种格式能处理得多深。</p>
-
-    <div class="mods">
-      <article class="mod c-v">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L12 15.6 8.4 12z"/><path d="M8.4 12C6 12 4.5 13.6 4.5 16c0 1.6-.8 2.6-1.5 3 3.7.9 8.6.2 9-3.4"/></svg></div>
-        <h3>位图<small>图像 · PSD</small></h3>
-        <ul><li>基于 256px 图块的画笔与橡皮擦（压感、硬度、不透明度）</li><li>打开 <strong>PSD</strong>：像素图层 + 合并图像（不含效果和调整图层）</li><li>打开 TIFF、WebP、AVIF 等图像</li></ul>
-      </article>
-      <article class="mod c-t">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19C7 8 17 16 20 5"/><rect x="2.5" y="17.5" width="3" height="3" rx=".6"/><rect x="18.5" y="3.5" width="3" height="3" rx=".6"/><path d="M4 19l5-9M20 5l-6 3"/><circle cx="9" cy="10" r="1.2"/><circle cx="14" cy="8" r="1.2"/></svg></div>
-        <h3>矢量<small>矢量 · AI · SVG</small></h3>
-        <ul><li>钢笔（贝塞尔手柄）、直接选择、矩形、椭圆</li><li>路径查找器：合并/减去/交集/排除</li><li>打开 <strong>AI</strong> 文件（以 PDF 兼容方式保存的文件）</li></ul>
-      </article>
-      <article class="mod c-c">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></svg></div>
-        <h3>PDF<small>PDF 编辑</small></h3>
-        <ul><li>渲染页面 + 将文字提升为按行的<strong>可编辑文本对象</strong></li><li>打开并重新加密受密码保护的 PDF (AES-256)</li><li>快捷工具：合并、压缩、转 JPG</li></ul>
-      </article>
-      <article class="mod c-b">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 11.5h8M8 15h5"/></svg></div>
-        <h3>Word<small>DOCX</small></h3>
-        <ul><li>打开并保存 DOCX 段落与字符格式</li><li>编辑表格对象 · 保存为 DOCX</li><li>旧版 DOC：导入正文和表格内容</li></ul>
-      </article>
-      <article class="mod c-o">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.5 8.5h5c0 4-1.8 6.5-5 7.5M15.5 7v10M15.5 12h2"/></svg></div>
-        <h3>HWPX<small>HWPX</small></h3>
-        <ul><li>打开并保存 HWPX（基于公开 OWPML 结构的净室实现）</li><li>旧版 HWP (5.0)：导入正文和表格内容</li><li>按字素和语节进行韩文换行</li></ul>
-      </article>
-      <article class="mod c-p">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.8"/><path d="M12 16v4M8.5 20h7M10 8.2v4.6l4-2.3z"/></svg></div>
-        <h3>幻灯片<small>PPTX · PPT</small></h3>
-        <ul><li>打开并保存 PPTX（文本、形状、图片、表格、背景）</li><li>母版 · 切换 FADE / SLIDE_LEFT / ZOOM</li><li>关键帧动画 · 全屏放映</li></ul>
-      </article>
-    </div>
-
-    <div class="common">
-      <div><h4>对所有对象一视同仁</h4>选择、移动、缩放、旋转、不透明度、混合模式、锁定与隐藏、调整层级、撤销。</div>
-      <div><h4>导出</h4>PNG · PDF · SVG · DOCX · HWPX · PPTX · XLSX · CSV · Markdown · HTML · SRT · <code>.omw</code></div>
-      <div><h4>韩文排版</h4>通过 <code>Intl.Segmenter</code> 按字素断行，韩文音节不会被拆开；并用 <code>keep-all</code> 按词换行。</div>
-    </div>
-    <p class="note">导入存在限制 — 请先阅读<a href="#faq" class="grad">坦诚的 FAQ</a>。</p>
-  </div>
-</section>
-
-<!-- ───────── Loom 엔진 ───────── -->
+<!-- ───────── Loom 엔진 (짧게 + 접기) ───────── -->
 <section class="sec alt" id="loom" aria-labelledby="loom-h">
   <div class="wrap">
     <div class="loom-grid">
       <div>
         <p class="eyebrow">Loom 引擎</p>
-        <h2 class="h-sec" id="loom-h">万物皆有<br><em>内容地址。</em></h2>
-        <p class="lead">每个像素图块、节点和资源都有自己的 64 位内容地址。画面显示、保存和撤销，全都由这些地址决定。</p>
-        <ul class="parts">
-          <li class="c-v"><b>Thread</b><span>256px 像素图块、节点和资源的内容地址。相同的图块在文件里只存一份；打开时会重新计算哈希，只跳过损坏的部分。</span></li>
-          <li class="c-t"><b>Weave Cache</b><span>屏幕图块的键，就是覆盖该区域的所有片段地址的哈希。<strong>没有脏标记，也没有缓存失效代码</strong>，所以“明明擦掉了却还留在屏幕上”这类 bug 从结构上就不会出现。</span></li>
-          <li class="c-c"><b>Shuttle Journal</b><span>只把第一次出现的片段增量写入 IndexedDB。自动保存很轻量，程序异常退出后也能恢复。</span></li>
-          <li class="c-p"><b>不可变历史</b><span>撤销 = 替换不可变文档的引用。不复制像素，所以开销与文档大小无关。</span></li>
-        </ul>
+        <h2 class="h-sec" id="loom-h">只重绘、只重存<br><em>改动的部分。</em></h2>
+        <p class="lead">每个图块和对象都有内容地址，相同的数据只保存一次。</p>
+        <div class="metrics two">
+          <div class="metric"><div class="v grad">79.5<small>%</small></div><div class="k">图块数据去重</div></div>
+          <div class="metric"><div class="v">0.18<small>ms</small></div><div class="k">撤销与重做</div></div>
+        </div>
+        <details class="more">
+          <summary>原理与测量条件</summary>
+          <ul class="parts">
+            <li class="c-v"><b>Thread</b><span>256px 图块、对象、资源各有 64 位内容地址。相同的图块在文件中只存一次。</span></li>
+            <li class="c-t"><b>Weave Cache</b><span>屏幕图块的键就是覆盖该区域的数据块地址的哈希。没有失效处理代码，因此从结构上杜绝了残留旧像素这类错误。</span></li>
+            <li class="c-c"><b>Shuttle Journal</b><span>只把新出现的数据块写入 IndexedDB。自动保存很轻，异常退出后也能恢复。</span></li>
+            <li class="c-p"><b>不可变历史</b><span>撤销只是替换文档引用，不复制像素。</span></li>
+          </ul>
+          <p class="bench-note">用 <code>npm run bench</code> (Vitest bench, Node) 测量合成 4K 文档：205 个图块引用中只有 42 个不同，51.3 MiB 原始像素保存为 1.43 MiB 的 .omw，撤销加重做耗时 0.09–0.18 ms（深拷贝同一文档需 24–28 ms）。保存后重新打开：损坏 0、缺失 0。设备：Intel Core Ultra 5 125H、Windows 11、Node v24.13.1。不含绘制时间。</p>
+        </details>
       </div>
 
       <figure class="loom-viz">
-        <canvas id="loom-canvas" width="800" height="500" role="img" aria-label="示意图：左侧是 40 个屏幕图块组成的网格，右侧图块拆散成紫、青、珊瑚红三股线交织在一起。在网格上拖动，只有碰到的图块会被重绘。"></canvas>
+        <canvas id="loom-canvas" width="800" height="500" role="img" aria-label="示意图：在图块网格上涂抹，只有碰到的图块会重绘。"></canvas>
         <div class="loom-ctl">
-          <p class="loom-stat" id="loom-stat" aria-live="polite">在网格上拖动试试，只有碰到的屏幕图块会被重绘。</p>
+          <p class="loom-stat" id="loom-stat" aria-live="polite">在网格上涂抹试试，只重绘碰到的图块。</p>
           <div class="btn-row">
             <button type="button" class="btn btn-ghost btn-sm" id="loom-paint">画一笔</button>
             <button type="button" class="btn btn-ghost btn-sm" id="loom-undo" disabled aria-disabled="true">撤销</button>
           </div>
         </div>
         <figcaption class="loom-legend">
-          <span class="c-c">重绘（键已改变）</span><span class="c-t">命中缓存（复用旧的键）</span><span>简化示意图 · 并非实测</span>
+          <span class="c-c">重绘</span><span class="c-t">复用缓存</span><span>示意图，非测量值</span>
         </figcaption>
       </figure>
-    </div>
-
-    <h3 class="sr-only">实测数据</h3>
-    <div class="metrics">
-      <div class="metric"><div class="v grad">79.5<small>%</small></div><div class="k">图块数据去重</div><div class="d">合成 4K 文档 · 205 个图块引用 → 42 个唯一图块</div></div>
-      <div class="metric"><div class="v">1.43<small>MiB</small></div><div class="k">.omw 文件大小</div><div class="d">原始 RGBA 51.3 MiB → 去重后 10.5 MiB → 保存</div></div>
-      <div class="metric"><div class="v">0.36–0.43<small>ms</small></div><div class="k">计算一整帧的屏幕键</div><div class="d">1920×1080 · 40 个屏幕图块 · 31 个节点</div></div>
-      <div class="metric"><div class="v">0.09–0.18<small>ms</small></div><div class="k">撤销 + 重做</div><div class="d">对同一 4K 文档做深拷贝 (<code>structuredClone</code>) 需要 24–28 ms</div></div>
-    </div>
-    <p class="bench-note">数据来自 <code>bench/loom.bench.ts</code>（Vitest bench，Node，不涉及 DOM 的代码路径），测试对象为<strong>合成文档</strong>，与实际文档可能有差异。测试环境：Intel Core Ultra 5 125H、Windows 11、Node v24.13.1 · 两次运行平均值的范围（测试时有其他任务在运行，波动较大）· 保存→打开往返：损坏 0 · 缺失 0 · 文档根地址一致。不含渲染（画布绘制）耗时，可在应用状态栏的 Loom 仪表中实时查看。复现：<code>npm run bench</code></p>
-  </div>
-</section>
-
-<!-- ───────── .omw ───────── -->
-<section class="sec" id="omw" aria-labelledby="omw-h">
-  <div class="wrap">
-    <p class="eyebrow">.omw 格式</p>
-    <h2 class="h-sec" id="omw-h">一个<em>能直接打开的 zip。</em></h2>
-    <p class="lead"><code>.omw</code> (Omniweave Workspace Package) 就是普通的 zip 容器。相同的图块只存一份，同时附带其他工具也能读取的副本。</p>
-    <div class="omw">
-<pre class="tree" tabindex="0" aria-label=".omw 包的结构"><span class="f">document.omw</span>
-├── <span class="f">mimetype</span>                    <span class="c">"application/x-omniweave"（不压缩，首个条目）</span>
-├── <span class="f">manifest.json</span>               <span class="c">元数据、Loom 根地址、页面索引</span>
-├── <span class="k">scene_graph.cbor</span>            <span class="c">统一场景图（像素以图块地址表示）</span>
-├── <span class="t">rasters/&lt;hash&gt;.raw</span>          <span class="c">去重后的 256×256 RGBA 图块</span>
-├── <span class="t">assets/&lt;hash&gt;.&lt;ext&gt;</span>         <span class="c">图片、PDF、字体原件</span>
-├── <span class="f">slides/slide_deck.json</span>      <span class="c">幻灯片顺序、切换与动画（副本）</span>
-├── <span class="f">slides/master_styles.json</span>   <span class="c">幻灯片母版（副本）</span>
-├── <span class="f">vectors/paths.json</span>          <span class="c">矢量节点的 SVG 路径（副本）</span>
-├── <span class="f">documents/document.xml</span>      <span class="c">全部文本段落（副本）</span>
-└── <span class="f">documents/preview.txt</span>       <span class="c">用于搜索和索引的纯文本</span></pre>
-      <ul class="facts">
-        <li><h3>每次打开都全部重新校验</h3><p>重新计算所有图块和资源的哈希。对不上的片段会被跳过并报告数量，文档其余部分照常打开。</p></li>
-        <li><h3>打开时只用到两样东西</h3><p>Omniweave 只读取 <code>scene_graph.cbor</code> 和内容寻址的片段，其余都是给其他工具准备的<strong>只读副本</strong>。</p></li>
-        <li><h3>Windows 文件关联</h3><p>安装版会把 <code>.omw</code> 关联到 Omniweave，双击即可打开。</p></li>
-      </ul>
     </div>
   </div>
 </section>
 
 <!-- ───────── FAQ ───────── -->
-<section class="sec alt" id="faq" aria-labelledby="faq-h">
+<section class="sec" id="faq" aria-labelledby="faq-h">
   <div class="wrap center">
     <p class="eyebrow">常见问题</p>
-    <h2 class="h-sec" id="faq-h"><em>坦诚版</em>常见问题</h2>
-    <p class="lead">项目还处于早期开发阶段，能做什么、还做不到什么，先说清楚。</p>
+    <h2 class="h-sec" id="faq-h">常见问题</h2>
   </div>
   <div class="wrap">
     <div class="faq">
       <details>
-        <summary>能完全取代现有软件吗？</summary>
-        <div class="a"><p>不能。目标是在一个地方处理多种格式的<strong>集成编辑器</strong>，较量点在于每种格式的处理深度。高级滤镜、印刷分色、公式编辑器、修订跟踪等专业功能目前不在范围内。</p></div>
+        <summary>有了它就不需要其他软件了吗？</summary>
+        <div class="a"><p>不是。我们的方向是在一个地方处理多种格式，分色印刷、高级滤镜等专业功能目前不在范围内。</p></div>
       </details>
       <details>
-        <summary>“不破坏原文件”具体指什么？</summary>
-        <div class="a"><p>方向是<strong>未修改的部分按原样保存</strong>。如实说明现状：</p><ul><li><strong>开发中：</strong>PDF 和 PSD 的保留原文件保存。</li><li><strong>路线图：</strong>DOCX 和 HWPX 的保留原文件（直通）保存。</li><li><strong>目前：</strong>保存为 DOCX/HWPX 时，会根据已理解的内容（段落、字符格式、表格对象）生成新文档，脚注、页眉等元素可能丢失。</li><li>加密文档在保存时会重新加密。</li></ul></div>
+        <summary>保存为其他格式会丢内容吗？</summary>
+        <div class="a"><p>如果有内容无法带过去，保存前会告诉你具体缺少什么。</p></div>
       </details>
       <details>
-        <summary>打开 DOCX/HWPX 会和原文件一模一样吗？</summary>
-        <div class="a"><p>目前以<strong>段落和字符格式为主</strong>（对齐、行距、字体、字号、颜色、加粗/斜体/下划线）。以下尚不支持或已简化：</p><ul><li>DOCX/HWPX 中的<strong>表格</strong>还不能按表格导入，会展开为段落。</li><li>脚注/尾注、页眉/页脚、页码、样式继承、目录、修订跟踪。</li><li>文档中的图片、形状和公式。</li><li>分页按 A4 版式重新计算，可能与原文件不同。</li></ul></div>
+        <summary>对方没有 Omniweave，怎么打开 .omw？</summary>
+        <div class="a"><p>请导出为 DOCX、PDF 等原格式再发送。.omw 本身是 zip，里面的图片和文字副本也能用其他工具取出。</p></div>
       </details>
       <details>
-        <summary>可以编辑 PDF 吗？</summary>
-        <div class="a"><p>页面按原样渲染；使用“文字提升”后，文字会变成<strong>按行的文本对象</strong>，可以修改，原文字用背景色矩形遮盖。复杂背景上的文字、多栏和表格的重排目前还不支持。</p><p>当前版本的 PDF 导出是把页面作为图像嵌入。保留可选文字的 PDF 导出正在开发中。</p></div>
-      </details>
-      <details>
-        <summary>PPTX、旧版 HWP 和 PSD 支持到什么程度？</summary>
-        <div class="a"><ul><li><strong>PPTX：</strong>将文本、形状、图片、表格和背景作为幻灯片打开，并可保存为 PPTX。EMF 等部分图片格式会被省略，部分形状以矩形近似。</li><li><strong>旧版 HWP/DOC/PPT：</strong>仅导入正文和表格内容（文本）。如需格式和图片，请先在原软件中另存为 HWPX/DOCX/PPTX。</li><li><strong>PSD：</strong>打开像素图层和合并图像，不含图层效果、调整图层和文字引擎。</li></ul></div>
-      </details>
-      <details>
-        <summary>真的不会上传我的文件吗？</summary>
-        <div class="a"><p>是的。打开、编辑、保存、转换和快捷工具都在你的电脑上完成，自动保存日志也记录在本地。网络只用于检查新版本 (GitHub Releases)，本网站也没有任何跟踪或统计脚本。源代码公开，可以自行核实。</p></div>
-      </details>
-      <details>
-        <summary>可以不安装就试用吗？</summary>
-        <div class="a"><p>同一个应用可以在网页浏览器中运行。浏览器演示公开后，本页面会出现“无需安装，立即试用”按钮。演示同样在浏览器内处理文件，不会发送到服务器。</p></div>
-      </details>
-      <details>
-        <summary>听说很快，用了 GPU 吗？</summary>
-        <div class="a"><p>还没有——目前是 <strong>Canvas 2D + TypeScript</strong>。WebGPU 渲染器和 Rust/WASM 内核在路线图中。现在的优势来自 Loom“只重绘、只重存改动部分”的结构。我们给出的数字仅限 <a href="#loom" class="grad">Loom 引擎表格</a>。</p></div>
-      </details>
-      <details>
-        <summary>有英文界面吗？macOS 和 Linux 呢？</summary>
-        <div class="a"><p>有。应用界面支持韩语、英语、日语和简体中文：安装时选择语言，之后可随时在“首选项”中更改。macOS 和 Linux 构建在真机验证之前标为<strong>实验性</strong>。正式支持 Windows 10·11 和浏览器运行。</p></div>
+        <summary>所有文件都能正确打开吗？</summary>
+        <div class="a"><p>每种格式都标明支持程度：完整、部分或提示。PSD 的部分效果和 PPTX 的部分形状会近似绘制，HEIC 照片等无法打开的文件会说明原因。打不开的文件欢迎反馈给我们。</p></div>
       </details>
     </div>
   </div>
 </section>
 
 <!-- ───────── 오픈소스 ───────── -->
-<section class="sec" id="oss" aria-labelledby="oss-h">
+<section class="sec alt" id="oss" aria-labelledby="oss-h">
   <div class="wrap oss">
     <div>
       <p class="eyebrow">开源 · GPL-3.0</p>
-      <h2 class="h-sec" id="oss-h">一根一根，<br><em>一起织起来。</em></h2>
-      <p class="lead">欢迎提交 Issue 和 PR。最有帮助的，是<strong>真实文件中出现的显示错误</strong>。</p>
+      <h2 class="h-sec" id="oss-h">一起来编织。</h2>
+      <p class="lead">最有帮助的，是那些打不开或显示不对的文件。</p>
       <ul class="ways">
-        <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg><div><b>反馈出问题的文件</b><span>请把无法正常打开的 DOCX、HWPX、PDF 去除敏感信息后作为样本发给我们。</span></div></li>
-        <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><div><b>贡献代码</b><span>TypeScript (strict) · React · Tauri 2。开发环境和提交规范见 CONTRIBUTING.md。</span></div></li>
-        <li class="c-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3 4.7-5"/></svg><div><b>净室原则</b><span>不对第三方二进制文件进行逆向工程，只依据公开标准（ISO 32000、ECMA-376、KS X 6101）实现。</span></div></li>
+        <li class="c-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M9.5 12.5l5 5M14.5 12.5l-5 5"/></svg><div><b>反馈文件</b><span>删去敏感内容的样本就够了。</span></div></li>
+        <li class="c-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg><div><b>贡献代码</b><span>TypeScript、React、Tauri 2。规则见 CONTRIBUTING.md。</span></div></li>
       </ul>
       <div class="btn-row mt-28">
         <a class="btn btn-primary" data-repo="" data-on-text="GitHub 仓库" data-off-text="仓库即将公开" aria-disabled="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-6 3-11 6.6"/></svg>
           <span class="t">仓库即将公开</span>
         </a>
-        <a class="btn btn-ghost" data-repo="/blob/main/CONTRIBUTING.md" data-on-text="贡献指南" data-off-text="贡献指南（公开后开放）" aria-disabled="true"><span class="t">贡献指南（公开后开放）</span></a>
+        <a class="btn btn-ghost" data-repo="/blob/main/CONTRIBUTING.md" data-on-text="贡献指南" data-off-text="贡献指南（公开后）" aria-disabled="true"><span class="t">贡献指南（公开后）</span></a>
       </div>
     </div>
     <div>
       <div class="term">
         <div class="term-h"><span>从源码运行 · Node.js 18 及以上</span><button type="button" class="copy" data-copy="qs">复制</button></div>
-<pre id="qs"><span class="c"># 仓库公开后即可使用</span>
-git clone https://github.com/wind2sp/omniweave.git
+<pre id="qs">git clone https://github.com/wind2sp/omniweave.git
 cd omniweave
 npm i
 npm run dev      <span class="c"># 在浏览器中运行</span>
 npm test         <span class="c"># 单元测试</span>
 npm run bench    <span class="c"># Loom 基准测试</span></pre>
       </div>
-      <p class="road-h">接下来 <span class="note">（顺序可能调整）</span></p>
-      <ul class="road"><li>四种语言界面（韩语、英语、日语、中文） <span class="note-inline done">已完成</span></li><li>原文件无损保存 — PDF、PSD 开发中</li><li>DOCX/HWPX 保留原文件（直通）保存</li><li>将 DOCX/HWPX 表格按表格导入</li><li>保留可选文字的 PDF 导出 — 开发中</li><li>代码签名的安装包</li><li>WebGPU 渲染器 · Rust/WASM 内核</li><li>正式支持 macOS 和 Linux</li></ul>
     </div>
   </div>
 </section>
 
 <!-- ───────── 이름 이야기 ───────── -->
-<section class="sec alt" id="name" aria-labelledby="name-h">
+<section class="sec" id="name" aria-labelledby="name-h">
   <div class="wrap">
     <div class="name-story">
       <div>
         <p class="eyebrow">名字的由来</p>
         <h2 class="h-sec" id="name-h">为什么叫<em>“欧梅”</em>？</h2>
-        <p class="lead">“오메（Ome）！”是韩国西南部全罗道的方言感叹词，人们在吃惊或赞叹时会脱口而出，意思接近“哎呀！”“哇！”。就算是其他地区的韩国人，听到也会觉得很有地方味儿。</p>
-        <p class="lead">它同时也是 <strong>Om</strong>niweave 开头的发音（OM-niweave → 오메）。第一次看到图片、文档、PDF 和幻灯片都能在一块画布上搞定时，那声脱口而出的“哇！”，就是这个名字的由来。中文名“欧梅”取其音，梅花也寓意坚韧与美好。</p>
-        <p class="name-quote">“一个文件全搞定？欧梅！”</p>
+        <p class="lead">“오메！”(Ome)是韩国全罗道人吃惊或赞叹时脱口而出的方言，意思接近“哎呀！”“哇！”。它也是 <strong>Om</strong>niweave 的开头字母。</p>
+        <p class="name-quote">“一个文件全搞定？오메！”</p>
       </div>
       <dl class="say">
         <div lang="ko"><dt>한국어</dt><dd><b>오메</b><span>[o.me]</span></dd></div>
@@ -403,15 +426,16 @@ npm run bench    <span class="c"># Loom 基准测试</span></pre>
 <section class="cta" aria-labelledby="cta-h">
   <div class="wrap">
     <img src="../assets/img/icon-192.png" alt="" width="72" height="72" loading="lazy">
-    <h2 id="cta-h">原文件保持原样，<br><span class="grad">编辑集中一处。</span></h2>
+    <h2 id="cta-h">收到什么文件，<br><span class="grad">就用 Omniweave 打开。</span></h2>
     <div class="btn-row">
       <a class="btn btn-primary btn-lg" href="download.html" data-cta data-on-text="免费下载" data-off-text="下载 · 即将发布">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
         <span class="t">下载 · 即将发布</span>
       </a>
-      <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">无需安装，立即试用</span></a>
+      <a class="btn btn-ghost btn-lg" data-store hidden rel="noopener">从 Microsoft Store 获取</a>
+      <a class="btn btn-ghost btn-lg" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">在浏览器中试用</span></a>
     </div>
-    <p class="dl-meta">v<span data-cfg="version">0.1.0</span> · Windows 10·11 · 安装包约 17 MB · 免费 · GPL-3.0</p>
+    <p class="dl-meta">v<span data-cfg="version">0.2.0</span> · 免费 · GPL-3.0</p>
   </div>
 </section>
 
@@ -422,25 +446,25 @@ npm run bench    <span class="c"># Loom 基准测试</span></pre>
     <div class="ft">
       <div>
         <div class="brand"><img src="../assets/img/logo-96.png" alt="" width="28" height="28" loading="lazy">Omniweave (欧梅)</div>
-        <p class="mt-10">不破坏原文件的本地 6 合 1 编辑器。位图、矢量、PDF、DOCX、HWPX、幻灯片，还有 PSD，都在同一张画布上。</p>
-        <p class="mt-10 name-line">“欧梅”（韩语 오메，Ome）是韩国全罗道方言里表示惊叹的口头语，相当于“哎呀！”“哇！”；同时也取自 <b>Om</b>niweave 的开头。</p>
+        <p class="mt-10">免费开源编辑器：任何格式都在一块画布上打开，工作统一保存为一个 .omw 文件。</p>
       </div>
       <div>
         <h2>浏览</h2>
-        <ul><li><a href="#modules">六合一模块</a></li><li><a href="#loom">Loom 引擎</a></li><li><a href="#omw">.omw 格式</a></li><li><a href="#faq">坦诚的常见问题</a></li><li><a href="#name">名字的由来</a></li><li><a href="download.html">下载</a></li></ul>
+        <ul><li><a href="index.html#omw">.omw 格式</a></li><li><a href="index.html#tour">界面导览</a></li><li><a href="index.html#loom">Loom 引擎</a></li><li><a href="index.html#faq">常见问题</a></li><li><a href="index.html#name">名字的由来</a></li><li><a href="download.html">下载</a></li></ul>
       </div>
       <div>
         <h2>项目</h2>
         <ul>
           <li><a data-repo="" data-on-text="GitHub 仓库" data-off-text="GitHub 仓库（即将公开）"><span class="t">GitHub 仓库（即将公开）</span></a></li>
           <li><a data-repo="/issues" data-on-text="Issue 与问题反馈" data-off-text="Issue（公开后开放）"><span class="t">Issue（公开后开放）</span></a></li>
-          <li><a data-repo="/blob/main/LICENSE" data-on-text="GPL-3.0 许可证全文" data-off-text="GPL-3.0 许可证"><span class="t">GPL-3.0 许可证</span></a></li>
+          <li><a data-repo="/blob/main/LICENSE" data-on-text="许可证全文" data-off-text="许可证全文"><span class="t">许可证全文</span></a></li>
         </ul>
       </div>
     </div>
     <div class="legal">
-      <p><strong>许可证</strong> GPL-3.0-or-later（GNU 通用公共许可证第 3 版或更高版本）。本软件按“原样”提供，不附带任何形式的保证。 <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later · wind2sp@9rowpar.com</span></p>
-      <p><strong>净室实现</strong> 我们不对任何第三方商业软件的二进制文件进行逆向工程，仅依据公开标准和公开文档（ISO 32000 PDF、ECMA-376 Office Open XML、KS X 6101 HWPX/OWPML 等）实现。</p>
+      <p><span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · wind2sp@9rowpar.com</span></p>
+      <p><strong>许可证</strong> GPL-3.0-or-later（GNU 通用公共许可证第3版或更高版本）。按“原样”提供，不作任何担保。</p>
+      <p><strong>净室开发</strong> 不对其他公司的软件做逆向工程，只依据公开标准实现，如 ISO 32000 (PDF)、ECMA-376 (Office Open XML)、KS X 6101 (HWPX)。</p>
       <p><strong>商标</strong> Omniweave™ and the Omniweave logo are trademarks of the project's copyright holder. Microsoft, Windows, Word, Excel, PowerPoint, Office, WebView2 and Edge are trademarks of Microsoft Corporation. Adobe, Photoshop, Illustrator, Acrobat and PostScript are registered trademarks or trademarks of Adobe Inc. Hangul, Hancom and HWP are trademarks of Hancom Inc. AutoCAD, Autodesk and DXF are registered trademarks or trademarks of Autodesk, Inc. in the USA and other countries; "DWG" names the drawing file format. ACIS is a trademark of Spatial Corp. All other names are the property of their owners. Omniweave is not affiliated with, sponsored or endorsed by any of these companies; their names are used only to describe file compatibility.</p>
       <p><strong>使用的开源项目</strong> pdf.js、pdf-lib、fflate、cbor-x、polygon-clipping、immer、zustand、React、Tauri。本站的西文与韩文字体为 Pretendard (SIL Open Font License)。</p>
     </div>
@@ -448,7 +472,7 @@ npm run bench    <span class="c"># Loom 基准测试</span></pre>
 </footer>
 
 <script type="application/json" id="i18n">{"soon":"即将发布","preparing":"暂未提供","platformsBtn":"查看各平台文件","mobileMsg":"Omniweave 是桌面应用，请在 Windows、macOS 或 Linux 电脑上打开本页面。","unknownMsg":"无法识别你的操作系统，请在下方选择。","dlFor":"下载 {os} 版","installerSuffix":"（安装版）","experimentalBuild":"实验性版本","soonFor":"{os} 版 · 即将发布","prepFor":"{os} 版 · 暂未提供","notAvailable":"该平台暂时还没有安装文件，请查看下方列表。","firstRelease":"首个版本 v{v} 正在准备中。","copied":"已复制","locale":"zh-CN","loomStroke":"本次笔画：\u003cspan class=\"m\">重绘屏幕图块 {n} 个\u003c/span> · \u003cspan class=\"h\">直接复用 {r} 个\u003c/span>（共 {t} 个）","loomUndo":"撤销：旧的键重新出现，\u003cspan class=\"h\">{n} 个图块直接命中缓存\u003c/span> · 重绘 0 个"}</script>
-<script src="../assets/js/site.js?v=5" defer></script>
-<script src="../assets/js/loom.js?v=5" defer></script>
+<script src="../assets/js/site.js?v=6" defer></script>
+<script src="../assets/js/loom.js?v=6" defer></script>
 </body>
 </html>

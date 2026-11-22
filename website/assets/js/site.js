@@ -73,6 +73,11 @@
       if (c.demoPublic) { a.href = isHttp(u) || u.charAt(0) === '/' ? u : ROOT + u; a.hidden = false; }
       else { a.removeAttribute('href'); a.hidden = true; }
     });
+    // Microsoft Store 링크: config.json의 storeUrl이 http(s) 주소일 때만 보입니다(공식 배지 그림은 쓰지 않음).
+    $$('[data-store]').forEach(function (a) {
+      if (isHttp(c.storeUrl)) { a.href = c.storeUrl; a.hidden = false; }
+      else { a.removeAttribute('href'); a.hidden = true; }
+    });
     $$('[data-release-page]').forEach(function (a) {
       if (released && c.repoPublic && isHttp(c.releasePageUrl)) { a.href = c.releasePageUrl; a.hidden = false; }
       else { a.hidden = true; }
@@ -100,20 +105,6 @@
 
     // 체크섬 예시 안의 파일 이름
     $$('[data-ver]').forEach(function (el) { el.textContent = c.version || el.textContent; });
-
-    // 스크린샷: config.json의 screenshots.<이름>에 경로가 있으면 자리표시자 대신 표시
-    var shots = c.screenshots || {};
-    $$('[data-shot]').forEach(function (body) {
-      var src = shots[body.getAttribute('data-shot')];
-      if (!src || body.querySelector('img')) return;
-      var img = new Image();
-      img.alt = body.getAttribute('data-alt') || '';
-      img.decoding = 'async';
-      img.onload = function () { body.classList.add('has-img'); };
-      img.onerror = function () { img.hidden = true; };
-      img.src = isHttp(src) || src.charAt(0) === '/' ? src : ROOT + src;
-      body.insertBefore(img, body.firstChild);
-    });
 
     recommend(c);
   }
@@ -172,7 +163,10 @@
       });
     });
     var os = detectOS(), pre = tabs.filter(function (t) { return t.getAttribute('data-os') === os; })[0];
-    if (pre) pick(pre);
+    // 주소 끝의 #<패널 id>(예: index.html#tp-pdf)로 그 탭을 바로 열 수 있습니다.
+    var want = location.hash && tabs.filter(function (t) { return '#' + t.getAttribute('aria-controls') === location.hash; })[0];
+    if (want || pre) pick(want || pre);
+    if (want && list.closest('section')) setTimeout(function () { list.closest('section').scrollIntoView(); }, 0);
   });
 
   // 기본값으로 먼저 한 번 그린 뒤, config.json으로 덮어씁니다.

@@ -36,8 +36,8 @@
       <img src="{{_root}}assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>{{common.logoSub}}</span>
     </a>
     <nav class="nav-links" aria-label="{{common.navAria|a}}">
-      <a href="index.html#modules">{{common.nav.modules}}</a>
-      <a href="index.html#loom">{{common.nav.loom}}</a>
+      <a href="index.html#omw">{{common.nav.vision}}</a>
+      <a href="index.html#tour">{{common.nav.tour}}</a>
       <a href="index.html#faq">{{common.nav.faq}}</a>
       <a href="download.html" aria-current="page">{{common.nav.download}}</a>
     </nav>
@@ -59,6 +59,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
         <span class="t">{{common.soon}}</span>
       </a>
+      <a class="btn btn-ghost btn-lg" data-store hidden rel="noopener">{{common.store}}</a>
     </div>
     <p class="rec-sub" id="rec-sub" aria-live="polite">{{dl.recInit}}</p>
 
@@ -213,11 +214,30 @@ npm run dev</pre>
 
 <footer>
   <div class="wrap">
+    <div class="ft">
+      <div>
+        <div class="brand"><img src="{{_root}}assets/img/logo-96.png" alt="" width="28" height="28" loading="lazy">Omniweave ({{common.logoSub}})</div>
+        <p class="mt-10">{{common.footer.tagline}}</p>
+      </div>
+      <div>
+        <h2>{{common.footer.exploreH}}</h2>
+        <ul><li><a href="index.html#omw">{{common.footer.l1}}</a></li><li><a href="index.html#tour">{{common.footer.l2}}</a></li><li><a href="index.html#loom">{{common.footer.l3}}</a></li><li><a href="index.html#faq">{{common.footer.l4}}</a></li><li><a href="index.html#name">{{common.footer.l5}}</a></li><li><a href="download.html">{{common.nav.download}}</a></li></ul>
+      </div>
+      <div>
+        <h2>{{common.footer.projectH}}</h2>
+        <ul>
+          <li><a data-repo="" data-on-text="{{common.repoOn|a}}" data-off-text="{{common.footer.repoOff|a}}"><span class="t">{{common.footer.repoOff}}</span></a></li>
+          <li><a data-repo="/issues" data-on-text="{{common.footer.issuesOn|a}}" data-off-text="{{common.footer.issuesOff|a}}"><span class="t">{{common.footer.issuesOff}}</span></a></li>
+          <li><a data-repo="/blob/main/LICENSE" data-on-text="{{common.footer.licenseOn|a}}" data-off-text="{{common.footer.licenseOff|a}}"><span class="t">{{common.footer.licenseOff}}</span></a></li>
+        </ul>
+      </div>
+    </div>
     <div class="legal">
-      <p><strong>Omniweave ({{common.logoSub}})</strong> · <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later · wind2sp@9rowpar.com</span> · {{common.footer.license}}</p>
-      <p class="name-line">{{common.footer.nameLine}}</p>
-      <p><strong>{{common.footer.tmH}}</strong> {{dl.tm}}</p>
-      <p><a href="index.html">{{common.nav.home}}</a> · <a href="index.html#faq">FAQ</a> · <a href="index.html#name">{{common.footer.l5}}</a> · <a data-repo="" data-on-text="{{common.repoOn|a}}" data-off-text="{{common.footer.repoOff|a}}"><span class="t">{{common.footer.repoOff}}</span></a></p>
+      <p><span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · wind2sp@9rowpar.com</span></p>
+      <p><strong>{{common.footer.licenseH}}</strong> {{common.footer.license}}</p>
+      <p><strong>{{common.footer.cleanH}}</strong> {{common.footer.clean}}</p>
+      <p><strong>{{common.footer.tmH}}</strong> {{common.footer.tm}}</p>
+      <p><strong>{{common.footer.ossH}}</strong> {{common.footer.oss}}</p>
     </div>
   </div>
 </footer>

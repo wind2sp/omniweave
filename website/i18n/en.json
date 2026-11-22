@@ -32,13 +32,14 @@
     "langAria": "Choose language",
     "logoSub": "Ome",
     "nav": {
-      "modules": "Modules",
+      "vision": ".omw",
+      "tour": "Tour",
+      "proof": "Numbers",
       "loom": "Loom engine",
       "faq": "FAQ",
       "oss": "Open source",
       "download": "Download",
-      "home": "Home",
-      "proof": "Proof"
+      "home": "Home"
     },
     "ctaOn": "Download free",
     "ctaOff": "Download · coming soon",
@@ -49,355 +50,279 @@
     "repoOff": "Repository going public soon",
     "ogImageAlt": "Omniweave logo with the line: file formats are just exits — editing happens on one canvas.",
     "footer": {
-      "tagline": "A local 6-in-1 editor that doesn't break your originals. Raster, vector, PDF, DOCX, HWPX, slides — and PSD — on one canvas.",
-      "nameLine": "“Ome” (Oh-meh) is what people in Korea's Jeolla region blurt out when something amazes them — think “Oh my!” — and it's also the first letters of <b>Om</b>niweave.",
+      "tagline": "A free, open-source editor that opens any format on one canvas and keeps the work in a single .omw file.",
       "exploreH": "Explore",
-      "l1": "6-in-1 modules",
-      "l2": "Loom engine",
-      "l3": ".omw format",
-      "l4": "Honest FAQ",
+      "l1": "The .omw format",
+      "l2": "Tour",
+      "l3": "Loom engine",
+      "l4": "FAQ",
       "l5": "About the name",
       "projectH": "Project",
       "repoOff": "GitHub repository (going public soon)",
       "issuesOn": "Issues & bug reports",
       "issuesOff": "Issues (after launch)",
-      "licenseOn": "Full GPL-3.0 license",
-      "licenseOff": "GPL-3.0 license",
+      "licenseOn": "License text",
+      "licenseOff": "License text",
       "licenseH": "License",
-      "license": "GPL-3.0-or-later (GNU General Public License v3 or later). The software is provided “as is”, without warranty of any kind.",
+      "license": "GPL-3.0-or-later (GNU General Public License v3 or later). Provided “as is”, without warranty of any kind.",
       "cleanH": "Clean room",
-      "clean": "We never reverse-engineer binaries of commercial third-party software. Everything is built only from public standards and public documentation (ISO 32000 PDF, ECMA-376 Office Open XML, KS X 6101 HWPX/OWPML and others).",
+      "clean": "No reverse engineering of other companies' software. Built only from public standards such as ISO 32000 (PDF), ECMA-376 (Office Open XML) and KS X 6101 (HWPX).",
       "tmH": "Trademarks",
       "tm": "Omniweave™ and the Omniweave logo are trademarks of the project's copyright holder. Microsoft, Windows, Word, Excel, PowerPoint, Office, WebView2 and Edge are trademarks of Microsoft Corporation. Adobe, Photoshop, Illustrator, Acrobat and PostScript are registered trademarks or trademarks of Adobe Inc. Hangul, Hancom and HWP are trademarks of Hancom Inc. AutoCAD, Autodesk and DXF are registered trademarks or trademarks of Autodesk, Inc. in the USA and other countries; \"DWG\" names the drawing file format. ACIS is a trademark of Spatial Corp. All other names are the property of their owners. Omniweave is not affiliated with, sponsored or endorsed by any of these companies; their names are used only to describe file compatibility.",
       "ossH": "Open source used",
       "oss": "pdf.js, pdf-lib, fflate, cbor-x, polygon-clipping, immer, zustand, React, Tauri. This site uses the Pretendard typeface (SIL Open Font License)."
-    }
+    },
+    "store": "Get it from Microsoft Store"
   },
   "index": {
-    "title": "Omniweave — a local 6-in-1 editor that doesn't break your originals",
-    "description": "A free, open-source (GPL-3.0) editor with a ~17 MB installer that never uploads your files. Open, edit and save raster, vector (AI), PDF, DOCX, HWPX, slides and PSD on one canvas.",
-    "ogTitle": "Omniweave — a local 6-in-1 editor that doesn't break your originals",
-    "ogDescription": "~17 MB installer · your files never leave your PC · raster, vector, PDF, DOCX, HWPX, slides and PSD on one canvas.",
+    "title": "Omniweave — every document, one .omw file",
+    "description": "A free, open-source editor that opens DOCX, HWPX, PPTX, PDF, PSD and DWG on one canvas. Keep your work in a single open .omw file and export back to the original format when you share it.",
+    "ogTitle": "Omniweave — every document, one .omw file",
+    "ogDescription": "Open any format on one canvas and keep the work in one .omw file. Free and open source.",
     "hero": {
-      "pillSoon": "v<span data-cfg=\"version\">0.1.0</span> coming soon",
-      "pillOut": "v<span data-cfg=\"version\">0.1.0</span> is out",
-      "pillFree": "Free · open source (GPL-3.0)",
-      "h1a": "A local 6-in-1 editor",
-      "h1b": "that doesn't break your originals.",
-      "lead": "A ~17 MB installer. Your files are never uploaded anywhere. Raster, vector (AI), PDF, DOCX, HWPX, slides — and PSD — open, edit and save them on one canvas.",
-      "how": "See the measurements",
-      "meta": "Windows 10·11 · UI in Korean, English, Japanese and Chinese · runs in the browser · macOS and Linux builds are experimental",
-      "chipsAria": "Supported formats",
-      "shotAlt": "Omniweave in action — raster, vector, document and slide objects on one canvas.",
-      "phAria": "Placeholder illustration of the app — real screenshot coming soon.",
-      "phCap": "Real screenshot coming soon",
-      "demo": "Try it now — no install"
+      "pillSoon": "v<span data-cfg=\"version\">0.2.0</span> coming soon",
+      "pillOut": "v<span data-cfg=\"version\">0.2.0</span> is out",
+      "pillFree": "Free · open source · GPL-3.0",
+      "h1a": "Files arrive in every format.",
+      "h1b": "Your work lives in one .omw.",
+      "lead": "Open anything on one canvas and edit it there. When it's time to send, export back to the original format.",
+      "how": "Take the tour",
+      "meta": "Windows 10 and 11 · about 17 MB installer · Korean, English, Japanese, Chinese",
+      "demo": "Try it in your browser"
     },
-    "proof": {
-      "eyebrow": "Proof, not adjectives",
-      "h2": "Only what we measured.<br><em>And what doesn't work yet.</em>",
-      "lead": "Every number below comes from an actual run, with its conditions. Work that is still in progress is marked “in progress”.",
-      "size": {
-        "k": "Installer size",
-        "d": "Windows x64 installer, 0.1.0 development build (10,239,987 bytes). Rendering uses WebView2, which ships with Windows."
-      },
-      "corpus": {
-        "k": "Opened 81 real-world sample files",
-        "d": "65 succeeded · 8 partial · 0 failed · 8 unsupported with an explanation. “Partial” means cases like legacy DOC/HWP (text and tables only) or PSD (effects and adjustments excluded)."
-      },
-      "local": {
-        "unit": "servers",
-        "k": "Servers your files are sent to",
-        "d": "Opening, editing, saving, converting and the quick tools all run on your PC. The network is used only to check for new versions (GitHub Releases)."
-      },
-      "crypto": {
-        "k": "Encrypted documents stay encrypted",
-        "d": "PDF (AES-256) · DOCX/XLSX/PPTX (Office Agile) · .omw (AES-256-GCM). Edited files are re-encrypted on save; re-encrypted Office files were verified to open in Microsoft Office 16."
-      },
-      "formatsH": "40+ file extensions",
-      "formats": "Documents, spreadsheets, slides, images, PSD, video, audio, e-books, text and code. Each format states its support level (full, partial, or an explanation).",
-      "historyH": "History timeline",
-      "history": "Every command since you started is recorded. Preview any point and jump back in one step; the history is saved inside the .omw.",
-      "toolsH": "6 quick tools · local",
-      "tools": "Merge PDFs, shrink PDFs, PDF→JPG, images→PDF, shrink photos, batch JPG conversion — processed on your PC instead of an upload website.",
-      "losslessH": "Lossless save of originals <span class=\"note-inline\">in progress</span>",
-      "lossless": "Goal: parts you didn't edit are saved byte-for-byte as in the original. In progress for PDF and PSD; DOCX and HWPX are on the roadmap. Today, saving DOCX/HWPX writes a new document from what Omniweave understood.",
-      "signH": "Code signing",
-      "sign": "Current builds are not code-signed yet, so SmartScreen may warn on first run. The download page explains how to verify files with SHA-256.",
-      "uiH": "Language",
-      "ui": "The app UI is available in Korean, English, Japanese and Chinese: pick one in the installer and change it any time in Preferences. This website is available in the same four languages.",
-      "note": "Sample results copy only the counts from <code>test-corpus/REPORT.md</code> (file contents and names are not published). Installer size is from a development build and may change per release."
+    "flow": {
+      "aria": "DOCX, HWPX, PPTX, XLSX, PDF, PSD, AI and DWG files flow into Omniweave and are kept as one .omw file, then exported back to formats such as DOCX, PDF and PNG when needed",
+      "app": "one canvas",
+      "s1h": "Open",
+      "s1": "files as you received them",
+      "s2h": "Keep",
+      "s2": "all the work in one .omw",
+      "s3h": "Export",
+      "s3": "back to the original format",
+      "goalTag": "Goal",
+      "goal": "make .omw a shared working file anyone can read and write"
     },
-    "chips": {
-      "raster": "Raster",
-      "vector": "Vector",
-      "slides": "Slides"
-    },
-    "why": {
-      "eyebrow": "Why we built it",
-      "h2": "One job.<br><em>Six programs.</em>",
-      "lead": "An image editor, an illustration tool, a PDF editor, two word processors (DOCX and HWPX), a slide app. You paste the same logo six times and re-fit the same paragraph six different ways.",
-      "s1": "Place images and text",
-      "s2": "Draw shapes and lines",
-      "s3": "Tweak the position, size, color, opacity and font of whatever is selected",
-      "claim": "<strong>Different names, same work.</strong> Pages or layers, vectors or bitmaps — in the end that only decides <strong>how the result is saved</strong>. It doesn't matter while you're editing."
-    },
-    "matrix": {
-      "caption": "What your hands actually do is the same in all six. What differs is feature depth and the file format.",
-      "task": "Task",
-      "yes": "yes",
-      "c1": "Image",
-      "c2": "Illustration",
-      "c4": "DOCX",
-      "c5": "HWPX",
-      "c6": "Slides",
-      "h1": "Image",
-      "h2": "Illus&shy;tration",
-      "h4": "DOCX",
-      "h5": "HWPX",
-      "h6": "Slides",
-      "rows": [
-        "Place images",
-        "Text & styling",
-        "Shapes & lines",
-        "Move, resize, rotate",
-        "Color, opacity, order",
-        "Undo"
-      ]
-    },
-    "mods": {
-      "eyebrow": "6-in-1 modules",
-      "h2": "Six kinds of work,<br><em>one scene graph.</em>",
-      "lead": "Raster tiles, Bézier paths, text paragraphs, tables, PDF pages, images and video are all the same kind of node. Only what is implemented in code today is listed. Depth per format is where we compete.",
-      "raster": {
-        "name": "Raster",
-        "like": "Images · PSD",
-        "items": [
-          "256 px tile brush and eraser (pressure, hardness, opacity)",
-          "Open <strong>PSD</strong>: pixel layers + composite (effects and adjustment layers excluded)",
-          "Open TIFF, WebP, AVIF and more"
-        ]
-      },
-      "vector": {
-        "name": "Vector",
-        "like": "Vector · AI · SVG",
-        "items": [
-          "Pen (Bézier handles), direct selection, rectangle, ellipse",
-          "Pathfinder unite/subtract/intersect/exclude",
-          "Open <strong>AI</strong> files (saved with PDF compatibility)"
-        ]
-      },
-      "pdf": {
-        "like": "PDF editing",
-        "items": [
-          "Render pages + elevate text into <strong>editable line-level text objects</strong>",
-          "Open and re-encrypt password-protected PDFs (AES-256)",
-          "Quick tools: merge, shrink, convert to JPG"
-        ]
-      },
-      "word": {
-        "items": [
-          "Open and save DOCX paragraph and character formatting",
-          "Edit table objects · save to DOCX",
-          "Legacy DOC: import body text and table contents"
-        ]
-      },
-      "hwpx": {
-        "name": "HWPX",
-        "items": [
-          "Open and save HWPX (clean-room, from the public OWPML structure)",
-          "Legacy HWP (5.0): import body text and table contents",
-          "Hangul line breaking by grapheme and eojeol"
-        ]
+    "tour": {
+      "eyebrow": "Tour",
+      "h2": "One app.<br><em>Just switch modes.</em>",
+      "lead": "Every screen below is the real app. Pick a tab.",
+      "tabsAria": "Editing modes",
+      "note": "The files on screen are sample files made for testing.",
+      "doc": {
+        "name": "Document",
+        "fmt": "DOCX · HWPX · DOC · HWP",
+        "line": "A document editor with a heading outline and page setup",
+        "h1": "Mode switcher",
+        "h2": "Heading outline",
+        "h3": "Page size and margins",
+        "alt": "Document mode in the real app: heading outline on the left, a sample report in the middle, page setup on the right."
       },
       "slides": {
         "name": "Slides",
-        "like": "PPTX · PPT",
-        "items": [
-          "Open and save PPTX (text, shapes, pictures, tables, backgrounds)",
-          "Masters · transitions FADE / SLIDE_LEFT / ZOOM",
-          "Keyframe animation · full-screen slideshow"
-        ]
+        "fmt": "PPTX · PPT",
+        "line": "Masters, transitions and a full-screen slide show",
+        "h1": "Slide list",
+        "h2": "Transitions",
+        "h3": "Present",
+        "alt": "Slides mode in the real app: slide list on the left and a slide with a title and shapes in the middle."
       },
-      "note": "Import has limits — please read the <a href=\"#faq\" class=\"grad\">honest FAQ</a> first."
+      "image": {
+        "name": "Image",
+        "fmt": "PSD · PNG · JPG · WebP",
+        "line": "Open PSD layers as they are and keep editing",
+        "h1": "Layers",
+        "h2": "Blend modes",
+        "h3": "Drawing tools",
+        "alt": "Image mode in the real app: PSD layer list on the left and a picture made of overlapping layers in the middle."
+      },
+      "design": {
+        "name": "Design",
+        "fmt": "AI · SVG",
+        "line": "Shapes and gradients from AI files, kept intact",
+        "h1": "Pages",
+        "h2": "Pen and shape tools",
+        "h3": "Size presets",
+        "alt": "Design mode in the real app showing linear and radial gradient shapes from an AI file."
+      },
+      "pdf": {
+        "name": "PDF",
+        "fmt": "PDF",
+        "line": "Turn text into editable objects and fix it in place",
+        "h1": "Edit text",
+        "h2": "Organize pages",
+        "h3": "Comments, forms, signatures",
+        "alt": "PDF mode in the real app with text editing, page, comment and signature tools along the top."
+      },
+      "drawing": {
+        "name": "Drawing",
+        "fmt": "DWG · DXF",
+        "line": "Import drawings and edit their layers and lines",
+        "h1": "Drawing layers",
+        "h2": "Modify commands",
+        "h3": "Command line",
+        "alt": "Drawing mode in the real app: drawing layer list on the left and lines of different weights in the middle."
+      }
     },
-    "common": {
-      "allH": "The same for every object",
-      "all": "Select, move, resize, rotate, opacity, blend modes, lock and hide, reorder, undo.",
-      "exportH": "Export",
-      "typoH": "Korean typesetting",
-      "typo": "Line breaks by grapheme with <code>Intl.Segmenter</code>, so Hangul syllables never split, plus word-level <code>keep-all</code> wrapping."
+    "omw": {
+      "eyebrow": "The .omw format",
+      "h2": "A working file<br><em>that isn't locked up.</em>",
+      "lead": "A file everyone can use has to be one everyone can open. So .omw has been open from day one.",
+      "f1h": "Just a zip",
+      "f1": "Open it with any archive tool and look inside, unless it's password-protected.",
+      "f2h": "Documented layout",
+      "f2": "What goes where inside the package is written down and public.",
+      "f3h": "GPL open source",
+      "f3": "The code that reads and writes .omw is there for anyone to study and reuse.",
+      "goal": "Today Omniweave is the only app that opens .omw. The goal is a common format that other tools read and write too.",
+      "treeSummary": "Show the package layout",
+      "treeAria": ".omw package layout",
+      "t1": "format marker (first entry, stored)",
+      "t2": "metadata and page index",
+      "t3": "the full editable content",
+      "t4": "deduplicated 256×256 pixel tiles",
+      "t5": "original images, PDFs and fonts",
+      "t6": "slide order and transitions (copy)",
+      "t8": "vector paths (copy)",
+      "t9": "document paragraphs (copy)",
+      "t10": "plain text for search",
+      "treeNote": "Omniweave reads only scene_graph.cbor and the content pieces; the copies are there for other tools. Every piece is re-hashed on open, and only damaged pieces are skipped."
+    },
+    "proof": {
+      "eyebrow": "By the numbers",
+      "h2": "Only what we measured.",
+      "size": {
+        "k": "Installer",
+        "d": "AI models included, Windows x64"
+      },
+      "corpus": {
+        "k": "Files that failed to open",
+        "d": "91 real-world samples checked"
+      },
+      "same": {
+        "unit": "B",
+        "k": "Bytes changed on an unedited save",
+        "d": "Untouched files stay identical"
+      },
+      "local": {
+        "unit": "",
+        "k": "Servers your files go to",
+        "d": "AI features run on your PC too"
+      },
+      "notesSummary": "How we measured, and the limits",
+      "notes": [
+        "Installer: Omniweave_0.2.0_x64-setup.exe, 17,464,150 bytes (unsigned build). Sizes vary between releases.",
+        "Real-world samples: pre-release check on 2026-11-22. Every file ended as full, partial or explained (the app says why it can't open it). File names and contents stay private.",
+        "Byte-identical saves: confirmed on every DOCX, HWPX, XLSX, PPTX and PDF sample in the repository, and 259/259 for PSD.",
+        "The internet is used only to check for new versions (GitHub Releases).",
+        "Encrypted files (PDF AES-256, Office Agile, .omw AES-256-GCM) are encrypted again when you save.",
+        "This is an early release. Keep copies of important originals."
+      ]
     },
     "loom": {
       "eyebrow": "Loom engine",
-      "h2": "Everything gets<br><em>a content address.</em>",
-      "lead": "Every pixel tile, node and asset has its own 64-bit content address. The screen, saving and undo are all functions of those addresses.",
-      "thread": "Content addresses for 256 px pixel tiles, nodes and assets. Identical tiles are stored once, and on open every hash is recomputed so only damaged pieces get skipped.",
-      "weave": "A screen tile's key is the hash of the pieces that touch it. With <strong>no dirty flags and no invalidation code</strong>, “I erased it but it's still on screen” bugs simply can't happen by design.",
-      "shuttle": "Writes only never-seen pieces to IndexedDB, incrementally. Autosave stays light, and you can recover after a crash.",
+      "h2": "Redraw and resave<br><em>only what changed.</em>",
+      "lead": "Every tile and object gets a content address, so identical pieces are stored once.",
+      "moreSummary": "How it works and how we measured",
+      "thread": "64-bit content addresses for 256px tiles, objects and assets. A repeated tile is stored in the file only once.",
+      "weave": "A screen tile's key is the hash of the pieces that touch it. There's no invalidation code, so stale pixels can't linger by design.",
+      "shuttle": "Only new pieces are written to IndexedDB. Autosave stays light and you can recover after a crash.",
       "historyName": "Immutable history",
-      "history": "Undo just swaps an immutable document reference. No pixels are copied, so its cost doesn't grow with document size.",
-      "canvasAria": "Illustration: a grid of 40 screen tiles on the left; on the right the tiles unravel into three threads — violet, teal and coral. Rubbing the grid redraws only the tiles you touch.",
-      "statInit": "Rub the grid. Only the screen tiles you touch get redrawn.",
+      "history": "Undo swaps a document reference instead of copying pixels.",
+      "canvasAria": "Illustration: rub the tile grid and only the tiles you touch are redrawn.",
+      "statInit": "Rub the grid. Only the tiles you touch are redrawn.",
       "paint": "Draw a stroke",
       "undo": "Undo",
-      "legendMiss": "Redrawn (key changed)",
-      "legendHit": "Cache hit (old key reused)",
-      "legendNote": "Simplified illustration · not a measurement"
+      "legendMiss": "Redrawn",
+      "legendHit": "Reused from cache",
+      "legendNote": "Illustration, not a measurement"
     },
     "metrics": {
-      "h": "Measurements",
       "m1k": "Tile data deduplicated",
-      "m1d": "Synthetic 4K document · 205 tile refs → 42 unique",
-      "m2k": ".omw file size",
-      "m2d": "Raw RGBA 51.3 MiB → 10.5 MiB deduped → saved",
-      "m3k": "Keys for a whole frame",
-      "m3d": "1920×1080 · 40 screen tiles · 31 nodes",
-      "m4k": "Undo + redo",
-      "m4d": "A deep copy of the same 4K document (<code>structuredClone</code>) takes 24–28 ms",
-      "note": "Measured with <code>bench/loom.bench.ts</code> (Vitest bench, Node, DOM-free code paths) on <strong>synthetic documents</strong>; real documents may differ. Machine: Intel Core Ultra 5 125H, Windows 11, Node v24.13.1 · range of means over two runs (other work was running, so variance is high) · save→open round trip: 0 corrupt · 0 missing · document root address matches. Rendering (canvas drawing) time is not included — the Loom meter in the app's status bar shows it live. Reproduce with <code>npm run bench</code>."
-    },
-    "omw": {
-      "eyebrow": ".omw format",
-      "h2": "Just a <em>zip you can open.</em>",
-      "lead": "<code>.omw</code> (Omniweave Workspace Package) is a plain zip container. Identical tiles go in once, along with copies other tools can read.",
-      "treeAria": "Structure of an .omw package",
-      "t1": "\"application/x-omniweave\" (stored, first entry)",
-      "t2": "metadata, Loom root address, page index",
-      "t3": "unified scene graph (pixels as tile addresses)",
-      "t4": "deduplicated 256×256 RGBA tiles",
-      "t5": "original images, PDFs, fonts",
-      "t6": "slide order, transitions, animations (copy)",
-      "t7": "slide masters (copy)",
-      "t8": "SVG paths of vector nodes (copy)",
-      "t9": "every text paragraph (copy)",
-      "t10": "plain text for search and indexing",
-      "f1h": "Verified on every open",
-      "f1": "Every tile and asset hash is recomputed. Pieces that don't match are skipped and counted, and the rest of the document opens normally.",
-      "f2h": "Only two things are needed to open it",
-      "f2": "Omniweave reads just <code>scene_graph.cbor</code> and the content-addressed pieces. Everything else is a <strong>read-only copy</strong> for other tools.",
-      "f3h": "Windows file association",
-      "f3": "The installer associates <code>.omw</code> with Omniweave, so a double-click opens it."
+      "m4k": "Undo and redo",
+      "note": "Measured with <code>npm run bench</code> (Vitest bench, Node) on a synthetic 4K document: 42 unique tiles out of 205 references, 51.3 MiB of raw pixels saved as a 1.43 MiB .omw, and undo plus redo in 0.09–0.18 ms (a deep copy of the same document takes 24–28 ms). Save and reopen: 0 damaged, 0 missing. Machine: Intel Core Ultra 5 125H, Windows 11, Node v24.13.1. Drawing time is not included."
     },
     "faq": {
       "eyebrow": "FAQ",
-      "h2": "The <em>honest</em> FAQ.",
-      "lead": "We're in early development, so here is what works and what doesn't — up front.",
+      "h2": "Questions",
       "items": [
         {
-          "q": "Does it fully replace the existing programs?",
-          "a": "<p>No. The goal is an <strong>integrated editor</strong> for many formats in one place, and depth per format is where we compete. Specialist features such as advanced filters, print separations, equation editors and track changes are out of scope today.</p>"
+          "q": "Do I still need my other apps?",
+          "a": "<p>Yes, for now. The aim is to handle many formats in one place; specialist features such as color separations or advanced filters are out of scope today.</p>"
         },
         {
-          "q": "What exactly does “doesn't break your originals” mean?",
-          "a": "<p>The direction is: <strong>parts you didn't edit are saved exactly as in the original</strong>. Honestly, today:</p><ul><li><strong>In progress:</strong> original-preserving save for PDF and PSD.</li><li><strong>Roadmap:</strong> original-preserving (pass-through) save for DOCX and HWPX.</li><li><strong>Today:</strong> saving to DOCX/HWPX writes a new document from what Omniweave understood (paragraphs, character formatting, table objects). Elements such as footnotes and headers can be lost.</li><li>Encrypted documents are re-encrypted when saved.</li></ul>"
+          "q": "Will I lose anything when I save to another format?",
+          "a": "<p>If something can't be carried over, Omniweave tells you what before it saves.</p>"
         },
         {
-          "q": "Will DOCX/HWPX files look exactly like the original?",
-          "a": "<p>Import is <strong>paragraph- and character-format centric</strong> (alignment, line spacing, font, size, color, bold/italic/underline). Not yet supported or simplified:</p><ul><li><strong>Tables</strong> inside DOCX/HWPX are not yet imported as tables; they flatten into paragraphs.</li><li>Footnotes/endnotes, headers/footers, page numbers, style inheritance, TOC, tracked changes.</li><li>Embedded pictures, shapes and equations.</li><li>Pagination is recomputed with A4 layout and may differ from the original.</li></ul>"
+          "q": "How does someone without Omniweave open my .omw?",
+          "a": "<p>Export to the original format, such as DOCX or PDF, and send that. Because .omw is a zip, the images and text copies inside can also be pulled out with other tools.</p>"
         },
         {
-          "q": "Can I edit PDFs?",
-          "a": "<p>Pages render as-is; “text elevation” turns the text into <strong>line-level text objects</strong> you can edit, covering the original glyphs with a background-colored rectangle. Text over complex backgrounds and reflowing columns or tables are not supported yet.</p><p>PDF export in the current release embeds each page as an image. Export with live text is in progress.</p>"
-        },
-        {
-          "q": "How far do PPTX, legacy HWP and PSD go?",
-          "a": "<ul><li><strong>PPTX:</strong> opens text, shapes, pictures, tables and backgrounds as slides and saves back to PPTX. Some picture formats such as EMF are skipped and some shapes are approximated as rectangles.</li><li><strong>Legacy HWP/DOC/PPT:</strong> body text and table contents only. For formatting and pictures, save as HWPX/DOCX/PPTX in the original program first.</li><li><strong>PSD:</strong> opens pixel layers and the composite image. Layer effects, adjustment layers and the text engine are excluded.</li></ul>"
-        },
-        {
-          "q": "Are my files really never uploaded?",
-          "a": "<p>Yes. Opening, editing, saving, converting and the quick tools all run on your PC, and the autosave journal is local. The network is used only to check for new versions (GitHub Releases), and this website has no tracking or analytics scripts. The source is open, so you can verify it.</p>"
-        },
-        {
-          "q": "Can I try it without installing?",
-          "a": "<p>The same app runs in a web browser. When the browser demo goes public, a “Try it now — no install” button appears on this page. The demo also processes files inside your browser, without sending them to a server.</p>"
-        },
-        {
-          "q": "Is it GPU-accelerated?",
-          "a": "<p>Not yet — it is <strong>Canvas 2D + TypeScript</strong>. A WebGPU renderer and a Rust/WASM core are on the roadmap. Today's speed comes from Loom's “repaint and re-save only what changed” structure. The <a href=\"#loom\" class=\"grad\">Loom table</a> is everything we claim.</p>"
-        },
-        {
-          "q": "Is there an English UI? What about macOS and Linux?",
-          "a": "<p>Yes. The app UI comes in Korean, English, Japanese and Simplified Chinese: pick one in the installer and change it any time in Preferences. macOS and Linux builds are marked <strong>experimental</strong> until verified on real machines. Officially supported: Windows 10·11 and running in the browser.</p>"
+          "q": "Will every file open correctly?",
+          "a": "<p>Each format is labeled full, partial or explained. Some PSD effects and some PPTX shapes are drawn as close approximations, and files that can't be opened, such as HEIC photos, come with a reason. Please report files that don't open well.</p>"
         }
       ]
     },
     "oss": {
       "eyebrow": "Open source · GPL-3.0",
-      "h2": "One thread at a time —<br><em>weave it with us.</em>",
-      "lead": "Issues and pull requests are welcome. The most helpful thing of all: <strong>real files that break</strong>.",
-      "w1h": "Report files that break",
-      "w1": "Send DOCX, HWPX or PDF files that don't open correctly, with any sensitive content removed.",
+      "h2": "Weave it with us.",
+      "lead": "The most useful thing you can send is a file that doesn't open properly.",
+      "w1h": "Report a file",
+      "w1": "A sample with sensitive content removed is enough.",
       "w2h": "Contribute code",
-      "w2": "TypeScript (strict) · React · Tauri 2. Dev setup and commit rules are in CONTRIBUTING.md.",
-      "w3h": "Clean-room rule",
-      "w3": "No reverse engineering of third-party binaries — only public standards (ISO 32000, ECMA-376, KS X 6101).",
-      "contribOn": "How to contribute",
-      "contribOff": "Contributing (after launch)",
+      "w2": "TypeScript, React, Tauri 2. See CONTRIBUTING.md for the rules.",
+      "contribOn": "Contributing guide",
+      "contribOff": "Contributing guide (after launch)",
       "termH": "Run from source · Node.js 18+",
-      "qsNote": "Works as soon as the repository is public",
       "qsDev": "run in the browser",
       "qsTest": "unit tests",
-      "qsBench": "Loom benchmarks",
-      "roadH": "Coming next",
-      "roadNote": "(order may change)",
-      "road": [
-        "UI in four languages (Korean, English, Japanese, Chinese) <span class=\"note-inline done\">Done</span>",
-        "Lossless save of originals — PDF and PSD in progress",
-        "Original-preserving (pass-through) save for DOCX/HWPX",
-        "Import DOCX/HWPX tables as tables",
-        "PDF export with live text — in progress",
-        "Code-signed installer",
-        "WebGPU renderer · Rust/WASM core",
-        "Official macOS and Linux support"
-      ]
+      "qsBench": "Loom benchmark"
     },
     "name": {
       "eyebrow": "About the name",
       "h2": "Why <em>“Ome”</em>?",
-      "p1": "“Ome!” (Oh-meh) is what people in Jeolla, in southwestern Korea, blurt out when something surprises or amazes them — the local way of saying “Oh my!” or “Wow!”. Even many Koreans from other regions know it only from friends or TV.",
-      "p2": "It's also the first letters of <strong>Om</strong>niweave (OM-niweave → Ome). The name holds that little gasp you let out the first time you see images, documents, PDFs and slides all working on one canvas.",
-      "quote": "“All of it, in one file? Ome!”"
+      "p1": "“Ome!” (oh-meh) is what people in Korea's Jeolla region blurt out when something surprises them. It's also the first letters of <strong>Om</strong>niweave.",
+      "quote": "“All of it in one file? Ome!”"
     },
     "cta": {
-      "h2a": "Keep the original,",
-      "h2b": "edit in one place.",
-      "meta": "v<span data-cfg=\"version\">0.1.0</span> · Windows 10·11 · ~17 MB installer · free · GPL-3.0"
+      "h2a": "Whatever you received,",
+      "h2b": "open it in Omniweave.",
+      "meta": "v<span data-cfg=\"version\">0.2.0</span> · Free · GPL-3.0"
     }
   },
   "dl": {
     "title": "Download — Omniweave",
-    "description": "Download the latest version of Omniweave.~17 MB installer, Windows installer and portable, SHA-256 verification and system requirements.",
+    "description": "Download Omniweave: Windows installer and portable app, how to verify your download (SHA-256), and system requirements.",
     "ogTitle": "Download Omniweave",
-    "ogDescription": "A local 6-in-1 editor that doesn't break your originals. ~17 MB installer, free and open source (GPL-3.0).",
+    "ogDescription": "Every document, one .omw file. About 17 MB, free and open source (GPL-3.0).",
     "h1": "Download Omniweave",
-    "sub": "Free · open source (GPL-3.0) · version <b data-cfg=\"version\">0.1.0</b><span data-when=\"dated\" hidden> · released <span data-cfg=\"releaseDate\"></span></span>",
-    "recInit": "The first release, v0.1.0, is on its way.",
-    "banner": "<strong>Coming soon.</strong> As soon as the first release is out, the buttons on this page will work. Until then you can run it from source (once the repository is public).",
+    "sub": "Free and open source (GPL-3.0) · Version <b data-cfg=\"version\">0.2.0</b><span data-when=\"dated\" hidden> · released <span data-cfg=\"releaseDate\"></span></span>",
+    "recInit": "Checking for the latest version.",
+    "banner": "<strong>Coming soon.</strong> The buttons will work as soon as the first release is out.",
     "platH": "Files by platform",
-    "platLead": "All files are hosted on GitHub Releases. Each platform installs or runs from a single file.",
+    "platLead": "All files are downloaded from GitHub Releases.",
     "thisPc": "This PC",
     "thisMac": "This Mac",
     "exp": "Experimental",
     "win": {
       "setup": "Installer",
       "rec": "Recommended",
-      "setupD": "About 17 MB. Start menu entry, <code>.omw</code> file association, installs for the current user without admin rights.",
+      "setupD": "About 17 MB. Installs without admin rights and opens .omw files.",
       "portable": "Portable",
-      "portableD": "A single exe that runs without installing. No file association or Start menu entry."
+      "portableD": "A single exe that runs without installing. No file associations."
     },
     "web": {
       "h": "Web browser (from source)",
-      "p": "Runs in your browser without an installer. Requires Node.js 18 or later.",
+      "p": "With Node.js 18 or later, run it in your browser without installing.",
       "term": "Terminal",
-      "noRepo": "The repository isn't public yet. Once it is, the commands above will work as-is.",
-      "demo": "Try it now — no install",
-      "demoNote": "Runs entirely in your browser; files are not sent to a server."
+      "noRepo": "These commands will work once the repository is public.",
+      "demo": "Try it in your browser",
+      "demoNote": "Your files never leave the browser."
     },
     "mac": {
       "dmg": "Disk image (Universal)",
-      "dmgD": "For Apple silicon and Intel Macs. Not yet tested on real hardware.",
-      "gate": "This build isn't notarized by Apple yet, so macOS may block it the first time. If so, go to <strong>System Settings → Privacy &amp; Security</strong> and click <strong>Open Anyway</strong>."
+      "dmgD": "For Apple silicon and Intel. Not yet tested on real hardware.",
+      "gate": "If macOS blocks it the first time, go to <strong>System Settings → Privacy &amp; Security</strong> and click <strong>Open Anyway</strong>."
     },
     "linux": {
       "d": "Built on Ubuntu 22.04. Not yet tested across distributions.",
@@ -405,53 +330,52 @@
     },
     "allReleases": "All releases and changelogs:",
     "releasesLink": "GitHub Releases",
-    "releasesSoon": "The link opens after the first release.",
-    "infoAria": "Installation notes",
+    "releasesSoon": "Available after the first release.",
+    "infoAria": "Installation help",
     "ss": {
-      "h": "If you see “Windows protected your PC”",
-      "browser": "<strong>When downloading:</strong> if Edge or Chrome says the file “isn’t commonly downloaded”, open the download list, choose <strong>…</strong> next to the file and pick <strong>Keep</strong> (Chrome: <strong>Keep</strong> or <strong>Download anyway</strong>). The warning appears because the app is new and has few downloads yet.",
-      "unsigned": "Current builds are <strong>not code-signed yet</strong>, so Microsoft Defender SmartScreen may block the first launch. If you downloaded the file from this page (GitHub Releases) and the checksum below matches:",
-      "signed": "The installer is code-signed. If SmartScreen still shows a warning, you can run it like this:",
+      "h": "If Windows blocks it",
+      "browser": "<strong>When downloading:</strong> if your browser says the file “isn't commonly downloaded”, open the <strong>…</strong> menu next to it in the downloads list and choose <strong>Keep</strong> (in Chrome, <strong>Keep anyway</strong>). New apps get this warning until more people have downloaded them.",
+      "unsigned": "<strong>When running:</strong> this build isn't code-signed yet, so SmartScreen may stop it. If you got it from this page and the checksum matches:",
+      "signed": "The installer is code-signed. If SmartScreen still warns you:",
       "steps": [
-        "Click <strong>More info</strong> in the warning.",
+        "Click <strong>More info</strong>.",
         "Check that the app name is Omniweave.",
         "Click <strong>Run anyway</strong>."
       ],
-      "warn": "If you got the file from anywhere else, don't run it."
+      "warn": "If you got the file anywhere else, don't run it."
     },
     "up": {
       "h": "Updates",
-      "manual": "<strong>Automatic updates are coming.</strong> They're planned for the installer; until then:",
+      "manual": "<strong>Automatic updates are on the way.</strong> Until then:",
       "steps": [
         "Download the new installer from this page.",
-        "Run it to install over the old version. Your work files (<code>.omw</code>) are left untouched."
+        "Run it to install over the old version. Your .omw files stay as they are."
       ],
-      "portable": "For the portable build, just replace the exe with the new one.",
-      "auto": "<strong>The installer and the portable build check for new versions on their own.</strong> When one is available, the app downloads and verifies it, lets you know, and updates once you confirm. The Microsoft Store version is updated by the Store.",
-      "autoPortable": "The portable build replaces its own exe in place (same name and folder) after checking its size, SHA-256 and signature. If its folder is read-only, it opens this page instead."
+      "portable": "For the portable app, just replace the exe.",
+      "auto": "<strong>Both the installer and the portable app check for new versions on their own.</strong> The download is verified first, then you're asked before anything is updated. The Store version is updated by the Store.",
+      "autoPortable": "The portable app checks the size, SHA-256 and signature of the new exe, then replaces itself in place. If it can't write to its folder, it opens this page instead."
     },
     "ck": {
       "h": "Verify your download (SHA-256)",
-      "p1": "Every release includes",
-      "p2": ", which lists the SHA-256 hash of each file. If the value you compute <strong>matches it character for character</strong>, the file wasn't altered on the way to you.",
-      "tabsAria": "Verification command by operating system",
-      "inFolder": "Run in your download folder",
-      "inFolderTerm": "Terminal · in your download folder",
-      "winNote": "Compare the Hash with the same file's line in SHA256SUMS.txt (case doesn't matter)",
-      "unix": "On macOS and Linux, put <code>SHA256SUMS.txt</code> next to the downloaded file and run the command — matching files are reported as <code>OK</code>."
+      "p1": "Each release includes",
+      "p2": " with the SHA-256 of every file. If the value you compute <strong>matches exactly</strong>, the file wasn't altered on the way.",
+      "tabsAria": "Commands by operating system",
+      "inFolder": "Run in the download folder",
+      "inFolderTerm": "Terminal · in the download folder",
+      "winNote": "Compare Hash with the line for the same file in SHA256SUMS.txt (case doesn't matter)",
+      "unix": "On macOS and Linux, put SHA256SUMS.txt next to the downloaded files and run the command; matching files show <code>OK</code>."
     },
     "req": {
       "h": "System requirements",
       "osH": "Operating system",
       "os": "Windows 10 or 11 (64-bit, x64)",
-      "wv": "Built into Windows 11. If it's missing on Windows 10, the <strong>installer</strong> downloads and installs it during setup (internet connection required). The <strong>portable</strong> build only runs where WebView2 is already installed.",
+      "wv": "Built into Windows 11. On Windows 10 the installer downloads it if it's missing (internet required). The portable app runs only where WebView2 is already installed.",
       "permH": "Permissions",
-      "perm": "Installs for the current user, so no administrator rights are needed.",
-      "webH": "In the browser",
-      "web": "Node.js 18+ and a recent Chromium-based browser, Firefox or Safari",
-      "other": "Experimental builds — we'll list supported versions here once they've been verified on real machines.",
-      "note": "This is an early preview. Keep a separate copy of any important document you open with it. Import limits are covered in the <a class=\"grad\" href=\"index.html#faq\">honest FAQ</a>."
-    },
-    "tm": "Microsoft, Windows and Edge are trademarks of Microsoft Corporation; macOS is a trademark of Apple Inc. Omniweave is not affiliated with these companies."
+      "perm": "Installs for the current user, so no admin rights are needed.",
+      "webH": "Running in a browser",
+      "web": "Node.js 18+, plus a recent Chromium-based browser, Firefox or Safari",
+      "other": "Experimental builds. We'll list what's supported once we've tested on real hardware.",
+      "note": "This is an early release. Keep copies of important originals."
+    }
   }
 }

@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>다운로드 — Omniweave (오메)</title>
-<meta name="description" content="Omniweave 최신 버전 내려받기. 설치 파일 약 17 MB, Windows 설치본·포터블, SHA-256 체크섬 확인 방법과 시스템 요구사항.">
+<meta name="description" content="Omniweave 내려받기. Windows 설치본과 포터블, 받은 파일 확인 방법(SHA-256), 시스템 요구사항.">
 <meta name="theme-color" content="#101116" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#fafafc" media="(prefers-color-scheme: light)">
 <meta name="color-scheme" content="dark light">
@@ -13,7 +13,7 @@
 <meta property="og:site_name" content="Omniweave">
 <meta property="og:locale" content="ko_KR">
 <meta property="og:title" content="Omniweave 다운로드">
-<meta property="og:description" content="원본을 깨뜨리지 않는 로컬 6-in-1 편집기. 설치 파일 약 17 MB, 무료 오픈소스(GPL-3.0).">
+<meta property="og:description" content="모든 문서를 .omw 하나로. 설치 파일 약 17 MB, 무료 오픈소스(GPL-3.0).">
 <link rel="alternate" hreflang="ko" href="download.html">
 <link rel="alternate" hreflang="en" href="en/download.html">
 <link rel="alternate" hreflang="ja" href="ja/download.html">
@@ -32,8 +32,8 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
 <link rel="preload" href="assets/fonts/Pretendard-Bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/site.css?v=5">
-<script src="assets/js/lang.js?v=5"></script>
+<link rel="stylesheet" href="assets/css/site.css?v=6">
+<script src="assets/js/lang.js?v=6"></script>
 </head>
 <body>
 <a class="skip" href="#main">본문으로 건너뛰기</a>
@@ -44,8 +44,8 @@
       <img src="assets/img/logo-96.png" alt="" width="32" height="32">Omniweave<span>오메</span>
     </a>
     <nav class="nav-links" aria-label="주요 메뉴">
-      <a href="index.html#modules">모듈</a>
-      <a href="index.html#loom">Loom 엔진</a>
+      <a href="index.html#omw">.omw</a>
+      <a href="index.html#tour">화면</a>
       <a href="index.html#faq">FAQ</a>
       <a href="download.html" aria-current="page">다운로드</a>
     </nav>
@@ -69,18 +69,19 @@
   <div class="wrap">
     <img class="app" src="assets/img/icon-192.png" alt="" width="88" height="88">
     <h1 id="dl-h">Omniweave 내려받기</h1>
-    <p class="lead center-x">무료 · 오픈소스(GPL-3.0) · 버전 <b data-cfg="version">0.1.0</b><span data-when="dated" hidden> · <span data-cfg="releaseDate"></span> 공개</span></p>
+    <p class="lead center-x">무료 오픈소스(GPL-3.0) · 버전 <b data-cfg="version">0.2.0</b><span data-when="dated" hidden> · <span data-cfg="releaseDate"></span> 공개</span></p>
     <div class="btn-row">
       <a class="btn btn-primary btn-lg off" id="rec-btn" aria-disabled="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
         <span class="t">곧 공개</span>
       </a>
+      <a class="btn btn-ghost btn-lg" data-store hidden rel="noopener">Microsoft Store에서 받기</a>
     </div>
-    <p class="rec-sub" id="rec-sub" aria-live="polite">첫 릴리스(v0.1.0)를 준비하고 있습니다.</p>
+    <p class="rec-sub" id="rec-sub" aria-live="polite">최신 버전을 확인하고 있습니다.</p>
 
     <div class="banner" data-when="unreleased" role="status">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
-      <p><strong>공개 준비 중입니다.</strong> 첫 릴리스가 나오면 이 페이지의 버튼이 바로 동작합니다. 그 전에는 소스에서 직접 실행할 수 있습니다(저장소 공개 후).</p>
+      <p><strong>공개 준비 중입니다.</strong> 첫 릴리스가 나오면 버튼이 바로 동작합니다.</p>
     </div>
   </div>
 </section>
@@ -88,7 +89,7 @@
 <section class="sec" id="platforms" aria-labelledby="plat-h">
   <div class="wrap">
     <h2 class="h-sec" id="plat-h">플랫폼별 파일</h2>
-    <p class="lead">모든 파일은 GitHub Releases에서 받습니다. 각 플랫폼은 파일 하나로 설치·실행됩니다.</p>
+    <p class="lead">모든 파일은 GitHub Releases에서 받습니다.</p>
 
     <div class="plats">
       <article class="plat" data-os="win">
@@ -98,11 +99,11 @@
         </div>
         <ul class="files">
           <li class="file">
-            <div><b>설치본 <span class="note-inline">권장</span></b><code data-fname="winSetup">Omniweave_0.1.0_x64-setup.exe</code><p>약 17 MB. 시작 메뉴 등록, <code>.omw</code> 파일 연결, 관리자 권한 없이 현재 사용자에게 설치.</p></div>
+            <div><b>설치본 <span class="note-inline">권장</span></b><code data-fname="winSetup">Omniweave_0.1.0_x64-setup.exe</code><p>약 17 MB. 관리자 권한 없이 설치되고, .omw 파일을 연결합니다.</p></div>
             <a class="btn btn-primary btn-sm off" data-dl="winSetup" data-on-text="받기" data-off-text="곧 공개" aria-disabled="true"><span class="t">곧 공개</span></a>
           </li>
           <li class="file">
-            <div><b>포터블</b><code data-fname="winPortable">Omniweave_0.1.0_x64-portable.exe</code><p>설치 없이 실행하는 단일 exe. 파일 연결과 시작 메뉴 등록은 없습니다.</p></div>
+            <div><b>포터블</b><code data-fname="winPortable">Omniweave_0.1.0_x64-portable.exe</code><p>설치 없이 실행하는 exe 하나. 파일 연결은 하지 않습니다.</p></div>
             <a class="btn btn-ghost btn-sm off" data-dl="winPortable" data-on-text="받기" data-off-text="곧 공개" aria-disabled="true"><span class="t">곧 공개</span></a>
           </li>
         </ul>
@@ -113,8 +114,8 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3"/></svg>
           <h2>웹 브라우저 (소스에서)</h2>
         </div>
-        <p>설치 파일 없이 브라우저에서 실행합니다. Node.js 18 이상이 필요합니다.</p>
-        <p data-when="demo" hidden><a class="btn btn-ghost btn-sm" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">설치 없이 지금 써 보기</span></a> <span class="note">브라우저 안에서만 동작하며 파일을 서버로 보내지 않습니다.</span></p>
+        <p>Node.js 18 이상이 있으면 설치 없이 브라우저에서 실행합니다.</p>
+        <p data-when="demo" hidden><a class="btn btn-ghost btn-sm" data-demo hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 2.5-5 2.5z"/></svg><span class="t">설치 없이 써 보기</span></a> <span class="note">파일은 브라우저 밖으로 나가지 않습니다.</span></p>
         <div class="term">
           <div class="term-h"><span>터미널</span><button type="button" class="copy" data-copy="qs-web">복사</button></div>
 <pre id="qs-web">git clone https://github.com/wind2sp/omniweave.git
@@ -122,7 +123,7 @@ cd omniweave
 npm i
 npm run dev</pre>
         </div>
-        <p class="note" data-when="no-repo">저장소는 공개 준비 중입니다. 공개되면 위 명령이 바로 동작합니다.</p>
+        <p class="note" data-when="no-repo">저장소가 공개되면 위 명령이 바로 동작합니다.</p>
       </article>
 
       <article class="plat" data-os="mac">
@@ -132,11 +133,11 @@ npm run dev</pre>
         </div>
         <ul class="files">
           <li class="file">
-            <div><b>디스크 이미지 (Universal)</b><code data-fname="macDmg">Omniweave_0.1.0_universal.dmg</code><p>Apple Silicon·Intel 겸용. 실제 기기에서 검증하기 전인 빌드입니다.</p></div>
+            <div><b>디스크 이미지 (Universal)</b><code data-fname="macDmg">Omniweave_0.1.0_universal.dmg</code><p>Apple Silicon과 Intel 겸용. 실제 기기에서 확인하기 전입니다.</p></div>
             <a class="btn btn-ghost btn-sm off" data-dl="macDmg" data-on-text="받기" data-off-text="곧 공개" aria-disabled="true"><span class="t">곧 공개</span></a>
           </li>
         </ul>
-        <p>Apple 공증 전 빌드라 처음 열 때 막힐 수 있습니다. 그럴 때는 <strong>시스템 설정 → 개인정보 보호 및 보안</strong>에서 <strong>그래도 열기</strong>를 누르세요.</p>
+        <p>처음 열 때 막히면 <strong>시스템 설정 → 개인정보 보호 및 보안</strong>에서 <strong>그래도 열기</strong>를 누르세요.</p>
       </article>
 
       <article class="plat" data-os="linux">
@@ -146,15 +147,15 @@ npm run dev</pre>
         </div>
         <ul class="files">
           <li class="file">
-            <div><b>AppImage (x86_64)</b><code data-fname="linuxAppImage">Omniweave_0.1.0_amd64.AppImage</code><p>Ubuntu 22.04에서 빌드. 실제 배포판별 검증 전입니다.</p></div>
+            <div><b>AppImage (x86_64)</b><code data-fname="linuxAppImage">Omniweave_0.1.0_amd64.AppImage</code><p>Ubuntu 22.04에서 빌드. 배포판별 확인 전입니다.</p></div>
             <a class="btn btn-ghost btn-sm off" data-dl="linuxAppImage" data-on-text="받기" data-off-text="곧 공개" aria-disabled="true"><span class="t">곧 공개</span></a>
           </li>
         </ul>
-        <p>받은 뒤 실행 권한을 주세요: <code>chmod +x Omniweave_*.AppImage</code></p>
+        <p>받은 뒤 실행 권한 주기: <code>chmod +x Omniweave_*.AppImage</code></p>
       </article>
     </div>
 
-    <p class="note">모든 릴리스와 변경 내역: <a data-release-page hidden class="grad">GitHub Releases 페이지</a><span data-when="unreleased">첫 릴리스 공개 후 링크가 열립니다.</span></p>
+    <p class="note">모든 릴리스와 변경 내역: <a data-release-page hidden class="grad">GitHub Releases</a><span data-when="unreleased">첫 릴리스 공개 후 열립니다.</span></p>
   </div>
 </section>
 
@@ -163,30 +164,30 @@ npm run dev</pre>
     <div class="info">
 
       <div class="box" id="smartscreen">
-        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M12 8v4.5M12 16h.01"/></svg>“Windows의 PC 보호” 창이 뜨면</h2>
-        <p><strong>받을 때:</strong> Edge·Chrome이 “일반적으로 다운로드되지 않는 파일”이라며 막으면, 다운로드 목록에서 파일 옆 <strong>…</strong> 메뉴 → <strong>유지</strong>(Chrome은 <strong>계속</strong>)를 누르세요. 새 프로그램이라 아직 다운로드 수가 적어서 뜨는 경고입니다.</p>
-        <p data-when="unsigned">지금 빌드는 <strong>코드 서명 전</strong>이라 Microsoft Defender SmartScreen이 처음 실행을 막을 수 있습니다. 파일이 이 페이지(GitHub Releases)에서 받은 것이고 아래 체크섬이 맞는다면:</p>
-        <p data-when="signed" hidden>설치 파일은 코드 서명되어 있습니다. 그래도 SmartScreen 경고가 보이면 아래 순서로 실행할 수 있습니다.</p>
-        <ol><li>경고 창에서 <strong>추가 정보</strong>를 누릅니다.</li><li>앱 이름이 Omniweave인지 확인합니다.</li><li><strong>실행</strong>을 누릅니다.</li></ol>
-        <p>출처가 불분명한 곳에서 받은 파일이라면 실행하지 마세요.</p>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M12 8v4.5M12 16h.01"/></svg>실행이 막힐 때</h2>
+        <p><strong>받을 때</strong> 브라우저가 “일반적으로 다운로드되지 않는 파일”이라며 막으면, 다운로드 목록의 <strong>…</strong> 메뉴에서 <strong>유지</strong>(Chrome은 <strong>계속</strong>)를 누르세요. 아직 받은 사람이 적은 새 프로그램이라 뜨는 경고입니다.</p>
+        <p data-when="unsigned"><strong>실행할 때</strong> 코드 서명 전이라 SmartScreen이 막을 수 있습니다. 이 페이지에서 받았고 체크섬이 맞다면:</p>
+        <p data-when="signed" hidden>설치 파일은 코드 서명되어 있습니다. 그래도 SmartScreen 경고가 보이면:</p>
+        <ol><li><strong>추가 정보</strong>를 누릅니다.</li><li>앱 이름이 Omniweave인지 확인합니다.</li><li><strong>실행</strong>을 누릅니다.</li></ol>
+        <p>다른 곳에서 받은 파일이라면 실행하지 마세요.</p>
       </div>
 
       <div class="box" id="update">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v3.5h3.5M4 13a8 8 0 0 0 14.6 4.5M20 20v-3.5h-3.5"/></svg>업데이트</h2>
         <div data-when="no-autoupdate">
-          <p><strong>자동 업데이트는 준비 중입니다.</strong> 설치본에 넣을 예정이며, 그 전까지는:</p>
-          <ol><li>이 페이지에서 새 버전 설치본을 받습니다.</li><li>그대로 실행해 덮어 설치합니다. 작업 파일(<code>.omw</code>)은 건드리지 않습니다.</li></ol>
+          <p><strong>자동 업데이트는 준비 중입니다.</strong> 그전까지는:</p>
+          <ol><li>이 페이지에서 새 설치본을 받습니다.</li><li>실행해 덮어 설치합니다. 작업 파일(.omw)은 그대로 남습니다.</li></ol>
           <p>포터블은 새 exe로 바꿔 쓰면 됩니다.</p>
         </div>
         <div data-when="autoupdate" hidden>
-          <p><strong>설치본과 포터블 모두 새 버전을 스스로 확인합니다.</strong> 새 버전이 있으면 앱이 받아서 검사한 뒤 알려 주고, 확인을 누르면 업데이트합니다. Microsoft Store 판은 Store가 업데이트합니다.</p>
-          <p>포터블은 받은 exe의 크기·SHA-256·서명을 확인한 뒤 같은 폴더·같은 이름으로 스스로 바꿉니다. 폴더에 쓸 수 없으면 이 페이지를 엽니다.</p>
+          <p><strong>설치본과 포터블 모두 새 버전을 스스로 확인합니다.</strong> 받은 파일을 검사한 뒤 물어보고, 확인을 누르면 업데이트합니다. Store 판은 Store가 업데이트합니다.</p>
+          <p>포터블은 받은 exe의 크기, SHA-256, 서명을 확인한 뒤 같은 자리에서 바꿉니다. 폴더에 쓸 수 없으면 이 페이지를 엽니다.</p>
         </div>
       </div>
 
       <div class="box wide" id="checksum">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>받은 파일 확인 (SHA-256)</h2>
-        <p>릴리스마다 모든 파일의 SHA-256 값을 적은 <a class="grad off-link" data-dl="checksums" data-on-text="SHA256SUMS.txt" data-off-text="SHA256SUMS.txt" aria-disabled="true"><span class="t">SHA256SUMS.txt</span></a>를 함께 올립니다. 내 PC에서 계산한 값이 그 파일의 값과 <strong>한 글자도 빠짐없이 같으면</strong> 받는 도중 바뀌지 않은 파일입니다.</p>
+        <p>릴리스마다 SHA-256 값을 적은 <a class="grad off-link" data-dl="checksums" data-on-text="SHA256SUMS.txt" data-off-text="SHA256SUMS.txt" aria-disabled="true"><span class="t">SHA256SUMS.txt</span></a>를 함께 올립니다. 내 PC에서 계산한 값과 <strong>한 글자도 다르지 않으면</strong> 받는 도중 바뀌지 않은 파일입니다.</p>
         <div class="tabs" role="tablist" aria-label="운영체제별 확인 명령">
           <button type="button" role="tab" id="t-win" aria-controls="p-win" aria-selected="true" data-os="win">Windows (PowerShell)</button>
           <button type="button" role="tab" id="t-mac" aria-controls="p-mac" aria-selected="false" tabindex="-1" data-os="mac">macOS</button>
@@ -195,7 +196,7 @@ npm run dev</pre>
         <div class="term" id="p-win" role="tabpanel" aria-labelledby="t-win">
           <div class="term-h"><span>받은 폴더에서 실행</span><button type="button" class="copy" data-copy="ck-win">복사</button></div>
 <pre id="ck-win">Get-FileHash .\Omniweave_<span data-ver>0.1.0</span>_x64-setup.exe -Algorithm SHA256
-<span class="c"># 출력된 Hash 값을 SHA256SUMS.txt의 같은 파일 줄과 비교 (대소문자 무관)</span></pre>
+<span class="c"># 출력된 Hash를 SHA256SUMS.txt의 같은 파일 줄과 비교 (대소문자 무관)</span></pre>
         </div>
         <div class="term" id="p-mac" role="tabpanel" aria-labelledby="t-mac" hidden>
           <div class="term-h"><span>터미널 · 받은 폴더에서</span><button type="button" class="copy" data-copy="ck-mac">복사</button></div>
@@ -205,21 +206,21 @@ npm run dev</pre>
           <div class="term-h"><span>터미널 · 받은 폴더에서</span><button type="button" class="copy" data-copy="ck-lin">복사</button></div>
 <pre id="ck-lin">sha256sum -c SHA256SUMS.txt --ignore-missing</pre>
         </div>
-        <p>macOS·Linux 명령은 받은 파일 옆에 <code>SHA256SUMS.txt</code>를 두고 실행하면, 맞는 파일에 <code>OK</code>가 표시됩니다.</p>
+        <p>macOS와 Linux에서는 SHA256SUMS.txt를 받은 파일 옆에 두고 실행하면 맞는 파일에 <code>OK</code>가 표시됩니다.</p>
       </div>
 
       <div class="box wide" id="requirements">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1.5V4M15 1.5V4M9 20v2.5M15 20v2.5M1.5 9H4M1.5 15H4M20 9h2.5M20 15h2.5"/></svg>시스템 요구사항</h2>
         <table class="req">
           <tbody>
-            <tr><th scope="row">운영체제</th><td>Windows 10 · 11 (64비트, x64)</td></tr>
-            <tr><th scope="row">Microsoft Edge WebView2</th><td>Windows 11에는 기본으로 들어 있습니다. Windows 10에 없으면 <strong>설치본</strong>이 설치 중에 내려받아 설치합니다(인터넷 연결 필요). <strong>포터블</strong>은 WebView2가 이미 설치된 PC에서만 실행됩니다.</td></tr>
-            <tr><th scope="row">설치 권한</th><td>현재 사용자 계정에 설치하므로 관리자 권한이 필요 없습니다.</td></tr>
-            <tr><th scope="row">웹 브라우저 실행</th><td>Node.js 18 이상 + 최신 Chromium 계열·Firefox·Safari</td></tr>
-            <tr><th scope="row">macOS · Linux</th><td>실험적 빌드 — 지원 범위는 실제 기기에서 검증한 뒤 이 페이지에 적겠습니다.</td></tr>
+            <tr><th scope="row">운영체제</th><td>Windows 10, 11 (64비트, x64)</td></tr>
+            <tr><th scope="row">Microsoft Edge WebView2</th><td>Windows 11에는 들어 있습니다. Windows 10에 없으면 설치본이 설치 중에 받아 옵니다(인터넷 필요). 포터블은 WebView2가 있는 PC에서만 실행됩니다.</td></tr>
+            <tr><th scope="row">설치 권한</th><td>현재 사용자에게 설치하므로 관리자 권한이 필요 없습니다.</td></tr>
+            <tr><th scope="row">웹 브라우저 실행</th><td>Node.js 18 이상, 최신 Chromium 계열 브라우저, Firefox, Safari</td></tr>
+            <tr><th scope="row">macOS · Linux</th><td>실험적 빌드. 실제 기기에서 확인한 뒤 지원 범위를 적겠습니다.</td></tr>
           </tbody>
         </table>
-        <p class="note">초기 미리보기 버전입니다. 실제 업무 문서는 원본을 따로 보관한 채 사용해 주세요. 가져오기 한계는 <a class="grad" href="index.html#faq">솔직한 FAQ</a>에 정리했습니다.</p>
+        <p class="note">초기 판입니다. 중요한 문서는 원본을 따로 보관해 주세요.</p>
       </div>
 
     </div>
@@ -229,16 +230,35 @@ npm run dev</pre>
 
 <footer>
   <div class="wrap">
+    <div class="ft">
+      <div>
+        <div class="brand"><img src="assets/img/logo-96.png" alt="" width="28" height="28" loading="lazy">Omniweave (오메)</div>
+        <p class="mt-10">어떤 형식이든 한 캔버스에서 열고 .omw 하나로 모으는 무료 오픈소스 편집기.</p>
+      </div>
+      <div>
+        <h2>둘러보기</h2>
+        <ul><li><a href="index.html#omw">.omw 형식</a></li><li><a href="index.html#tour">화면 둘러보기</a></li><li><a href="index.html#loom">Loom 엔진</a></li><li><a href="index.html#faq">FAQ</a></li><li><a href="index.html#name">이름 이야기</a></li><li><a href="download.html">다운로드</a></li></ul>
+      </div>
+      <div>
+        <h2>프로젝트</h2>
+        <ul>
+          <li><a data-repo="" data-on-text="GitHub 저장소" data-off-text="GitHub 저장소 (공개 준비 중)"><span class="t">GitHub 저장소 (공개 준비 중)</span></a></li>
+          <li><a data-repo="/issues" data-on-text="이슈·제보" data-off-text="이슈·제보 (공개 후)"><span class="t">이슈·제보 (공개 후)</span></a></li>
+          <li><a data-repo="/blob/main/LICENSE" data-on-text="라이선스 전문" data-off-text="라이선스 전문"><span class="t">라이선스 전문</span></a></li>
+        </ul>
+      </div>
+    </div>
     <div class="legal">
-      <p><strong>Omniweave (오메)</strong> · <span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · GPL-3.0-or-later · wind2sp@9rowpar.com</span> · GPL-3.0-or-later (GNU 일반 공중 사용 허가서 3판 또는 그 이후 판). 소프트웨어는 “있는 그대로” 제공되며 어떠한 보증도 하지 않습니다.</p>
-      <p class="name-line">‘오메’는 놀라거나 감탄할 때 나오는 전라도 사투리 감탄사(“어머나!”, “와!”)이자 <b>Om</b>niweave의 앞 글자입니다.</p>
-      <p><strong>상표</strong> Microsoft, Windows, Edge는 Microsoft Corporation의, macOS는 Apple Inc.의 상표입니다. Omniweave는 이들 회사와 관련이 없습니다.</p>
-      <p><a href="index.html">홈</a> · <a href="index.html#faq">FAQ</a> · <a href="index.html#name">이름 이야기</a> · <a data-repo="" data-on-text="GitHub 저장소" data-off-text="GitHub 저장소 (공개 준비 중)"><span class="t">GitHub 저장소 (공개 준비 중)</span></a></p>
+      <p><span data-cfg="copyright">© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · wind2sp@9rowpar.com</span></p>
+      <p><strong>라이선스</strong> GPL-3.0-or-later(GNU 일반 공중 사용 허가서 3판 이상). 있는 그대로 제공되며 어떠한 보증도 하지 않습니다.</p>
+      <p><strong>클린룸</strong> 다른 회사 프로그램을 역설계하지 않습니다. 공개 표준(ISO 32000 PDF, ECMA-376 Office Open XML, KS X 6101 HWPX 등)만 근거로 만듭니다.</p>
+      <p><strong>상표</strong> Omniweave™ and the Omniweave logo are trademarks of the project's copyright holder. Microsoft, Windows, Word, Excel, PowerPoint, Office, WebView2 and Edge are trademarks of Microsoft Corporation. Adobe, Photoshop, Illustrator, Acrobat and PostScript are registered trademarks or trademarks of Adobe Inc. Hangul (한글), Hancom and HWP are trademarks of Hancom Inc. AutoCAD, Autodesk and DXF are registered trademarks or trademarks of Autodesk, Inc. in the USA and other countries; "DWG" names the drawing file format. ACIS is a trademark of Spatial Corp. All other names are the property of their owners. Omniweave is not affiliated with, sponsored or endorsed by any of these companies; their names are used only to describe file compatibility.</p>
+      <p><strong>사용한 오픈소스</strong> pdf.js, pdf-lib, fflate, cbor-x, polygon-clipping, immer, zustand, React, Tauri. 이 사이트의 글꼴은 Pretendard(SIL Open Font License)입니다.</p>
     </div>
   </div>
 </footer>
 
 <script type="application/json" id="i18n">{"soon":"곧 공개","preparing":"준비 중","platformsBtn":"플랫폼별 파일 보기","mobileMsg":"Omniweave는 PC용 데스크톱 앱입니다. Windows·macOS·Linux PC에서 이 페이지를 열어 주세요.","unknownMsg":"사용 중인 운영체제를 알아내지 못했습니다. 아래에서 골라 주세요.","dlFor":"{os}용 다운로드","installerSuffix":" (설치본)","experimentalBuild":"실험적 빌드","soonFor":"{os}용 · 곧 공개","prepFor":"{os}용 · 준비 중","notAvailable":"이 플랫폼 파일은 아직 없습니다. 아래 목록을 확인해 주세요.","firstRelease":"첫 릴리스(v{v})를 준비하고 있습니다.","copied":"복사됨","locale":"ko-KR","loomStroke":"이번 획: \u003cspan class=\"m\">다시 그린 화면 타일 {n}개\u003c/span> · \u003cspan class=\"h\">그대로 재사용 {r}개\u003c/span> (전체 {t}개)","loomUndo":"실행 취소: 예전 키가 다시 나타나 \u003cspan class=\"h\">{n}개 타일이 캐시에서 바로 적중\u003c/span> · 다시 그린 타일 0개"}</script>
-<script src="assets/js/site.js?v=5" defer></script>
+<script src="assets/js/site.js?v=6" defer></script>
 </body>
 </html>

@@ -138,27 +138,112 @@ def paste_icon(img: Image.Image, x: int, y: int, s: int):
 
 MODES = ["래스터", "벡터", "PDF", "Word", "HWPX", "슬라이드"]
 
+# Share pictures (og-image, social preview): "every document, one .omw" — format chips on the right are woven into one
+# .omw file by the three threads; the headline says it in each homepage language.
+HEADLINE = {
+    "ko": ("받은 문서는 제각각,", "작업은 .omw 하나로.", "무료 오픈소스 편집기 · GPL-3.0"),
+    "en": ("Files arrive in every format.", "Your work lives in one .omw.", "Free, open-source editor · GPL-3.0"),
+    "ja": ("届く文書は形式バラバラ。", "作業は .omw ひとつで。", "無料のオープンソースエディター · GPL-3.0"),
+    "zh": ("收到的文件五花八门，", "工作只需一个 .omw。", "免费开源编辑器 · GPL-3.0"),
+}
+CJK_FONT = {"ja": ("YuGothB.ttc", "YuGothM.ttc"), "zh": ("msyhbd.ttc", "msyh.ttc")}
+FORMATS = ["DOCX", "HWPX", "PPTX", "XLSX", "PDF", "PSD", "AI", "DWG"]
+FORMAT_COL = [(79, 155, 255), (255, 181, 71), (255, 107, 129), (34, 211, 197), (255, 107, 129), (124, 92, 255), (255, 181, 71), (34, 211, 197)]
 
-def landscape(w: int, h: int, name: str, tagline_size: float = 1.0):
+
+def lang_font(lang: str, bold: bool, size: int) -> ImageFont.FreeTypeFont:
+    if lang in CJK_FONT:
+        win = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", CJK_FONT[lang][0 if bold else 1])
+        return ImageFont.truetype(win, size)
+    return font("Bold" if bold else "Medium", size)
+
+
+def fit(d: ImageDraw.ImageDraw, text: str, lang: str, size: int, max_w: float) -> ImageFont.FreeTypeFont:
+    f = lang_font(lang, True, size)
+    while d.textlength(text, font=f) > max_w and size > 20:
+        size -= 2
+        f = lang_font(lang, True, size)
+    return f
+
+
+def gradient_text(img: Image.Image, xy, text: str, f: ImageFont.FreeTypeFont):
+    """text filled with the brand gradient (violet → blue → teal)"""
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).text(xy, text, font=f, fill=255)
+    box = mask.getbbox()
+    if not box:
+        return
+    grad = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(grad)
+    x0, x1 = box[0], box[2]
+    stops = [(0.0, (166, 143, 255)), (0.5, (110, 166, 255)), (1.0, (62, 224, 207))]
+    for x in range(x0, x1 + 1):
+        t = (x - x0) / max(1, x1 - x0)
+        for (a, ca), (b, cb) in zip(stops, stops[1:]):
+            if a <= t <= b:
+                u = (t - a) / (b - a)
+                c = tuple(int(ca[k] + (cb[k] - ca[k]) * u) for k in range(3))
+        gd.line([(x, box[1]), (x, box[3])], fill=(*c, 255))
+    img.paste(grad, (0, 0), mask)
+
+
+def omw_file(img: Image.Image, x: float, y: float, w: float, h: float):
+    S = 3
+    W, H = img.size
+    layer = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    c = w * 0.26
+    pts = [(x, y), (x + w - c, y), (x + w, y + c), (x + w, y + h), (x, y + h)]
+    d.polygon([(px * S, py * S) for px, py in pts], fill=(124, 92, 255, 70))
+    d.line([(px * S, py * S) for px, py in pts + [pts[0]]], fill=(*VIOLET, 255), width=int(5 * S), joint="curve")
+    d.line([((x + w - c) * S, y * S), ((x + w - c) * S, (y + c) * S), ((x + w) * S, (y + c) * S)], fill=(*VIOLET, 255), width=int(4 * S))
+    layer = layer.resize((W, H), Image.LANCZOS)
+    img.alpha_composite(layer.filter(ImageFilter.GaussianBlur(14)))
+    img.alpha_composite(layer)
+    dd = ImageDraw.Draw(img, "RGBA")
+    f = font("Bold", int(w * 0.3))
+    t = ".omw"
+    dd.text((x + (w - dd.textlength(t, font=f)) / 2, y + h * 0.42), t, font=f, fill=(198, 186, 255))
+
+
+def landscape(w: int, h: int, name: str, lang: str = "ko", out_dir: str = HERE):
     img = background(w, h)
-    tile_field(img, 0, 0, w * 0.62, h, cell=max(18, h // 22))
-    woven_threads(img, w * 0.30, w * 1.05, h * 0.72, h * 0.13, width=max(5, h * 0.016))
-    # left scrim for legibility
-    scrim = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(scrim).rectangle([0, 0, w * 0.66, h], fill=(*INK, 150))
-    img.alpha_composite(scrim.filter(ImageFilter.GaussianBlur(h * 0.12)))
-    m = int(h * 0.11)
-    s = int(h * 0.2)
+    # right: format chips woven into one .omw file
+    fx, fy, fw, fh = w * 0.79, h * 0.27, h * 0.28, h * 0.36
+    cx0, cw, chh = w * 0.58, h * 0.14, h * 0.062
+    for i, (lab, col) in enumerate(zip(FORMATS, FORMAT_COL)):
+        cxi, cyi = cx0, h * 0.115 + i * h * 0.1
+        end = (fx + 2, fy + fh * (0.3 + 0.4 * (i / 7)))
+        start = (cxi + cw, cyi + chh / 2)
+        mid = ((start[0] + end[0]) / 2, (start[1] * 0.6 + end[1] * 0.4))
+        thread(img, [start, mid, end], [VIOLET, TEAL, CORAL][i % 3], max(2.5, h * 0.006), glow=False)
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    fchip = font("Bold", int(h * 0.03))
+    for i, (lab, col) in enumerate(zip(FORMATS, FORMAT_COL)):
+        cxi, cyi = cx0, h * 0.115 + i * h * 0.1
+        d.rounded_rectangle([cxi, cyi, cxi + cw, cyi + chh], radius=chh * 0.28, fill=(*col, 40), outline=(*col, 230), width=max(2, int(h * 0.004)))
+        tw = d.textlength(lab, font=fchip)
+        d.text((cxi + (cw - tw) / 2, cyi + chh * 0.2), lab, font=fchip, fill=(*WHITE, 245))
+    img.alpha_composite(layer)
+    omw_file(img, fx, fy, fw, fh)
+    # left: name, headline, one line
+    m = int(h * 0.1)
+    s = int(h * 0.13)
     paste_icon(img, m, m, s)
     d = ImageDraw.Draw(img, "RGBA")
-    d.text((m + s + h * 0.04, m + s * 0.08), "Omniweave", font=font("Bold", int(h * 0.105)), fill=WHITE)
-    d.text((m + s + h * 0.045, m + s * 0.62), "오메 · open-source studio", font=font("Medium", int(h * 0.042)), fill=MUTED)
-    ty = m + s + h * 0.1
-    d.text((m, ty), "파일 형식은 출구일 뿐,", font=font("Bold", int(h * 0.07 * tagline_size)), fill=WHITE)
-    d.text((m, ty + h * 0.09 * tagline_size), "편집은 하나의 캔버스에서.", font=font("Bold", int(h * 0.07 * tagline_size)), fill=WHITE)
-    chips(img, m, ty + h * 0.215 * tagline_size, MODES, int(h * 0.03), int(h * 0.016), w * 0.6)
-    d.text((m, h - m * 0.75), "Loom engine · content-addressed tiles · GPL-3.0", font=font("Medium", int(h * 0.028)), fill=(*MUTED, 220))
-    img.convert("RGB").save(os.path.join(HERE, name), optimize=True)
+    d.text((m + s + h * 0.03, m + s * 0.02), "Omniweave", font=font("Bold", int(h * 0.07)), fill=WHITE)
+    d.text((m + s + h * 0.032, m + s * 0.62), "오메" if lang == "ko" else {"en": "Ome", "ja": "オメ", "zh": "欧梅"}[lang], font=lang_font(lang, False, int(h * 0.036)), fill=MUTED)
+    l1, l2, sub = HEADLINE[lang]
+    maxw = w * 0.5 - m
+    f = fit(d, max(l1, l2, key=len), lang, int(h * 0.095), maxw)
+    f = min((fit(d, l1, lang, int(h * 0.095), maxw), fit(d, l2, lang, int(h * 0.095), maxw)), key=lambda x: x.size)
+    ty = m + s + h * 0.12
+    d.text((m, ty), l1, font=f, fill=WHITE)
+    gradient_text(img, (m, ty + f.size * 1.3), l2, f)
+    d = ImageDraw.Draw(img, "RGBA")
+    d.text((m, h - m - h * 0.04), sub, font=lang_font(lang, False, int(h * 0.036)), fill=(*MUTED, 235))
+    img.convert("RGB").save(os.path.join(out_dir, name), optimize=True)
 
 
 def banner(w=1600, h=480):
@@ -201,6 +286,11 @@ def square(n=1080):
 if __name__ == "__main__":
     landscape(1280, 640, "social-preview.png")
     landscape(1200, 630, "og-image.png")
+    # homepage share pictures, one per language (website/assets/img/og-image[-en|-ja|-zh].png) and the GitHub preview copy
+    site = os.path.join(ROOT, "website", "assets", "img")
+    for lang in ("ko", "en", "ja", "zh"):
+        landscape(1200, 630, "og-image.png" if lang == "ko" else f"og-image-{lang}.png", lang, site)
+    landscape(1280, 640, "social-preview.png", "ko", os.path.join(ROOT, "docs", "images"))
     banner()
     square()
     print("brand images written")

@@ -48,6 +48,12 @@
 문서 내용은 저장소의 omni- 시험 자료와 데모 문서뿐이며 실제 사용자 문서·실명·다른 회사 로고는 쓰지 않았습니다.
 다시 찍기: `node packaging/msix/store_listing/make_screenshots.mjs`(웹 빌드를 띄운 뒤, 머리 없는 Edge로 찍음).
 
+**다음 판용 `screenshots-next/<언어>/`** (2026-11-22): 언어마다 그 언어로 쓴 예시 파일(지어낸 회사·숫자, `qa/samples/store-sample/<언어>/`)을 연 화면입니다.
+지금 제출된 `screenshots/`는 그대로 두었고, 다음 제출 때 이 폴더의 그림으로 바꿔 올리면 됩니다. `highlights.json`은 홈페이지 "화면 둘러보기"의 번호 테두리 위치입니다.
+만들기: 견본 `node scripts/make-doc-sample.mjs --store --lang <언어>`, `OMW_STORE_SAMPLES=1 npx vitest run scripts/make-store-samples.test.ts --dir scripts`,
+`python packaging/msix/store_listing/make_store_samples.py` → `npx vite build` → `node packaging/msix/store_listing/make_screenshots.mjs --out packaging/msix/store_listing/screenshots-next`
+→ 홈페이지용 `python website/make-shots.py`.
+
 ## Store 표시 이미지·트레일러 (언어별 목록 화면)
 
 네 언어에 **같은 이미지**를 올립니다(트레일러 영상·썸네일만 한국어판/영어판).

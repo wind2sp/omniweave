@@ -37,6 +37,7 @@ import { officePages } from "../../src/io/formats/flow";
 import { exportDocx, exportHwpx, parseDocxFlow, parseHwpxFlow, type OfficeImportReport } from "../../src/io/office";
 import { packOmw } from "../../src/io/omw";
 import { picGeomOf } from "../../src/io/officeDrawing";
+import { ORIG, STORE, type DocText, type MarkKind } from "./text";
 import { fieldRun, hfText, newHfParagraph, patchSectionHF, setHfParas, setTitlePage } from "../../src/core/headerFooter";
 
 const S = () => useStore.getState();
@@ -52,17 +53,31 @@ const save = async (name: string, bytes: Uint8Array | string) => {
 
 /** `?store=1` (make-doc-sample.mjs --store): the same document for the Store screenshots, without the internal engine
  *  name or numbers that could be read as claims about the app (qa/samples/store-sample/). */
-const STORE = new URLSearchParams(location.search).has("store");
-const NAME = STORE ? "새 저장 방식" : "Office Surgeon";
-const LEAD = STORE ? "2026년 4분기 견본 회사의 문서 처리량은 전 분기보다 18.4% 늘었고" : "2026년 4분기 Omni 사용자는 전 분기보다 18.4% 늘었고";
+const QS = new URLSearchParams(location.search);
+const IS_STORE = QS.has("store");
+/** `&lang=ko|en|ja|zh` with `?store=1`: the Store variant in that UI language (scripts/doc-sample/text.ts STORE) */
+const LANG = (["ko", "en", "ja", "zh"] as const).find((l) => l === QS.get("lang")) ?? "ko";
+const TX: DocText = IS_STORE ? STORE[LANG] : ORIG;
+/** file name prefix: the Store variant is saved as omni-store-sample.* */
+const OUT_NAME = IS_STORE ? "omni-store-sample" : "omni-sample";
 
 // ── identity ──────────────────────────────────────────────────────────────────────────────────
 const C = { violet: "#7c5cff", teal: "#1fc9bb", rose: "#ff6b81", ink: "#1d1f2a", body: "#2c2f3a", grey: "#6b7080", soft: "#eeeaff", line: "#dcdfe8" };
-const BODY: Partial<TextRun> = { fontFamily: "Pretendard", fontSize: 14, color: C.body };
+const BODY: Partial<TextRun> = { fontFamily: TX.font, fontSize: 14, color: C.body };
 const BODY_FMT = { ...DEFAULT_RUN, ...BODY } as Omit<TextRun, "text">;
 
 // ── paragraph builders (rich-text API) ────────────────────────────────────────────────────────
 type Mark = [needle: string, patch: RunPatch, from?: number, to?: number];
+const MARK: Record<MarkKind, RunPatch> = {
+  num: { bold: true, color: C.violet },
+  italic: { italic: true },
+  strike: { strike: true, color: C.grey },
+  bold: { bold: true },
+  sub: { script: "sub" },
+  sup: { script: "super" },
+  hl: { highlight: "#fff3a8" },
+  ul: { underline: true },
+};
 /** A body paragraph; `marks` apply character formats to the first occurrence of each needle (applyRunFormat), or to its characters from..to. */
 function para(
   text: string,
@@ -157,7 +172,7 @@ function makeMaster(name: string, s: PageSetup): Page {
 //    roman numbers in the front section (i, ii) and arabic from 1 in the appendix section ──
 const HF_RUN: Partial<TextRun> = { ...BODY, fontSize: 11, color: C.grey };
 function addHeadersFooters(ps: Page[]) {
-  setHfParas(ps, ps[1].id, "header", [newHfParagraph("Omni 분기 보고서 · 2026년 4분기", "LEFT", HF_RUN)]);
+  setHfParas(ps, ps[1].id, "header", [newHfParagraph(TX.header, "LEFT", HF_RUN)]);
   const foot = newHfParagraph("", "CENTER", HF_RUN);
   foot.runs = [fieldRun("page", HF_RUN), { ...DEFAULT_RUN, ...HF_RUN, text: " / " } as TextRun, fieldRun("pages", HF_RUN)];
   setHfParas(ps, ps[1].id, "footer", [foot]);
@@ -188,7 +203,7 @@ let origPng = new Uint8Array();
 
 async function build() {
   // fonts first: layout heights are measured with the faces the page is drawn with
-  await Promise.allSettled(["400", "700"].map((w) => document.fonts.load(`${w} 16px "Pretendard"`, "가A")));
+  await Promise.allSettled(["400", "700"].map((w) => document.fonts.load(`${w} 16px "${TX.font}"`, "가A字")));
   await document.fonts.ready;
   fontsChanged();
 
@@ -198,54 +213,28 @@ async function build() {
   // ───────── page 1 ─────────
   startPage("1쪽 — 요약", masterP);
   textBox("표제", [
-    para("Omni 분기 보고서", [["Omni 분기 보고서", { fontSize: 32, bold: true, color: C.ink }]], { align: "CENTER", lineSpacing: 1.3, spaceAfter: 4 }),
-    para("2026년 4분기 · Quarterly Report Q4 2026", [["2026년 4분기 · Quarterly Report Q4 2026", { fontSize: 16, color: C.grey }]], { align: "CENTER", spaceAfter: 6 }),
-    para("작성: 오메 문서부  |  작성일: 2026년 11월 12일  |  문서 번호: OMW-Q4-SAMPLE", [["작성: 오메 문서부  |  작성일: 2026년 11월 12일  |  문서 번호: OMW-Q4-SAMPLE", { fontSize: 11, color: C.grey }]], {
+    para(TX.title, [[TX.title, { fontSize: 32, bold: true, color: C.ink }]], { align: "CENTER", lineSpacing: 1.3, spaceAfter: 4 }),
+    para(TX.sub, [[TX.sub, { fontSize: 16, color: C.grey }]], { align: "CENTER", spaceAfter: 6 }),
+    para(TX.meta, [[TX.meta, { fontSize: 11, color: C.grey }]], {
       align: "RIGHT",
       spaceAfter: 18,
     }),
   ]);
   textBox("본문 1", [
-    heading(1, "요약 (Executive Summary)"),
-    para(
-      `${LEAD}, 저장 형식 가운데 HWPX 비중이 처음으로 DOCX를 앞질렀습니다. 이 수치는 잠정치가 아닌 확정치이며, 탄소 지표는 CO2 환산량, 사무실 면적은 m2 단위로 적었습니다. 편집 세션의 중앙값은 23분으로, ${NAME} 도입 뒤 원본 보존 저장을 쓰는 사람이 꾸준히 늘었습니다.`,
-      [
-        ["18.4%", { bold: true, color: C.violet }],
-        ["HWPX", { italic: true }],
-        ["잠정치", { strike: true, color: C.grey }],
-        ["확정치", { bold: true }],
-        ["CO2", { script: "sub" }, 2, 3],
-        ["m2", { script: "super" }, 1, 2],
-        ["편집 세션의 중앙값은 23분", { highlight: "#fff3a8" }],
-        [NAME, { underline: true }],
-      ],
-      { align: "JUSTIFY", indent: 14, lineSpacing: 1.8, spaceAfter: 10 },
-    ),
-    para("한 캔버스, 모든 형식 — One canvas, every format.", [["한 캔버스, 모든 형식", { letterSpacing: 3, bold: true, color: C.teal }], ["One canvas, every format.", { italic: true, color: C.grey }]], {
+    heading(1, TX.hSummary),
+    para(TX.body1, TX.body1Marks.map(([n, k, a, b]): Mark => [n, MARK[k], a, b]), { align: TX.bodyAlign ?? "JUSTIFY", indent: 14, lineSpacing: 1.8, spaceAfter: 10 }),
+    para(TX.tag, [[TX.tagA, { letterSpacing: 3, bold: true, color: C.teal }], [TX.tagB, { italic: true, color: C.grey }]], {
       align: "CENTER",
       spaceAfter: 14,
     }),
   ]);
   textBox("본문 2", [
-    heading(2, "주요 성과"),
-    ...multiList("bullet", [
-      { text: "문서 편집: 글자·문단 단위 서식, 제목 스타일, 글머리표·번호 목록", marks: [["문서 편집", { bold: true }]] },
-      { text: "글자 서식 — 취소선·위/아래 첨자·형광펜·자간·장평", level: 1 },
-      { text: "문단 서식 — 정렬·들여쓰기·오른쪽 여백·줄 간격(배수·고정·최소)·문단 앞뒤 간격", level: 1 },
-      { text: `원본 보존 저장(${NAME} 1단계): DOCX·XLSX·HWPX에서 바뀐 문단만 다시 씀`, marks: [["원본 보존 저장", { bold: true }]] },
-    ]),
-    heading(2, "다음 분기 과제"),
-    ...multiList("korean", [
-      { text: "각주·미주와 다단", marks: [["각주·미주", { bold: true }]] },
-      { text: "문서 모델에 각주 영역", level: 1 },
-      { text: "DOCX footnotes·HWPX hp:footNote로 저장", level: 2 },
-      { text: "각주 번호 필드", level: 2 },
-      { text: "구역마다 단 수·단 간격", level: 1 },
-      { text: "그림·도형을 DOCX·HWPX로 저장, 머리말 속 그림" },
-      { text: "편집 중 자동 쪽 넘김(본문 흐름)" },
-    ]),
-    heading(3, "참고", false),
-    para("내어쓰기: 첫 줄은 왼쪽으로 내밀고 둘째 줄부터는 들여 써서 항목 이름이 눈에 띄게 하는 문단 모양입니다. Hanging indents keep the label flush while the text wraps neatly.", [["내어쓰기:", { bold: true }]], {
+    heading(2, TX.hHighlights),
+    ...multiList("bullet", TX.bullets.map((it) => ({ text: it.text, level: it.level, marks: it.bold ? [[it.bold, { bold: true }] as Mark] : [] }))),
+    heading(2, TX.hNext),
+    ...multiList(TX.numPreset, TX.nums.map((it) => ({ text: it.text, level: it.level, marks: it.bold ? [[it.bold, { bold: true }] as Mark] : [] }))),
+    heading(3, TX.hNote, false),
+    para(TX.note, [[TX.noteBold, { bold: true }]], {
       indentLeft: 64,
       indent: -64,
       lineSpacing: 1.6,
@@ -256,18 +245,15 @@ async function build() {
   // ───────── page 2 (쪽 나누기: a new page in the same section) ─────────
   startPage("2쪽 — 실적", masterP);
   textBox("본문 3", [
-    heading(1, "실적"),
-    heading(2, "분기별 지표"),
-    para("아래 표는 월별 지표를 정리한 것입니다. 첫 열은 세로로 합친 셀, 마지막 행의 이름 칸은 가로로 합친 셀이고, 머리글 행은 배경색으로 구분했습니다.", [], { align: "JUSTIFY", spaceAfter: 10 }),
+    heading(1, TX.hResults),
+    heading(2, TX.hMonthly),
+    para(TX.pTable, [], { align: TX.bodyAlign ?? "JUSTIFY", spaceAfter: 10 }),
   ]);
   const t = newTable(
     [
-      [ctr("분류"), ctr("지표"), ctr("10월"), ctr("11월"), ctr("12월")],
-      [ctr("사용", { rowSpan: 2 }), { text: "활성 사용자(명)" }, num("12,480"), num("13,920"), num("14,770")],
-      [ctr(""), { text: "새 문서(건)" }, num("41,205"), num("44,890"), num("47,312")],
-      [ctr("형식", { rowSpan: 2 }), { text: "HWPX 저장 비율" }, num("38.2%"), num("41.5%"), num("44.9%")],
-      [ctr(""), { text: "DOCX 저장 비율" }, num("43.0%"), num("41.1%"), num("39.6%")],
-      [ctr("분기 합계 (새 문서)", { colSpan: 2, bold: true, fill: C.soft }), ctr("", { fill: C.soft }), num("—", { fill: C.soft }), num("—", { fill: C.soft }), num("133,407", { bold: true, fill: C.soft })],
+      TX.t1Head.map((h) => ctr(h)),
+      ...TX.t1Rows.map((r, i) => [ctr(r[0], i % 2 === 0 ? { rowSpan: 2 } : {}), { text: r[1] }, num(r[2]), num(r[3]), num(r[4])]),
+      [ctr(TX.t1Total, { colSpan: 2, bold: true, fill: C.soft }), ctr("", { fill: C.soft }), num("—", { fill: C.soft }), num("—", { fill: C.soft }), num("133,407", { bold: true, fill: C.soft })],
     ],
     [96, 186, 120, 120, 120],
     "표 1 — 분기별 지표",
@@ -277,7 +263,7 @@ async function build() {
   t.fontSize = 13;
   t.rowHeight = 30;
   place(t, layoutTable(t).height, left(), 6);
-  textBox("표 캡션(일반 문단)", [para("표 1. 2026년 4분기 주요 지표 (예시 수치)", [["표 1. 2026년 4분기 주요 지표 (예시 수치)", { fontSize: 12, color: C.grey }], ["표 1.", { bold: true }]], { align: "CENTER", spaceAfter: 18 })]);
+  textBox("표 캡션(일반 문단)", [para(TX.t1Caption, [[TX.t1Caption, { fontSize: 12, color: C.grey }], [TX.t1CaptionBold, { bold: true }]], { align: "CENTER", spaceAfter: 18 })]);
 
   // figure row: image + vector shape, caption below
   origPng = new Uint8Array(await (await fetch("/assets/app.png")).arrayBuffer());
@@ -293,32 +279,28 @@ async function build() {
   const rings = [ring(cx, cy, 64, -120, 10, C.violet), ring(cx, cy, 64, 0, 130, C.teal), ring(cx, cy, 64, 120, 250, C.rose)];
   for (const r of rings) page.nodes.push(r);
   y = figTop + 132 + 8;
-  textBox("그림 캡션(일반 문단)", [para("그림 1. 그림 개체(앱 아이콘)와 벡터 도형(실 가닥) — Image & vector objects", [["그림 1. 그림 개체(앱 아이콘)와 벡터 도형(실 가닥) — Image & vector objects", { fontSize: 12, color: C.grey }], ["그림 1.", { bold: true }]], { align: "CENTER", spaceAfter: 16 })]);
+  textBox("그림 캡션(일반 문단)", [para(TX.figCaption, [[TX.figCaption, { fontSize: 12, color: C.grey }], [TX.figCaptionBold, { bold: true }]], { align: "CENTER", spaceAfter: 16 })]);
 
   textBox("본문 4", [
-    heading(2, "해설"),
-    heading(3, "형식별 흐름"),
-    para(
-      "11월부터 공공기관 서식을 HWPX로 그대로 고쳐 저장하는 사례가 늘면서 HWPX 비율이 꾸준히 올랐습니다. Word users, meanwhile, mostly exported to PDF for sharing, which kept the DOCX share slightly lower in December. 표의 합계 행은 같은 분기 안의 새 문서 수를 더한 값입니다.",
-      [["Word users", { bold: true }]],
-      { align: "JUSTIFY", lineSpacing: 1.7, indent: 14, spaceAfter: 8 },
-    ),
-    para("다음 쪽은 용지 방향을 가로로 바꾼 부록입니다.", [["가로", { bold: true }]], { align: "RIGHT", spaceAfter: 0 }),
+    heading(2, TX.hComment),
+    heading(3, TX.hChannel),
+    para(TX.pComment, [[TX.pCommentBold, { bold: true }]], { align: TX.bodyAlign ?? "JUSTIFY", lineSpacing: 1.7, indent: 14, spaceAfter: 8 }),
+    para(TX.pNext, [[TX.pNextBold, { bold: true }]], { align: "RIGHT", spaceAfter: 0 }),
   ]);
 
   // ───────── page 3 (구역 나누기: a new section, A4 landscape with its own margins) ─────────
   startPage("3쪽 — 부록(가로)", masterL, LANDSCAPE, "section");
   textBox("본문 5", [
-    heading(1, "부록 A. 형식별 열기·저장 건수", false),
-    para("이 쪽부터 새 구역입니다. 구역마다 용지 크기·방향·여백을 따로 정합니다(쪽 설정). 이 구역은 A4 가로, 여백 15 mm입니다. (A new section: A4 landscape with its own margins.)", [["새 구역", { bold: true }]], { spaceAfter: 10 }),
+    heading(1, TX.hAppA, false),
+    para(TX.pAppA, [[TX.pAppABold, { bold: true }]], { spaceAfter: 10 }),
   ]);
-  const months = ["형식", "열기 10월", "열기 11월", "열기 12월", "저장 10월", "저장 11월", "저장 12월", "분기 증감"];
+  const months = TX.t2Head;
   const rows: TableCell[][] = [
     months.map((m) => ctr(m)),
-    [ctr("HWPX"), num("18,204"), num("20,115"), num("22,730"), num("15,742"), num("18,629"), num("21,243"), num("+34.9%", { color: C.violet, bold: true })],
-    [ctr("DOCX"), num("21,870"), num("21,402"), num("21,955"), num("17,718"), num("18,450"), num("18,735"), num("+5.7%")],
-    [ctr("PDF"), num("30,511"), num("31,260"), num("33,804"), num("9,120"), num("9,874"), num("10,402"), num("+14.1%")],
-    [ctr("PPTX"), num("6,032"), num("6,410"), num("6,987"), num("2,315"), num("2,470"), num("2,801"), num("+21.0%")],
+    [ctr(TX.t2Rows[0]), num("18,204"), num("20,115"), num("22,730"), num("15,742"), num("18,629"), num("21,243"), num("+34.9%", { color: C.violet, bold: true })],
+    [ctr(TX.t2Rows[1]), num("21,870"), num("21,402"), num("21,955"), num("17,718"), num("18,450"), num("18,735"), num("+5.7%")],
+    [ctr(TX.t2Rows[2]), num("30,511"), num("31,260"), num("33,804"), num("9,120"), num("9,874"), num("10,402"), num("+14.1%")],
+    [ctr(TX.t2Rows[3]), num("6,032"), num("6,410"), num("6,987"), num("2,315"), num("2,470"), num("2,801"), num("+21.0%")],
   ];
   const wide = newTable(rows, [111, 120, 120, 120, 120, 120, 120, 140], "표 2 — 형식별 건수");
   wide.headerFill = "#e3dcff";
@@ -326,9 +308,9 @@ async function build() {
   wide.fontSize = 13;
   wide.rowHeight = 30;
   place(wide, layoutTable(wide).height, left(), 6);
-  textBox("표 캡션(일반 문단)", [para("표 2. 형식별 열기·저장 건수 (예시 수치)", [["표 2. 형식별 열기·저장 건수 (예시 수치)", { fontSize: 12, color: C.grey }], ["표 2.", { bold: true }]], { align: "CENTER", spaceAfter: 0 })]);
+  textBox("표 캡션(일반 문단)", [para(TX.t2Caption, [[TX.t2Caption, { fontSize: 12, color: C.grey }], [TX.t2CaptionBold, { bold: true }]], { align: "CENTER", spaceAfter: 0 })]);
   // paragraph and character shapes of batch 2: line spacing exact vs percent, space before / after, right indent, 장평, 자간
-  const sampleText = "Omni 분기 보고서는 이번 분기의 매출과 비용, 다음 분기의 계획을 한 문서에 정리합니다. The same sentence keeps going so the lines wrap, and the line spacing of each paragraph shows between its lines.";
+  const sampleText = TX.sample;
   const scaled = (label: string, run: Partial<TextRun>) => {
     const p = para(`${label} ${sampleText}`, [[label, { bold: true, color: C.violet }]], { spaceAfter: 4 });
     const at = label.length + 1;
@@ -337,21 +319,21 @@ async function build() {
   // ───────── page 4 (쪽 나누기 in the landscape section: 부록 B no longer fits on page 3 with the Word 배수 line) ─────────
   startPage("4쪽 — 부록 B(가로)", masterL, LANDSCAPE);
   textBox("부록 B — 문단·글자 모양", [
-    heading(2, "부록 B. 문단·글자 모양", false),
-    para(`[줄 간격 고정 18 pt] ${sampleText}`, [["[줄 간격 고정 18 pt]", { bold: true, color: C.violet }]], { lineHeight: { mode: "exact", v: { v: 18, u: "pt" } }, spaceAfter: 6 }),
-    para(`[줄 간격 글자 크기 200%(한글 방식)] ${sampleText}`, [["[줄 간격 글자 크기 200%(한글 방식)]", { bold: true, color: C.violet }]], { lineSpacing: 2, spaceAfter: 6 }),
+    heading(2, TX.hAppB, false),
+    para(`${TX.lExact} ${sampleText}`, [[TX.lExact, { bold: true, color: C.violet }]], { lineHeight: { mode: "exact", v: { v: 18, u: "pt" } }, spaceAfter: 6 }),
+    para(`${TX.lPct} ${sampleText}`, [[TX.lPct, { bold: true, color: C.violet }]], { lineSpacing: 2, spaceAfter: 6 }),
     // 배수 = Word's multiple (the font's single line × 2): DOCX w:line 480, HWPX the PERCENT of the same height (core/lineSpacing.ts)
-    applyParaFormat([para(`[줄 간격 배수 2.0(Word 방식)] ${sampleText}`, [["[줄 간격 배수 2.0(Word 방식)]", { bold: true, color: C.violet }]], { spaceAfter: 6 })], 0, 0, { lineMultiple: 2 })[0],
-    para(`[문단 위 14 pt · 아래 14 pt · 왼쪽·오른쪽 여백 60 pt] ${sampleText}`, [["[문단 위 14 pt · 아래 14 pt · 왼쪽·오른쪽 여백 60 pt]", { bold: true, color: C.teal }]], {
+    applyParaFormat([para(`${TX.lMult} ${sampleText}`, [[TX.lMult, { bold: true, color: C.violet }]], { spaceAfter: 6 })], 0, 0, { lineMultiple: 2 })[0],
+    para(`${TX.lSpace} ${sampleText}`, [[TX.lSpace, { bold: true, color: C.teal }]], {
       spaceBefore: 18.67,
       spaceAfter: 18.67,
       indentLeft: 80,
       indentRight: 80,
       align: "JUSTIFY",
     }),
-    scaled("[장평 90%]", { hscale: 90 }),
-    scaled("[자간 −5%]", { spacingPct: -5 }),
-    scaled("[보통]", {}),
+    scaled(TX.lScale, { hscale: 90 }),
+    scaled(TX.lSpacing, { spacingPct: -5 }),
+    scaled(TX.lNormal, {}),
   ]);
 
   // heading outline numbers count on across the text boxes and pages (the editor's renumberAfter does the same)
@@ -366,7 +348,7 @@ async function build() {
       }
 
   // ───────── into the store, as the editor would ─────────
-  const doc = newDocument("Omni 분기 보고서 — 2026년 4분기 (오메 견본)");
+  const doc = newDocument(TX.docTitle);
   S().load(doc);
   S().commit("견본 문서 만들기", (d) => {
     d.pages = [] as any;
@@ -380,15 +362,16 @@ async function build() {
   log(`쪽 ${final.pages.length}, 바탕쪽 ${final.masters.length}, 개체 ${final.pages.reduce((a, p) => a + p.nodes.length, 0)}`);
 
   // ───────── save with the app's own writers ─────────
-  await save("omni-sample.omw", packOmw(final).bytes);
+  if (!IS_STORE) await save(`${OUT_NAME}.omw`, packOmw(final).bytes);
   // pictures go in with their bytes as they are (word/media, BinData): the writers get the document's assets
   const docx = exportDocx(final.pages, { assets: final.assets });
-  await save("omni-sample.docx", docx);
+  await save(`${OUT_NAME}.docx`, docx);
   const hwpx = exportHwpx(final.pages, final.title, { assets: final.assets });
-  await save("omni-sample.hwpx", hwpx);
+  if (!IS_STORE) await save(`${OUT_NAME}.hwpx`, hwpx);
   const warnings: string[] = [];
   const pdf = await exportPdf(final, final.pages, { onWarning: (w) => warnings.push(w) });
-  await save("omni-sample.pdf", pdf);
+  await save(`${OUT_NAME}.pdf`, pdf);
+  if (IS_STORE) return; // the Store variant needs only the DOCX and the PDF
   for (let i = 0; i < final.pages.length; i++) await save(`page-${i + 1}.png`, await exportPng(final, final.pages[i], 1.5));
 
   // ───────── read the Office files back with our own importers (what survives) ─────────

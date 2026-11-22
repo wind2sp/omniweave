@@ -25,11 +25,22 @@ const LANGS = [
 ];
 const PAGES = ['index.html', 'download.html'];
 // CSS·JS를 고치면 이 숫자를 올리고 다시 생성하세요(브라우저 캐시 갱신용 ?v=).
-const ASSET_VERSION = '5';
+const ASSET_VERSION = '6';
 
 const config = JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8'));
 const SITE_RAW = String(config.siteUrl || '').trim();
 const SITE = SITE_RAW ? SITE_RAW.replace(/\/*$/, '/') : '';
+
+// Tour highlights per language (website/make-shots.py → assets/img/shots/highlights.json): {lang: {mode: [{x,y,w,h} %]}}
+const HL_FILE = join(ROOT, 'assets', 'img', 'shots', 'highlights.json');
+const HL = existsSync(HL_FILE) ? JSON.parse(readFileSync(HL_FILE, 'utf8')) : {};
+/** attributes of the n-th numbered box (1-based) on a tour picture: position, and which side its number sits on */
+function hlAttrs(lang, mode, n) {
+  const b = HL[lang]?.[mode]?.[n - 1];
+  if (!b) throw new Error(`[${lang}] 하이라이트 없음 → ${mode} ${n} (python website/make-shots.py)`);
+  const cls = ['hl', b.x + b.w > 95 ? 'ml' : '', b.y < 8 ? 'mb' : ''].filter(Boolean).join(' ');
+  return `class="${cls}" style="--x:${b.x}%;--y:${b.y}%;--w:${b.w}%;--h:${b.h}%"`;
+}
 
 const dict = Object.fromEntries(LANGS.map((l) => [l.code, JSON.parse(readFileSync(join(ROOT, 'i18n', `${l.code}.json`), 'utf8'))]));
 
@@ -72,7 +83,7 @@ function render(tpl, lang, page) {
     ...alt,
     SITE ? `<link rel="canonical" href="${SITE + pageUrl(lang.dir, page)}">` : '',
     SITE ? `<meta property="og:url" content="${SITE + pageUrl(lang.dir, page)}">` : '',
-    `<meta property="og:image" content="${SITE ? SITE : root}assets/img/og-image.png">`,
+    `<meta property="og:image" content="${SITE ? SITE : root}assets/img/og-image${lang.code === 'ko' ? '' : '-' + lang.code}.png">`,
     ...LANGS.filter((l) => l !== lang).map((l) => `<meta property="og:locale:alternate" content="${dict[l.code].meta.ogLocale}">`),
   ].filter(Boolean).join('\n');
 
@@ -89,17 +100,19 @@ function render(tpl, lang, page) {
     `      </details>`,
   ].join('\n');
 
-  const mx = t.index.matrix;
-  const matrix = mx.rows.map((r) => `          <tr><th scope="row">${r}</th>${('<td><i></i><span class="sr-only">' + esc(mx.yes) + '</span></td>').repeat(6)}</tr>`).join('\n');
   const faq = t.index.faq.items.map((it) => `      <details>\n        <summary>${it.q}</summary>\n        <div class="a">${it.a}</div>\n      </details>`).join('\n');
   const i18nJson = JSON.stringify(t.js).replace(/</g, '\\u003c');
 
   const special = {
     _lang: lang.code, _htmlLang: t.meta.htmlLang, _ogLocale: t.meta.ogLocale, _root: root, _v: ASSET_VERSION,
-    _head: head, _langmenu: menu, _matrix: matrix, _faq: faq, _i18n: i18nJson,
+    _head: head, _langmenu: menu, _faq: faq, _i18n: i18nJson,
   };
 
   return tpl.replace(/\{\{\s*([\w.]+)(\|a)?\s*\}\}/g, (_, key, attr) => {
+    if (key.startsWith('_hl.')) {
+      const [, mode, n] = key.split('.');
+      return hlAttrs(lang.code, mode, Number(n));
+    }
     let v = key in special ? special[key] : get(t, key);
     if (v === undefined) throw new Error(`[${lang.code}] ${page}: 번역 키 없음 → ${key}`);
     if (Array.isArray(v)) v = v.map((x) => `<li>${x}</li>`).join('');
