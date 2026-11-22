@@ -18,14 +18,14 @@ import { useUI } from "./shell/uiStore";
 
 type Kind = "img" | "doc" | "show" | "table";
 const KINDS: [Kind, string[]][] = [
-  ["img", ["png", "svg", "psd", "pdf-image"]],
+  ["img", ["png", "jpg", "webp", "svg", "psd", "pdf-image"]],
   ["doc", ["pdf", "docx", "doc", "hwpx", "hwp", "md", "html", "txt"]],
   ["show", ["pptx", "ppt"]],
   ["table", ["xlsx", "xls", "csv", "srt"]],
 ];
 /** what comes first in each edit mode (the mode's own format and the most common ones) */
 const FIRST: Record<EditMode, string[]> = {
-  IMAGE: ["png", "psd", "pdf"],
+  IMAGE: ["png", "jpg", "psd", "pdf"],
   DOCUMENT: ["pdf", "docx", "hwpx"],
   SLIDE: ["pptx", "pdf"],
   DESIGN: ["svg", "pdf", "png"],

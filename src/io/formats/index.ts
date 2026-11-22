@@ -36,6 +36,8 @@ import { exportXlsx } from "./xlsx";
 import { openSheetBook, writeFreshXlsx } from "../sheet/book";
 import { expandSheetPages, expandSheetPrintPages, tableToSheet } from "../sheet/pages";
 import { SAVE_CANCELLED } from "../errors";
+import { pageFileStem } from "../exportName";
+import { defaultPictureOptions, encodePicture, PICTURE_SOURCE, pictureRequest, pictureScale, pictureUnedited, type EncodeImage, type PictureFormat, type PictureOptions, type PictureOptionsRequest } from "./pictureExport";
 import { docxMeta, hwpxMeta, saveOffice } from "../officesurgeon";
 import { attachPptxMeta, pptxSurgical, pptxUnchanged } from "../officesurgeon/pptx";
 
@@ -689,6 +691,10 @@ export interface ExportCtx {
   svg?: (doc: OmwDocument, page: Page) => Promise<string>;
   /** a page's pixels at a scale (io/export.ts pageRgba) — the first-page preview of an HWP file */
   pageRgba?: (doc: OmwDocument, page: Page, scale: number) => Promise<{ rgba: Uint8ClampedArray; width: number; height: number }>;
+  /** a page drawn and encoded by the browser (JPG · WebP · PNG at a scale; io/export.ts exportImage) */
+  encodeImage?: EncodeImage;
+  /** quality · background · photo information before a JPG / WebP is written; null = cancelled (none: the defaults) */
+  pictureOptions?: (req: PictureOptionsRequest) => Promise<PictureOptions | null>;
 }
 
 export interface ExportDef {
@@ -736,6 +742,58 @@ function legacyExport(kind: LegacyKind): ExportDef {
   };
 }
 
+/** Ask (or take the defaults) for a JPG / WebP of this page; cancelled → SAVE_CANCELLED. */
+async function askPicture(d: OmwDocument, p: Page, fmt: "jpg" | "webp", c: ExportCtx): Promise<PictureOptions> {
+  const o = c.pictureOptions ? await c.pictureOptions(pictureRequest(d, p, fmt)) : defaultPictureOptions();
+  if (!o) throw new Error(SAVE_CANCELLED);
+  return o;
+}
+
+/** JPG / WebP of the current page (io/formats/pictureExport.ts): drawn as the PNG export, quality as chosen. */
+function pictureExport(fmt: "jpg" | "webp"): ExportDef {
+  return {
+    id: fmt,
+    get label() {
+      return t(`imgexport.label.${fmt}`);
+    },
+    get hint() {
+      return t(`imgexport.hint.${fmt}`);
+    },
+    ext: fmt,
+    filter: {
+      get name() {
+        return t(`imgexport.filter.${fmt}`);
+      },
+      extensions: fmt === "jpg" ? ["jpg", "jpeg"] : ["webp"],
+    },
+    fileName: (d, p) => pageFileStem(d, p),
+    run: async (d, p, c) => encodePicture(d, p, fmt, await askPicture(d, p, fmt, c), c.encodeImage!),
+  };
+}
+
+/**
+ * "Save in the original format" of a picture opened as a file (PNG · JPG · WebP): unedited, its original bytes
+ * (photo information and all); edited, drawn again at its own size in its own format (JPG / WebP asked as an export).
+ */
+function samePicture(page: Page, ext: string): ExportDef {
+  const src = page.source!;
+  const fmt = src.format as PictureFormat;
+  return {
+    id: "same",
+    label: t("engine.export.sameFormat", { ext }),
+    hint: t("imgexport.same.hint"),
+    ext,
+    filter: { name: ext.toUpperCase(), extensions: fmt === "jpg" ? [ext, ext === "jpg" ? "jpeg" : "jpg"] : [ext] },
+    fileName: () => baseName(src.name),
+    run: async (d, p, c) => {
+      const kept = pictureUnedited(d, p);
+      if (kept) return kept;
+      const o = fmt === "png" ? defaultPictureOptions() : await askPicture(d, p, fmt, c);
+      return encodePicture(d, p, fmt, o, c.encodeImage!);
+    },
+  };
+}
+
 const needTable = (doc: OmwDocument) => {
   if (!collectTables(doc.pages).length) throw new Error(t("engine.export.noTable"));
 };
@@ -757,9 +815,12 @@ export const EXPORTS: ExportDef[] = [
       },
       extensions: ["png"],
     },
-    fileName: (d, p) => `${d.title}-${p.name}`,
-    run: (d, p, c) => c.png!(d, p),
+    fileName: (d, p) => pageFileStem(d, p),
+    // a picture opened as a file: its own pixels (1:1), as JPG / WebP; other pages twice their size
+    run: (d, p, c) => (pictureScale(p) === 1 && c.encodeImage ? c.encodeImage(d, p, { mime: "image/png", quality: 1, background: null, scale: 1 }) : c.png!(d, p)),
   },
+  pictureExport("jpg"),
+  pictureExport("webp"),
   {
     id: "pdf",
     get label() {
@@ -795,7 +856,7 @@ export const EXPORTS: ExportDef[] = [
     },
     ext: "svg",
     filter: { name: "SVG", extensions: ["svg"] },
-    fileName: (d, p) => `${d.title}-${p.name}`,
+    fileName: (d, p) => pageFileStem(d, p),
     run: (d, p, c) => c.svg!(d, p),
   },
   {
@@ -985,7 +1046,7 @@ export const EXPORTS: ExportDef[] = [
     },
     ext: "psd",
     filter: { name: "PSD", extensions: ["psd"] },
-    fileName: (d, p) => (p.source?.format === "psd" ? baseName(p.source.name) : `${d.title}-${p.name}`),
+    fileName: (d, p) => (p.source?.format === "psd" ? baseName(p.source.name) : pageFileStem(d, p)),
     run: async (d, p, c) => {
       const r = await writePsd(d, p, { rasterize: c.rasterize });
       if (r.warnings.length && !c.confirm([t("engine.psd.saveNotesTitle"), ...r.warnings.map((w) => "- " + w), "", t("engine.common.saveConfirm")].join("\n"))) throw new Error(SAVE_CANCELLED);
@@ -996,7 +1057,7 @@ export const EXPORTS: ExportDef[] = [
 
 // exports that write pages see sheet pages as Excel prints them (PDF, pictures: one page per printed page, as Excel's
 // PDF) or laid out as table pages (documents, slides, CSV…: the cells stay text and tables)
-const SHEET_AS_PRINTED = new Set(["png", "pdf", "pdf-image", "svg", "psd"]);
+const SHEET_AS_PRINTED = new Set(["png", "jpg", "webp", "pdf", "pdf-image", "svg", "psd"]);
 for (const e of EXPORTS) {
   // (DOC / XLS / PPT: the original file — the pages as they are decide whether it is unedited)
   if (e.id === "xlsx" || (LEGACY_KINDS as readonly string[]).includes(e.id)) continue;
@@ -1053,6 +1114,7 @@ export function sameTypeExport(page: Page, pages: readonly Page[] = [page]): Exp
       },
     };
   }
+  if (PICTURE_SOURCE.has(fmt)) return samePicture(page, ext);
   if (fmt === "psd" && (ext === "psd" || ext === "psb")) {
     const psd = exportById("psd")!;
     return { ...psd, id: "same", label: t("engine.export.sameFormat", { ext }), hint: t("engine.export.same.hintPsd"), ext, filter: { name: ext.toUpperCase(), extensions: [ext] }, fileName: () => baseName(src.name) };

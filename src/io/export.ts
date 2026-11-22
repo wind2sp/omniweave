@@ -36,6 +36,29 @@ export async function exportPng(doc: OmwDocument, page: Page, scale = 2): Promis
   return canvasToPng(await settledCanvas(doc, page, scale));
 }
 
+/**
+ * A page as a JPG / WebP / PNG (ExportCtx.encodeImage): drawn as the PNG export, `background` under it (JPEG has no
+ * transparency), encoded by the browser in the same canvas — a big picture is not copied once more.
+ */
+export async function exportImage(doc: OmwDocument, page: Page, o: { mime: string; quality: number; background: string | null; scale: number }): Promise<Uint8Array> {
+  const c = await settledCanvas(doc, page, o.scale);
+  if (o.background) {
+    const g = c.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = "destination-over";
+    g.fillStyle = o.background;
+    g.fillRect(0, 0, c.width, c.height);
+    g.restore();
+  }
+  const blob = "convertToBlob" in c ? await c.convertToBlob({ type: o.mime, quality: o.quality }) : await new Promise<Blob | null>((res) => (c as HTMLCanvasElement).toBlob(res, o.mime, o.quality));
+  // a browser without the encoder hands back a PNG instead: say so rather than write a PNG under a .jpg / .webp name
+  if (!blob || blob.type !== o.mime) throw new Error(t("imgexport.err.encoder", { fmt: o.mime.split("/")[1].toUpperCase() }));
+  // free the big canvas now (an 8000 px picture is 256 MB of pixels)
+  c.width = c.height = 1;
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
 /** A page's pixels (RGBA, on its background colour) at `scale` — e.g. the first-page preview of an HWP file (hwp5Write.ts). */
 export async function pageRgba(doc: OmwDocument, page: Page, scale: number): Promise<{ rgba: Uint8ClampedArray; width: number; height: number }> {
   const src = await settledCanvas(doc, page, scale);

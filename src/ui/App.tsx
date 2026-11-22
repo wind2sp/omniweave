@@ -1,5 +1,6 @@
 // Application shell: top bar, adaptive ribbon, docks around the Loom canvas, status bar.
 import { SecurityDialogs } from "./shell/SecurityDialogs";
+import { ImageExportDialog } from "./shell/ImageExportDialog";
 import { useHistory } from "../core/history";
 
 import { useEffect, useRef, useState } from "react";
@@ -389,6 +390,7 @@ export function App() {
       <PageOrganizer />
       <ToolsDialog />
       <SecurityDialogs />
+      <ImageExportDialog />
       <TabDialogs />
       <ShellDialogs />
       {presenting && <Presenter />}

@@ -7,6 +7,7 @@ import { encryptPdf } from "../io/crypto/pdfEncrypt";
 import { decryptOffice, encryptOffice, isEncryptedOffice } from "../io/crypto/office";
 import { encryptHwpx } from "../io/crypto/hwpx";
 import { askProtection } from "./shell/SecurityDialogs";
+import { askPictureOptions } from "./shell/ImageExportDialog";
 import { forgetRecent, rememberRecent } from "./shell/recent";
 import { resetHistory, useHistory } from "../core/history";
 import { ANIM_PRESETS, type AnimPreset } from "../core/anim";
@@ -33,7 +34,8 @@ import {
 import { flattenRanges, parsePageRanges } from "../core/pages";
 import { isSvg, svgIntrinsicSize } from "../render/svgSize";
 import { svgToVectors } from "../io/svgVectors";
-import { bakeAdjustments, exportPdf, exportPng, exportSvg, pageRgba, rasterizeNode, webpBytesToPng } from "../io/export";
+import { bakeAdjustments, exportImage, exportPdf, exportPng, exportSvg, pageRgba, rasterizeNode, webpBytesToPng } from "../io/export";
+import { docFileStem, withExt } from "../io/exportName";
 import { webpToPng } from "../io/webpPolicy";
 import { EXPORTS, heicMessage, exportById, formatForExt, openFilters, sameTypeExport, TEXT_SOURCE_EXTS, type ExportDef } from "../io/formats";
 import { SAVE_CANCELLED } from "../io/errors";
@@ -44,7 +46,7 @@ import { activeSessionId, claimTab, isPristineActive, newSession, registerSessio
 import { packOmw, unpackOmw } from "../io/omw";
 import { FILTERS, isTauri, openFiles, saveFile, type OpenedFile } from "../io/platform";
 import { elevatePdfText } from "../io/pdf";
-import { docTitle, t } from "../i18n";
+import { t } from "../i18n";
 import { exportNotes } from "./exportNotes";
 import { isCancelled, withProgress } from "./progress";
 import { useUI } from "./shell/uiStore";
@@ -96,14 +98,23 @@ export async function openDemoIfRequested() {
   }
 }
 
-/** Desktop: open the file the app was launched with (double-clicked .omw, or CLI argument). */
+/**
+ * Desktop: open the files the app was launched with (double-click, Windows "Open with", files dropped on the exe,
+ * CLI arguments), each in its own tab, in order. One that cannot be read does not stop the others.
+ */
 export async function openStartupFile() {
   if (!isTauri) return;
   const { invoke } = await import("@tauri-apps/api/core");
-  const path = await invoke<string | null>("startup_file");
-  if (!path) return;
-  const buf = await invoke<ArrayBuffer>("startup_bytes");
-  await openAndRemember({ name: path.split(/[\\/]/).pop()!, path, bytes: new Uint8Array(buf) });
+  const paths = await invoke<string[]>("startup_files");
+  for (let index = 0; index < paths.length; index++) {
+    const path = paths[index];
+    try {
+      const buf = await invoke<ArrayBuffer>("startup_bytes", { index });
+      await openAndRemember({ name: path.split(/[\\/]/).pop()!, path, bytes: new Uint8Array(buf) });
+    } catch (e: any) {
+      S().notify(String(e?.message ?? e));
+    }
+  }
 }
 
 /**
@@ -657,7 +668,7 @@ export async function saveDoc(as = false, forceProtect = false) {
   }
   if (!prot) return S().notify(t("doc.toast.saveCancelled"));
   const bytes = prot.bytes;
-  const name = docTitle(s.doc.title).replace(/[\/:*?"<>|]/g, "_") + ".omw";
+  const name = withExt(docFileStem(s.doc), "omw");
   const path = await saveFile(name, bytes, [FILTERS.omw], as || forceProtect ? null : s.filePath);
   if (!path) return;
   // the file on disk is now protected with this secret: later saves must ask (and offer it as "same")
@@ -696,8 +707,9 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
   if (!page) return;
   const def = kind === "same" ? sameTypeExport(page, s.doc.pages) : exportById(kind);
   if (!def) return S().notify(t("doc.toast.unknownExport", { kind }));
-  // per-page file names (PNG / SVG / PSD) use the shown title too, not the stored default "제목 없음"
-  const title = (def.fileName?.({ ...s.doc, title: docTitle(s.doc.title) }, page) ?? docTitle(s.doc.title)).replace(/[\\/:*?"<>|]/g, "_");
+  // "name.ext": the document's name (untitled: the file its page came from) with the extension once; per-page
+  // formats (PNG · JPG · WebP · SVG · PSD) add the page name only when it says more (io/exportName.ts)
+  const fileName = withExt(def.fileName?.(s.doc, page) ?? docFileStem(s.doc), def.ext);
   try {
     const out = await withProgress(t("progress.export", { fmt: def.ext.toUpperCase() }), async () => {
       // formats without adjustment layers: what they touch goes in as a picture (PDF does this itself, exportPdf)
@@ -712,12 +724,14 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
         pdf: (d, ps) => exportPdf(d, ps, { onWarning: (m) => pdfWarnings.push(m) }),
         svg: (d, p) => exportSvg(d, p),
         pageRgba: (d, p, k) => pageRgba(d, p, k),
+        encodeImage: (d, p, o) => exportImage(d, p, o),
+        pictureOptions: (req) => askPictureOptions(req),
       });
     }, { cancel: true });
     const raw = typeof out === "string" ? new TextEncoder().encode(out) : out;
     const prot = typeof out === "string" && !forceProtect && !docProtection().wasProtected ? { bytes: out, secretId: null } : await protectOutput(def.ext, raw, forceProtect);
     if (prot == null) return S().notify(t("doc.toast.exportCancelled"));
-    const path = await saveFile(`${title}.${def.ext}`, prot.bytes, [def.filter]);
+    const path = await saveFile(fileName, prot.bytes, [def.filter]);
     // a format with its own notice (DOC / XLS / PPT: "saved as the original file") says it in place of "exported"
     if (path) S().notify((def.doneNote && !prot.secretId ? def.doneNote : t(prot.secretId ? "doc.toast.exportedProtected" : "doc.toast.exported", { fmt: def.ext.toUpperCase() })) + (adjNote ? ` · ${adjNote}` : ""));
     // what this format keeps of effects and other properties (core/style/caps.ts), after the saved notice

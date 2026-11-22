@@ -2,6 +2,7 @@
 // with a preview rendered from the very PDF that goes to the printer.
 // The dialog mounts itself (openPrintDialog) so the app shell does not need to host it.
 
+import { docFileStem } from "../../io/exportName";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { pdfjsLib } from "../../io/pdfjsLoader";
@@ -240,7 +241,7 @@ function PrintDialog({ onClose }: { onClose: () => void }) {
 
   const doSave = async () => {
     if (!job) return;
-    const name = t("doc.print.fileName", { title: docTitle(doc.title).replace(/[\\/:*?"<>|]/g, "_") });
+    const name = t("doc.print.fileName", { title: docFileStem(doc).replace(/[\\/:*?"<>|]/g, "_") });
     const path = await saveFile(name, job.bytes, [FILTERS.pdf]);
     if (path) {
       useStore.getState().notify(t("doc.print.saved"));

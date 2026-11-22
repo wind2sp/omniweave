@@ -15,7 +15,7 @@
   "engine.export.pdf.label": "PDF 문서",
   "engine.export.pdfImage.hint": "모든 페이지 · 화면 그대로 그림으로",
   "engine.export.pdfImage.label": "PDF (이미지)",
-  "engine.export.png.hint": "현재 페이지 · 2배",
+  "engine.export.png.hint": "현재 페이지 · 2배 (그림 파일은 원래 크기)",
   "engine.export.png.label": "PNG 이미지",
   "engine.export.pptx.hint": "슬라이드 · 텍스트·도형·그림·표",
   "engine.export.psd.hint": "현재 페이지 · 레이어별 (PSD에서 연 페이지는 원본 레이어·효과 보존)",

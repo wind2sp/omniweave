@@ -1,0 +1,21 @@
+{
+  "imgexport.label.jpg": "JPG image",
+  "imgexport.label.webp": "WebP image",
+  "imgexport.hint.jpg": "Current page · choose quality · keeps photo info",
+  "imgexport.hint.webp": "Current page · choose quality · keeps transparency",
+  "imgexport.filter.jpg": "JPG image",
+  "imgexport.filter.webp": "WebP image",
+  "imgexport.same.hint": "Unedited: the original file as is. Edited: saved again in the same format",
+  "imgexport.dialog.titleJpg": "Export as JPG",
+  "imgexport.dialog.titleWebp": "Export as WebP",
+  "imgexport.dialog.quality": "Quality",
+  "imgexport.dialog.background": "Background",
+  "imgexport.dialog.dropExif": "Remove all photo info (EXIF)",
+  "imgexport.dialog.keepGps": "Also keep location (GPS)",
+  "imgexport.dialog.noAlpha": "JPG has no transparency, so transparent areas are filled with the background color.",
+  "imgexport.dialog.exifNoGps": "Camera details are kept; the location is removed.",
+  "imgexport.dialog.exifAll": "All photo info is kept, including the location.",
+  "imgexport.dialog.exifNone": "No photo info is kept.",
+  "imgexport.dialog.save": "Export",
+  "imgexport.err.encoder": "Can't save as {fmt} here"
+}

@@ -2,6 +2,7 @@
 // blank pages or pages from other files at a chosen position, extract and split to PDF, and
 // "many files → one PDF". Every document change is one store.commit (undoable, in the history).
 
+import { docFileStem } from "../io/exportName";
 import { chunkPages, insertionIndex, moveIdsTo, parsePageRanges, rangeLabel, resizePageInPlace, rotatePageInPlace, type InsertWhere } from "../core/pages";
 import { useStore } from "../core/store";
 import { PAGE_PRESETS, copyNode, newDocument, newPage, newRaster, uid, type AssetRef, type OmwDocument, type Page, type PageKind } from "../core/types";
@@ -13,7 +14,7 @@ import { encryptPdf } from "../io/crypto/pdfEncrypt";
 import { openFilters } from "../io/formats";
 import { fileToPages, fitCurrent, importFile, pickPages, protectOutput } from "./actions";
 import { useUI } from "./shell/uiStore";
-import { docTitle, t } from "../i18n";
+import { t } from "../i18n";
 import { SAVE_CANCELLED } from "../io/errors";
 
 const S = () => useStore.getState();
@@ -156,7 +157,7 @@ export async function extractPages(ids: string[]) {
     const prot = await protectOutput("pdf", bytes);
     if (!prot) return S().notify(t("doc.toast.extractCancelled"));
     const label = rangeLabel(order.map(indexOf));
-    const path = await saveFile(t("doc.file.extract", { title: safe(docTitle(s.doc.title)), pages: label }), prot.bytes, [{ name: "PDF", extensions: ["pdf"] }]);
+    const path = await saveFile(t("doc.file.extract", { title: safe(docFileStem(s.doc)), pages: label }), prot.bytes, [{ name: "PDF", extensions: ["pdf"] }]);
     if (path) S().notify(tn(prot.secretId ? "doc.toast.extractedProtected" : "doc.toast.extracted", pages.length));
   } catch (e: any) {
     if (e?.message === SAVE_CANCELLED) return S().notify(t("doc.toast.saveCancelled"));
@@ -185,14 +186,14 @@ export async function splitToZip(mode: SplitMode) {
     for (let i = 0; i < groups.length; i++) {
       S().notify(t("doc.toast.splitting", { i: i + 1, n: groups.length }));
       const pages = groups[i].map((k) => s.doc.pages[k]);
-      files.push({ name: t("doc.file.splitPart", { title: safe(docTitle(s.doc.title)), num: String(i + 1).padStart(2, "0"), pages: rangeLabel(groups[i]) }), bytes: await pdfOf(s.doc, pages, warnings) });
+      files.push({ name: t("doc.file.splitPart", { title: safe(docFileStem(s.doc)), num: String(i + 1).padStart(2, "0"), pages: rangeLabel(groups[i]) }), bytes: await pdfOf(s.doc, pages, warnings) });
     }
     // a protected source asks once for the whole set; each PDF gets the same choice
     const first = await protectOutput("pdf", files[0].bytes);
     if (!first) return S().notify(t("doc.toast.splitCancelled"));
     files[0].bytes = first.bytes;
     if (first.secretId) for (let i = 1; i < files.length; i++) files[i].bytes = (await protectWith(files[i].bytes, first.secretId)) ?? files[i].bytes;
-    const path = await saveFile(t("doc.file.splitZip", { title: safe(docTitle(s.doc.title)), n: files.length }), zipFiles(files), [{ name: "ZIP", extensions: ["zip"] }]);
+    const path = await saveFile(t("doc.file.splitZip", { title: safe(docFileStem(s.doc)), n: files.length }), zipFiles(files), [{ name: "ZIP", extensions: ["zip"] }]);
     if (path) S().notify(t("doc.toast.splitSaved", { n: files.length }));
   } catch (e: any) {
     if (e?.message === SAVE_CANCELLED) return S().notify(t("doc.toast.saveCancelled"));

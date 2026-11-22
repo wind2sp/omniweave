@@ -1,0 +1,21 @@
+{
+  "imgexport.label.jpg": "JPG 画像",
+  "imgexport.label.webp": "WebP 画像",
+  "imgexport.hint.jpg": "現在のページ · 品質を選択 · 写真情報を保持",
+  "imgexport.hint.webp": "現在のページ · 品質を選択 · 透明を保持",
+  "imgexport.filter.jpg": "JPG 画像",
+  "imgexport.filter.webp": "WebP 画像",
+  "imgexport.same.hint": "未編集なら元のファイルのまま、編集済みなら同じ形式で保存し直します",
+  "imgexport.dialog.titleJpg": "JPG で書き出し",
+  "imgexport.dialog.titleWebp": "WebP で書き出し",
+  "imgexport.dialog.quality": "品質",
+  "imgexport.dialog.background": "背景色",
+  "imgexport.dialog.dropExif": "写真情報(EXIF)をすべて削除",
+  "imgexport.dialog.keepGps": "位置情報(GPS)も残す",
+  "imgexport.dialog.noAlpha": "JPG は透明に対応していないため、透明な部分は背景色で塗りつぶします。",
+  "imgexport.dialog.exifNoGps": "撮影情報は残し、位置情報は削除します。",
+  "imgexport.dialog.exifAll": "位置情報を含む写真情報をすべて残します。",
+  "imgexport.dialog.exifNone": "写真情報は残しません。",
+  "imgexport.dialog.save": "書き出し",
+  "imgexport.err.encoder": "この環境では {fmt} 形式で保存できません"
+}

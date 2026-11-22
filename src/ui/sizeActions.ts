@@ -4,8 +4,9 @@
 //   original  the current PDF page's source file as "save in the original format" gives it (original + incremental
 //             update), then fully rewritten by optimizePdf — kept incremental when the file is signed
 
+import { docFileStem } from "../io/exportName";
 import { currentPage, useStore } from "../core/store";
-import { docTitle, t } from "../i18n";
+import { t } from "../i18n";
 import { exportPdf } from "../io/export";
 import { sameTypeExport } from "../io/formats";
 import { optimizePdf } from "../io/pdfOptimize";
@@ -68,7 +69,7 @@ export async function saveSizedPdf(o: SizeOptions, built?: SizedPdf): Promise<bo
   const prot = await protectOutput("pdf", r.bytes);
   if (!prot) return false;
   const page = currentPage();
-  const base = o.source === "original" && page?.source ? page.source.name.replace(/\.[^.]+$/, "") : docTitle(s.doc.title);
+  const base = o.source === "original" && page?.source ? page.source.name.replace(/\.[^.]+$/, "") : docFileStem(s.doc);
   const path = await saveFile(`${base.replace(/[\\/:*?"<>|]/g, "_")}.pdf`, prot.bytes, [FILTERS.pdf]);
   if (!path) return false;
   s.notify([t("size.saved", { before: formatBytes(r.before), after: formatBytes(prot.bytes.length) }), ...r.notes].join(" · "));

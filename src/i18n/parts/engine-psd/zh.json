@@ -15,7 +15,7 @@
   "engine.export.pdf.label": "PDF 文档",
   "engine.export.pdfImage.hint": "所有页面 · 按屏幕原样转为图片",
   "engine.export.pdfImage.label": "PDF（图像）",
-  "engine.export.png.hint": "当前页面 · 2 倍",
+  "engine.export.png.hint": "当前页面 · 2 倍（图片文件为原始尺寸）",
   "engine.export.png.label": "PNG 图像",
   "engine.export.pptx.hint": "幻灯片 · 文本、形状、图片、表格",
   "engine.export.psd.hint": "当前页面 · 按图层（从 PSD 打开的页面保留原始图层和效果）",

@@ -1,6 +1,6 @@
 [package]
 name = "omniweave"
-version = "0.2.0"
+version = "0.2.1"
 description = "Omniweave (오메) — 6-in-1 studio"
 authors = ["NINEROW partners Co., Ltd.", "Omniweave contributors"]
 license = "GPL-3.0-or-later"

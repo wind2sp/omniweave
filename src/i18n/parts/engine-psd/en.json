@@ -15,7 +15,7 @@
   "engine.export.pdf.label": "PDF document",
   "engine.export.pdfImage.hint": "All pages · as pictures, exactly as on screen",
   "engine.export.pdfImage.label": "PDF (image)",
-  "engine.export.png.hint": "Current page · 2×",
+  "engine.export.png.hint": "Current page · 2× (picture files at their own size)",
   "engine.export.png.label": "PNG image",
   "engine.export.pptx.hint": "Slides · text, shapes, images, tables",
   "engine.export.psd.hint": "Current page · one layer per object (pages opened from PSD keep their original layers and effects)",

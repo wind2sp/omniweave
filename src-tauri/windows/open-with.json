@@ -1,0 +1,29 @@
+{
+  "_comment": "Windows 'Open with' types (no default-app takeover). One source for the NSIS hooks (scripts/open-with.mjs writes the generated part of installer-hooks.nsh) and the MSIX manifest (packaging/msix/AppxManifest.template.xml, same list). tests/openWith.test.ts keeps them and src/io/formats FORMATS in step: every openable extension is either here or in notListed with a reason.",
+  "progIds": [
+    { "id": "Omniweave.Document", "msix": "omniweave.documents", "en": "Omniweave document", "ko": "Omniweave 문서", "exts": ["docx", "doc", "hwpx", "hwp", "md", "markdown", "txt", "epub"] },
+    { "id": "Omniweave.Sheet", "msix": "omniweave.documents", "en": "Omniweave spreadsheet", "ko": "Omniweave 표", "exts": ["xlsx", "xlsm", "xls", "csv", "tsv"] },
+    { "id": "Omniweave.Slides", "msix": "omniweave.documents", "en": "Omniweave presentation", "ko": "Omniweave 슬라이드", "exts": ["pptx", "ppsx", "ppt", "pps"] },
+    { "id": "Omniweave.Pdf", "msix": "omniweave.documents", "en": "Omniweave PDF", "ko": "Omniweave PDF", "exts": ["pdf"] },
+    { "id": "Omniweave.Image", "msix": "omniweave.graphics", "en": "Omniweave image", "ko": "Omniweave 이미지", "exts": ["png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "psd", "psb"] },
+    { "id": "Omniweave.Vector", "msix": "omniweave.graphics", "en": "Omniweave vector art", "ko": "Omniweave 벡터", "exts": ["ai", "svg"] },
+    { "id": "Omniweave.Drawing", "msix": "omniweave.graphics", "en": "Omniweave drawing", "ko": "Omniweave 도면", "exts": ["dwg", "dxf"] }
+  ],
+  "notListed": {
+    "_keys": "a FORMATS id (all its extensions) or one extension",
+    "video": "media is for PPTX slides, not a player",
+    "audio": "media is for PPTX slides, not a player",
+    "srt": "subtitles go with media",
+    "html": "web pages belong to the browser",
+    "json": "code and config files belong to editors",
+    "xml": "code and config files belong to editors",
+    "yaml": "code and config files belong to editors",
+    "bat": "code and config files belong to editors",
+    "code": "code and config files belong to editors",
+    "heic": "opens only with a message (no decoder)",
+    "ico": "rarely opened to edit",
+    "avif": "rarely opened to edit",
+    "text": "a rare synonym of .txt",
+    "log": "log files belong to editors"
+  }
+}

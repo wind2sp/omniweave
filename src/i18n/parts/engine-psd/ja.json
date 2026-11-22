@@ -15,7 +15,7 @@
   "engine.export.pdf.label": "PDF ドキュメント",
   "engine.export.pdfImage.hint": "すべてのページ · 画面どおりに画像として",
   "engine.export.pdfImage.label": "PDF（画像）",
-  "engine.export.png.hint": "現在のページ · 2 倍",
+  "engine.export.png.hint": "現在のページ · 2 倍 (画像ファイルは元のサイズ)",
   "engine.export.png.label": "PNG 画像",
   "engine.export.pptx.hint": "スライド · テキスト・図形・画像・表",
   "engine.export.psd.hint": "現在のページ · レイヤーごと（PSD から開いたページは元のレイヤーと効果を保持）",

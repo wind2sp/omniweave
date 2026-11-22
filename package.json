@@ -1,6 +1,6 @@
 {
   "name": "omniweave",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Omniweave (오메) — 6-in-1 studio: raster, vector, PDF, Word, HWPX, slides on one canvas",
   "scripts": {
     "dev": "vite",

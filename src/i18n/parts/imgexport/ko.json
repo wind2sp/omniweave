@@ -1,0 +1,21 @@
+{
+  "imgexport.label.jpg": "JPG 이미지",
+  "imgexport.label.webp": "WebP 이미지",
+  "imgexport.hint.jpg": "현재 페이지 · 품질 선택 · 사진 정보 유지",
+  "imgexport.hint.webp": "현재 페이지 · 품질 선택 · 투명 유지",
+  "imgexport.filter.jpg": "JPG 이미지",
+  "imgexport.filter.webp": "WebP 이미지",
+  "imgexport.same.hint": "고치지 않았으면 원본 그대로, 고쳤으면 같은 형식으로 다시 저장",
+  "imgexport.dialog.titleJpg": "JPG로 내보내기",
+  "imgexport.dialog.titleWebp": "WebP로 내보내기",
+  "imgexport.dialog.quality": "품질",
+  "imgexport.dialog.background": "배경색",
+  "imgexport.dialog.dropExif": "사진 정보(EXIF) 모두 지우기",
+  "imgexport.dialog.keepGps": "위치(GPS) 정보도 남기기",
+  "imgexport.dialog.noAlpha": "JPG는 투명을 지원하지 않아 투명한 곳은 배경색으로 채웁니다.",
+  "imgexport.dialog.exifNoGps": "촬영 정보는 남기고 위치 정보는 지웁니다.",
+  "imgexport.dialog.exifAll": "위치를 포함한 사진 정보를 모두 남깁니다.",
+  "imgexport.dialog.exifNone": "사진 정보를 남기지 않습니다.",
+  "imgexport.dialog.save": "내보내기",
+  "imgexport.err.encoder": "이 환경에서는 {fmt} 형식으로 저장할 수 없습니다"
+}

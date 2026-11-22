@@ -3,21 +3,53 @@ use std::path::PathBuf;
 mod portable;
 mod spell;
 
-fn startup_path() -> Option<PathBuf> {
-    std::env::args_os().skip(1).map(PathBuf::from).find(|p| p.is_file())
+/// The files on the command line: a double-click or "Open with" (`"<exe>" "%1"`), files dropped on the exe, or a
+/// CLI call. Windows already split the line (quotes, spaces, Korean names: args_os is exact UTF-16). Flags (`--x`)
+/// are skipped, relative paths are made absolute against `cwd`, a stray pair of quotes is dropped, each file once,
+/// in order. When no single argument is a file, all of them joined by spaces are tried as one path: a launcher
+/// that left `%1` unquoted splits "C:\My Files\a.pdf" in two.
+fn launch_paths(args: &[std::ffi::OsString], cwd: Option<&std::path::Path>, is_file: impl Fn(&std::path::Path) -> bool) -> Vec<PathBuf> {
+    let abs = |s: &str| {
+        let p = PathBuf::from(s.trim().trim_matches('"'));
+        match cwd {
+            Some(c) if p.is_relative() => c.join(p),
+            _ => p,
+        }
+    };
+    let words: Vec<String> = args.iter().map(|a| a.to_string_lossy().into_owned()).filter(|a| !a.starts_with("--") && !a.trim().is_empty()).collect();
+    let mut out: Vec<PathBuf> = Vec::new();
+    for w in &words {
+        let p = abs(w);
+        if is_file(&p) && !out.contains(&p) {
+            out.push(p);
+        }
+    }
+    if out.is_empty() && words.len() > 1 {
+        let p = abs(&words.join(" "));
+        if is_file(&p) {
+            out.push(p);
+        }
+    }
+    out
 }
 
-/// The .omw / .pdf / .docx / .hwpx file the app was launched with (file association or CLI).
-#[tauri::command]
-fn startup_file() -> Option<String> {
-    startup_path().map(|p| p.to_string_lossy().into_owned())
+fn startup_paths() -> Vec<PathBuf> {
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    launch_paths(&args, std::env::current_dir().ok().as_deref(), |p| p.is_file())
 }
 
-/// Bytes of that launch file. Read here (not through the fs plugin scope) because the user
-/// chose it by double-clicking; only this one path can be read this way.
+/// The files the app was launched with (file association, "Open with", files dropped on the exe, CLI), in order.
+/// The window opens each in its own tab (ui/actions.ts openStartupFile).
 #[tauri::command]
-fn startup_bytes() -> Result<tauri::ipc::Response, String> {
-    let p = startup_path().ok_or("no startup file")?;
+fn startup_files() -> Vec<String> {
+    startup_paths().iter().map(|p| p.to_string_lossy().into_owned()).collect()
+}
+
+/// Bytes of launch file `index` (default the first). Read here (not through the fs plugin scope) because the user
+/// chose it by double-clicking; only the launch files can be read this way.
+#[tauri::command]
+fn startup_bytes(index: Option<usize>) -> Result<tauri::ipc::Response, String> {
+    let p = startup_paths().into_iter().nth(index.unwrap_or(0)).ok_or("no startup file")?;
     std::fs::read(&p).map(tauri::ipc::Response::new).map_err(|e| e.to_string())
 }
 
@@ -219,6 +251,29 @@ mod tests {
         let conf = include_str!("../tauri.conf.json");
         assert!(conf.contains(&format!("\"identifier\": \"{RELEASE_IDENTIFIER}\"")), "RELEASE_IDENTIFIER must match tauri.conf.json");
     }
+    #[test]
+    fn launch_arguments_become_files() {
+        use std::ffi::OsString;
+        use std::path::Path;
+        let cwd = Path::new(r"C:\Users\u\Desktop");
+        let files = [r"C:\Users\u\Desktop\보고서 최종.hwpx", r"C:\My Files\a.pdf", r"D:\b.docx", r"C:\Users\u\Desktop\rel.pptx"];
+        let is_file = |p: &Path| files.iter().any(|f| Path::new(f) == p);
+        let os = |v: &[&str]| v.iter().map(OsString::from).collect::<Vec<_>>();
+        let want = |i: &[usize]| i.iter().map(|&i| PathBuf::from(files[i])).collect::<Vec<_>>();
+        // "Open with" / double-click: one quoted path, unquoted by Windows; spaces and Korean kept
+        assert_eq!(launch_paths(&os(&[files[0]]), Some(cwd), is_file), want(&[0]));
+        // several files dropped on the exe: all, in order, each once; flags and missing files skipped
+        let got = launch_paths(&os(&["--update-check", r"D:\b.docx", r"C:\nope.pdf", r"C:\My Files\a.pdf", r"D:\b.docx"]), Some(cwd), is_file);
+        assert_eq!(got, want(&[2, 1]));
+        // a relative CLI path, and a stray pair of quotes
+        assert_eq!(launch_paths(&os(&["rel.pptx"]), Some(cwd), is_file), want(&[3]));
+        assert_eq!(launch_paths(&os(&["\"D:\\b.docx\""]), Some(cwd), is_file), want(&[2]));
+        // an unquoted %1 split at the space
+        assert_eq!(launch_paths(&os(&[r"C:\My", r"Files\a.pdf"]), Some(cwd), is_file), want(&[1]));
+        // nothing to open
+        assert!(launch_paths(&os(&[]), Some(cwd), is_file).is_empty());
+        assert!(launch_paths(&os(&["--selftest", ""]), Some(cwd), is_file).is_empty());
+    }
     // (no test of store_package() itself: a process started by a packaged app — an IDE or assistant installed from
     // the Store — runs with that app's package identity, so the answer depends on who started the tests)
 }
@@ -251,7 +306,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![startup_file, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, portable::portable_update_download, portable::portable_update_finish, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore])
+        .invoke_handler(tauri::generate_handler![startup_files, startup_bytes, is_portable, is_store_package, installer_language, update_log, update_diag, update_test_mode, portable::portable_update_download, portable::portable_update_finish, spell::spell_languages, spell::spell_check, spell::spell_suggest, spell::spell_add, spell::spell_ignore])
         .setup(|app| {
             use tauri::Manager;
             if update_qa_env(&app.config().identifier) {

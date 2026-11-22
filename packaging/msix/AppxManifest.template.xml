@@ -59,15 +59,24 @@
             <uap:DisplayName>ms-resource:FileTypeDocuments</uap:DisplayName>
             <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
             <uap:SupportedFileTypes>
+              <!-- the same types as src-tauri/windows/open-with.json "msix": "omniweave.documents" (tests/openWith.test.ts) -->
               <uap:FileType>.docx</uap:FileType>
               <uap:FileType>.doc</uap:FileType>
               <uap:FileType>.hwpx</uap:FileType>
               <uap:FileType>.hwp</uap:FileType>
-              <uap:FileType>.pptx</uap:FileType>
-              <uap:FileType>.ppt</uap:FileType>
+              <uap:FileType>.md</uap:FileType>
+              <uap:FileType>.markdown</uap:FileType>
+              <uap:FileType>.txt</uap:FileType>
+              <uap:FileType>.epub</uap:FileType>
               <uap:FileType>.xlsx</uap:FileType>
+              <uap:FileType>.xlsm</uap:FileType>
               <uap:FileType>.xls</uap:FileType>
               <uap:FileType>.csv</uap:FileType>
+              <uap:FileType>.tsv</uap:FileType>
+              <uap:FileType>.pptx</uap:FileType>
+              <uap:FileType>.ppsx</uap:FileType>
+              <uap:FileType>.ppt</uap:FileType>
+              <uap:FileType>.pps</uap:FileType>
               <uap:FileType>.pdf</uap:FileType>
             </uap:SupportedFileTypes>
           </uap:FileTypeAssociation>
@@ -77,11 +86,21 @@
             <uap:DisplayName>ms-resource:FileTypeGraphics</uap:DisplayName>
             <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
             <uap:SupportedFileTypes>
+              <!-- the same types as src-tauri/windows/open-with.json "msix": "omniweave.graphics" -->
+              <uap:FileType>.png</uap:FileType>
+              <uap:FileType>.jpg</uap:FileType>
+              <uap:FileType>.jpeg</uap:FileType>
+              <uap:FileType>.webp</uap:FileType>
+              <uap:FileType>.gif</uap:FileType>
+              <uap:FileType>.bmp</uap:FileType>
+              <uap:FileType>.tif</uap:FileType>
+              <uap:FileType>.tiff</uap:FileType>
               <uap:FileType>.psd</uap:FileType>
+              <uap:FileType>.psb</uap:FileType>
               <uap:FileType>.ai</uap:FileType>
               <uap:FileType>.svg</uap:FileType>
-              <uap:FileType>.dxf</uap:FileType>
               <uap:FileType>.dwg</uap:FileType>
+              <uap:FileType>.dxf</uap:FileType>
             </uap:SupportedFileTypes>
           </uap:FileTypeAssociation>
         </uap:Extension>
