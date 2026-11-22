@@ -2,6 +2,7 @@
 
 import { t } from "../i18n";
 import { ALL_EXTS } from "./formats";
+import { isIOS } from "../web/device";
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -29,7 +30,9 @@ export async function openFiles(filters: Filter[], multiple = false): Promise<Op
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = multiple;
-    input.accept = filters.flatMap((f) => f.extensions.map((e) => "." + e)).join(",");
+    // iPhone / iPad: Safari turns `accept` into file types it knows and greys out the rest (.omw, .hwpx, .hwp, .psd
+    // ...), so there every file can be picked; the format registry rejects what it cannot open
+    if (!isIOS()) input.accept = filters.flatMap((f) => f.extensions.map((e) => "." + e)).join(",");
     input.onchange = async () => {
       const files = Array.from(input.files ?? []);
       resolve(await Promise.all(files.map(async (f) => ({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) }))));
@@ -68,6 +71,12 @@ export async function saveFile(suggested: string, bytes: Uint8Array | string, fi
       if (e?.name === "AbortError") return null;
     }
   }
+  // iPhone / iPad: the share sheet ("Save to Files", AirDrop, mail ...) — a download from a home-screen app has no
+  // place to go. Needs a recent tap: when Safari refuses (NotAllowedError) the plain download below is used.
+  if (isIOS()) {
+    const shared = await shareFile(suggested, data);
+    if (shared !== "unsupported") return shared === "shared" ? suggested : null;
+  }
   const url = URL.createObjectURL(new Blob([data as BlobPart]));
   const a = document.createElement("a");
   a.href = url;
@@ -75,6 +84,41 @@ export async function saveFile(suggested: string, bytes: Uint8Array | string, fi
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   return suggested;
+}
+
+const MIME: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  svg: "image/svg+xml",
+  txt: "text/plain",
+  md: "text/markdown",
+  html: "text/html",
+  csv: "text/csv",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+/** Media type for a file name (the share sheet offers apps by it); octet-stream for the rest. */
+export function mimeFor(name: string): string {
+  return MIME[name.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+}
+
+/** Hand a file to the system share sheet (Web Share with files). */
+export async function shareFile(name: string, data: Uint8Array, nav: any = typeof navigator === "undefined" ? undefined : navigator): Promise<"shared" | "cancelled" | "unsupported"> {
+  if (!nav?.share || typeof nav.canShare !== "function" || typeof File === "undefined") return "unsupported";
+  const file = new File([data as BlobPart], name, { type: mimeFor(name) });
+  if (!nav.canShare({ files: [file] })) return "unsupported";
+  try {
+    await nav.share({ files: [file] });
+    return "shared";
+  } catch (e: any) {
+    return e?.name === "AbortError" ? "cancelled" : "unsupported";
+  }
 }
 
 /** File-dialog filters; names are getters so they follow the UI language when a dialog opens. */

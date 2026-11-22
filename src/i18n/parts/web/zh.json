@@ -10,5 +10,13 @@
   "web.recover.journal": "已在此浏览器中保留关闭或刷新标签页之前的更改。",
   "web.mobile.title": "小屏幕上建议以查看为主",
   "web.mobile.text": "Omniweave 网页版是为在有鼠标和键盘的电脑浏览器中编辑而设计的。在手机上画面会显得较小，部分功能可能不便使用。",
-  "web.mobile.ok": "继续"
+  "web.mobile.ok": "继续",
+  "web.mobile.iosMemory": "iPhone 和 iPad 上浏览器可用内存较小，打开特别大的文件（数百 MB 的 PSD、PDF 等）时页面可能会重新加载。所做的更改可从自动保存中恢复。",
+  "web.install.iosTitle": "添加到主屏幕，像 App 一样使用",
+  "web.install.iosShare": "点按 Safari 的共享按钮",
+  "web.install.iosAdd": "再选“添加到主屏幕”",
+  "web.install.title": "将 Omniweave 安装为应用",
+  "web.install.text": "从主屏幕直接打开，没有网络也能使用。",
+  "web.install.button": "安装",
+  "web.install.close": "关闭"
 }

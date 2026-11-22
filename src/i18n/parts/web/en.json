@@ -10,5 +10,13 @@
   "web.recover.journal": "Changes made until the tab was closed or reloaded were kept in this browser.",
   "web.mobile.title": "Best for viewing on small screens",
   "web.mobile.text": "The Omniweave web app is made for editing in a desktop browser with a mouse and keyboard. On a phone the screen is shown small and some tools may be awkward to use.",
-  "web.mobile.ok": "Continue"
+  "web.mobile.ok": "Continue",
+  "web.mobile.iosMemory": "On iPhone and iPad the browser has little memory, so a very large file (a PSD or PDF of hundreds of MB) may make the page reload while opening. Your changes come back from autosave.",
+  "web.install.iosTitle": "Add to Home Screen to use it like an app",
+  "web.install.iosShare": "Tap Safari's Share button",
+  "web.install.iosAdd": "then 'Add to Home Screen'",
+  "web.install.title": "Install Omniweave as an app",
+  "web.install.text": "Open it from your home screen, even without internet.",
+  "web.install.button": "Install",
+  "web.install.close": "Close"
 }

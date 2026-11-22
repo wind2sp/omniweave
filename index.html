@@ -3,18 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/app_small.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: in a home-screen app the page reaches the rounded corners and the home bar; body keeps
+         env(safe-area-inset-*) clear (styles.css) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- browser / home-screen app bar colour: the window colour (dark; light theme below and App.tsx) -->
+    <meta name="theme-color" content="#151618" />
     <title>Omniweave (오메)</title>
     <script>
       // first paint in the viewer's theme (uiStore.ts persists it), so a light-theme start never flashes dark
       try {
-        if (JSON.parse(localStorage.getItem("omniweave.ui.v1") || "{}").theme === "light") document.documentElement.dataset.theme = "light";
+        if (JSON.parse(localStorage.getItem("omniweave.ui.v1") || "{}").theme === "light") {
+          document.documentElement.dataset.theme = "light";
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#e6e7e9");
+        }
       } catch (e) {}
       // phones and small tablets (browser): the layout needs 960 px (.app min-width), so lay the page out 1024 px wide
       // and let the browser scale it to the screen instead of cutting it off; ui/shell/WebNotice.tsx says why
       try {
         if (Math.min(screen.width, screen.height) < 600 || screen.width < 960)
-          document.querySelector('meta[name="viewport"]').setAttribute("content", "width=1024, initial-scale=" + Math.min(1, screen.width / 1024).toFixed(3));
+          document.querySelector('meta[name="viewport"]').setAttribute("content", "width=1024, initial-scale=" + Math.min(1, screen.width / 1024).toFixed(3) + ", viewport-fit=cover");
       } catch (e) {}
     </script>
     <style>

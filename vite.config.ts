@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { version as PKG_VERSION } from "./package.json";
+import { webPwa } from "./scripts/web-pwa.mjs";
 
 /** How src/core/{image,fidelity}/run.ts start their worker (dev server: Vite's own worker handling). */
 export const WORKER_CALL = 'new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })';
@@ -85,7 +86,7 @@ export function webVersion(version: string): Plugin {
 export default defineConfig({
   // relative asset paths: the same build runs in Tauri, at a site root, or under /app/ (browser demo)
   base: "./",
-  plugins: [react(), sharedWorkers(), sniffGuard(), webVersion(PKG_VERSION)],
+  plugins: [react(), sharedWorkers(), sniffGuard(), webVersion(PKG_VERSION), webPwa()],
   clearScreen: false,
   server: { port: 5199, strictPort: true },
   build: {

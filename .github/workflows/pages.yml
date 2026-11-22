@@ -45,6 +45,9 @@ jobs:
                    --exclude 'README.txt' --exclude '.htaccess' website/ _site/
       # browser demo: the real app (web build) served at /app/ — "try it now, no install"
       - name: Build the web app into /app
+        # OMW_WEB=1: manifest, home-screen icons and the offline service worker (scripts/web-pwa.mjs) — web build only
+        env:
+          OMW_WEB: "1"
         run: |
           npx vite build --outDir _site/app --emptyOutDir
           cp docs/demo/omniweave-demo.omw _site/app/demo.omw

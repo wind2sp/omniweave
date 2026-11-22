@@ -11,7 +11,7 @@ import { activeSessionId, claimTab, isPristineActive, newSession } from "../core
 import { anyDirty, confirmAllSaved } from "./tabs";
 import { TabDialogs } from "./shell/TabDialogs";
 import { isTauri } from "../io/platform";
-import { fitCurrent, isDocProtected, openDemoIfRequested, openStartupFile } from "./actions";
+import { fitCurrent, isDocProtected, openDemoIfRequested, openInTab, openStartupFile } from "./actions";
 import { CanvasView } from "./CanvasView";
 import { NotesPane, SlideSorter } from "./shell/SlideMode";
 import { useSlideUI } from "./slideActions";
@@ -21,6 +21,8 @@ import { TooltipLayer, cx } from "./shell/controls";
 import { RecoveryDialog } from "./shell/Dialogs";
 import { StartScreen } from "./shell/StartScreen";
 import { WebMobileNotice } from "./shell/WebNotice";
+import { WebInstallHint } from "./shell/WebInstall";
+import { openLaunchedFiles } from "../web/pwa";
 import { Icon } from "./shell/Icons";
 import { LeftDock } from "./shell/LeftDock";
 import { Ribbon, ToolBox } from "./shell/Ribbon";
@@ -174,6 +176,8 @@ export function App() {
   // theme
   useEffect(() => {
     document.documentElement.dataset.theme = ui.theme;
+    // browser / home-screen app bar in the window colour (index.html sets it before the first paint)
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", ui.theme === "light" ? "#e6e7e9" : "#151618");
     document.documentElement.style.colorScheme = ui.theme;
   }, [ui.theme]);
 
@@ -206,7 +210,7 @@ export function App() {
   const finishStartup = (restored: boolean) => {
     setRecovery(null);
     setReady(true);
-    Promise.all([openStartupFile(), openDemoIfRequested()])
+    Promise.all([openStartupFile(), openDemoIfRequested(), openLaunchedFiles((f) => openInTab(f))])
       .catch(() => {})
       .finally(() => {
         if (!restored && isPristine(S().doc)) {
@@ -391,6 +395,7 @@ export function App() {
         />
       )}
       {!recovery && <WebMobileNotice />}
+      {!recovery && <WebInstallHint />}
       <PageOrganizer />
       <ToolsDialog />
       <SecurityDialogs />

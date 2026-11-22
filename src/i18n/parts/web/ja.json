@@ -10,5 +10,13 @@
   "web.recover.journal": "タブを閉じるか再読み込みする直前までの変更を、このブラウザーに保存しておきました。",
   "web.mobile.title": "小さな画面では表示を中心にお使いください",
   "web.mobile.text": "Omniweave のウェブ版は、マウスとキーボードのあるパソコンのブラウザーで編集しやすいように作られています。スマートフォンでは画面が小さく表示され、一部の機能が使いにくい場合があります。",
-  "web.mobile.ok": "続ける"
+  "web.mobile.ok": "続ける",
+  "web.mobile.iosMemory": "iPhone・iPad ではブラウザが使えるメモリが少ないため、非常に大きなファイル（数百 MB の PSD・PDF など）を開くとページが再読み込みされることがあります。変更内容は自動保存から復元できます。",
+  "web.install.iosTitle": "ホーム画面に追加してアプリのように使う",
+  "web.install.iosShare": "Safari の共有ボタン",
+  "web.install.iosAdd": "「ホーム画面に追加」",
+  "web.install.title": "Omniweave をアプリとしてインストール",
+  "web.install.text": "ホーム画面からすぐ開け、インターネットがなくても使えます。",
+  "web.install.button": "インストール",
+  "web.install.close": "閉じる"
 }

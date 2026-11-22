@@ -4,11 +4,15 @@
 // "Reload to update" (unsaved edits stay in the autosave journal and come back after the reload). A lazy chunk that
 // is gone after a new deployment (hashed names, the old build replaced) shows the same pill instead of a dead feature.
 // GitHub Pages caches every file for 10 minutes (max-age=600), so version.json is read with cache: "no-store".
+// With the offline service worker (src/web/pwa.ts, sw.js) the page itself comes from the worker's cache: a new build
+// is installed by the worker in the background and the pill hands over to it (applyUpdate) instead of a plain reload,
+// which would get the old build again. A new build found by the worker alone shows the same pill.
 
 import { useEffect, useState } from "react";
 import { useStore } from "../../core/store";
 import { t as tr, useT } from "../../i18n";
 import { isTauri } from "../../io/platform";
+import { applyUpdate, checkForSwUpdate, usePwa } from "../../web/pwa";
 import { Icon } from "./Icons";
 
 const PERIOD_MS = 6 * 60 * 60 * 1000;
@@ -48,6 +52,8 @@ type St = null | { kind: "new"; version?: string } | { kind: "stale" };
 export function WebUpdatePill() {
   const t = useT();
   const [st, setSt] = useState<St>(null);
+  const [busy, setBusy] = useState(false);
+  const { updateReady } = usePwa();
 
   useEffect(() => {
     if (isTauri) return;
@@ -57,7 +63,10 @@ export function WebUpdatePill() {
       if (!cur || Date.now() - last < MIN_GAP_MS) return;
       last = Date.now();
       const remote = await fetchVersion();
-      if (isNewBuild(remote, cur)) setSt((s) => s ?? { kind: "new", version: remote?.version });
+      if (isNewBuild(remote, cur)) {
+        setSt((s) => s ?? { kind: "new", version: remote?.version });
+        checkForSwUpdate(); // let the service worker start fetching the new build now
+      }
     };
     // a lazy chunk of this build is gone (a new build replaced it): the feature cannot load until a reload
     const onPreloadError = () => {
@@ -84,10 +93,21 @@ export function WebUpdatePill() {
     };
   }, []);
 
-  if (!st) return null;
-  const tip = st.kind === "new" && st.version ? `${t("web.update.tip", { version: st.version })} — ${t("web.update.keep")}` : t("web.update.keep");
+  const shown: St = st ?? (updateReady ? { kind: "new" } : null);
+  if (!shown) return null;
+  const tip = shown.kind === "new" && shown.version ? `${t("web.update.tip", { version: shown.version })} — ${t("web.update.keep")}` : t("web.update.keep");
   return (
-    <button type="button" className="update-pill is-ready" data-tip={tip} aria-live="polite" onClick={() => location.reload()}>
+    <button
+      type="button"
+      className="update-pill is-ready"
+      data-tip={tip}
+      aria-live="polite"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void applyUpdate();
+      }}
+    >
       <Icon name="rotate" size={14} />
       <span className="update-pill-label">{t("web.update.reload")}</span>
     </button>

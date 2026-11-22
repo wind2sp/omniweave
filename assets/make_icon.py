@@ -4,7 +4,8 @@ Symbol: a woven ring — three interlaced thread bands (violet / teal / coral) f
 over a dark rounded tile; a 2x2 pixel-tile mark sits in the centre (the Loom engine's tiles).
 Small sizes (<= 40px) drop the tile mark and thicken the ring so it stays legible.
 
-Outputs: app.ico (16..256), app.png (1024), app_small.png (64), preview.png (light/dark sheet)
+Outputs: app.ico (16..256), app.png (1024), app_small.png (64), preview.png (light/dark sheet),
+src/web/icons (web app: manifest icons, maskable, apple-touch-icon, iPhone start-up images; `--web` writes only these)
 and public/app_small.png for the web build (the favicon; the 1024 px master stays here).
 """
 from __future__ import annotations
@@ -146,12 +147,63 @@ def msix_assets(dest: str) -> int:
     return count
 
 
+APP_BG = (21, 22, 24)  # the app window's own colour (src/ui/styles.css --bg-0, index.html start-up frame)
+
+# iPhone screens (portrait px, device pixel ratio) for the home-screen app's start-up image (apple-touch-startup-image)
+IPHONE_SPLASH = [
+    (1320, 2868, 3), (1206, 2622, 3), (1290, 2796, 3), (1179, 2556, 3), (1284, 2778, 3),
+    (1170, 2532, 3), (1125, 2436, 3), (1242, 2688, 3), (828, 1792, 2), (750, 1334, 2),
+]
+
+
+def full_bleed(size: int) -> Image.Image:
+    """Opaque square without rounded corners: the home screen / launcher cuts its own shape (iOS rounds the corners,
+    Android masks to a circle or squircle). The ring stays inside the maskable safe zone (radius 40 %)."""
+    grad = Image.new("RGB", (1, 256))
+    for y in range(256):
+        grad.putpixel((0, y), lerp(BG_TOP, BG_BOT, y / 255))
+    out = grad.resize((size, size)).convert("RGBA")
+    return Image.alpha_composite(out, woven_ring(size, size > 40))
+
+
+def web_icons(dest: str) -> int:
+    """Web app (src/web): manifest icons 192/512 (rounded tile, transparent corners), maskable 512 and the iOS
+    apple-touch-icon 180 (full bleed), and iPhone start-up images (window colour + mark). vite.config.ts webPwa
+    emits them in the web build only, so the desktop installer does not carry them."""
+    os.makedirs(dest, exist_ok=True)
+    for f in os.listdir(dest):
+        if f.endswith(".png"):
+            os.remove(os.path.join(dest, f))
+    render(192).save(os.path.join(dest, "icon-192.png"), optimize=True)
+    render(512).save(os.path.join(dest, "icon-512.png"), optimize=True)
+    full_bleed(512).save(os.path.join(dest, "maskable-512.png"), optimize=True)
+    full_bleed(180).convert("RGB").save(os.path.join(dest, "apple-touch-icon.png"), optimize=True)
+    n = 4
+    marks: dict[int, Image.Image] = {}
+    for w, h, dpr in IPHONE_SPLASH:
+        m = 96 * dpr  # 96 pt mark, centred
+        if m not in marks:
+            marks[m] = render(m)
+        img = Image.new("RGBA", (w, h), (*APP_BG, 255))
+        img.alpha_composite(marks[m], ((w - m) // 2, (h - m) // 2))
+        # few colours (flat window colour + the mark): a palette PNG is a fraction of the RGB size
+        img.convert("RGB").quantize(colors=128, method=Image.Quantize.MEDIANCUT).save(
+            os.path.join(dest, f"splash-{w}x{h}-{dpr}x.png"), optimize=True)
+        n += 1
+    return n
+
+
 def main():
     import sys
 
     if len(sys.argv) == 3 and sys.argv[1] == "--msix":
         print(f"msix assets {msix_assets(sys.argv[2])}")
         return
+    web = os.path.join(HERE, "..", "src", "web", "icons")
+    if len(sys.argv) == 2 and sys.argv[1] == "--web":
+        print(f"web icons {web_icons(web)}")
+        return
+    web_icons(web)
     master = render(1024)
     master.save(os.path.join(HERE, "app.png"))
     render(64).save(os.path.join(HERE, "app_small.png"))

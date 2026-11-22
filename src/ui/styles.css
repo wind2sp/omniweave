@@ -221,6 +221,9 @@ body,
   margin: 0;
 }
 body {
+  /* home-screen web app (index.html viewport-fit=cover): keep the notch, rounded corners and home bar clear;
+     0 everywhere else (desktop app, desktop browsers) */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   background: var(--bg-0);
   color: var(--text);
   font: 400 var(--fs-ui)/1.4 var(--font);
@@ -302,7 +305,7 @@ body.resizing * {
 .app {
   display: grid;
   grid-template-rows: var(--h-title) var(--h-cmd) var(--h-ribbon) minmax(0, 1fr) var(--h-status);
-  height: 100vh;
+  height: 100%; /* #root inside body's safe-area padding (100vh is taller than the visible page in mobile Safari) */
   min-width: 960px;
   background: var(--bg-0);
 }
@@ -2881,6 +2884,89 @@ body.resizing .splitter::after {
 }
 .modal-text b {
   color: var(--text);
+}
+/* phone (web): the 1024 px layout is scaled down to the screen; this dialog is enlarged back to a readable size
+   (--phone-zoom, src/web/pwa.ts), narrow enough to fit a portrait phone */
+.modal.web-phone {
+  zoom: var(--phone-zoom, 1);
+  max-width: min(calc(420px * var(--ui-scale)), 360px);
+}
+
+/* "use it like an app" card (ui/shell/WebInstall.tsx): bottom centre, once, phones and tablets in the browser */
+.web-install {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1600; /* over the start screen and its scrim (.modal-backdrop 1500): small, bottom, closable */
+  display: flex;
+  gap: 12px;
+  width: 340px;
+  margin: 0 auto;
+  padding: 14px 36px 14px 14px;
+  zoom: var(--phone-zoom, 1);
+  border-radius: 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  user-select: none;
+}
+.web-install-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+.web-install-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.web-install h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: var(--fw-strong);
+}
+.web-install p {
+  margin: 0;
+  color: var(--text-2);
+}
+.web-install-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+.web-install-steps li + li {
+  margin-top: 2px;
+}
+.web-install-glyph {
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  vertical-align: -4px;
+  color: var(--accent, #2f6fdc);
+}
+.web-install-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.web-install-close:hover {
+  background: var(--hover, rgba(127, 127, 127, 0.12));
 }
 .tab-save-list {
   display: flex;

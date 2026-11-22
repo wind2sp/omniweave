@@ -1,9 +1,12 @@
 // Browser on a phone or small tablet: the editor is laid out for a desktop browser (index.html scales the 960 px
 // layout to the screen), so say once per visit that small screens are best for viewing. Nothing is blocked.
+// As a home-screen app (standalone) it is said once for good, not at every start. iPhone / iPad add a line on
+// Safari's memory limit (a page that uses too much is reloaded; the autosave journal brings the edits back).
 
 import { useState } from "react";
 import { useT } from "../../i18n";
 import { isTauri } from "../../io/platform";
+import { isIOS, isStandalone } from "../../web/device";
 import { Modal } from "./Dialogs";
 
 const KEY = "omniweave.web.mobileNotice";
@@ -18,9 +21,12 @@ export function isSmallTouchScreen(): boolean {
   }
 }
 
+/** per visit in the browser; for good in the home-screen app */
+const store = (): Storage => (isStandalone() ? localStorage : sessionStorage);
+
 function seen(): boolean {
   try {
-    return sessionStorage.getItem(KEY) === "1";
+    return store().getItem(KEY) === "1";
   } catch {
     return false;
   }
@@ -32,14 +38,15 @@ export function WebMobileNotice() {
   if (!open) return null;
   const close = () => {
     try {
-      sessionStorage.setItem(KEY, "1");
+      store().setItem(KEY, "1");
     } catch {}
     setOpen(false);
   };
   return (
-    <Modal labelledBy="web-mobile-title" className="modal-sm" onClose={close}>
+    <Modal labelledBy="web-mobile-title" className="modal-sm web-phone" onClose={close}>
       <h2 id="web-mobile-title">{t("web.mobile.title")}</h2>
       <p className="modal-text">{t("web.mobile.text")}</p>
+      {isIOS() && <p className="modal-text">{t("web.mobile.iosMemory")}</p>}
       <div className="modal-actions">
         <button type="button" className="btn btn-primary" data-autofocus onClick={close}>
           {t("web.mobile.ok")}

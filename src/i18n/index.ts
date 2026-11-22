@@ -89,6 +89,13 @@ export function useT(): typeof t {
 
 /** Pick the starting language: saved choice → installer choice (desktop) → OS / browser language. */
 export async function initLang(): Promise<void> {
+  // web: a link can choose the language (?lang=en|ko|ja|zh) — it wins over the saved choice for this visit, not saved
+  if (!isTauri && typeof location !== "undefined") {
+    try {
+      const asked = new URLSearchParams(location.search).get("lang");
+      if (isLang(asked)) return useLang.getState().set(asked, false);
+    } catch {}
+  }
   let saved: string | null = null;
   try {
     saved = localStorage.getItem(KEY);

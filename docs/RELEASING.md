@@ -122,7 +122,22 @@ $env:CARGO_ENCODED_RUSTFLAGS = node scripts/rust-remap.mjs; npx tauri build
 함께 만들고(vite.config.ts `webVersion`), 앱이 시작 10초 뒤·6시간마다·탭으로 돌아올 때(30분 간격) `cache: "no-store"`로 읽어
 입구 스크립트가 다르면 제목 줄에 **"새로 고쳐서 업데이트"**를 띄웁니다(src/ui/shell/WebUpdate.tsx). 새 배포로 옛 지연 로딩 파일이
 사라져 기능을 못 불러오면(`vite:preloadError`) 같은 알림과 안내를 냅니다. 저장 안 한 내용은 새로 고친 뒤 자동 저장 복구로 돌아옵니다.
-아직 안 된 것: 서비스 워커(오프라인·미리 받기), 옛 해시 파일 보존(Pages는 배포마다 사이트 전체를 바꿈), `minOmwReader`, `/app-beta/`.
+아직 안 된 것: 옛 해시 파일 보존(Pages는 배포마다 사이트 전체를 바꿈), `minOmwReader`, `/app-beta/`.
+
+**홈 화면 앱·오프라인(PWA, 2026-11-22):** iPhone은 App Store 대신 웹판을 사파리 '홈 화면에 추가'로 씁니다(대표님 결정).
+웹 빌드(`OMW_WEB=1`, Pages 워크플로가 켬 — 데스크톱 빌드·설치본에는 하나도 안 들어감)가 `scripts/web-pwa.mjs`로
+`manifest.webmanifest`·`icons/`(192·512·maskable·apple-touch-icon·iPhone 시작 그림, `assets/make_icon.py --web`)·`sw.js`를 만들고
+head에 iOS 태그를 넣습니다. 앱은 브라우저에서만 서비스 워커를 등록합니다(`src/web/pwa.ts`, Tauri·개발 서버·http는 안 함).
+- 빌드마다 캐시 `omw-shell-<입구 스크립트>`에 껍데기(스크립트·CSS·UI 글꼴·pdf.js 자료·아이콘, 약 16 MB)를 **전부** 받아야 설치 완료.
+  `index.html`이 다른 빌드(Pages 10분 캐시)면 설치 실패 → 다음 확인 때 다시. 페이지는 이 캐시에서 엽니다(오프라인·빠른 시작).
+- AI 모델(`models/**`, `*.lwt`)은 처음 쓸 때 `omw-models-<모델 파일 해시>`에 저장(모델이 같으면 업데이트 뒤에도 유지). `version.json`·`sw.js`는 캐시 안 함.
+- **업데이트:** 새 `sw.js`가 새 빌드를 뒤에서 받고 **기다립니다**(자동 skipWaiting 없음 — 열린 탭이 자기 빌드 파일을 계속 씀).
+  준비되면(또는 `version.json`이 새 빌드를 알리면) 기존 **"새로 고쳐서 업데이트"**가 뜨고, 누르면 `SKIP_WAITING` → 새 워커가 넘겨받은 뒤 새로 고침.
+  그냥 새로 고침만 하면 옛 빌드가 다시 나오므로 이 단추가 넘김을 맡습니다(20초 안에 준비 안 되면 그냥 새로 고침). 앱 창을 모두 닫았다 열어도 넘어갑니다.
+  첫 설치만 바로 넘겨받습니다. 새 워커가 켜지면 옛 `omw-` 캐시를 지웁니다.
+- **갇힘 방지:** `sw.js`는 HTTP 캐시를 건너뛰어 받고(`updateViaCache: "none"`), 문제가 생기면 주소 끝에 `?sw=off`를 붙여 열면 워커와 캐시를 모두 지우고 네트워크에서 엽니다.
+- 설치된 데스크톱 Chrome·Edge에서는 파일 연결(`file_handlers` → `launchQueue`)로 .omw·PDF·DOCX·HWPX… 를 탭으로 엽니다.
+- iPhone: 파일 열기는 형식 제한 없이 고름(사파리가 .omw·.hwpx를 회색으로 막음), 저장·내보내기는 공유 시트('파일에 저장'), 큰 파일 메모리 안내.
 Pages는 모든 파일에 `Cache-Control: max-age=600`을 주고 헤더를 바꿀 수 없어서 1번의 `index.html` no-cache는 못 합니다(최대 10분 늦게 보임).
 
 ## .omw 형식 호환 정책

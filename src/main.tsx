@@ -7,6 +7,10 @@ import { initLang } from "./i18n";
 import { installUiFonts } from "./io/pretendard";
 import { App } from "./ui/App";
 import "./ui/styles.css";
+import { initPwa } from "./web/pwa";
+
+// browser only: offline service worker, install offer, files opened with the installed app (src/web/pwa.ts)
+initPwa();
 
 // Real glyph metrics for the text engine (core/text.ts falls back to an estimate
 // outside the DOM). Installed before the first layout so cached layouts are correct.
