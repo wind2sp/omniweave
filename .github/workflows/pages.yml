@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -69,7 +70,7 @@ jobs:
           # its own name on the home screen next to the release app (the manifest id and scope are already its own path)
           node -e 'const f="_site/app-beta/manifest.webmanifest",fs=require("fs"),m=JSON.parse(fs.readFileSync(f,"utf8"));m.name="Omniweave Beta";m.short_name="Omniweave β";fs.writeFileSync(f,JSON.stringify(m,null,2))'
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
       - id: deployment
