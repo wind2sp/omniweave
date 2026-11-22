@@ -131,7 +131,7 @@ function trackedFiles(withNew = process.argv.includes("--allow-dirty")) {
 const GENERIC = new Set(["user", "users", "admin", "administrator", "runner", "runneradmin", "root", "test", "build", "builder", "ci", "node", "default", "owner", "public", "guest", "omniweave"]);
 /** the project contact (copyright lines, Director line) is published on purpose — only in these files */
 const CONTACT = "wind2sp@9rowpar.com";
-const CONTACT_FILES = /^(NOTICE|README(\.en)?\.md|THIRD_PARTY_NOTICES\.md|src\/ui\/shell\/ShellDialogs\.tsx|scripts\/third-party-notices\.mjs|CONTRIBUTING\.md|website\/privacy\.html|packaging\/msix\/store_listing\/.*)$/;
+const CONTACT_FILES = /^(NOTICE|README(\.en)?\.md|THIRD_PARTY_NOTICES\.md|src\/ui\/shell\/ShellDialogs\.tsx|scripts\/third-party-notices\.mjs|CONTRIBUTING\.md|SECURITY\.md|website\/(.*\.html|config\.json)|packaging\/msix\/store_listing\/.*)$/;
 /** documentation-only addresses (RFC 2606 domains), package specifiers and test strings */
 const SAFE_MAIL = /@(example\.(com|org|net)|y\.com|github\.com)$|^git@github\.com$|^noreply@/i;
 const BINARY = /\.(png|jpe?g|gif|webp|avif|ico|icns|bmp|tiff?|psd|ai|pdf|docx?|xlsx?|pptx?|hwpx?|omw|zip|gz|7z|woff2?|ttf|otf|lwt|wasm|mp[34]|webm|wav|ogg|m4a|icc|bin|pack|dwg|dxf|shx|emf|wmf|eps|heic)$/i;
