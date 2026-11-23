@@ -6,7 +6,7 @@ import { isEmptyPh } from "../core/slides";
 import { decodePicture } from "./picDecode";
 import { getBlob } from "../core/assets";
 import type { NodeOverride } from "../core/anim";
-import { inverseTransformRect, type Rect } from "../core/geom";
+import { inverseTransformRect, scaleYOf, type Rect } from "../core/geom";
 import { localBounds } from "../core/loom";
 import { CELL_PAD_Y, TABLE_LINE, cellFont, hasMerges, layoutTable, lineX, tableCells } from "../core/table";
 import { SCRIPT_SCALE, graphemes, isLockedFont, layoutText, measure, shadeWidth, type Piece } from "../core/text";
@@ -587,19 +587,30 @@ export function drawNode(ctx: Ctx, n: SceneNode, env: DrawEnv, o?: NodeOverride,
       const tx0 = Math.floor(local.x / TILE), ty0 = Math.floor(local.y / TILE);
       const tx1 = Math.floor((local.x + local.w) / TILE), ty1 = Math.floor((local.y + local.h) / TILE);
       ctx.imageSmoothingEnabled = env.scale < 1;
-      // reduced (smoothed), each tile's edge is a half-covered device pixel: tile by tile, two half-covered edges
-      // leave a faint line along every 256 px seam (clear on a flat colour). A tile with a neighbour to its right /
-      // below is drawn one device pixel longer under it, so the seam is covered (2026-11-23)
-      const ov = env.scale < 1 && env.scale > 0 ? 1 / env.scale : 0;
+      // Tile by tile, a 256 px seam that does not fall on a device-pixel edge (any zoom but whole multiples, and while
+      // panning) is a device pixel each tile covers only in part: the two partial covers leave a faint line along every
+      // seam (2026-11-23: a light 1 px line across a rasterized photo at 114 %). Under the tiles, a strip of the left /
+      // upper tile's edge pixels two device pixels wide is laid across each seam that has a tile on both sides, so the
+      // seam pixel is fully covered before the tiles go on top; the strip ends under the neighbour's own pixels.
+      const sx = Math.abs(n.transform.scale) || 1, sy = Math.abs(scaleYOf(n.transform)) || 1;
+      const ox = env.scale > 0 ? 1 / (env.scale * sx) : 0, oy = env.scale > 0 ? 1 / (env.scale * sy) : 0;
+      const shown: [number, number, PixelTile][] = [];
       for (const [k, tile] of Object.entries(n.tiles)) {
         const i = k.indexOf("_");
         const tx = +k.slice(0, i), ty = +k.slice(i + 1);
         if (tx < tx0 || tx > tx1 || ty < ty0 || ty > ty1) continue;
-        const ex = ov && n.tiles[`${tx + 1}_${ty}`] ? ov : 0, ey = ov && n.tiles[`${tx}_${ty + 1}`] ? ov : 0;
-        if (ex || ey) ctx.drawImage(tileCanvas(tile), 0, 0, TILE, TILE, tx * TILE, ty * TILE, TILE + ex, TILE + ey);
-        else ctx.drawImage(tileCanvas(tile), tx * TILE, ty * TILE);
+        shown.push([tx, ty, tile]);
       }
-      break;
+      if (ox && oy)
+        for (const [tx, ty, tile] of shown) {
+          const r = !!n.tiles[`${tx + 1}_${ty}`], b = !!n.tiles[`${tx}_${ty + 1}`];
+          if (!r && !b) continue;
+          const c = tileCanvas(tile), x1 = (tx + 1) * TILE, y1 = (ty + 1) * TILE;
+          if (r) ctx.drawImage(c, TILE - 1, 0, 1, TILE, x1 - ox, ty * TILE, 2 * ox, TILE);
+          if (b) ctx.drawImage(c, 0, TILE - 1, TILE, 1, tx * TILE, y1 - oy, TILE, 2 * oy);
+          if (r && b && n.tiles[`${tx + 1}_${ty + 1}`]) ctx.drawImage(c, TILE - 1, TILE - 1, 1, 1, x1 - ox, y1 - oy, 2 * ox, 2 * oy);
+        }
+      for (const [tx, ty, tile] of shown) ctx.drawImage(tileCanvas(tile), tx * TILE, ty * TILE);      break;
     }
     case "VECTOR": {
       const p = vectorPath(n);
