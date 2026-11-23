@@ -8,6 +8,8 @@ import { dissolveReady, loadDissolveField } from "../core/style/blend";
 import { currentPage, draftPage, findPage, selectedNodes, useStore } from "../core/store";
 import { nodeBounds } from "../core/loom";
 import { findMatches, replaceAllInDoc } from "../core/textSearch";
+import { reflowPages } from "../core/flow";
+import { current } from "immer";
 import { boxCenter } from "../core/transform";
 import { detachCopies } from "../core/layerTree";
 import { newTable, newText, uid, type AssetRef, type OmwDocument, type Page, type RasterNode, type SceneNode, type Transform, type Vec2 } from "../core/types";
@@ -436,7 +438,13 @@ export function replaceAll(query: string, replacement: string, matchCase: boolea
   let n = 0;
   // find first, so a search with no match leaves no history entry
   if (findMatches(S().doc, query, matchCase).length)
-    S().commit(t("menu.hist.replaceAll"), (d) => void (n = replaceAllInDoc(d as OmwDocument, query, replacement, matchCase)));
+    S().commit(t("menu.hist.replaceAll"), (d) => {
+      n = replaceAllInDoc(d as OmwDocument, query, replacement, matchCase);
+      // a flowing body takes its lines again within the margins (its frames kept the old lines and widths: the text
+      // ran past the right margin, selected like a text box — QA ui-audit #11)
+      if (n) d.pages = reflowPages(current(d).pages) as typeof d.pages;
+    });
+  if (n) S().set({ selection: [] });
   S().notify(n ? t("menu.toast.replaced", { n }) : t("menu.toast.noMatch"));
   return n;
 }

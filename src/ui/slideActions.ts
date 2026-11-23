@@ -74,7 +74,19 @@ export function layoutChoices(doc: OmwDocument, page: Page | undefined): LayoutC
 export function defaultChoice(choices: LayoutChoice[], page: Page | undefined): LayoutChoice | undefined {
   const cur = choices.find((c) => c.id === page?.layout);
   const isTitle = (c: LayoutChoice) => c.layout.slots.some((s) => s.type === "ctrTitle");
-  const content = choices.find((c) => !isTitle(c) && c.layout.slots.some((s) => s.type === "title") && c.layout.slots.some((s) => s.type === "body"));
+  // PowerPoint's "Title and Content": one title over one body. The first layout with a title and a body was taken
+  // before, which in a deck listing its layouts out of order was "Content with Caption" (a small title, a caption under
+  // it and the content beside them: 실사용 점검 2026-11-23 #57 — it looked like overlapping placeholders)
+  const score = (c: LayoutChoice) => {
+    const titles = c.layout.slots.filter((s) => s.type === "title"), bodies = c.layout.slots.filter((s) => s.type === "body");
+    const tb = titles[0]?.box, bb = bodies[0]?.box;
+    const over = tb && bb && tb[1] + tb[3] * 0.9 <= bb[1] && bb[2] >= tb[2] * 0.8;
+    return (titles.length === 1 && bodies.length === 1 ? 2 : 0) + (over ? 1 : 0);
+  };
+  const partNo = (c: LayoutChoice) => Number(/(\d+)\.xml$/.exec(c.id)?.[1] ?? 1e9);
+  const content = choices
+    .filter((c) => !isTitle(c) && c.layout.slots.some((s) => s.type === "title") && c.layout.slots.some((s) => s.type === "body"))
+    .sort((a, b) => score(b) - score(a) || partNo(a) - partNo(b))[0];
   if (!cur || isTitle(cur)) return content ?? choices[0];
   return cur;
 }

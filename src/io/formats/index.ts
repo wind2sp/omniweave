@@ -12,6 +12,8 @@ import { importPdf, saveSameTypePdf } from "../pdf";
 import { aiNoPdfContentMsg, aiXmpThumbnail, detectAiWithoutPdfContent } from "../pdfsurgeon";
 import { collectTables, exportCsv, importCsv } from "./csv";
 import { importEpub } from "./epub";
+import { importOdp } from "./odp";
+import { importOdt } from "./odt";
 import { codeBlocks, officePages } from "./flow";
 import { exportHtml, importHtml } from "./html";
 import { docText, hwpText, pptText, type LegacyText } from "./legacy";
@@ -388,6 +390,18 @@ export const FORMATS: FormatDef[] = [
     },
   },
   {
+    id: "odt",
+    label: "ODT (OpenDocument)",
+    exts: ["odt"],
+    group: "document",
+    level: "본문·제목·서식·목록·표·그림 · DOCX로 저장", // i18n: later
+    saveAs: "docx",
+    open: async (f) => {
+      // OpenDocument text (io/formats/odt.ts): read into document pages; there is no ODT writer, so it saves as DOCX
+      const r = importOdt(f.bytes, f.name);
+      return { pages: r.pages, assets: r.assets, mode: "DOCUMENT", message: t("engine.open.odt", { paras: r.paragraphs, tables: r.tables, pictures: r.pictures, pages: r.pages.length }) };
+    },
+  },  {
     id: "epub",
     label: "EPUB 전자책", // i18n: later
     exts: ["epub"],
@@ -397,6 +411,19 @@ export const FORMATS: FormatDef[] = [
     open: async (f) => {
       const r = importEpub(f.bytes, f.name);
       return { pages: r.pages, assets: r.assets, mode: "DOCUMENT", message: t("engine.open.epub", { title: r.title, chapters: r.chapters, pages: r.pages.length }) };
+    },
+  },
+  {
+    id: "odp",
+    label: "ODP 프레젠테이션", // i18n: later
+    exts: ["odp"],
+    group: "slide",
+    level: "슬라이드로 열기(글상자·그림·도형·배경·메모) · PPTX/PDF로 저장", // i18n: later
+    saveAs: "pptx",
+    open: async (f) => {
+      const r = importOdp(f.bytes, f.name);
+      const note = r.skipped ? t("engine.odp.skipped", { n: r.skipped }) : "";
+      return { pages: r.pages, assets: r.assets, mode: "SLIDE", warnings: note ? [note] : [], message: tn("engine.open.slides", r.pages.length, { fmt: "ODP" }) + (note ? " · " + note : "") };
     },
   },
   {
@@ -993,7 +1020,7 @@ export const EXPORTS: ExportDef[] = [
     },
     ext: "md",
     filter: { name: "Markdown", extensions: ["md"] },
-    run: async (d) => exportMarkdown(d.pages),
+    run: async (d) => exportMarkdown(d.pages, d.assets),
   },
   {
     id: "html",
@@ -1003,7 +1030,7 @@ export const EXPORTS: ExportDef[] = [
     },
     ext: "html",
     filter: { name: "HTML", extensions: ["html", "htm"] },
-    run: async (d) => exportHtml(d.pages, d.title),
+    run: async (d) => exportHtml(d.pages, d.title, d.assets),
   },
   {
     id: "txt",
@@ -1096,9 +1123,12 @@ const TEXT_SAVE = new Set(["txt", "log", "json", "xml", "yaml", "bat", "code", "
  * type, with the original file name. Returns null when the page did not come from a file.
  */
 export function sameTypeExport(page: Page, pages: readonly Page[] = [page]): ExportDef | null {
-  const src = page.source;
+  let src = page.source;
   if (!src) return null;
   const fmt = src.format;
+  // a PDF with pages taken from another file is saved as the document's own file (its first PDF page's), whichever
+  // page is shown (io/pdf.ts saveSameTypePdf)
+  if (fmt === "pdf") src = pages.find((p) => p.source?.format === "pdf" && p.nodes.some((n) => n.type === "PDF"))?.source ?? src;
   const ext = extOf(src.name);
   if (fmt === "pdf" || fmt === "ai") {
     // drawn from Illustrator's native data (no PDF content): the PDF behind the pages is a rendering — writing it
@@ -1110,8 +1140,8 @@ export function sameTypeExport(page: Page, pages: readonly Page[] = [page]): Exp
       hint: t(fmt === "ai" ? "engine.export.same.hintAi" : "engine.export.same.hintPdf"),
       ext,
       filter: { name: ext.toUpperCase(), extensions: [ext] },
-      fileName: () => baseName(src.name),
-      run: (d, p, c) => saveSameTypePdf(d, p, c.confirm),
+      fileName: () => baseName(src!.name),
+      run: (d, p, c) => saveSameTypePdf(d, p, c.confirm, c.pdf),
     };
   }
   if (TEXT_SAVE.has(fmt)) {

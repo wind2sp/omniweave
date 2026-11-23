@@ -9,7 +9,7 @@
   "engine.officeSurgeon.tableRebuilt_one": "{n} table changed shape or format and is written anew",
   "engine.officeSurgeon.nestedLost": "{n} tables inside table cells found no place after the row or column change and are kept only as their text (cancel to leave the file as it is)",
   "engine.officeSurgeon.nestedLost_one": "{n} table inside a table cell found no place after the row or column change and is kept only as its text (cancel to leave the file as it is)",
-  "engine.officeSurgeon.fallback": "Couldn't match the original file, so the whole document is written anew. Styles, headers, pictures and other content Omniweave doesn't read are left out",
+  "engine.officeSurgeon.fallback": "Couldn't match the original file, so the whole document is written anew. Styles, text boxes, drawings and other content Omniweave doesn't read are left out",
   "engine.officeSurgeon.controlDropped": "{n} content controls changed and are saved as plain paragraphs",
   "engine.officeSurgeon.controlDropped_one": "{n} content control changed and is saved as plain paragraphs",
   "engine.officeSurgeon.sheetReshaped": "{n} sheets with added or removed rows or columns: cell values are written by position, and formulas elsewhere keep their references",

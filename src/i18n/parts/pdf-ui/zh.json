@@ -37,5 +37,7 @@
   "pdf.sign.ok": "添加",
   "pdf.sign.hist": "添加签名",
   "pdf.sign.histMove": "移动签名",
-  "cmd.text.pdfSign": "添加签名"
+  "cmd.text.pdfSign": "添加签名",
+  "pdf.find.hint": "在 PDF 页面中查找文字。Enter：下一个，Shift+Enter：上一个",
+  "pdf.find.searching": "正在查找…"
 }

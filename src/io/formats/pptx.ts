@@ -53,6 +53,7 @@ import { t as tr } from "../../i18n";
 import { effectLstXml, pptxNeedsPicture, readEffectLst } from "./pptxFx";
 import { avOf, custContours, flipContours, presetContours } from "./pptxGeom";
 import { drawChart, readChart } from "./pptxChart";
+import { withAnimTiming } from "./pptxAnim";
 import type { Effect } from "../../core/style/types";
 import { applyLstStyle, emptyStyle, LEVELS, paraLevel, resolveFace, runLevel, slideAscentOf, splitScripts, themeFontsOf, type ListStyle, type ThemeFonts } from "./pptxText";
 
@@ -1647,6 +1648,8 @@ export interface SlideWriter {
   /** relationship elements (Ids `rId<relBase + position>`) */
   rels: string[];
   clips: ClipTiming[];
+  /** node id → the shape id it was written under */
+  spids: Map<string, number>;
   /** writes nodes (with the page's groups and clip stacks) */
   emit: (nodes: readonly SceneNode[]) => Promise<void>;
   /** the next free shape id */
@@ -1781,7 +1784,14 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
       }
     }
   };
+  // the shape id each node was written under (its animations point at it: io/formats/pptxAnim.ts)
+  const spids = new Map<string, number>();
   const emitNode = async (n: SceneNode) => {
+    const sid = id;
+    await emitNode0(n);
+    if (id > sid) spids.set(n.id, sid);
+  };
+  const emitNode0 = async (n: SceneNode) => {
     // effects DrawingML lacks (inner glow, stroke, overlay): the object as a picture, effects drawn in
     if (pptxNeedsPicture(n.effects)) {
       counts.fxPictures++;
@@ -1868,7 +1878,7 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
     if (hasStructure(nodes, page.groups)) await emitItems(buildTree(nodes, page.groups));
     else for (const n of nodes) if (n.visible) await emitNode(n);
   };
-  return { shapes, rels, clips, emit, next: () => id };
+  return { shapes, rels, clips, spids, emit, next: () => id };
 }
 
 /** p:transition for a page's transition ("" for none). */
@@ -1879,7 +1889,7 @@ export const solidBgXml = (p: Page) => `<p:bg><p:bgPr><a:solidFill><a:srgbClr va
 
 /** A whole slide part: background, the writer's shapes, the transition and the clips' timing. `showMasterSp` false hides the layout's and master's shapes. */
 export function slidePartXml(page: Page, w: SlideWriter, showMasterSp = true): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"${showMasterSp ? "" : ' showMasterSp="0"'}${page.hidden ? ' show="0"' : ""}><p:cSld>${solidBgXml(page)}<p:spTree>${SP_TREE_HEAD}${w.shapes.join("")}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transitionXml(page)}${clipTimingXml(w.clips)}</p:sld>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"${showMasterSp ? "" : ' showMasterSp="0"'}${page.hidden ? ' show="0"' : ""}><p:cSld>${solidBgXml(page)}<p:spTree>${SP_TREE_HEAD}${w.shapes.join("")}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>${transitionXml(page)}${withAnimTiming(clipTimingXml(w.clips), page, w.spids)}</p:sld>`;
 }
 
 // ───────── notes and sections ─────────

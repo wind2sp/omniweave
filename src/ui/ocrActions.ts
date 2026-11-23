@@ -7,26 +7,55 @@ import type { OcrLang } from "../core/image/ocr/models";
 import type { OcrPage } from "../core/image/ocr/pipeline";
 import { imageFrame, reconstruct, type OcrMode, type ReconstructOptions } from "../core/image/ocr/reconstruct";
 import { draftPage, findPage, useStore } from "../core/store";
-import { newGroup, type SceneNode } from "../core/types";
-import { imageTarget, loadSource, type ImageSource, type ImageTarget } from "./imageActions";
+import { newGroup, type PdfNode, type SceneNode } from "../core/types";
+import { imageTarget, loadSource, type ImageSource, type ImageTargetNode } from "./imageActions";
+import { pdfPagePixels } from "../io/pdf";
 import { t as tr } from "../i18n";
 
 const S = () => useStore.getState();
 
+/**
+ * What OCR reads: the selected picture / raster layer, or — on a PDF page with no picture picked — the page itself
+ * (a scanned PDF: 실사용 점검 2026-11-23 #81 — the button stayed grey because a PDF page offers no picture to select).
+ */
+export interface OcrTarget {
+  pageId: string;
+  node: ImageTargetNode | PdfNode;
+}
+
+export function ocrTarget(): OcrTarget | null {
+  const img = imageTarget();
+  if (img) return img;
+  const s = S();
+  const page = findPage(s.doc, s.pageId);
+  const pdf = page?.nodes.find((n): n is PdfNode => n.type === "PDF" && n.visible);
+  if (!page || !pdf || s.selection.some((id) => id !== pdf.id)) return null;
+  return { pageId: page.id, node: pdf };
+}
+
+/** Pixels to read: a PDF page painted at 200 % (about 190 dpi: small print stays readable), else the picture's own. */
+async function ocrSource(node: OcrTarget["node"]): Promise<ImageSource> {
+  if (node.type !== "PDF") return loadSource(node);
+  const hash = S().doc.assets[node.assetId]?.hash;
+  if (!hash) throw new Error(tr("image.err.noSource"));
+  const img = await pdfPagePixels(hash, node.pageIndex, 2);
+  return { img, ox: 0, oy: 0, sx: node.width / img.width, sy: node.height / img.height };
+}
+
 export interface OcrRun {
-  target: ImageTarget;
+  target: OcrTarget;
   src: ImageSource;
   page: OcrPage;
   ms: number;
 }
 
 export async function recognizeTarget(lang: OcrLang): Promise<OcrRun | null> {
-  const target = imageTarget();
+  const target = ocrTarget();
   if (!target) {
     S().notify(tr("image.needTarget"));
     return null;
   }
-  const src = await loadSource(target.node);
+  const src = await ocrSource(target.node);
   const { value: page, ms } = await runOcr(src.img, lang);
   return { target, src, page, ms };
 }

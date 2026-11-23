@@ -339,6 +339,45 @@ describe("Office Surgeon: headers / footers", () => {
     expect(back.pages.map((_, i) => hfText(back, i, "footer"))).toEqual(["1 / 4", "2 / 4", "", "X / 4"]);
   });
 
+  it("docx: a new first-page header and a new picture in one save → both relationships (QA ui-audit #31: Word said 'damaged')", async () => {
+    const { makeAsset } = await import("../src/core/assets");
+    const { newImage } = await import("../src/core/types");
+    const { strFromU8, unzipSync: unz } = await import("fflate");
+    const doc = await openFile("docx");
+    setTitlePage(doc.pages, 2, true);
+    setLinked(doc.pages, 2, "header", "first", false);
+    setHfParas(doc.pages, doc.pages[2].id, "header", [newHfParagraph("머리말QA")]);
+    const asset = makeAsset(new Uint8Array(readFileSync("public/app_small.png")), "image/png", "omni-icon.png");
+    doc.assets[asset.id] = asset;
+    const img = newImage(asset.id, 64, 64, "새 그림");
+    img.transform = { x: 200, y: 300, rotation: 0, scale: 1 };
+    doc.pages[0].nodes.push(img);
+    const out = await save("docx", doc);
+    const files = unz(out);
+    const rels = strFromU8(files["word/_rels/document.xml.rels"]);
+    const body = strFromU8(files["word/document.xml"]);
+    // every r:id of the body has its relationship
+    for (const m of body.matchAll(/\br:(?:id|embed)="([^"]+)"/g)) expect(rels).toContain(`Id="${m[1]}"`);
+    expect(rels).toMatch(/Id="rIdOmwHF\d+"/);
+    expect(rels).toMatch(/Id="rIdOmwImg\d+"/);
+    const back = await reopen("docx", out);
+    expect(back.pages.map((_, i) => hfText(back, i, "header"))[2]).toBe("머리말QA");
+  });
+
+  it.each([
+    ["hwpx", "footer", "꼬리말QA"],
+    ["docx", "header", "머리말QA"],
+  ] as const)("omni-sample.%s: a first-page %s of its own → HWPX → back: kept on page 1, the usual one after (QA ui-audit #32, #50)", async (kind, area, text) => {
+    const r = await formatForExt(kind)!.open({ name: `omni-sample.${kind}`, path: null, bytes: new Uint8Array(readFileSync(`qa/samples/doc-features/omni-sample.${kind}`)) }, {} as any);
+    const doc = { ...docOf(r.pages, "omni-sample"), assets: (r as any).assets ?? {} };
+    const was = doc.pages.map((_, i) => [hfText(doc, i, "header"), hfText(doc, i, "footer")]);
+    setHfParas(doc.pages, doc.pages[0].id, area, [newHfParagraph(text)]);
+    const back = await reopen("hwpx", await save("hwpx", doc));
+    const got = back.pages.map((_, i) => [hfText(back, i, "header"), hfText(back, i, "footer")]);
+    expect(got[0][area === "header" ? 0 : 1]).toBe(text);
+    expect(got.slice(1)).toEqual(was.slice(1));
+  });
+
   it("hwpx: a changed header is written anew (with the notice) and shows the change", async () => {
     const doc = await openFile("hwpx");
     setHfParas(doc.pages, doc.pages[1].id, "header", [newHfParagraph("한글 머리말 고침")]);

@@ -7,6 +7,7 @@ import { t } from "../i18n";
 import { isTauri } from "../io/platform";
 import { addMaster, addPage, deletePage, deleteSelected, duplicatePage, duplicateSelected, elevatePdf, fitCurrent, movePage, openAny, openAsSource, reorderSelected, runPathfinder, saveDoc, selectAll } from "./actions";
 import { usePdfForm } from "./pdf/PdfFormLayer";
+import { pdfSearchNode } from "./pdf/PdfFind";
 import { setAnnotTool, usePdfAnnot } from "./pdf/PdfAnnotLayer";
 import { addCenterGuides, clearGuides, toggleGrid, toggleGuides, toggleGuidesLocked, toggleRulers, toggleSnap, useAids } from "./aids";
 import { alignSelected, distributeSelected } from "./arrange";
@@ -132,7 +133,8 @@ export const COMMANDS: Command[] = [
   { id: "edit.selectAll", run: selectAll },
   { id: "edit.selectInverse", when: () => curNodes() > 0, run: selectInverse },
   { id: "edit.deselect", when: hasSel, run: () => S().set({ selection: [] }) },
-  { id: "edit.find", icon: "search", dialog: true, run: () => UI().set({ shellDialog: "find" }) },
+  // (a PDF page: its words are in the file, not in text boxes - the PDF Find bar reads them, ui/pdf/PdfFind.tsx)
+  { id: "edit.find", icon: "search", dialog: true, run: () => UI().set({ shellDialog: curPage() && pdfSearchNode(curPage()!) ? "pdfFind" : "find" }) },
   { id: "edit.replace", dialog: true, run: () => UI().set({ shellDialog: "replace" }) },
 
   // view

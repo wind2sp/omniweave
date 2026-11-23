@@ -9,6 +9,7 @@ import { Modal } from "./Dialogs";
 import { Icon, LogoMark } from "./Icons";
 import { cx } from "./controls";
 import { FindReplace, SymbolDialog, WordCount } from "./MenuDialogs";
+import { PdfFindBar } from "../pdf/PdfFind";
 import { SizeDialog } from "./SizeDialog";
 import { PageSetupDialog } from "./PageSetupDialog";
 import { CanvasSizeDialog } from "./CanvasSizeDialog";
@@ -304,6 +305,7 @@ export function ShellDialogs() {
   if (which === "settings") return <Settings />;
   if (which === "shortcuts") return <Shortcuts />;
   if (which === "about") return <About />;
+  if (which === "pdfFind") return <PdfFindBar />;
   if (which === "find" || which === "replace") return <FindReplace replace={which === "replace"} />;
   if (which === "wordCount") return <WordCount />;
   if (which === "symbol") return <SymbolDialog />;

@@ -662,6 +662,8 @@ class DocxMedia {
   private relsChanged = false;
   private ctChanged = false;
   private parts = new Map<string, Uint8Array>();
+  private relAdds: string[] = [];
+  private ctAdds: { ext: string; xml: string }[] = [];
   private byHash = new Map<string, string>();
   private docPr: number;
   private names: Set<string>;
@@ -697,12 +699,15 @@ class DocxMedia {
     while (this.rels.includes(`Id="${id}"`)) id += "x";
     const end = this.rels.lastIndexOf("</Relationships>");
     if (end < 0) throw new SurgeryUnavailable("rels");
-    this.rels = this.rels.slice(0, end) + `<Relationship Id="${id}" Type="${REL_IMAGE}" Target="media/omw-image${n}.${m.ext}"/>` + this.rels.slice(end);
+    const rel = `<Relationship Id="${id}" Type="${REL_IMAGE}" Target="media/omw-image${n}.${m.ext}"/>`;
+    this.rels = this.rels.slice(0, end) + rel + this.rels.slice(end);
+    this.relAdds.push(rel);
     this.relsChanged = true;
     if (!new RegExp(`<Default\\b[^>]*Extension="${m.ext}"`, "i").test(this.ct)) {
       const at = this.ct.indexOf("<Default");
       const ins = `<Default Extension="${m.ext}" ContentType="${m.mime}"/>`;
       this.ct = at >= 0 ? this.ct.slice(0, at) + ins + this.ct.slice(at) : this.ct.replace("</Types>", ins + "</Types>");
+      this.ctAdds.push({ ext: m.ext, xml: ins });
       this.ctChanged = true;
     }
     this.byHash.set(m.hash, id);
@@ -740,8 +745,30 @@ class DocxMedia {
   commit(changed: Map<string, Uint8Array>) {
     const enc = new TextEncoder();
     for (const [n, b] of this.parts) changed.set(n, b);
-    if (this.relsChanged) changed.set(MAIN_RELS, enc.encode(this.rels));
-    if (this.ctChanged) changed.set("[Content_Types].xml", enc.encode(this.ct));
+    // merged into what earlier stages wrote (a new header / footer part's relationship and content type): writing this
+    // stage's copy of the original over them left a w:headerReference without its relationship ??Word: "damaged"
+    // (QA ui-audit #31)
+    const cur = (name: string) => {
+      const c = changed.get(name);
+      if (c) return strFromU8(c);
+      const e = this.zip.entries.find((x) => x.name === name);
+      return e ? strFromU8(entryData(this.zip, e)) : "";
+    };
+    if (this.relsChanged) {
+      const now = cur(MAIN_RELS);
+      const end = now.lastIndexOf("</Relationships>");
+      if (end < 0) throw new SurgeryUnavailable("rels");
+      changed.set(MAIN_RELS, enc.encode(now.slice(0, end) + this.relAdds.join("") + now.slice(end)));
+    }
+    if (this.ctChanged) {
+      let now = cur("[Content_Types].xml");
+      for (const a of this.ctAdds) {
+        if (new RegExp(`<Default\\b[^>]*Extension="${a.ext}"`, "i").test(now)) continue;
+        const at = now.indexOf("<Default");
+        now = at >= 0 ? now.slice(0, at) + a.xml + now.slice(at) : now.replace("</Types>", a.xml + "</Types>");
+      }
+      changed.set("[Content_Types].xml", enc.encode(now));
+    }
   }
 }
 
@@ -824,6 +851,9 @@ export function cloneAbstractNum(s: string, id: string, newId: string, was: List
 /** Register a numbering.xml the original did not have: content type override and document relationship. */
 function addNumberingPart(zip: ZipArchive, changed: Map<string, Uint8Array>) {
   const read = (name: string) => {
+    // (what an earlier stage wrote first: a new header's relationship must not be dropped)
+    const c = changed.get(name);
+    if (c) return strFromU8(c);
     const e = zip.entries.find((x) => x.name === name);
     if (!e) throw new SurgeryUnavailable(name);
     return strFromU8(entryData(zip, e));

@@ -97,5 +97,6 @@
   "cmd.image.canvasSize": "캔버스 크기",
   "cmd.image.flipCanvasH": "캔버스 좌우 뒤집기",
   "cmd.image.flipCanvasV": "캔버스 상하 뒤집기",
-  "cmd.image.rotateCanvas180": "캔버스 180° 회전"
+  "cmd.image.rotateCanvas180": "캔버스 180° 회전",
+  "topui.pdf.protectPdfTip": "PDF 표준 암호(AES-256)를 건 PDF로 저장합니다. 열 때 암호를 묻습니다."
 }

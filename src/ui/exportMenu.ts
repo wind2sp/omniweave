@@ -7,6 +7,7 @@ import { t } from "../i18n";
 import { useStore } from "../core/store";
 import type { Page } from "../core/types";
 import { collectTables } from "../io/formats/csv";
+import { usedRange } from "../io/sheet/pages";
 import { pagesToText } from "../io/formats/text";
 import { cuesFromPages } from "../io/formats/srt";
 import { hwp5Source } from "../io/formats/hwp5Fp";
@@ -33,6 +34,11 @@ const FIRST: Record<EditMode, string[]> = {
 
 /** Why this format cannot make anything of the document now (shown greyed with this), or null when it can. */
 export function exportBlocked(id: string, pages: Page[] = useStore.getState().doc.pages): string | null {
+  // a workbook is a table (XLSX writes its sheets as they are); the other formats see the sheets laid out as table
+  // pages, as the export itself does (io/formats/index.ts — expandSheetPages)
+  // (a sheet with any filled cell is a table with text; checked without laying out a large sheet)
+  if (id === "xlsx" && pages.some((p) => p.sheet)) return null;
+  if ((id === "csv" || id === "md" || id === "txt" || id === "html") && pages.some((p) => p.sheet && usedRange(p.sheet).r1 >= 0)) return null;
   if (id === "xlsx" || id === "csv") return collectTables(pages).length ? null : t("menu.export.noTable");
   if (id === "srt") return cuesFromPages(pages).cues.length ? null : t("menu.export.noCues");
   if (id === "md" || id === "txt" || id === "html") return pagesToText(pages).trim() ? null : t("menu.export.noText");

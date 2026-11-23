@@ -7,9 +7,8 @@ import { downscale, type Img } from "../../core/image/pixels";
 import type { OcrLang } from "../../core/image/ocr/models";
 import { cancelImageWork, CANCELLED, warmOcr } from "../../core/image/run";
 import type { OcrMode } from "../../core/image/ocr/reconstruct";
-import { applyOcr, recognizeTarget, type OcrRun } from "../ocrActions";
+import { applyOcr, ocrTarget, recognizeTarget, type OcrRun } from "../ocrActions";
 import { withProgress } from "../progress";
-import { imageTarget } from "../imageActions";
 import { useT } from "../../i18n";
 import { Modal } from "./Dialogs";
 import { Seg } from "./controls";
@@ -39,13 +38,14 @@ export function OcrDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
   const titleId = "ocr-dialog-title";
   const [lang, setLang] = useState<OcrLang>("auto");
-  const [mode, setMode] = useState<OcrMode>("rebuild");
+  // a PDF page (a scan): a searchable text layer over the unchanged page by default, as Acrobat's Recognize Text
+  const [mode, setMode] = useState<OcrMode>(() => (ocrTarget()?.node.type === "PDF" ? "layer" : "rebuild"));
   const [showImage, setShowImage] = useState(false);
   const [mark, setMark] = useState(true);
   const [run, setRun] = useState<OcrRun | null>(null);
   const [busy, setBusy] = useState<"" | "rec" | "apply">("");
   const [error, setError] = useState("");
-  const target = imageTarget();
+  const target = ocrTarget();
   const preview = useMemo(() => (run ? overlayImage(run) : null), [run]);
   const doubtful = run ? run.page.lines.reduce((a, l) => a + l.chars.filter((c) => c.ch !== " " && (c.p < LOW || c.jamo)).length, 0) : 0;
 

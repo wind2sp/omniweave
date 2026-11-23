@@ -12,6 +12,9 @@ import { PAPERS, PX_PER_MM, marginsOf, paperPx, type PageSetup } from "../../cor
 import { PX_PER } from "../../core/units";
 import { hfEditNode, parseHfId } from "../../core/headerFooter";
 import { useRichStatus } from "../RichTextEditor";
+import { useCellSel } from "../CellEditor";
+import { useDocView } from "../docFlow";
+import { insertToc, toggleFormatMarks } from "../docExtrasUi";
 import { command, enabled } from "../commands";
 import { docLengthUnit, fontScale } from "../editModes";
 import { fitPageView, fitWidthView } from "../docView";
@@ -281,7 +284,7 @@ function ReferencesPanel() {
         </div>
       </Group>
       <Group label={t("topui.group.toc")}>
-        <BigBtn icon="outline" label={t("topui.toc")} tip={t("docmode.coming")} disabled onClick={() => {}} />
+        <BigBtn icon="outline" label={t("topui.toc")} tip={t("docmode.toc.tip")} onClick={() => void insertToc()} />
       </Group>
       <span className="ctx-hint">{t("topui.references.hint")}</span>
     </div>
@@ -417,6 +420,7 @@ export function docZoom(kind: "page" | "width" | "100") {
 function ViewPanel() {
   const t = useT();
   const ui = useUI();
+  const marks = useDocView((st) => !!st.marks);
   return (
     <div className="rpanel">
       <Group label={t("docmode.group.zoom")}>
@@ -448,8 +452,8 @@ function ViewPanel() {
             <input type="checkbox" checked={checkedNow("view.textBounds")} onChange={() => run("view.textBounds")} />
             <span>{t("cmd.view.textBounds")}</span>
           </label>
-          <label className="rcheck is-off" data-tip={t("docmode.coming")}>
-            <input type="checkbox" checked={false} disabled readOnly />
+          <label className="rcheck" data-tip={t("docmode.formatMarksTip")}>
+            <input type="checkbox" checked={marks} onChange={toggleFormatMarks} />
             <span>{t("docmode.formatMarks")}</span>
           </label>
         </div>
@@ -479,6 +483,10 @@ function DrawPanel() {
 export function TablePanel() {
   const t = useT();
   useStore((s) => s.selection);
+  // the picked cell range (click, Shift+click / drag) lives in its own store: without this the ribbon kept 셀 합치기
+  // greyed after a range was picked (QA ui-audit #14)
+  useCellSel((s) => s.target);
+  useCellSel((s) => s.end);
   useStore((s) => s.doc);
   return (
     <div className="rpanel">

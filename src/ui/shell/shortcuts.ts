@@ -17,7 +17,7 @@ import { applyCrop, cancelCrop, startCrop, useCrop } from "../cropTool";
 import { armClipboardMarker, copySelection, cutSelection, hasClipboard, mergeDown, mergeDownPair, pasteClipboard, pasteSoon } from "../menuActions";
 import { t as tr } from "../../i18n";
 import { insertBreak, onDocumentPage } from "../pageSetupActions";
-import { startNote } from "../docFlow";
+import { flowUndo, startNote } from "../docFlow";
 import { startComment } from "../reviewActions";
 import { cadScreenNow, currentEditMode, currentProfile, docHooks, toolForKey } from "../editModes";
 import { chordOf, keyContext, resolveBinding } from "../keymap";
@@ -30,6 +30,7 @@ import { pathKey } from "../pathTools";
 import { undoDrawnPoint } from "../pathCanvas";
 import { applyNumberFormat, inSheetGrid, switchSheet } from "../sheet/sheetActions";
 import { sheetCommand } from "../sheet/sheetEdit";
+import { pdfSearchNode } from "../pdf/PdfFind";
 
 const S = () => useStore.getState();
 
@@ -132,7 +133,9 @@ export function globalKey(e: KeyboardEvent) {
     e.preventDefault();
     // in a sheet: Excel's Find and Replace of the sheet (ui/sheet/SheetDialogs.tsx)
     if (inSheetGrid()) return sheetCommand(e.code === "KeyF" ? "find" : "replace");
-    useUI.getState().set({ shellDialog: e.code === "KeyF" ? "find" : "replace" });
+    // on a PDF page: the PDF Find bar, which reads the page's own words (ui/pdf/PdfFind.tsx)
+    const pg = e.code === "KeyF" ? currentPage() : undefined;
+    useUI.getState().set({ shellDialog: e.code === "KeyF" ? (pg && pdfSearchNode(pg) ? "pdfFind" : "find") : "replace" });
     return;
   }
   if (!modal && e.key === "F1") {
@@ -151,6 +154,26 @@ export function globalKey(e: KeyboardEvent) {
   if (!modal && want === "review.newComment" && onDocumentPage() && !(e.target as HTMLElement | null)?.closest?.(".review-pane")) {
     e.preventDefault();
     startComment();
+    return;
+  }
+  // 열기 (Ctrl+O) also while typing in the document body or a text box, as in Word / 한글 (QA ui-audit #40: no reaction
+  // while the caret was in the text) — not from another field (the name box, a panel's number)
+  const inDocText = !isTyping(e.target) || !!(e.target as HTMLElement | null)?.closest?.(".flow-editor, .rich-editor");
+  if (!modal && mod && !e.altKey && !e.shiftKey && want === "file.open" && inDocText) {
+    e.preventDefault();
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    void openAny();
+    return;
+  }
+  // 되돌리기 / 다시 실행 while the caret is in a text but the focus is on the ribbon (a page setup just chosen there):
+  // the document's undo, as the ribbon's own button does (QA ui-audit #20: Ctrl+Z did nothing)
+  if (!modal && mod && !e.altKey && s.editingTextId && !isTyping(e.target) && (k === "z" || k === "y")) {
+    e.preventDefault();
+    const redo = k === "y" || e.shiftKey;
+    if (!flowUndo(redo)) {
+      if (redo) S().redo();
+      else S().undo();
+    }
     return;
   }
   // the keys below act on the page: not while typing, and never behind an open dialog (its buttons have the focus —

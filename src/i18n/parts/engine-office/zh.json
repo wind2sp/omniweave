@@ -58,6 +58,8 @@
   "engine.epub.noContainer": "缺少 META-INF/container.xml——这不是 EPUB。",
   "engine.epub.drm": "无法打开受 DRM 保护的 EPUB。",
   "engine.epub.noOpf": "找不到 OPF 包文档。",
+  "engine.odt.notOdt": "这不是 ODT（OpenDocument 文本）文件",
+  "engine.odt.encrypted": "此 ODT 受密码保护。请在 LibreOffice 中取消密码后再打开",
   "engine.epub.noBody": "此 EPUB 没有正文。",
   "engine.media.noBrowser": "不是浏览器环境。",
   "engine.media.timeout": "超时——无法解析此格式。",
@@ -126,5 +128,6 @@
   "engine.doc.look.textFlow": "竖排文字",
   "engine.doc.look.oldMerge": "旧式横向合并单元格",
   "engine.doc.look.pageBorder": "页面边框",
-  "engine.doc.look.sectionMid": "段落中间的分节符"
+  "engine.doc.look.sectionMid": "段落中间的分节符",
+  "engine.odp.skipped": "{n} 个对象未读取（图表、OLE 等）"
 }

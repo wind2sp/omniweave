@@ -97,5 +97,6 @@
   "cmd.image.canvasSize": "Canvas Size",
   "cmd.image.flipCanvasH": "Flip Canvas Horizontal",
   "cmd.image.flipCanvasV": "Flip Canvas Vertical",
-  "cmd.image.rotateCanvas180": "Rotate Canvas 180°"
+  "cmd.image.rotateCanvas180": "Rotate Canvas 180°",
+  "topui.pdf.protectPdfTip": "Saves the PDF with a standard PDF password (AES-256). It asks for the password when opened."
 }

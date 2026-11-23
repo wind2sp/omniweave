@@ -138,14 +138,34 @@ export function Backstage() {
   useEffect(() => {
     if (!open) return;
     ref.current?.querySelector<HTMLButtonElement>(".bs-back")?.focus();
+    // typing while 파일 covers the window goes nowhere behind it: a sheet's cell editor kept the focus and took the
+    // letters (실사용 점검 2026-11-23 #86 — "새문서QA" landed in C5)
+    const behind = (t: EventTarget | null) => !(t instanceof Node && ref.current?.contains(t)) && !document.querySelector(".modal-backdrop, .menu-pop");
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || document.querySelector(".modal-backdrop, .menu-pop")) return;
+      if (e.key !== "Escape") {
+        if (behind(e.target) && (e.key.length === 1 || e.key === "Process" || e.key === "Backspace" || e.key === "Delete" || e.key === "Enter") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          ref.current?.querySelector<HTMLButtonElement>(".bs-back")?.focus();
+        }
+        return;
+      }
+      if (document.querySelector(".modal-backdrop, .menu-pop")) return;
       e.preventDefault();
       e.stopPropagation();
       closeBackstage();
     };
+    const onInput = (e: Event) => {
+      if (!behind(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    window.addEventListener("beforeinput", onInput, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("beforeinput", onInput, true);
+    };
   }, [open]);
   if (!open) return null;
   const group = (id: string) => BACKSTAGE.find((b) => b.id === id)!.entries.map((c) => <CmdRow key={c} id={c} />);

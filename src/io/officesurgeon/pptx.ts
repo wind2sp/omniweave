@@ -21,6 +21,7 @@ import { t } from "../../i18n";
 import { contentKey, isEmptyPh, layoutDecor, layoutPhOf } from "../../core/slides";
 import { chartFrameNow, chartRun, drawChart } from "../formats/pptxChart";
 import { chartPartWithData, workbookWithData } from "./pptxChart";
+import { withAnimTiming } from "../formats/pptxAnim";
 import { CT_NOTES, importPptx, pptxLayoutSlides, notesParasXml, notesSlideXml, parasXml, relsXml, runXml, sectionExtXml, sectionLstXml, slidePartXml, slideWriter, solidBgXml, transitionXml, type Rasterize, type SlideEnv, type SlideTrace } from "../formats/pptx";
 import { childNamed, childrenOf, descendantsNamed, rootOf, type XmlEl } from "./scan";
 import { entryData, readZip, rewriteZip, type ZipArchive } from "./zip";
@@ -45,7 +46,8 @@ const hash = (s: string) => fnv(s, 2166136261) + fnv(s, 0x9747b28c) + s.length.t
 
 /** Content fingerprint of a slide: everything that is drawn or played (not its name in the slide list). */
 export function slideFingerprint(p: Page): string {
-  return hash(JSON.stringify([p.width, p.height, p.background, p.transition, p.nodes, p.groups ?? null]));
+  // (animations only when there are some: a slide read from a file has none, so its fingerprint is as before)
+  return hash(JSON.stringify([p.width, p.height, p.background, p.transition, p.nodes, p.groups ?? null, ...(p.animations?.length ? [p.animations] : [])]));
 }
 
 /**
@@ -1073,9 +1075,12 @@ async function surgeSlide(pkg: Pkg, doc: OmwDocument, job: SlideJob, si: number,
   let maxId = Math.max(1, ...shapeIds(s).map(Number));
   const relBase = { n: maxRid(rels) };
   const addedRels: string[] = [];
+  /** node id → its shape id in the written slide (the page's animations point at them) */
+  const spids = new Map<string, number>();
   const write = async (nodes: SceneNode[]) => {
     const w = slideWriter(env, page, si, W, H, { id: maxId + 1, relBase: relBase.n });
     await w.emit(nodes);
+    for (const [k, v] of w.spids) spids.set(k, v);
     maxId = w.next() - 1;
     relBase.n += w.rels.length;
     addedRels.push(...w.rels);
@@ -1115,6 +1120,11 @@ async function surgeSlide(pkg: Pkg, doc: OmwDocument, job: SlideJob, si: number,
     if (!body) return false;
     if (inhChanged) note.copied.push(si + 1);
     treeXml = treeOf(body);
+    // elements kept or written again keep their shape id
+    els.forEach((e, i) => {
+      const m = state[i].st !== "gone" && kids[e.k] ? /<(?:\w+:)?cNvPr\b[^>]*?\sid="(\d+)"/.exec(elText(s, kids[e.k])) : null;
+      if (m) for (const id of e.ids) spids.set(id, Number(m[1]));
+    });
   }
   let out = splice(s, tree, treeXml);
   // background and transition, when they changed
@@ -1147,12 +1157,26 @@ async function surgeSlide(pkg: Pkg, doc: OmwDocument, job: SlideJob, si: number,
       out = splice(out, tm, p.xml);
     }
   }
+  // the page's animations (Omniweave's): added to the slide's main sequence (io/formats/pptxAnim.ts)
+  if (page.animations?.length) out = putAnimTiming(out, page, spids);
   pkg.put(part, out);
   if (addedRels.length) {
     const rs = pkg.text(relsPart) ?? relsXml([]);
     pkg.put(relsPart, rs.replace(/<\/(\w+:)?Relationships>\s*$/, (m) => addedRels.join("") + m).replace(/<Relationships([^>]*)\/>\s*$/, `<Relationships$1>${addedRels.join("")}</Relationships>`));
   }
   return true;
+}
+
+/** The slide part with the page's animations in its p:timing (a p:timing added after the transition when it has none). */
+function putAnimTiming(out: string, page: Page, spids: ReadonlyMap<string, number>): string {
+  const r = rootOf(out);
+  const tm = childNamed(out, r, "timing");
+  if (tm) return splice(out, tm, withAnimTiming(elText(out, tm), page, spids));
+  const x = withAnimTiming("", page, spids);
+  if (!x) return out;
+  const ext = childNamed(out, r, "extLst");
+  const at = ext ? ext.start : r.closeStart;
+  return out.slice(0, at) + x + out.slice(at);
 }
 
 type Note = { rewritten: number[]; shapes: number; anims: number; copied: number[]; warn: string[]; pkg: Pkg };

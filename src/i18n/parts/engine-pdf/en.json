@@ -103,5 +103,8 @@
   "engine.ai.native.damaged": "Part of the AI file's data is damaged; the art was drawn up to that point.",
   "engine.ai.native.tooLarge": "There were too many objects to draw; the rest were left out (damaged or excessively large data).",
   "engine.ai.native.other": "{n} AI objects could not be read and were not drawn.",
-  "engine.ai.native.fonts": "Fonts are not included in the file; they are drawn with the installed fonts of the same name: {fonts}"
+  "engine.ai.native.fonts": "Fonts are not included in the file; they are drawn with the installed fonts of the same name: {fonts}",
+  "engine.pdf.mergedSave": "{n} pages taken from other files, new or copied are put in their places and the whole file is written again (not an update appended to the original).",
+  "engine.pdf.drawnPages": "{n} pages that are not PDF pages were drawn as the PDF export draws them.",
+  "engine.pdf.otherPagesLeft": "An AI file cannot take the {n} pages taken from other files or added; they are left out. Use Export ▸ PDF document to keep them all."
 }

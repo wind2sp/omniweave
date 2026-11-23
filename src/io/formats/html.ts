@@ -9,6 +9,8 @@ import { HEADING_SIZE } from "./markdown";
 import { baseName } from "./text";
 import { decodeText } from "./textcodec";
 import { acceptedPages } from "../../core/review";
+import type { AssetRef } from "../../core/types";
+import { NoteCollector, docHeaderFooter, imageDataUrl, imageSize } from "./docExtras";
 
 const BODY = 15;
 const SKIP = new Set(["script", "style", "head", "noscript", "template", "svg", "math", "iframe", "object", "button", "select", "input", "textarea", "title", "meta", "link"]);
@@ -252,7 +254,7 @@ export function importHtml(bytes: Uint8Array, name: string): Page[] {
 
 // ───────── export ─────────
 
-function runHtml(r: TextRun): string {
+function runHtmlOf(r: TextRun): string {
   // a line break inside the paragraph (Word w:br, HWPX hp:lineBreak) — whitespace in HTML, so a <br>
   let t = esc(r.text).replace(/\n/g, "<br>");
   if (r.fontFamily === MONO_FONT) t = `<code>${t}</code>`;
@@ -263,9 +265,18 @@ function runHtml(r: TextRun): string {
   return t;
 }
 
-export function pagesToHtml(pages: Page[], title: string): string {
+export function pagesToHtml(pages: Page[], title: string, assets?: Record<string, AssetRef>): string {
   pages = acceptedPages(pages); // tracked changes as accepted (core/review.ts)
   const body: string[] = [];
+  // footnotes / endnotes: a numbered link at the reference, their text at the end (QA ui-audit #34)
+  const notes = new NoteCollector();
+  const runHtml = (r: TextRun): string => {
+    if (r.obj) return "";
+    const n = notes.add(r);
+    return n ? `<sup><a href="#fn${n.id}" id="fnref${n.id}">${esc(n.mark)}</a></sup>` : runHtmlOf(r);
+  };
+  const hf = docHeaderFooter(pages);
+  if (hf.header.length) body.push(`<header>${hf.header.map((h) => `<p>${esc(h).replace(/\n/g, "<br>")}</p>`).join("")}</header>`);
   let list: "ul" | "ol" | null = null;
   let code = false;
   const close = () => {
@@ -281,6 +292,16 @@ export function pagesToHtml(pages: Page[], title: string): string {
       body.push("<table>");
       g.forEach((r, i) => body.push("<tr>" + r.map((c) => (i === 0 && n.headerRow ? `<th>${esc(c)}</th>` : `<td>${esc(c)}</td>`)).join("") + "</tr>"));
       body.push("</table>");
+      continue;
+    }
+    if (n.type === "IMAGE") {
+      // a picture: its bytes in the file (one file, as the export is), at its shown size
+      const src = imageDataUrl(n, assets);
+      if (src) {
+        close();
+        const z = imageSize(n);
+        body.push(`<p><img src="${src}" alt="${esc(n.name ?? "")}" width="${z.w}" height="${z.h}"></p>`);
+      }
       continue;
     }
     if (n.type !== "TEXT") continue;
@@ -318,11 +339,13 @@ export function pagesToHtml(pages: Page[], title: string): string {
     }
   }
   close();
+  if (notes.any) body.push(`<section class="footnotes"><hr><ol>${notes.notes.map((x) => `<li id="fn${x.id}" value="${/^\d+$/.test(x.mark) ? x.mark : x.id}">${esc(x.text).replace(/\n/g, "<br>")} <a href="#fnref${x.id}">↩</a></li>`).join("")}</ol></section>`);
+  if (hf.footer.length) body.push(`<footer>${hf.footer.map((h) => `<p>${esc(h).replace(/\n/g, "<br>")}</p>`).join("")}</footer>`);
   const src = pages.find((p) => p.source?.htmlHead)?.source;
   if (src?.htmlHead) return `${src.htmlHead}\n${src.htmlBodyTag ?? "<body>"}\n${body.join("\n")}\n</body>\n</html>\n`;
   return `<!DOCTYPE html>\n<html lang="ko">\n<head>\n<meta charset="utf-8">\n<title>${esc(title)}</title>\n</head>\n<body>\n${body.join("\n")}\n</body>\n</html>\n`;
 }
 
-export function exportHtml(pages: Page[], title: string): string {
-  return pagesToHtml(pagesFor(pages, ["html", "epub", "md"]), title);
+export function exportHtml(pages: Page[], title: string, assets?: Record<string, AssetRef>): string {
+  return pagesToHtml(pagesFor(pages, ["html", "epub", "md"]), title, assets);
 }

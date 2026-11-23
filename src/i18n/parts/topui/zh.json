@@ -97,5 +97,6 @@
   "cmd.image.canvasSize": "画布大小",
   "cmd.image.flipCanvasH": "水平翻转画布",
   "cmd.image.flipCanvasV": "垂直翻转画布",
-  "cmd.image.rotateCanvas180": "画布旋转 180°"
+  "cmd.image.rotateCanvas180": "画布旋转 180°",
+  "topui.pdf.protectPdfTip": "以 PDF 标准密码(AES-256)加密保存 PDF。打开时需要输入密码。"
 }

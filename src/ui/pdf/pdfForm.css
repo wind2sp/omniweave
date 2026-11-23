@@ -222,3 +222,44 @@ select.pdf-field-edit[multiple] {
 .pdf-sign-foot .grow {
   flex: 1;
 }
+
+/* Find on PDF pages (PdfFind.tsx): the bar over the top right of the canvas, the matches tinted on the page */
+.pdf-find-bar {
+  position: fixed;
+  top: 132px;
+  right: 320px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  box-shadow: var(--shadow-pop);
+  color: var(--text);
+}
+.pdf-find-bar input:not([type]) {
+  width: 200px;
+}
+.pdf-find-status {
+  min-width: 90px;
+  color: var(--text-2);
+  font-size: var(--fs-ui);
+  white-space: nowrap;
+}
+.pdf-find-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pdf-find-hit {
+  position: absolute;
+  background: rgba(255, 150, 0, 0.28);
+  mix-blend-mode: multiply;
+}
+.pdf-find-hit.cur {
+  background: rgba(255, 110, 0, 0.55);
+  outline: 2px solid rgba(255, 110, 0, 0.9);
+}

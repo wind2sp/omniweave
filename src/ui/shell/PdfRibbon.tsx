@@ -7,9 +7,10 @@
 // Every button runs a command of commands.ts (or the same function the old menu ran), so command search agrees.
 import { findPage, useStore } from "../../core/store";
 import { useT } from "../../i18n";
-import { elevatePdf } from "../actions";
+import { elevatePdf, exportAs } from "../actions";
+import { sameTypeExport } from "../../io/formats";
 import { toggleGrid, toggleRulers } from "../aids";
-import { imageTarget } from "../imageActions";
+import { ocrTarget } from "../ocrActions";
 import { PdfAnnotBtns, usePdfAnnot } from "../pdf/PdfAnnotLayer";
 import { PdfFormBtn } from "../pdf/PdfFormLayer";
 import { BigBtn, CmdBig, CmdSmall, CtxPanel, Group, SmallBtn, can, docZoom } from "./DocRibbon";
@@ -39,7 +40,9 @@ function ElevateBig() {
 function OcrBig() {
   const t = useT();
   useStore((s) => s.selection);
-  const target = imageTarget();
+  // (the selected picture, or the page itself: a scanned PDF page — ui/ocrActions.ts ocrTarget)
+  useStore((s) => s.pageId);
+  const target = ocrTarget();
   return <BigBtn icon="search" label={t("topui.pdf.ocr")} tip={target ? t("ocr.menuHint") : t("image.menu.needTarget")} disabled={!target} onClick={() => useImageUI.getState().set({ kind: "ocr" })} />;
 }
 
@@ -139,7 +142,8 @@ function PdfProtectPanel() {
   return (
     <div className="rpanel">
       <Group label={t("topui.pdf.g.protect")}>
-        <CmdBig id="file.saveProtected" icon="lock" />
+        {/* a PDF with a PDF password (standard AES-256), as Acrobat's Protect — not an Omniweave file (실사용 점검 2026-11-23 #80) */}
+        <BigBtn icon="lock" label={t("cmd.file.saveProtected")} tip={t("topui.pdf.protectPdfTip")} onClick={() => { const s = useStore.getState(); const pg = findPage(s.doc, s.pageId); void exportAs(pg && sameTypeExport(pg, s.doc.pages) ? "same" : "pdf", true); }} />
         <BigBtn icon="export" label={t("size.menu")} tip={t("size.menuHint")} onClick={() => useUI.getState().set({ shellDialog: "sizePdf" })} />
       </Group>
       <span className="ctx-hint">{t("topui.pdf.protectHint")}</span>

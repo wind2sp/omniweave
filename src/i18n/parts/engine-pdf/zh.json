@@ -103,5 +103,8 @@
   "engine.ai.native.damaged": "部分 AI 专用数据已损坏，只绘制到该处为止。",
   "engine.ai.native.tooLarge": "要绘制的对象过多，部分未绘制（数据损坏或过大）。",
   "engine.ai.native.other": "{n} 个无法读取的 AI 对象未能绘制。",
-  "engine.ai.native.fonts": "文件中未包含字体，使用本机安装的同名字体绘制：{fonts}"
+  "engine.ai.native.fonts": "文件中未包含字体，使用本机安装的同名字体绘制：{fonts}",
+  "engine.pdf.mergedSave": "将从其他文件导入的页、新页和复制的页共 {n} 页放回原位，并重写整个文件（不是追加到原文件后的增量保存）。",
+  "engine.pdf.drawnPages": "{n} 个非 PDF 页面已按 PDF 导出的方式绘制。",
+  "engine.pdf.otherPagesLeft": "AI 文件无法包含从其他文件导入或新增的 {n} 页，这些页将被省略。要全部保留，请使用 导出 ▸ PDF 文档。"
 }

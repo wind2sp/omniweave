@@ -9,7 +9,7 @@
   "engine.officeSurgeon.tableRebuilt_one": "{n} 個の表は構造または書式が変わったため新しく書き込みます",
   "engine.officeSurgeon.nestedLost": "セル内の表 {n} 個は行・列の変更で元の位置が見つからず、文字だけが残ります（キャンセルでファイルはそのまま）",
   "engine.officeSurgeon.nestedLost_one": "セル内の表 {n} 個は行・列の変更で元の位置が見つからず、文字だけが残ります（キャンセルでファイルはそのまま）",
-  "engine.officeSurgeon.fallback": "元のファイルと照合できないため、ドキュメント全体を新しく作成します。Omniweave が読み取らないスタイル・ヘッダー・画像などは含まれません",
+  "engine.officeSurgeon.fallback": "元のファイルと照合できないため、ドキュメント全体を新しく作成します。Omniweave が読み取らないスタイル・テキストボックス・図形などは含まれません",
   "engine.officeSurgeon.controlDropped": "{n} 個のコンテンツ コントロールは内容が変わったため、通常の段落として保存します",
   "engine.officeSurgeon.controlDropped_one": "{n} 個のコンテンツ コントロールは内容が変わったため、通常の段落として保存します",
   "engine.officeSurgeon.sheetReshaped": "行または列の数が変わった {n} 個のシートは、セルの値を位置どおりに書き込みます。ほかのセルの数式の参照は変わりません",

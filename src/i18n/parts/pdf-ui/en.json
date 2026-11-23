@@ -37,5 +37,7 @@
   "pdf.sign.ok": "Add",
   "pdf.sign.hist": "Add signature",
   "pdf.sign.histMove": "Move signature",
-  "cmd.text.pdfSign": "Add Signature"
+  "cmd.text.pdfSign": "Add Signature",
+  "pdf.find.hint": "Finds text on the PDF pages. Enter: next, Shift+Enter: previous",
+  "pdf.find.searching": "Searching…"
 }

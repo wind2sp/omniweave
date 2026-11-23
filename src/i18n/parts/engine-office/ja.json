@@ -58,6 +58,8 @@
   "engine.epub.noContainer": "META-INF/container.xml がありません — EPUB ではありません",
   "engine.epub.drm": "DRM で保護された EPUB は開けません",
   "engine.epub.noOpf": "OPF パッケージドキュメントが見つかりませんでした",
+  "engine.odt.notOdt": "ODT（OpenDocument テキスト）ファイルではありません",
+  "engine.odt.encrypted": "パスワード付きの ODT です。LibreOffice でパスワードを解除してから開いてください",
   "engine.epub.noBody": "本文がない EPUB です",
   "engine.media.noBrowser": "ブラウザー環境ではありません",
   "engine.media.timeout": "タイムアウトしました — この形式を解析できませんでした",
@@ -126,5 +128,6 @@
   "engine.doc.look.textFlow": "縦書き",
   "engine.doc.look.oldMerge": "旧形式の横方向の結合セル",
   "engine.doc.look.pageBorder": "ページ罫線",
-  "engine.doc.look.sectionMid": "段落の途中のセクション区切り"
+  "engine.doc.look.sectionMid": "段落の途中のセクション区切り",
+  "engine.odp.skipped": "読み込めないオブジェクト {n} 個（グラフ・OLE など）"
 }

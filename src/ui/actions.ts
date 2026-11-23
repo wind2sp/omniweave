@@ -690,6 +690,14 @@ export async function saveDoc(as = false, forceProtect = false) {
   // a smart object's content tab: saving puts it back into its parent document (Photoshop's Edit Contents)
   if (!as && !forceProtect && smartLinkOf() && (await saveSmartToParent())) return;
   const s = S();
+  // a Word / 한글 document opened from its file and not yet kept as .omw: 저장 writes its own format, as Word and 한글
+  // do (a save that would lose something asks first — the original-format export's confirm); 다른 이름으로 저장 keeps
+  // the work file (QA ui-audit #51: Ctrl+S on an HWPX wrote .omw)
+  const cur = currentPage();
+  if (!as && !forceProtect && !s.filePath && cur?.source && WORD_SAVE_SAME.has(cur.source.format) && sameTypeExport(cur, s.doc.pages)) {
+    if (await exportAs("same")) S().set({ dirty: false });
+    return;
+  }
   const t0 = performance.now();
   const h = useHistory.getState();
   const packed = await withProgress(t("progress.save"), () => packOmw(s.doc, h.includeInFile ? h.entries : []));
@@ -737,6 +745,7 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
   // PDF export warnings (missing glyphs placed as images, dropped objects) are shown to the person
   const pdfWarnings: string[] = [];
   let adjNote: string | null = null;
+  let saved = false;
   const s = S();
   const page = currentPage();
   if (!page) return;
@@ -768,6 +777,7 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
     if (prot == null) return S().notify(t("doc.toast.exportCancelled"));
     const path = await saveFile(fileName, prot.bytes, [def.filter]);
     // a format with its own notice (DOC / XLS / PPT: "saved as the original file") says it in place of "exported"
+    saved = !!path;
     if (path) S().notify((def.doneNote && !prot.secretId ? def.doneNote : t(prot.secretId ? "doc.toast.exportedProtected" : "doc.toast.exported", { fmt: def.ext.toUpperCase() })) + (adjNote ? ` · ${adjNote}` : ""));
     // what this format keeps of effects and other properties (core/style/caps.ts), after the saved notice
     const capNotes = path ? exportNotes(def.ext === "pdf" ? s.doc.pages : [page], def.ext) : [];
@@ -782,7 +792,11 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
     if (isCancelled(e)) return S().notify(t("doc.toast.exportCancelled"));
     alert(t("doc.alert.exportFailed", { error: String(e?.message ?? e) }));
   }
+  return saved;
 }
+
+/** Source formats whose 저장 (Ctrl+S) writes the original format (Word / 한글 documents). */
+const WORD_SAVE_SAME = new Set(["docx", "hwpx", "hwp"]);
 
 // ───────── pages ─────────
 

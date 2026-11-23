@@ -37,5 +37,7 @@
   "pdf.sign.ok": "追加",
   "pdf.sign.hist": "署名を追加",
   "pdf.sign.histMove": "署名を移動",
-  "cmd.text.pdfSign": "署名を追加"
+  "cmd.text.pdfSign": "署名を追加",
+  "pdf.find.hint": "PDF ページの文字を検索します。Enter: 次へ、Shift+Enter: 前へ",
+  "pdf.find.searching": "検索中…"
 }

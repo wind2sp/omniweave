@@ -58,6 +58,8 @@
   "engine.epub.noContainer": "META-INF/container.xml is missing — this is not an EPUB",
   "engine.epub.drm": "DRM-protected EPUBs can't be opened",
   "engine.epub.noOpf": "Couldn't find the OPF package document",
+  "engine.odt.notOdt": "This is not an ODT (OpenDocument text) file",
+  "engine.odt.encrypted": "This ODT is password-protected. Remove the password in LibreOffice and open it again",
   "engine.epub.noBody": "This EPUB has no content",
   "engine.media.noBrowser": "Not running in a browser",
   "engine.media.timeout": "Timed out — couldn't read this format",
@@ -126,5 +128,6 @@
   "engine.doc.look.textFlow": "vertical text",
   "engine.doc.look.oldMerge": "cells merged the old way",
   "engine.doc.look.pageBorder": "page borders",
-  "engine.doc.look.sectionMid": "section breaks inside a paragraph"
+  "engine.doc.look.sectionMid": "section breaks inside a paragraph",
+  "engine.odp.skipped": "{n} objects not read (charts, OLE…)"
 }

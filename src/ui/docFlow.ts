@@ -55,7 +55,7 @@ type Pos = RT.Pos;
 export const FLOW_ID_PREFIX = "flow:";
 
 /** View options of the document mode: 텍스트 경계 (the body box drawn as a dotted frame), off by default as in Word. */
-export const useDocView = create<{ textBounds: boolean }>(() => ({ textBounds: false }));
+export const useDocView = create<{ textBounds: boolean; marks?: boolean }>(() => ({ textBounds: false, marks: false }));
 export function toggleTextBounds() {
   useDocView.setState({ textBounds: !useDocView.getState().textBounds });
   // repaint the canvas (it redraws on any store change)
@@ -729,6 +729,13 @@ export function changedAt(before: readonly TextParagraph[], after: readonly Text
   return { p, o };
 }
 
+/** Undo / redo from outside the body's input (a ribbon button has the focus) while the caret is in the body. */
+export function flowUndo(redo: boolean): boolean {
+  if (!F().active) return false;
+  undo(redo);
+  return true;
+}
+
 function undo(redo: boolean) {
   closeTyping();
   const before = story()?.paras;
@@ -1195,6 +1202,38 @@ export function storyEdit(label: string, fn: (paras: TextParagraph[], sel: RT.Ra
   return true;
 }
 
+/**
+ * Find (Ctrl+F): put the caret / selection of the document body on characters [start, end) of paragraph `p` of the
+ * flow frame `nodeId` on page `pageId` (a piece of a paragraph cut at a page end counts on from the piece before), and
+ * scroll it into view. False when that frame is not part of a flowing body (QA ui-audit #10: only the count showed).
+ */
+export function selectFlowMatch(pageId: string, nodeId: string, p: number, start: number, end: number): boolean {
+  const pages = S().doc.pages;
+  const i = pages.findIndex((x) => x.id === pageId);
+  if (!isFlowPageAt(pages, i)) return false;
+  const seg = segmentAt(pages, i);
+  let sp = -1, base = 0, last = 0;
+  let at: { a: Pos; b: Pos } | null = null;
+  for (let k = seg.start; k < seg.end && !at; k++)
+    for (const n of pages[k].nodes.filter((x) => x.flow === true).sort((a, b) => a.transform.y - b.transform.y || a.transform.x - b.transform.x)) {
+      if (n.type !== "TEXT") continue;
+      n.paragraphs.forEach((q, j) => {
+        if (q.flowCont && sp >= 0) base += last;
+        else (sp++, (base = 0));
+        last = q.runs.reduce((s, r) => s + r.text.length, 0);
+        if (!at && n.id === nodeId && j === p) at = { a: { p: sp, o: base + start }, b: { p: sp, o: base + end } };
+      });
+      if (at) break;
+    }
+  if (!at) return false;
+  const { a, b } = at as { a: Pos; b: Pos };
+  if (!beginTyping(pageId, a)) return false;
+  const st = story();
+  if (!st) return false;
+  setSel(RT.clampPos(st.paras, a), RT.clampPos(st.paras, b));
+  return true;
+}
+
 // ───────── documents ─────────
 
 /** Re-flow every flowing page run of a document (the same document when nothing changed). */
@@ -1480,12 +1519,17 @@ docHooks.insertInline = (node, assets) => insertObject(node, assets);
  */
 if (typeof window !== "undefined")
   useStore.subscribe((s, prev) => {
-    if (selfWrite || s.doc === prev.doc || s.past.length <= prev.past.length || s.doc.id !== prev.doc.id || s.gestureBase) return;
+    // (a new step: the last history entry changed — the length stays the same once the history is full)
+    if (selfWrite || s.doc === prev.doc || !s.past.length || s.past[s.past.length - 1] === prev.past[prev.past.length - 1] || s.past.length < prev.past.length || s.doc.id !== prev.doc.id || s.gestureBase) return;
+    // compared with the document before the step: a drag (resizing a picture) ends with the pages of its last move,
+    // which the state just before already had — the run did not flow again and the old height stayed empty (QA
+    // ui-audit #16)
+    const before = s.past[s.past.length - 1]?.doc ?? prev.doc;
     // note text edited in a note area goes back into its notes first (the flow lays the areas out from them)
-    let pages = applyNoteAreaEdits(s.doc.pages, prev.doc.pages);
+    let pages = applyNoteAreaEdits(s.doc.pages, before.pages);
     const done = new Set<number>();
     for (let i = 0; i < pages.length; i++) {
-      if (prev.doc.pages.includes(pages[i])) continue;
+      if (before.pages.includes(pages[i])) continue;
       if (!isFlowPageAt(pages, i)) continue;
       const seg = segmentAt(pages, i);
       if (done.has(seg.start)) continue;

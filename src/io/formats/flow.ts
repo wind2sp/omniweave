@@ -410,18 +410,23 @@ function hwpxFirstPages(pages: Page[], items: OfficeItem[], sections: OfficeLayo
     for (const area of ["header", "footer"] as const) if (hf?.[area]?.default) eff[area] = hf[area]!.default;
     if (first === undefined) continue;
     const hide = { ...(sec.hfHide ?? {}) };
+    const early: { header?: TextParagraph[]; footer?: TextParagraph[] } = {};
     for (const area of ["header", "footer"] as const) {
       const at = sec.hfAt?.[area];
       const it = at !== undefined ? items[at] : undefined;
       const pi = it?.kind === "p" ? pageOfPara.get(it.p.id) : undefined;
-      if (pi !== undefined && pi > first) hide[area] = true;
+      if (pi !== undefined && pi > first) {
+        // a header at the section start and the usual one from the second page: the first one is the first page's
+        if (sec.hfEarly?.[area] && !hide[area]) early[area] = sec.hfEarly[area];
+        else hide[area] = true;
+      }
     }
-    if (!hide.header && !hide.footer) continue;
+    if (!hide.header && !hide.footer && !early.header && !early.footer) continue;
     const own = { ...(hf ?? {}) };
     own.titlePg = true;
     for (const area of ["header", "footer"] as const) {
       const v = { ...(own[area] ?? {}) };
-      v.first = hide[area] ? [] : (eff[area] ?? []).map((q) => ({ ...q, id: uid("p") }));
+      v.first = (hide[area] ? [] : early[area] ?? eff[area] ?? []).map((q) => ({ ...q, id: uid("p") }));
       own[area] = v;
     }
     pages[first].hf = own;

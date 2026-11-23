@@ -103,5 +103,8 @@
   "engine.ai.native.damaged": "AI 고유 데이터 일부가 손상되어 그 앞까지만 그렸습니다.",
   "engine.ai.native.tooLarge": "그릴 개체가 너무 많아 일부는 그리지 않았습니다(손상되었거나 지나치게 큰 데이터).",
   "engine.ai.native.other": "읽지 못한 AI 개체 {n}개는 그리지 못했습니다.",
-  "engine.ai.native.fonts": "글꼴은 파일에 들어 있지 않아 이 PC에 설치된 같은 이름의 글꼴로 그립니다: {fonts}"
+  "engine.ai.native.fonts": "글꼴은 파일에 들어 있지 않아 이 PC에 설치된 같은 이름의 글꼴로 그립니다: {fonts}",
+  "engine.pdf.mergedSave": "다른 파일에서 가져온 쪽·새 쪽·복사한 쪽 {n}개를 제자리에 넣어 파일 전체를 다시 씁니다(원본 뒤에 덧붙이는 저장이 아님).",
+  "engine.pdf.drawnPages": "PDF 쪽이 아닌 {n}개 쪽은 PDF 내보내기처럼 그려 넣었습니다.",
+  "engine.pdf.otherPagesLeft": "AI 파일에는 다른 파일에서 가져온 쪽·새 쪽 {n}개를 넣을 수 없어 빠집니다. 모두 넣으려면 내보내기 ▸ PDF 문서를 쓰세요."
 }

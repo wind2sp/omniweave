@@ -58,6 +58,8 @@
   "engine.epub.noContainer": "META-INF/container.xml이 없습니다 — EPUB이 아닙니다",
   "engine.epub.drm": "DRM으로 보호된 EPUB은 열 수 없습니다",
   "engine.epub.noOpf": "OPF 패키지 문서를 찾지 못했습니다",
+  "engine.odt.notOdt": "ODT(오픈문서 텍스트) 파일이 아닙니다",
+  "engine.odt.encrypted": "암호가 걸린 ODT입니다. LibreOffice에서 암호를 풀고 다시 여세요",
   "engine.epub.noBody": "본문이 없는 EPUB입니다",
   "engine.media.noBrowser": "브라우저 환경이 아닙니다",
   "engine.media.timeout": "시간이 초과되었습니다 — 이 형식을 해석하지 못했습니다",
@@ -126,5 +128,6 @@
   "engine.doc.look.textFlow": "세로 쓰기",
   "engine.doc.look.oldMerge": "옛 방식 가로 병합 칸",
   "engine.doc.look.pageBorder": "쪽 테두리",
-  "engine.doc.look.sectionMid": "문단 가운데 구역 나누기"
+  "engine.doc.look.sectionMid": "문단 가운데 구역 나누기",
+  "engine.odp.skipped": "읽지 못한 개체 {n}개(차트·OLE 등)"
 }

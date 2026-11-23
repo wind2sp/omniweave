@@ -9,6 +9,7 @@ import type { Page, PageSource } from "../../core/types";
 import { codeBlocks, flowBlocks, pagesFor, readingOrder, sourceOf } from "./flow";
 import { decodeText, encodeText } from "./textcodec";
 import { acceptedPages } from "../../core/review";
+import { NoteCollector, docHeaderFooter } from "./docExtras";
 
 export function baseName(name: string) {
   return name.replace(/\.[^.]+$/, "");
@@ -27,10 +28,20 @@ export function importTextPages(bytes: Uint8Array, name: string, format: string,
 export function pagesToText(pages: Page[]): string {
   pages = acceptedPages(pages); // tracked changes as accepted (core/review.ts)
   const parts: string[] = [];
+  // a Word / 한글 document's headers / footers, note marks [n] with the notes at the end and a mark where a picture
+  // is (QA ui-audit #34: all three were left out); a text file's own lines stay exactly as they were
+  const notes = new NoteCollector();
+  const hf = docHeaderFooter(pages);
+  if (hf.header.length) parts.push(...hf.header, "");
   for (const n of readingOrder(pages)) {
-    if (n.type === "TEXT") parts.push(plainText(n));
-    else if (n.type === "TABLE") parts.push(tableGrid(n).map((r) => r.join("\t")).join("\n"));
+    if (n.type === "TEXT") {
+      if (!n.paragraphs.some((p) => p.runs.some((r) => r.note || r.obj))) parts.push(plainText(n));
+      else parts.push(n.paragraphs.map((p) => p.runs.filter((r) => !r.obj).map((r) => (r.note ? `[${notes.add(r)!.mark}]` : r.text)).join("")).join("\n"));
+    } else if (n.type === "TABLE") parts.push(tableGrid(n).map((r) => r.join("\t")).join("\n"));
+    else if (n.type === "IMAGE") parts.push(tr("engine.export.txt.picture", { name: n.name ?? "" }));
   }
+  if (notes.any) parts.push("", "----", ...notes.notes.map((x) => `[${x.mark}] ${x.text}`));
+  if (hf.footer.length) parts.push("", ...hf.footer);
   return parts.join("\n");
 }
 

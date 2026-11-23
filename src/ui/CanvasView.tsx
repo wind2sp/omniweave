@@ -1,3 +1,4 @@
+import { drawFormatMarks } from "./docExtrasUi";
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { applyTransform, invertTransform, rectFromPoints, type Rect } from "../core/geom";
@@ -62,6 +63,7 @@ import {
 import type { SelOp } from "../core/image/pixelSelection";
 import { PdfFormLayer } from "./pdf/PdfFormLayer"; // PDF form fields
 import { PdfAnnotLayer } from "./pdf/PdfAnnotLayer"; // PDF comments
+import { PdfFindLayer } from "./pdf/PdfFind"; // PDF find matches
 import { PsdTextEditor, startPsdTextEdit } from "./psdText/PsdTextEditor"; // PSD text layers
 import { psdTextAt } from "./psdText/psdTextRender";
 import { changeHere, commentsHere, deleteComment, resolveHere, startComment } from "./reviewActions";
@@ -343,10 +345,13 @@ export function CanvasView() {
     if (docModeNow()) drawNeighbours(c, s.doc, page.id, s.view, h, dpr, (pg, v) => {
       weave.render(c, s.doc, pg, renderMasterOf(s.doc, pg), v, w, h, dpr, null, invalidate);
       drawSpelling(c, pg, v, dpr, invalidate);
+      drawFormatMarks(c, s.doc, pg, v, dpr);
     });
     drawFidelity(c, page, masterOf(s.doc, page), s.view, dpr, invalidate);
     // spelling: red wavy lines under misspelled words (screen only; ui/spell.ts)
     drawSpelling(c, page, s.view, dpr, invalidate, editingRef.current?.id);
+    // 문단 부호 (보기 › 문단 부호): ¶ at the end of each paragraph of the body
+    drawFormatMarks(c, s.doc, page, s.view, dpr);
     frames++;
     const now = performance.now();
     if (now - lastStats > 300) {
@@ -1405,7 +1410,12 @@ export function CanvasView() {
 
     // a document page whose body flows: a press puts the caret there (Word), no object handles
     if ((s.tool === "select" || s.tool === "text") && page.kind === "DOCUMENT" && currentEditMode() === "DOCUMENT") {
-      if (bodyAt(page, p) && flowPointerDown(page, p[0], p[1], { detail: e.detail, shift: e.shiftKey })) {
+      // …except on a handle of the selected picture / shape: its corner lies on the text around it, and the press went
+      // to the text (a selection drag) instead of resizing it (QA ui-audit #16)
+      const sel = s.tool === "select" && s.selection.length ? page.nodes.filter((n) => s.selection.includes(n.id)) : [];
+      const sbh = sel.length && sel.every((n) => !(n.type === "TEXT" && n.flow)) ? selectionBox(page, s.selection) : null;
+      const onHandle = !!sbh && pickHandle(sbh.box, p, HANDLE_PX / s.view.zoom, { edges: !sbh.multi, rotate: false })?.kind === "handle";
+      if (!onHandle && bodyAt(page, p) && flowPointerDown(page, p[0], p[1], { detail: e.detail, shift: e.shiftKey })) {
         drag.current = { kind: "flow" };
         return;
       }
@@ -2050,6 +2060,7 @@ export function CanvasView() {
       <PicLayoutButton />
       {spellMenu && <PopMenu at={spellMenu} items={spellMenu.items} onClose={() => setSpellMenu(null)} />}
       <PdfFormLayer />
+      <PdfFindLayer />
       <PdfAnnotLayer />
       <PsdTextEditor />
       {editing && <TextEditor node={editing} onDone={() => { setEditing(null); S().set({ editingTextId: null }); toolDone("text"); }} />}

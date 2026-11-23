@@ -8,6 +8,8 @@ import { MONO_RUN, flowBlocks, pagesFor, paraRuns, readingOrder, type Block } fr
 import { baseName } from "./text";
 import { decodeText } from "./textcodec";
 import { acceptedPages } from "../../core/review";
+import type { AssetRef } from "../../core/types";
+import { NoteCollector, docHeaderFooter, imageDataUrl } from "./docExtras";
 
 export const HEADING_SIZE: Record<string, number> = { h1: 32, h2: 26, h3: 22, h4: 19, h5: 17, h6: 16 };
 const BODY = 15;
@@ -371,9 +373,14 @@ function headingLevel(p: TextParagraph): number {
   return 0;
 }
 
-export function pagesToMarkdown(pages: Page[]): string {
+export function pagesToMarkdown(pages: Page[], assets?: Record<string, AssetRef>): string {
   pages = acceptedPages(pages); // tracked changes as accepted (core/review.ts)
   const out: string[] = [];
+  // footnotes / endnotes as [^n] with their text at the end, pictures as data: images, headers / footers as text
+  // (QA ui-audit #34: they were left out)
+  const notes = new NoteCollector();
+  const hf = docHeaderFooter(pages);
+  if (hf.header.length) out.push(...hf.header.map((h) => h.replace(/\n/g, "  \n")), "", "---", "");
   let inCode = false;
   let prevList = false;
   const endCode = () => {
@@ -391,8 +398,19 @@ export function pagesToMarkdown(pages: Page[]): string {
       out.push("");
       continue;
     }
+    if (n.type === "IMAGE") {
+      const src = imageDataUrl(n, assets);
+      if (src) {
+        endCode();
+        out.push(`![${(n.name ?? "").replace(/[\[\]]/g, "")}](${src})`, "");
+        prevList = false;
+      }
+      continue;
+    }
     if (n.type !== "TEXT") continue;
-    for (const p of n.paragraphs) {
+    for (const p0 of n.paragraphs) {
+      // a note reference → a mark replaced by [^n] once the line is written (not escaped as text); inline object chars go
+      const p = p0.runs.some((r) => r.note || r.obj) ? { ...p0, runs: p0.runs.filter((r) => !r.obj).map((r) => (r.note ? { ...r, note: undefined, text: `\u0001${notes.add(r)!.id}\u0001` } : r)) } : p0;
       const text = p.runs.map((r) => r.text).join("");
       const isCode = p.role === "code" || (p.runs.length > 0 && p.runs.every((r) => r.fontFamily === MONO_FONT) && p.role !== "li");
       if (isCode) {
@@ -431,10 +449,12 @@ export function pagesToMarkdown(pages: Page[]): string {
     }
   }
   endCode();
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  if (hf.footer.length) out.push("", "---", "", ...hf.footer.map((h) => h.replace(/\n/g, "  \n")));
+  if (notes.any) out.push("", ...notes.notes.map((x) => `[^${x.id}]: ${x.text.replace(/\n/g, "\n    ")}`));
+  return out.join("\n").replace(/\u0001(\w+)\u0001/g, "[^$1]").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }
 
-export function exportMarkdown(pages: Page[]): string {
+export function exportMarkdown(pages: Page[], assets?: Record<string, AssetRef>): string {
   const own = pagesFor(pages, ["md"]);
-  return own.some((p) => p.source?.fragments?.length) ? markdownWithFragments(own) : pagesToMarkdown(own);
+  return own.some((p) => p.source?.fragments?.length) ? markdownWithFragments(own) : pagesToMarkdown(own, assets);
 }

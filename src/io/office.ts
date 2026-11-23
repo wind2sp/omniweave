@@ -1231,6 +1231,8 @@ export interface OfficeLayout {
     hf?: SectionHF;
     /** HWPX: the item a header / footer control is in (한글 shows it from that page on) */
     hfAt?: { header?: number; footer?: number };
+    /** HWPX: the header / footer of the section start when another follows further down (the first page's) */
+    hfEarly?: { header?: TextParagraph[]; footer?: TextParagraph[] };
     /** HWPX: header / footer hidden on the section's first page (hp:visibility, hp:pageHiding) */
     hfHide?: { header?: boolean; footer?: boolean };
   }[];
@@ -2120,11 +2122,11 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
   };
 
   // headers / footers / page numbers of each section (secs index): 한글 shows a header from the page its control is on
-  const hfCols = new Map<number, { hf: SectionHF; at: { header?: number; footer?: number }; types: Record<string, Set<string>>; hide: { header?: boolean; footer?: boolean }; fmtSet?: boolean }>();
+  const hfCols = new Map<number, { hf: SectionHF; at: { header?: number; footer?: number }; early: { header?: TextParagraph[]; footer?: TextParagraph[] }; types: Record<string, Set<string>>; hide: { header?: boolean; footer?: boolean }; fmtSet?: boolean }>();
   const col = () => {
     const k = Math.max(0, secs.length - 1);
     let c = hfCols.get(k);
-    if (!c) hfCols.set(k, (c = { hf: {}, at: {}, types: { header: new Set(), footer: new Set() }, hide: {} }));
+    if (!c) hfCols.set(k, (c = { hf: {}, at: {}, early: {}, types: { header: new Set(), footer: new Set() }, hide: {} }));
     return c;
   };
   /** a page control of the body: header / footer (with its paragraphs), page number, new number, page hiding */
@@ -2138,6 +2140,13 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
       const type = attr(k, "applyPageType") ?? "BOTH";
       // 양쪽 = default; 홀수 = default with different odd / even pages; 짝수 = even
       const v = type === "EVEN" ? "even" : "default";
+      // a second header of the section further down (after the one at its start): the first one is the first page's
+      // (as this app writes Word's different first page with text; flow.ts settles it by the page it is on)
+      const had = c.hf[area]?.[v];
+      if (had && v === "default" && c.at[area] !== undefined && items.length > c.at[area]! && !c.early[area]) {
+        c.early[area] = had;
+        c.at[area] = items.length;
+      }
       (c.hf[area] ??= {})[v] = paras;
       c.types[area].add(type);
       if (type !== "BOTH") c.hf.evenOdd = true;
@@ -2502,6 +2511,7 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
     }
     if (Object.keys(c.hf).length) sec.hf = c.hf;
     if (c.at.header !== undefined || c.at.footer !== undefined) sec.hfAt = c.at;
+    if (c.early.header || c.early.footer) sec.hfEarly = c.early;
     if (c.hide.header || c.hide.footer) sec.hfHide = c.hide;
   }
   // 한글: a page number keeps the shape of its own control (쪽 번호 매기기, or the automatic number of a header the
@@ -2554,6 +2564,8 @@ export function hwpxPageNumXml(pn: { pos: PageNumPos; side?: string } | null, fm
 export interface HwpxHFSection {
   /** header / footer controls the section declares (양쪽 / 홀수 / 짝수), with the number format of their page numbers */
   ctrls: { area: "header" | "footer"; type: "BOTH" | "ODD" | "EVEN"; paras: TextParagraph[]; fmt: PageNumFormat }[];
+  /** controls on the section's second page (after a first page with a header / footer of its own) */
+  later?: HwpxHFSection["ctrls"];
   /** page number control (undefined = none declared here) */
   pageNum?: { pos: PageNumPos; side?: string } | null;
   fmt: PageNumFormat;
@@ -2594,6 +2606,18 @@ export function hwpxHFSections(hfs: readonly (SectionHF | undefined)[], evenOdd:
         const first = hf[area]?.first ?? eff[area + "first"];
         if (hf[area]?.first) eff[area + "first"] = hf[area]!.first;
         if (blankParas(first)) out[area === "header" ? "hideHeader" : "hideFooter"] = true;
+        else {
+          // a first page with its own text: 한글 shows a header from the page its control is on — the first page's
+          // text at the section start, the usual one again on the section's second page (QA ui-audit #32, #50: it
+          // was dropped and the usual header shown on the first page)
+          const type = evenOdd ? "ODD" : "BOTH";
+          const at = out.ctrls.findIndex((c) => c.area === area && c.type === type);
+          const usual = eff[area + "default"] ?? [];
+          if (at >= 0) out.ctrls[at] = { ...out.ctrls[at], paras: first! };
+          else out.ctrls.push({ area, type, paras: first!, fmt });
+          (out.later ??= []).push({ area, type, paras: usual, fmt });
+          wrote[area + "default"] = fmt;
+        }
       } else if (hf?.[area]?.first) eff[area + "first"] = hf[area]!.first;
     }
     if (hf?.pageNum !== undefined) pn = hf.pageNum;
@@ -3730,19 +3754,19 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
   if (!lay.sections.length) lay.sections.push(setupOf(PAGE_PRESETS.A4));
   // headers / footers / page numbers: 한글's own controls after the section settings (hwpxHFSections)
   const hwSecs = hwpxHFSections(lay.hfs, !!pages[0]?.hf?.evenOdd);
-  const hfCtrls = (k: number, setup: PageSetup) => {
+  const hfCtrls = (k: number, setup: PageSetup, later = false) => {
     curSection = k;
     const sec = hwSecs[k];
     if (!sec) return "";
     const m = setup.margins;
     const textW = hu(Math.max(16, setup.width - m.left - m.right));
-    const out = sec.ctrls.map((c) => {
+    const out = (later ? sec.later ?? [] : sec.ctrls).map((c) => {
       const tag = c.area === "header" ? "hp:header" : "hp:footer";
       const ps = (c.paras.length ? c.paras : [newParagraph("", { fontSize: 10 * PT })]).map((p) => pXml(p, "", false, c.fmt)).join("");
       const h = hu(Math.max(0, c.area === "header" ? m.top - m.header : m.bottom - m.footer));
       return `<hp:ctrl><${tag} id="" applyPageType="${c.type}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="${c.area === "header" ? "TOP" : "BOTTOM"}" linkListIDRef="0" linkListNextIDRef="0" textWidth="${textW}" textHeight="${h}" hasTextRef="0" hasNumRef="0">${ps}</hp:subList></${tag}></hp:ctrl>`;
     });
-    if (sec.pageNum !== undefined) out.push(`<hp:ctrl>${hwpxPageNumXml(sec.pageNum, sec.fmt)}</hp:ctrl>`);
+    if (!later && sec.pageNum !== undefined) out.push(`<hp:ctrl>${hwpxPageNumXml(sec.pageNum, sec.fmt)}</hp:ctrl>`);
     return out.join("");
   };
   const secPrOf = (setup: PageSetup, run: TextRun, k = 0) => {
@@ -3800,6 +3824,15 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
     } else if (pg.begin === "page") {
       flushEmpty();
       pending = { section: pg.section, prefix: "", pageBreak: true };
+    }
+    // the section's second page after a first page with its own header / footer: the usual ones again from here
+    const pi = lay.pages.indexOf(pg);
+    if (pi > 0 && lay.pages[pi - 1].section === pg.section && (pi < 2 || lay.pages[pi - 2].section !== pg.section) && hwSecs[pg.section]?.later?.length) {
+      const first = flow[pg.from];
+      const run = first?.kind === "p" ? first.p.runs[0] ?? DEFAULT_RUN : DEFAULT_RUN;
+      const ctrl = `<hp:run charPrIDRef="${charId(run)}">${hfCtrls(pg.section, lay.sections[pg.section], true)}</hp:run>`;
+      if (pending) (pending as { prefix: string }).prefix += ctrl;
+      else pending = { section: pg.section, prefix: ctrl, pageBreak: false };
     }
     const take = () => {
       const c: { section: number; prefix: string; pageBreak: boolean } | null = pending;

@@ -9,6 +9,7 @@ import { useT } from "../../i18n";
 import { insertSymbol, replaceAll } from "../menuActions";
 import { selectPage } from "../pageActions";
 import { richApi } from "../RichTextEditor";
+import { selectFlowMatch } from "../docFlow";
 import { Modal } from "./Dialogs";
 import { Icon } from "./Icons";
 import { useUI } from "./uiStore";
@@ -38,6 +39,8 @@ export function FindReplace({ replace }: { replace: boolean }) {
     const i = at < 0 ? (dir > 0 ? 0 : n - 1) : (at + dir + n) % n;
     setCur(i);
     const m = matches[i];
+    // the body of a flowing document: the matched characters selected in the text and scrolled into view (Word)
+    if (m.kind === "para" && selectFlowMatch(m.pageId, m.nodeId, m.p, m.start, m.end)) return;
     if (S().pageId !== m.pageId) selectPage(m.pageId);
     S().set({ selection: [m.nodeId] });
   };

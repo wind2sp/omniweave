@@ -97,5 +97,6 @@
   "cmd.image.canvasSize": "カンバスサイズ",
   "cmd.image.flipCanvasH": "カンバスを左右に反転",
   "cmd.image.flipCanvasV": "カンバスを上下に反転",
-  "cmd.image.rotateCanvas180": "カンバスを 180° 回転"
+  "cmd.image.rotateCanvas180": "カンバスを 180° 回転",
+  "topui.pdf.protectPdfTip": "PDF 標準のパスワード（AES-256）を付けた PDF として保存します。開くときにパスワードを求めます。"
 }

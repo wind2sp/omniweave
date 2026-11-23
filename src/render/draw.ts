@@ -516,7 +516,16 @@ function drawPdf(ctx: Ctx, n: PdfNode, env: DrawEnv) {
   const asset = env.doc.assets[n.assetId];
   const exact = !env.screen && env.scale <= 2;
   // typed form values: the file filled with them (io/pdf.ts pdfViewHash)
-  const bmp = asset ? pdfBitmap(pdfViewHash(asset.hash, n, env.onResourceReady, env.doc), n.pageIndex, env.scale, env.onResourceReady, exact) : null;
+  // (new marks / values still being written in: the page shown meanwhile is a stand-in, never kept in a tile cache)
+  const pending = { v: false };
+  const view = asset ? pdfViewHash(asset.hash, n, env.onResourceReady, env.doc, pending) : null;
+  let bmp = asset && view ? pdfBitmap(view, n.pageIndex, env.scale, env.onResourceReady, exact) : null;
+  if (pending.v) env.incomplete = true;
+  // the filled file's page still rendering: the plain page meanwhile (no grey flash after each mark or keystroke)
+  if (!bmp && asset && view !== asset.hash) {
+    env.incomplete = true;
+    bmp = pdfBitmap(asset.hash, n.pageIndex, env.scale, () => {}, exact);
+  }
   // a stand-in while the exact render loads: drawn (one-shot exports still get the page), but marked incomplete so
   // painters that wait (thumbnails, export settling, the fidelity screen) paint again with the exact one
   if (bmp && exact && !pdfBitmapIsExact(bmp)) env.incomplete = true;
