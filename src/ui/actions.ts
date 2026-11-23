@@ -511,7 +511,7 @@ export async function importFile(f: OpenedFile, opts: ImportOptions = {}): Promi
     }
     let added: Page[] = [];
     if (r.pages?.length) {
-      added = addPages(r.pages, r.assets ?? {});
+      added = addPages(r.pages, r.assets ?? {}, { title: f.name.replace(/\.[^.\\/]+$/, "") || f.name });
       // no explicit work mode is set: AUTO gives each page the edit mode of its kind and source format (ui/editModes.ts)
     }
     if (r.message) S().notify(r.message);
@@ -544,7 +544,7 @@ function renameIds(v: unknown, map: Map<string, string>): unknown {
  * Add pages (and their assets) as one undoable step. Default: after the current page; `at` = index
  * in the page list. A pristine blank document's only page is replaced instead of kept.
  */
-export function addPages(pages: Page[], assets: Record<string, AssetRef>, opts: { at?: number; label?: string } = {}): Page[] {
+export function addPages(pages: Page[], assets: Record<string, AssetRef>, opts: { at?: number; label?: string; title?: string } = {}): Page[] {
   if (!pages.length) return pages;
   const s = S();
   const cur = currentPage();
@@ -573,7 +573,9 @@ export function addPages(pages: Page[], assets: Record<string, AssetRef>, opts: 
       const i = opts.at !== undefined ? Math.max(0, Math.min(d.pages.length, opts.at)) : d.pages.findIndex((p) => p.id === s.pageId) + 1;
       d.pages.splice(i, 0, ...(pages as any));
     }
-    if (pristine) d.title = pages[0]?.name.split(" · ")[0] ?? d.title;
+    // the document is named after the file it was opened from ("report" for report.pdf, deck.odp, book.xlsx …), not
+    // after its first page: a slide, sheet or PDF page name gave tabs like "Sheet1" or "deck - 1" (QA 2026-11-23)
+    if (pristine) d.title = opts.title ?? pages[0]?.name.split(" · ")[0] ?? d.title;
   });
   S().set({ pageId: pages[0].id, selection: [] });
   setTimeout(fitCurrent);
@@ -698,6 +700,13 @@ export async function saveDoc(as = false, forceProtect = false) {
     if (await exportAs("same")) S().set({ dirty: false });
     return;
   }
+  // a format Omniweave opens but cannot write back (ODP): which format 저장 writes instead is said and asked
+  const instead = cur?.source && !s.filePath && !as && !forceProtect ? SAVE_INSTEAD[cur.source.format] : undefined;
+  if (instead) {
+    if (!ask(t("doc.confirm.saveInstead", { from: instead.from, to: instead.to }))) return S().notify(t("doc.toast.saveCancelled"));
+    if (await exportAs(instead.id)) S().set({ dirty: false });
+    return;
+  }
   const t0 = performance.now();
   const h = useHistory.getState();
   const packed = await withProgress(t("progress.save"), () => packOmw(s.doc, h.includeInFile ? h.entries : []));
@@ -795,8 +804,15 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
   return saved;
 }
 
-/** Source formats whose 저장 (Ctrl+S) writes the original format (Word / 한글 documents). */
-const WORD_SAVE_SAME = new Set(["docx", "hwpx", "hwp"]);
+/**
+ * Source formats whose 저장 (Ctrl+S) writes the original format: Word / 한글 documents, and the workbooks, decks and PDFs
+ * Omniweave saves back the same way (Excel / PowerPoint / Acrobat: Ctrl+S keeps the file's format; 다른 이름으로 저장 = .omw).
+ */
+const WORD_SAVE_SAME = new Set(["docx", "hwpx", "hwp", "xlsx", "xlsm", "csv", "pptx", "ppsx", "pdf"]);
+/** Formats opened but not written back: 저장 offers this one instead, saying why (ODP → PPTX). */
+const SAVE_INSTEAD: Record<string, { id: string; from: string; to: string }> = { odp: { id: "pptx", from: "ODP (.odp)", to: "PowerPoint (.pptx)" } };
+/** What 저장 (Ctrl+S) writes for a document opened from a file of this format and not yet kept as .omw. */
+export const saveTargetFor = (format: string): "same" | string | "omw" => (WORD_SAVE_SAME.has(format) ? "same" : SAVE_INSTEAD[format]?.id ?? "omw");
 
 // ───────── pages ─────────
 

@@ -14,7 +14,8 @@ import { drawFidelity } from "./fidelity";
 import { addToDictionary, drawSpelling, ignoreAll, replaceWord, spellAt, suggestionsFor } from "./spell";
 import { PopMenu } from "./shell/DocTabs";
 import type { MenuItem } from "./shell/controls";
-import { importFile, nodesAt, setViewportSize, fitCurrent, placeImage, viewIsFitted, viewportNow, keepCentre } from "./actions";
+import { importFile, nodesAt, openAndRemember, setViewportSize, fitCurrent, placeImage, viewIsFitted, viewportNow, keepCentre } from "./actions";
+import { claimDrop, droppedFiles, placesOnPage } from "./fileDrop";
 import { followCanvasSize, followsCanvas } from "./viewFollow";
 import { TouchNav, applyStep, doubleTapView, isDoubleTap } from "./touchNav";
 import { CellEditor, useCellSel, type CellTarget } from "./CellEditor";
@@ -1951,9 +1952,15 @@ export function CanvasView() {
   }
 
   // ───────── drag & drop files ─────────
+  // a picture / clip dropped on the page is placed on it; any other file opens as a document of its own (ui/fileDrop.ts)
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    for (const f of Array.from(e.dataTransfer.files)) await importFile({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) }, { place: true });
+    if (!e.dataTransfer.files.length) return;
+    claimDrop(e);
+    for (const f of await droppedFiles(e.dataTransfer)) {
+      if (placesOnPage(f.name) && currentPage()) await importFile(f, { place: true });
+      else await openAndRemember(f);
+    }
   };
 
   const tool = useStore((s) => s.tool);

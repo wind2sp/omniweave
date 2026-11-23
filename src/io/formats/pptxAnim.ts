@@ -22,10 +22,15 @@ function effectsOf(page: Page, spids: ReadonlyMap<string, number>): Effect[] {
     if (!spid) continue;
     const last = out[out.length - 1];
     const dur = a.keyframes.length ? a.keyframes[a.keyframes.length - 1].time : 0;
-    if (last && a.trigger === "WITH_PREVIOUS" && last.spid === spid && !last.anims.some((x) => x.property === a.property)) {
-      last.anims.push(a);
-      last.dur = Math.max(last.dur, dur);
-    } else out.push({ spid, trigger: a.trigger, anims: [a], dur });
+    // one PowerPoint effect read at import stays one (its animations on the shape's picture and text nodes too)
+    const sameEffect = !!a.pptx && last?.anims[0].pptx?.g === a.pptx.g && a.trigger === "WITH_PREVIOUS";
+    // the same move on another node of the same shape (its text over its fill) is that shape's effect already
+    const twin = last && a.trigger === "WITH_PREVIOUS" && last.spid === spid && last.anims.some((x) => x.property === a.property);
+    if (sameEffect || (last && a.trigger === "WITH_PREVIOUS" && last.spid === spid && !twin)) {
+      last!.anims.push(a);
+      last!.dur = Math.max(last!.dur, dur);
+    } else if (!twin) out.push({ spid, trigger: a.trigger, anims: [a], dur });
+    else last!.anims.push(a);
   }
   return out;
 }
@@ -78,7 +83,7 @@ function effectBody(e: Effect, id: () => number): { preset: number; cls: "entr" 
  * The click groups (p:par of the main sequence) for the page's animations; `mainSeqId` is the main sequence's cTn id
  * (an effect that starts by itself waits for it to begin), ids after `lastId`. Empty when nothing can be written.
  */
-export function animClickPars(page: Page, spids: ReadonlyMap<string, number>, mainSeqId: number, lastId: number): { xml: string; lastId: number } {
+export function animClickPars(page: Page, spids: ReadonlyMap<string, number>, mainSeqId: number, lastId: number, raw = false): { xml: string; lastId: number } {
   const effects = effectsOf(page, spids);
   if (!effects.length) return { xml: "", lastId };
   let n = lastId;
@@ -110,6 +115,8 @@ export function animClickPars(page: Page, spids: ReadonlyMap<string, number>, ma
           const gid = id();
           const items = g.items
             .map(({ e, node }) => {
+              // an effect read from this slide and not changed since: PowerPoint's own XML (ids renumbered)
+              if (raw && pristine(e)) return e.anims[0].pptx!.xml.replace(/(<p:cTn\b[^>]*?\sid=")\d+(")/g, (_m, a, b) => `${a}${id()}${b}`).replace(/(<p:cTn\b[^>]*?nodeType=")\w+(")/, `$1${node}$2`);
               const eid = id();
               const b = effectBody(e, id);
               return `<p:par><p:cTn id="${eid}" presetID="${b.preset}" presetClass="${b.cls}" presetSubtype="${b.sub}" fill="hold" nodeType="${node}"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>${b.xml}</p:childTnLst></p:cTn></p:par>`;
@@ -146,10 +153,12 @@ function closeOf(xml: string, open: number, pfx: string, name: string): { innerE
  * A slide's p:timing with the page's animations: `timing` is the slide's own (or "" for none) — its main sequence gets
  * them at its end (a main sequence is added when it has none). Returns `timing` unchanged when nothing is to be added.
  */
-export function withAnimTiming(timing: string, page: Page, spids: ReadonlyMap<string, number>): string {
-  if (!page.animations?.length) return timing;
+export function withAnimTiming(timing: string, page: Page, spids: ReadonlyMap<string, number>, raw = false): string {
+  // the slide's main sequence was read into the page (pptxTiming): written anew from it, not added to
+  const replace = raw && !!page.pptxTiming;
+  if (!page.animations?.length && !replace) return timing;
   if (!timing) {
-    const r = animClickPars(page, spids, 2, 2);
+    const r = animClickPars(page, spids, 2, 2, raw);
     if (!r.xml) return "";
     return `<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst><p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>${r.xml}</p:childTnLst></p:cTn>${SEQ_CONDS}</p:seq></p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>`;
   }
@@ -158,7 +167,8 @@ export function withAnimTiming(timing: string, page: Page, spids: ReadonlyMap<st
   if (main) {
     const pfx = main[1];
     const mainId = Number(/\sid="(\d+)"/.exec(main[0])?.[1] ?? 2);
-    const r = animClickPars(page, spids, mainId, maxId);
+    const r = animClickPars(page, spids, mainId, maxId, raw);
+    if (replace) return pruneBuilds(replaceMainSeq(timing, main.index, pfx, r.xml));
     if (!r.xml) return timing;
     const at = main.index + main[0].length;
     const lst = new RegExp(`<${pfx}childTnLst\\s*(/?)>`).exec(timing.slice(at));
@@ -185,8 +195,132 @@ export function withAnimTiming(timing: string, page: Page, spids: ReadonlyMap<st
   if (!root) return timing;
   const pfx = root[1];
   const seqId = maxId + 1;
-  const r = animClickPars(page, spids, seqId, seqId);
+  const r = animClickPars(page, spids, seqId, seqId, raw);
   if (!r.xml) return timing;
   const at = root.index + root[0].length;
   return timing.slice(0, at) + `<${pfx}seq concurrent="1" nextAc="seek"><${pfx}cTn id="${seqId}" dur="indefinite" nodeType="mainSeq"><${pfx}childTnLst>${r.xml}</${pfx}childTnLst></${pfx}cTn>${SEQ_CONDS.replace(/<(\/?)p:/g, `<$1${pfx}`)}</${pfx}seq>` + timing.slice(at);
+}
+
+/** Every animation of the effect is as read from the file (same object, start, property and keyframes). */
+function pristine(e: Effect): boolean {
+  const s = e.anims[0].pptx;
+  // (and its shape kept its id: a slide whose shapes were all written anew has new ones)
+  return !!s && e.anims.length === s.n && s.xml.includes(`spid="${e.spid}"`) && e.anims.every((a) => a.pptx?.g === s.g && a.pptx.sig === animSig(a));
+}
+
+/** What an animation read from a file is checked against when saving (unchanged → PowerPoint's own XML). */
+export const animSig = (a: KeyframeAnimation) => JSON.stringify([a.targetNodeId, a.trigger, a.property, a.keyframes]);
+
+/** The timing with its main sequence's effects replaced by `pars` (no effects left: the main sequence goes; nothing left: ""). */
+function replaceMainSeq(timing: string, mainAt: number, pfx: string, pars: string): string {
+  const seqOpen = timing.lastIndexOf(`<${pfx}seq`, mainAt);
+  const seq = seqOpen >= 0 ? closeOf(timing, seqOpen, pfx, "seq") : null;
+  if (!pars) {
+    if (!seq) return timing;
+    const rest = timing.slice(0, seqOpen) + timing.slice(seq.end);
+    // only the root left (no clips, no triggers): no timing at all
+    return /nodeType="tmRoot"[^>]*>\s*(?:<(\w+:)?childTnLst>\s*<\/\1?childTnLst>|<(?:\w+:)?childTnLst\s*\/>)/.test(rest) ? "" : rest;
+  }
+  const c0 = closeOf(timing, mainAt, pfx, "cTn");
+  if (!c0) return timing;
+  const at = /^<[^>]*>/.exec(timing.slice(mainAt))![0].length + mainAt;
+  const k = timing.slice(at, c0.innerEnd).search(new RegExp(`<${pfx}childTnLst\\b`));
+  if (k < 0) return timing.slice(0, at) + `<${pfx}childTnLst>${pars}</${pfx}childTnLst>` + timing.slice(at);
+  const open = at + k;
+  if (/^<[^>]*\/>/.test(timing.slice(open))) {
+    const tag = /^<[^>]*\/>/.exec(timing.slice(open))![0];
+    return timing.slice(0, open) + `<${pfx}childTnLst>${pars}</${pfx}childTnLst>` + timing.slice(open + tag.length);
+  }
+  const c = closeOf(timing, open, pfx, "childTnLst");
+  if (!c) return timing;
+  const inner = open + /^<[^>]*>/.exec(timing.slice(open))![0].length;
+  return timing.slice(0, inner) + pars + timing.slice(c.innerEnd);
+}
+
+/** Build entries (p:bldLst) of shapes no effect animates any more are dropped (PowerPoint would repair them). */
+function pruneBuilds(timing: string): string {
+  if (!timing) return timing;
+  const lst = /<((?:\w+:)?)bldLst\b[^>]*>([\s\S]*?)<\/\1bldLst>/.exec(timing);
+  if (!lst) return timing;
+  const used = new Set([...timing.slice(0, lst.index).matchAll(/spTgt\b[^>]*\sspid="(\d+)"/g)].map((m) => m[1]));
+  const kept = lst[2].replace(/<(\w+:)?bld\w+\b[^>]*?\sspid="(\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/\1bld\w+>)/g, (m, _p, spid) => (used.has(spid) ? m : ""));
+  return timing.slice(0, lst.index) + (kept.trim() ? `<${lst[1]}bldLst>${kept}</${lst[1]}bldLst>` : "") + timing.slice(lst.index + lst[0].length);
+}
+
+// ───────── reading ─────────
+
+const PROP = { opacity: "OPACITY", move: "TRANSLATION", scale: "SCALE", rot: "ROTATION" } as const;
+type Kf = KeyframeAnimation["keyframes"];
+/** The animations Omniweave plays for a PowerPoint effect (as its presets look), `dur` ms long. */
+function framesFor(cls: string, preset: number, sub: number, dur: number): [KeyframeAnimation["property"], Kf][] {
+  const d = Math.max(1, dur);
+  const fadeIn: [KeyframeAnimation["property"], Kf] = [PROP.opacity, [{ time: 0, value: 0, easing: "linear" }, { time: d, value: 1, easing: "ease-out" }]];
+  if (cls === "exit") return [[PROP.opacity, [{ time: 0, value: 1, easing: "linear" }, { time: d, value: 0, easing: "ease-in" }]]];
+  if (cls === "emph") {
+    // Pulse grows a little and back; other emphasis effects (colour, spin…) play as a still hold here
+    if (preset === 26 || preset === 6) return [[PROP.scale, [{ time: 0, value: 1, easing: "linear" }, { time: d / 2, value: 1.15, easing: "ease-out" }, { time: d, value: 1, easing: "ease-in" }]]];
+    return [[PROP.opacity, [{ time: 0, value: 1, easing: "linear" }, { time: d, value: 1, easing: "linear" }]]];
+  }
+  if (cls !== "entr") return [[PROP.opacity, [{ time: 0, value: 1, easing: "linear" }, { time: d, value: 1, easing: "linear" }]]];
+  const half: Kf = [{ time: 0, value: 0, easing: "linear" }, { time: d / 2, value: 1, easing: "linear" }];
+  if (preset === 2) {
+    const from: [number, number] = sub === 8 ? [-400, 0] : sub === 2 ? [400, 0] : sub === 1 ? [0, -120] : [0, 120];
+    return [[PROP.move, [{ time: 0, value: from, easing: "linear" }, { time: d, value: [0, 0], easing: from[1] > 0 ? "back-out" : "ease-out" }]], [PROP.opacity, half]];
+  }
+  if (preset === 53) return [[PROP.scale, [{ time: 0, value: 0.3, easing: "linear" }, { time: d, value: 1, easing: "back-out" }]], [PROP.opacity, half]];
+  if (preset === 49) return [[PROP.rot, [{ time: 0, value: -180, easing: "linear" }, { time: d, value: 0, easing: "ease-out" }]], [PROP.opacity, half]];
+  // Fade, Appear and the entrances Omniweave has no look for (Wipe, Split…): shown fading in
+  return [fadeIn];
+}
+
+const local = (e: Element) => e.localName ?? e.nodeName.split(":").pop()!;
+const kids = (e: Element) => Array.from(e.childNodes).filter((c): c is Element => c.nodeType === 1);
+const kid = (e: Element | undefined, name: string) => (e ? kids(e).find((c) => local(c) === name) : undefined);
+const num = (v: string | null) => (v && /^\d+$/.test(v) ? Number(v) : 0);
+
+/** How long an effect runs (ms): its behaviours' delays + durations. */
+function effectDur(eff: Element): number {
+  let d = 0;
+  for (const c of Array.from(eff.getElementsByTagName("*")))
+    if (local(c) === "cTn") {
+      const own = num(c.getAttribute("dur"));
+      const st = kid(kid(c, "stCondLst"), "cond");
+      d = Math.max(d, num(st?.getAttribute("delay") ?? null) + own * (c.getAttribute("autoRev") === "1" ? 2 : 1));
+    }
+  return d || 500;
+}
+
+let seq = 0;
+/**
+ * A slide's main sequence as animations (each effect → the animations Omniweave plays for it, on every node of the
+ * shape it targets), each remembering PowerPoint's XML of its effect so an unchanged one is written back as it was.
+ * Null when the slide has no main sequence Omniweave can take over (none, or one that starts clips).
+ */
+export function readMainSeq(slide: Document, nodesOf: ReadonlyMap<string, string[]>, serialize: (e: Element) => string): KeyframeAnimation[] | null {
+  const all = Array.from(slide.getElementsByTagName("*"));
+  const main = all.find((e) => local(e) === "cTn" && e.getAttribute("nodeType") === "mainSeq");
+  if (!main) return null;
+  // clips started by the slide live in the main sequence too (MediaNode autoplay): left to the clips' own writer
+  if (Array.from(main.getElementsByTagName("*")).some((e) => local(e) === "cTn" && e.getAttribute("presetClass") === "mediacall")) return null;
+  const out: KeyframeAnimation[] = [];
+  const effects = Array.from(main.getElementsByTagName("*")).filter((e) => local(e) === "cTn" && e.getAttribute("presetClass"));
+  for (const ctn of effects) {
+    const par = ctn.parentNode as Element;
+    const tgt = Array.from(ctn.getElementsByTagName("*")).find((e) => local(e) === "spTgt");
+    const ids = tgt ? nodesOf.get(tgt.getAttribute("spid") ?? "") : undefined;
+    if (!ids?.length) return null; // an effect on something Omniweave did not read: the sequence is kept as it is
+    const nt = ctn.getAttribute("nodeType");
+    const trigger: KeyframeAnimation["trigger"] = nt === "clickEffect" ? "ON_CLICK" : nt === "afterEffect" ? "AFTER_PREVIOUS" : "WITH_PREVIOUS";
+    const frames = framesFor(ctn.getAttribute("presetClass")!, num(ctn.getAttribute("presetID")), num(ctn.getAttribute("presetSubtype")), effectDur(ctn));
+    const g = `pptx${++seq}`;
+    const group: KeyframeAnimation[] = [];
+    ids.forEach((nodeId, k) =>
+      frames.forEach(([property, keyframes], i) => group.push({ id: `${g}-${k}-${i}`, targetNodeId: nodeId, trigger: k === 0 && i === 0 ? trigger : "WITH_PREVIOUS", property, keyframes })),
+    );
+    // (the serializer repeats the slide's own namespace declarations on the element: dropped, the slide has them)
+    const xml = serialize(par).replace(/\s+xmlns(?::(?:p|a|r))?="[^"]*"/g, "");
+    for (const a of group) a.pptx = { g, xml, n: group.length, sig: animSig(a) };
+    out.push(...group);
+  }
+  return out;
 }

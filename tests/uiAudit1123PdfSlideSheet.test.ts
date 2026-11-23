@@ -4,7 +4,7 @@
 // greyed out (#85), a new slide taking the caption layout (#57), marks / form values not drawn until reopened (#67, #72).
 
 import { beforeAll, describe, expect, it } from "vitest";
-import { DOMParser } from "@xmldom/xmldom";
+import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
 import { readFileSync } from "node:fs";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { PDFDocument } from "pdf-lib";
@@ -20,9 +20,14 @@ import { tableToSheet } from "../src/io/sheet/pages";
 import { exportBlocked } from "../src/ui/exportMenu";
 import { pdfLines, pdfMatches } from "../src/ui/pdf/PdfFind";
 import { defaultChoice, type LayoutChoice } from "../src/ui/slideActions";
+import { claimDrop, dropClaimed, placesOnPage } from "../src/ui/fileDrop";
+import { importFile, saveTargetFor } from "../src/ui/actions";
+import { PAGE_EDITORS, isAppChord } from "../src/ui/appKeys";
+import { useStore } from "../src/core/store";
 
 beforeAll(() => {
   (globalThis as any).DOMParser = DOMParser;
+  (globalThis as any).XMLSerializer = XMLSerializer;
 });
 
 const AD = "qa/interop/adobe-made/";
@@ -133,7 +138,7 @@ describe("PPTX: animations added in Omniweave reach PowerPoint (#63)", () => {
     const before = strFromU8(unzipSync(read(AD + "ppt_deck.pptx"))["ppt/slides/slide3.xml"]);
     const n0 = (before.match(/presetClass=/g) ?? []).length;
     const arrow = doc.pages[2].nodes.find((n) => n.type === "VECTOR" && /화살표/.test(n.name))!;
-    doc.pages[2].animations = [{ id: "f", targetNodeId: arrow.id, trigger: "ON_CLICK", property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 500, value: 1, easing: "ease-out" }] }];
+    doc.pages[2].animations = [...doc.pages[2].animations, { id: "f", targetNodeId: arrow.id, trigger: "ON_CLICK", property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 500, value: 1, easing: "ease-out" }] }];
     const r = (await pptxSurgical(doc, doc.pages))!;
     const s3 = strFromU8(unzipSync(r.bytes)["ppt/slides/slide3.xml"]);
     expect((s3.match(/presetClass=/g) ?? []).length).toBe(n0 + 1);
@@ -202,5 +207,102 @@ describe("a new slide after the title slide takes Title and Content (#57)", () =
     ];
     const title = { layout: "ppt/slideLayouts/slideLayout1.xml" } as Page;
     expect(defaultChoice(choices, title)?.id).toBe("ppt/slideLayouts/slideLayout2.xml");
+  });
+});
+
+describe("PPTX: a slide's own animations are read, edited and written back without doubling", () => {
+  function open(bytes: Uint8Array): OmwDocument {
+    const r = importPptx(bytes, "deck.pptx");
+    const asset = makeAsset(bytes, "application/vnd.openxmlformats-officedocument.presentationml.presentation", "deck.pptx");
+    attachPptxMeta(r.pages, r.slideParts, r.slideEls, asset, r.assets);
+    const doc = newDocument("deck");
+    doc.pages = r.pages;
+    doc.assets = { ...r.assets, [asset.id]: asset };
+    return doc;
+  }
+  const effects = (b: Uint8Array, n: number) => (strFromU8(unzipSync(b)[`ppt/slides/slide${n}.xml`]).match(/presetClass="/g) ?? []).length;
+  const orig = read(AD + "ppt_deck.pptx");
+
+  it("read at import: the effects show as animations (Fade, Fly In) on their shapes", () => {
+    const doc = open(orig);
+    const p = doc.pages[2];
+    expect(p.pptxTiming).toBe(true);
+    const starts = p.animations.filter((a) => a.trigger === "ON_CLICK");
+    expect(starts).toHaveLength(effects(orig, 3));
+    expect(p.animations.some((a) => a.property === "TRANSLATION")).toBe(true);
+    expect(p.animations.every((a) => p.nodes.some((n) => n.id === a.targetNodeId))).toBe(true);
+  });
+
+  it("add → save → open → edit → save: no effect doubled, unchanged ones as PowerPoint wrote them", async () => {
+    const doc = open(orig);
+    const p = doc.pages[2];
+    const n0 = effects(orig, 3);
+    const arrow = p.nodes.find((n) => n.type === "VECTOR" && /화살표/.test(n.name))!;
+    p.animations = [...p.animations, { id: "f", targetNodeId: arrow.id, trigger: "ON_CLICK", property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 500, value: 1, easing: "ease-out" }] }];
+    const saved = (await pptxSurgical(doc, doc.pages))!.bytes;
+    expect(effects(saved, 3)).toBe(n0 + 1);
+    // the original effects' own XML is still there (e.g. their own durations)
+    const o3 = strFromU8(unzipSync(orig)["ppt/slides/slide3.xml"]);
+    const s3 = strFromU8(unzipSync(saved)["ppt/slides/slide3.xml"]);
+    for (const m of o3.matchAll(/<p:animEffect[^>]*>/g)) expect(s3).toContain(m[0]);
+    // open again: all three are animations; saved again unchanged → the same three, not six
+    const doc2 = open(saved);
+    expect(doc2.pages[2].animations.filter((a) => a.trigger === "ON_CLICK")).toHaveLength(n0 + 1);
+    const t2 = doc2.pages[2].nodes.find((n) => n.type === "TEXT")!;
+    (t2 as any).paragraphs[0].runs[0].text += "!";
+    const again = (await pptxSurgical(doc2, doc2.pages))!.bytes;
+    expect(effects(again, 3)).toBe(n0 + 1);
+    // edit: the first effect deleted
+    const doc3 = open(again);
+    const g = doc3.pages[2].animations[0].pptx!.g;
+    doc3.pages[2].animations = doc3.pages[2].animations.filter((a) => a.pptx?.g !== g);
+    const less = (await pptxSurgical(doc3, doc3.pages))!.bytes;
+    expect(effects(less, 3)).toBe(n0);
+    // all deleted: no main sequence left
+    const doc4 = open(less);
+    doc4.pages[2].animations = [];
+    const none = (await pptxSurgical(doc4, doc4.pages))!.bytes;
+    expect(effects(none, 3)).toBe(0);
+  });
+});
+describe("a file dropped on an open document is never ignored", () => {
+  it("pictures and clips are placed on the page canvas; documents open in a tab of their own", () => {
+    for (const n of ["a.png", "b.JPG", "c.svg", "d.mp4", "e.wav"]) expect(placesOnPage(n)).toBe(true);
+    for (const n of ["a.pdf", "b.odp", "c.xlsx", "d.docx", "e.pptx", "f.psd", "g.hwpx", "h.omw"]) expect(placesOnPage(n)).toBe(false);
+  });
+  it("a place with its own drop claims it, so the window-wide rule does not open it twice", () => {
+    const e = new Event("drop");
+    expect(dropClaimed(e)).toBe(false);
+    claimDrop({ nativeEvent: e });
+    expect(dropClaimed(e)).toBe(true);
+  });
+});
+describe("an opened file names its document (the tab) after the file", () => {
+  it("not after its first page / sheet / slide", async () => {
+    for (const [name, bytes] of [
+      ["book.csv", strToU8("a,b\n1,2\n")],
+      ["notes.md", strToU8("# Title\n\ntext\n")],
+    ] as [string, Uint8Array][]) {
+      useStore.getState().load(newDocument(), null);
+      await importFile({ name, path: null, bytes });
+      expect(useStore.getState().doc.title).toBe(name.replace(/\.\w+$/, ""));
+    }
+  });
+});
+describe("the app's chords while typing in a sheet cell / the formula bar / a PDF form field", () => {
+  it("those editors pass Ctrl+O / S / N / W / F / H / P and the tab keys on to the app", () => {
+    for (const c of [".sheet-editor", ".sheet-formula", ".pdf-field-edit"]) expect(PAGE_EDITORS.split(", ")).toContain(c);
+    const k = (code: string, key = code.replace("Key", "").toLowerCase()) => ({ ctrlKey: true, metaKey: false, altKey: false, key, code });
+    for (const c of ["KeyO", "KeyS", "KeyN", "KeyW", "KeyF", "KeyH", "KeyP"]) expect(isAppChord(k(c))).toBe(true);
+    expect(isAppChord(k("Tab", "Tab"))).toBe(true);
+    // the sheet's own Excel keys stay the sheet's
+    for (const c of ["KeyD", "KeyR", "KeyB", "KeyZ"]) expect(isAppChord(k(c))).toBe(false);
+  });
+});
+describe("저장 (Ctrl+S) keeps the file's format, as Excel / PowerPoint / Acrobat", () => {
+  it("workbooks, CSV, decks and PDFs save back as themselves; ODP is offered as PPTX; others as .omw", () => {
+    for (const f of ["xlsx", "xlsm", "csv", "pptx", "ppsx", "pdf", "docx", "hwpx", "hwp"]) expect(saveTargetFor(f)).toBe("same");
+    expect(saveTargetFor("odp")).toBe("pptx");
+    expect(saveTargetFor("png")).toBe("omw");
   });
 });

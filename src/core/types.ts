@@ -75,6 +75,8 @@ interface NodeBase {
    * the story flows through from page to page. Omitted = a free object placed on the page (every node before flow).
    */
   flow?: true;
+  /** body flow in a section of several columns (단, Page.columns): the column it is laid out in (omitted = the first) */
+  flowCol?: number;
   /**
    * A page's note area as the body flow laid it out (core/flow.ts): the footnotes at the foot of the page or the
    * endnotes after the document's end, and their separator line. Made again whenever the flow runs; never body content
@@ -508,6 +510,17 @@ export interface TextParagraph {
   /** start on a new page (Word pageBreakBefore, 한글 '문단 앞에서 항상 쪽 나눔') */
   pageBreakBefore?: boolean;
   /**
+   * 단 나누기 (Word w:br type="column", 한글 columnBreak): the text goes on in the next column — before the paragraph,
+   * or after it (Word's break at a paragraph's end). On a page of one column it is a page break, as in Word.
+   */
+  colBreak?: "before" | "after";
+  /**
+   * 구역 나누기(이어서) — Word w:type="continuous", 한글 a 단 definition in the text: a section of the body starts at this
+   * paragraph on the same page, with its own columns (omitted = one). The columns before it are balanced (Word). `src`:
+   * the section's w:sectPr in the file it was read from (the Office Surgeon patches only that one).
+   */
+  contSect?: { columns?: PageColumns; src?: number };
+  /**
    * (Documents imported before `lineMultiple`; DOCX import now gives lineMultiple.)
    * Word's own line spacing of a paragraph read from DOCX (w:line, lineRule auto: 240ths of the font's single line)
    * and the lineSpacing it was read as. While lineSpacing is unchanged, DOCX export writes `line` back as it was (the
@@ -898,6 +911,12 @@ export interface KeyframeAnimation {
   trigger: AnimTrigger;
   property: AnimProperty;
   keyframes: Keyframe[];
+  /**
+   * Read from a PPTX slide's main sequence (io/formats/pptxAnim.ts): the PowerPoint effect it came from, written back
+   * as it was while the animations of that effect are unchanged (`sig`) — effects Omniweave only approximates (Wipe,
+   * motion paths…) keep PowerPoint's own. `g` names the effect, `n` how many animations it became.
+   */
+  pptx?: { g: string; xml: string; n: number; sig: string };
 }
 
 export type PageKind = "DESIGN" | "DOCUMENT" | "SLIDE" | "PDF" | "MASTER";
@@ -913,6 +932,8 @@ export interface Page {
   masterId: string | null;
   transition: { type: TransitionType; duration: number };
   animations: KeyframeAnimation[];
+  /** PPTX: `animations` hold the slide's whole main sequence (read at import), so saving writes it anew, not added to */
+  pptxTiming?: boolean;
   /** where the page came from (format id such as "csv", "md", "json"), used by "save as the same type" */
   source?: PageSource;
   /** ruler guides in page px (x = vertical lines, y = horizontal lines); omitted when there are none */
@@ -924,6 +945,8 @@ export interface Page {
    * the size every document page had before margins were stored), so old files lay out exactly as before.
    */
   margins?: PageMargins;
+  /** 단 (columns) of the page's section (core/pageSetup.ts PageColumns); omitted = one column */
+  columns?: PageColumns;
   /**
    * How a document page begins when it is written to a word-processor file (DOCX / HWPX). Omitted = after a page
    * break (쪽 나누기): the first page, and every page made with "new page" or Ctrl+Enter. "flow" = the text simply
@@ -1001,6 +1024,19 @@ export interface PageMargins {
   left: number;
   header: number;
   footer: number;
+}
+
+/**
+ * 단 (columns) of a section, px: `n` columns of equal width `gap` apart (Word w:cols num / space, 한글 colCount /
+ * sameGap), or the columns' own widths and the gap after each (Word w:col, 한글 colSz) when they differ; `line` = a
+ * rule between columns (Word w:sep, 한글 colLine).
+ */
+export interface PageColumns {
+  n: number;
+  gap: number;
+  widths?: number[];
+  gaps?: number[];
+  line?: boolean;
 }
 
 export interface PageGuides {

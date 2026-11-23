@@ -1,7 +1,7 @@
 // Page setup (쪽 설정) and break commands, and the table merge / split commands — each one undo step.
 // Model rules live in core/pageSetup.ts and core/table.ts; this file only reads the editor state and commits.
 
-import { flowActive, flowBreak } from "./docFlow";
+import { currentRegion, flowActive, flowBreak, setRegionColumns } from "./docFlow";
 import { applySetupInPlace, breakPageInPlace, sectionAt, setupOf, type PageSetup } from "../core/pageSetup";
 import { draftPage, findPage, useStore } from "../core/store";
 import { anchorOf, deleteColsInPlace, deleteRowsInPlace, expandRange, insertColsInPlace, insertRowsInPlace, mergeCellsInPlace, spanOf, splitCellInPlace } from "../core/table";
@@ -40,6 +40,45 @@ export function applyPageSetup(setup: PageSetup, scope: SetupScope): number {
   s.notify(t("pagesetup.toast.applied", { n: targets.length }));
   setTimeout(fitCurrent);
   return targets.length;
+}
+
+/** 단: the current section in `cols` columns (undefined = one), the rest of its setup as it is (one undo step). */
+export function setColumns(cols: PageSetup["columns"]): number {
+  return applyColumns(cols, "section");
+}
+
+/** 단 설정: `cols` (undefined or one = one column) on this section or the whole document's pages, nothing else changed. */
+export function applyColumns(cols: PageSetup["columns"], scope: "section" | "document"): number {
+  const s = S();
+  const index = s.doc.pages.findIndex((p) => p.id === s.pageId);
+  if (index < 0) return 0;
+  // the caret in an 이어서 구역: that part's columns
+  const region = scope === "section" ? currentRegion() : null;
+  if (region) return setRegionColumns(region.at, cols) ? 1 : 0;
+  const targets = scopePages(s.doc.pages, index, scope);
+  s.commit(t("pagesetup.hist.columns"), (d) => {
+    for (const i of targets) {
+      const pg = d.pages[i] as Page;
+      if (cols && cols.n > 1) pg.columns = JSON.parse(JSON.stringify(cols));
+      else delete pg.columns;
+      // (the whole document: its 이어서 구역 too)
+      if (scope === "document")
+        for (const n of pg.nodes)
+          if (n.type === "TEXT" && n.flow)
+            for (const q of n.paragraphs as TextParagraph[])
+              if (q.contSect) q.contSect = cols && cols.n > 1 ? { ...q.contSect, columns: JSON.parse(JSON.stringify(cols)) } : (({ columns: _c, ...rest }) => rest)(q.contSect);
+    }
+  });
+  return targets.length;
+}
+
+/** 단 where the caret is: its 이어서 구역's, else the page's section's. */
+export function columnsHere(): PageSetup["columns"] {
+  const r = currentRegion();
+  if (r) return r.cols;
+  const s = S();
+  const p = s.doc.pages.find((x) => x.id === s.pageId);
+  return p?.columns && p.columns.n > 1 ? p.columns : undefined;
 }
 
 /** The setup the dialog starts from: the current page's. */

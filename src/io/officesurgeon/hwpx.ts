@@ -17,10 +17,10 @@ import { hashString } from "../../core/hash";
 import { DEFAULT_RUN, type NoteRef, type OfficeSourceBlock, type OfficeSourceMeta, type Page, type Revision, type TableCell, type TableNode, type TextParagraph, type TextRun } from "../../core/types";
 import { t } from "../../i18n";
 import { TABLE_LINE, coverMap, spanOf } from "../../core/table";
-import type { PageSetup } from "../../core/pageSetup";
+import { sameColumns, type PageSetup } from "../../core/pageSetup";
 import { layoutDiff, legacyLayout } from "./layout";
 import { HF_MAP_VERSION, hfAddedToOldMap, hfStateKey, hwpxHFChanged } from "./hf";
-import { collectFlow, flowNotes, hwpxLeftOut, hwpxCharPrXml, hwpxLineSpacing, hwpxPagePrXml, hwpxHeaderMaps, hwpxText, parseHwpxFlow, pageListDefs, HWPX_NUMFMT_OUT, type HwpxHeaderMaps, type OfficeImportReport, type OfficeItem, type OfficeTable } from "../office";
+import { collectFlow, flowNotes, hwpxLeftOut, hwpxCharPrXml, hwpxLineSpacing, hwpxColPrXml, hwpxPagePrXml, hwpxHeaderMaps, hwpxText, parseHwpxFlow, pageListDefs, HWPX_NUMFMT_OUT, type HwpxHeaderMaps, type OfficeImportReport, type OfficeItem, type OfficeTable } from "../office";
 import { MAX_LEVELS, isBulletLevel, levelOf, resolveDef, toHwpxLevelText } from "../../core/lists";
 import type { ListDef } from "../../core/style/types";
 import { esc } from "../xml";
@@ -108,6 +108,11 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
 
   const starts: number[] = [];
   const flow = collectFlow(pages, starts);
+  // 이어서 구역 (한글 단 definitions in the text): changed → the file is written anew
+  {
+    const key = (ps: TextParagraph[]) => JSON.stringify(ps.flatMap((p) => (p.contSect ? [p.contSect.columns ?? null] : [])));
+    if (key(origItems.flatMap((it) => (it.kind === "p" ? [it.p] : []))) !== key(flow.flatMap((it) => (it.kind === "p" ? [it.p] : [])))) throw new SurgeryUnavailable("column definitions");
+  }
   // page layout against the original's (layout.ts): new page breaks, changed paper / margins
   const origLayout = report.layout;
   if (!origLayout) throw new SurgeryUnavailable("layout");
@@ -309,10 +314,12 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
   }
   // changed paper / margins: the hp:pagePr of those sections' hp:secPr (numbered across the section files)
   const bySrc = new Map<number, PageSetup>();
+  const colsChanged = new Set<number>();
   for (const [j, s] of diff.setups) {
     const src = origLayout.sections[j]?.src;
     if (src === undefined) throw new SurgeryUnavailable("section settings");
     bySrc.set(src, s);
+    if (!sameColumns(origLayout.sections[j].setup.columns, s.columns)) colsChanged.add(src);
   }
   let secBase = 0;
   const enc = new TextEncoder();
@@ -334,11 +341,15 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
     if ([...bySrc.keys()].some((k) => k >= secBase && k < secBase + origSecs)) {
       let l = 0;
       const base = secBase;
-      body = body.replace(SECPR, (sec) => {
-        const setup = bySrc.get(base + l++);
-        if (!setup) return sec;
+      // (with the hp:colPr control after it: 단 changed → that control only, 한글's own form)
+      body = body.replace(SECPR_COLS, (all, sec: string, cols: string | undefined) => {
+        const at = base + l++;
+        const setup = bySrc.get(at);
+        if (!setup) return all;
         if (!/<hp:pagePr\b[\s\S]*?<\/hp:pagePr>/.test(sec)) throw new SurgeryUnavailable("pagePr");
-        return sec.replace(/<hp:pagePr\b[\s\S]*?<\/hp:pagePr>/, hwpxPagePrXml(setup));
+        const out = sec.replace(/<hp:pagePr\b[\s\S]*?<\/hp:pagePr>/, hwpxPagePrXml(setup));
+        if (!colsChanged.has(at)) return out + (cols ?? "");
+        return out + `<hp:ctrl>${hwpxColPrXml(setup.columns)}</hp:ctrl>`;
       });
       if (l !== origSecs) throw new SurgeryUnavailable("section settings");
     }
@@ -370,6 +381,8 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
 }
 
 const SECPR = /<hp:secPr\b[\s\S]*?<\/hp:secPr>/g;
+/** an hp:secPr and the hp:colPr control right after it (in the same run, as 한글 writes them) */
+const SECPR_COLS = /(<hp:secPr\b[\s\S]*?<\/hp:secPr>)(<hp:ctrl><hp:colPr\b[^>]*?(?:\/>|>[\s\S]*?<\/hp:colPr>)<\/hp:ctrl>)?/g;
 
 /** Runs added at the end of a paragraph's runs (before 한글's line layout cache). */
 function injectHwpxRuns(p: string, runs: string): string {
@@ -868,7 +881,7 @@ class HwpxWriter {
         .map((p, i) => {
           const o = opens[Math.min(i, opens.length - 1)] ?? "";
           const v = this.paraFor(p, attrOf(o, "paraPrIDRef") ?? this.lastPP, attrOf(o, "styleIDRef") ?? "0");
-          return `<hp:p id="${this.nextPid++}" paraPrIDRef="${v.pp}" styleIDRef="${v.st}" pageBreak="0" columnBreak="0" merged="0">${this.runsXml(p, near)}</hp:p>`;
+          return `<hp:p id="${this.nextPid++}" paraPrIDRef="${v.pp}" styleIDRef="${v.st}" pageBreak="0" columnBreak="${p.colBreak === "before" ? 1 : 0}" merged="0">${this.runsXml(p, near)}</hp:p>`;
         })
         .join("");
       return body.slice(0, m.index) + m[1] + inner + m[3] + body.slice(m.index + m[0].length);
@@ -883,7 +896,7 @@ class HwpxWriter {
   freshPara(p: TextParagraph): string {
     const { pp, st } = this.paraFor(p, this.lastPP, "0");
     this.lastPP = pp;
-    return `<hp:p id="${this.nextPid++}" paraPrIDRef="${pp}" styleIDRef="${st}" pageBreak="0" columnBreak="0" merged="0">${this.runsXml(p, [])}</hp:p>`;
+    return `<hp:p id="${this.nextPid++}" paraPrIDRef="${pp}" styleIDRef="${st}" pageBreak="0" columnBreak="${p.colBreak === "before" ? 1 : 0}" merged="0">${this.runsXml(p, [])}</hp:p>`;
   }
 
   /**
@@ -901,6 +914,8 @@ class HwpxWriter {
     if (!settingsOnly) {
       const v = this.paraFor(p, pp, st);
       open = open.replace(/\sparaPrIDRef="[^"]*"/, ` paraPrIDRef="${v.pp}"`).replace(/\sstyleIDRef="[^"]*"/, ` styleIDRef="${v.st}"`);
+      // 단 나누기 before the paragraph (한글 columnBreak) as the model has it
+      if ((orig?.p.colBreak === "before") !== (p.colBreak === "before")) open = open.replace(/\scolumnBreak="[^"]*"/, ` columnBreak="${p.colBreak === "before" ? 1 : 0}"`);
       this.lastPP = v.pp;
     }
     let lead = "";

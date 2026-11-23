@@ -11,6 +11,7 @@
 // pause) or a store gesture (colour drags / number scrubs), so undo and the history timeline
 // see the editor like any other command.
 
+import { isAppChord } from "./appKeys";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { Draft } from "immer";
 import { create } from "zustand";
@@ -673,6 +674,11 @@ class Engine {
   }
 
   onKeyDown(e: KeyboardEvent) {
+    // 열기 / 저장 / 새로 / 닫기 / 찾기 / 인쇄 / tab keys: on to the app (what was typed is put into the document first)
+    if (isAppChord(e)) {
+      this.flush();
+      return;
+    }
     e.stopPropagation();
     if (e.isComposing || e.keyCode === 229) {
       // an IME is about to compose over a selection: delete it through the model first,

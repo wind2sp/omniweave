@@ -129,5 +129,6 @@
   "engine.doc.look.oldMerge": "cells merged the old way",
   "engine.doc.look.pageBorder": "page borders",
   "engine.doc.look.sectionMid": "section breaks inside a paragraph",
-  "engine.odp.skipped": "{n} objects not read (charts, OLE…)"
+  "engine.odp.skipped": "{n} objects not read (charts, OLE…)",
+  "doc.confirm.saveInstead": "{from} cannot be saved in its own format (Omniweave cannot write it).\nSave the same content as {to}?\n\nTo keep a work file (.omw), use Save As."
 }

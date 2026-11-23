@@ -129,5 +129,6 @@
   "engine.doc.look.oldMerge": "旧式横向合并单元格",
   "engine.doc.look.pageBorder": "页面边框",
   "engine.doc.look.sectionMid": "段落中间的分节符",
-  "engine.odp.skipped": "{n} 个对象未读取（图表、OLE 等）"
+  "engine.odp.skipped": "{n} 个对象未读取（图表、OLE 等）",
+  "doc.confirm.saveInstead": "{from} 无法以原格式保存（Omniweave 无法写入此格式）。\n要将相同内容保存为 {to} 吗?\n\n要保存为工作文件(.omw)，请使用［另存为］。"
 }

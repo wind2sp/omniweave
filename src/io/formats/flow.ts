@@ -28,7 +28,7 @@ import {
   type TextRun,
 } from "../../core/types";
 import { storedMargins } from "../../core/pageSetup";
-import { markFlowInPlace, reflowPages, tableGap } from "../../core/flow";
+import { markFlowInPlace, nodeOrder, reflowPages, tableGap } from "../../core/flow";
 import type { PageMargins } from "../../core/types";
 import type { ListDef } from "../../core/style/types";
 import { A4_MARGIN, paginate, type OfficeItem, type OfficeLayout } from "../office";
@@ -367,6 +367,8 @@ function officePagesWhole(items: OfficeItem[], title: string, layout?: OfficeLay
       blocks.push(...picBlocks(end));
       ps = flowBlocks(blocks, title, {}, { ...(setup ? { width: setup.width, height: setup.height, margins: setup.margins } : {}), ...(layout?.wordBreak ? { wordBreak: layout.wordBreak } : {}), ...(layout?.cjkSpace ? { cjkSpace: layout.cjkSpace } : {}), ...(layout?.hangPunct ? { hangPunct: true } : {}), ...(layout?.justifyShrink ? { justifyShrink: true } : {}), ...(layout?.autoSpace ? { autoSpace: layout.autoSpace } : {}), ...(layout?.wordSpacing ? { wordSpacing: layout.wordSpacing } : {}), ...(layout?.lang ? { lang: layout.lang } : {}) });
     }
+    // 단 of the section: on each of its pages (the body flow lays them out column by column)
+    if (setup?.columns && setup.columns.n > 1) for (const pg of ps) pg.columns = { ...setup.columns };
     if (a > 0) {
       if (starts.has(a)) ps[0].breakBefore = "section";
       else delete ps[0].breakBefore;
@@ -437,7 +439,7 @@ function hwpxFirstPages(pages: Page[], items: OfficeItem[], sections: OfficeLayo
 export function readingOrder(pages: Page[]): SceneNode[] {
   const out: SceneNode[] = [];
   // (note areas laid out by the body flow are not body text)
-  for (const p of pages) out.push(...p.nodes.filter((n) => !n.notes).sort((a, b) => a.transform.y - b.transform.y || a.transform.x - b.transform.x));
+  for (const p of pages) out.push(...p.nodes.filter((n) => !n.notes).sort(nodeOrder));
   return out;
 }
 

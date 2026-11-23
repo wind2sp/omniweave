@@ -129,5 +129,6 @@
   "engine.doc.look.oldMerge": "옛 방식 가로 병합 칸",
   "engine.doc.look.pageBorder": "쪽 테두리",
   "engine.doc.look.sectionMid": "문단 가운데 구역 나누기",
-  "engine.odp.skipped": "읽지 못한 개체 {n}개(차트·OLE 등)"
+  "engine.odp.skipped": "읽지 못한 개체 {n}개(차트·OLE 등)",
+  "doc.confirm.saveInstead": "원래 형식({from})으로는 저장할 수 없습니다(오메는 이 형식을 쓰지 못합니다).\n같은 내용을 {to} 파일로 저장할까요?\n\n작업 파일(.omw)로 저장하려면 [다른 이름으로 저장]을 쓰세요."
 }

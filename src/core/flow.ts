@@ -13,12 +13,12 @@
 import { t } from "../i18n";
 import { advance, graphemes, hwpLinesSig, layoutText, runScale, spacingOverlap, textMetricsEpoch, type LaidLine, type TextLayout } from "./text";
 import { coverMap, layoutTable, richBox, richOf } from "./table";
-import { bodyBox, flowHeight } from "./pageSetup";
+import { bodyBox, columnBoxes, flowHeight } from "./pageSetup";
 import { hfPush } from "./headerFooter";
 import { wordMultipleOf } from "./lineSpacing";
 import { countNotes, hasNotes, noteBody, notePrOf, notesOf, numberNotes, sepGeom, sepNode, type SepGeom } from "./notes";
 import { markerLength } from "./richtext";
-import { uid, type HwpLines, type NotePr, type NoteRef, type Page, type SceneNode, type TableCell, type TableNode, type TextNode, type TextParagraph, type TextRun } from "./types";
+import { uid, type HwpLines, type NotePr, type NoteRef, type Page, type PageColumns, type SceneNode, type TableCell, type TableNode, type TextNode, type TextParagraph, type TextRun } from "./types";
 import type { ListDef } from "./style/types";
 
 // ───────── segments ─────────
@@ -533,7 +533,9 @@ export function objSize(n: SceneNode): { w: number; h: number } {
   return { w: (b.width ?? 0) * k, h: (b.height ?? 0) * ky };
 }
 
-const flowSort = (a: SceneNode, b: SceneNode) => a.transform.y - b.transform.y || a.transform.x - b.transform.x;
+/** Reading order of a page's body nodes: column by column (Page.columns), top to bottom, left to right. */
+export const nodeOrder = (a: SceneNode, b: SceneNode) => (a.flowCol ?? 0) - (b.flowCol ?? 0) || a.transform.y - b.transform.y || a.transform.x - b.transform.x;
+const flowSort = nodeOrder;
 
 const storyMemo = new WeakMap<readonly Page[], Map<number, Story>>();
 
@@ -911,6 +913,8 @@ type Placed =
 
 interface PageGeom {
   box: { x: number; y: number; w: number; h: number };
+  /** the column of the page this box is (0 = the first; a section of several columns lays out column by column) */
+  col?: number;
 }
 
 export interface NoteOpts {
@@ -1111,8 +1115,13 @@ export function paginateStory(story: Story, geom: (k: number) => PageGeom, notes
     return need + firstNeed(nb);
   };
 
+  let colAfter = false; // the paragraph before ends with a column break
   for (let bi = 0; bi < blocks.length; bi++) {
     const b = blocks[bi];
+    if (b.kind === "obj" && colAfter) {
+      if (y > 0 || out[k].some((it) => it.kind !== "foot")) newPage();
+      colAfter = false;
+    }
     if (b.kind === "obj") {
       const n = b.node;
       if (n.type === "TABLE") {
@@ -1201,7 +1210,13 @@ export function paginateStory(story: Story, geom: (k: number) => PageGeom, notes
     }
 
     const p = b.p;
-    if (p.pageBreakBefore && (y > 0 || out[k].length) && !(k === 0 && out[0].length === 0)) newPage();
+    if (p.pageBreakBefore && (y > 0 || out[k].length) && !(k === 0 && out[0].length === 0)) {
+      newPage();
+      while (geom(k).col) newPage();
+    }
+    // 단 나누기 (Word / 한글): the next column (the next page on a page of one column)
+    if ((p.colBreak === "before" || colAfter) && (y > 0 || out[k].some((it) => it.kind !== "foot"))) newPage();
+    colAfter = p.colBreak === "after";
     // keep with next: the chain of paragraphs kept with the next and the first lines after them go on one page
     const prevKeeps = bi > 0 && keepsOn(blocks[bi - 1]);
     if (p.keepNext && !prevKeeps && y > 0) {
@@ -1407,6 +1422,7 @@ export function flowPageLike(like: Page, n: number): Page {
     breakBefore: "flow",
   };
   if (like.margins) p.margins = { ...like.margins };
+  if (like.columns) p.columns = { ...like.columns };
   if (like.source) {
     const { office: _o, fragments: _f, ...src } = like.source;
     p.source = src;
@@ -1456,29 +1472,35 @@ export function reflowSegment(pages: readonly Page[], start: number, story?: Sto
     return push.top || push.bottom ? { x: b.x, y: b.y + push.top, w: b.w, h: Math.max(16, b.h - push.top - push.bottom) } : b;
   });
   const boxAt = (k: number) => boxes[Math.min(k, boxes.length - 1)];
-  const geom = (k: number) => ({ box: boxAt(k) });
+  // 단 (Page.columns, the run's first page = its section's) and 이어서 구역 (TextParagraph.contSect): the story is laid
+  // out region by region, each column by column; a region followed by another on the same page has its columns
+  // balanced there (Word), and the next one begins below it
+  const colDef = segPages[0]?.columns && segPages[0].columns.n > 1 ? segPages[0].columns : undefined;
   // (a run that begins after a hard page break: Word drops the space before at its top too)
   const afterBreak = seg.start > 0 && !pages[seg.start].breakBefore;
   // (a run that begins a new section: its top overlaps the space after of the section before's last paragraph)
   const sectionAfter = seg.start > 0 && pages[seg.start].breakBefore === "section" ? lastBodyPara(pages[seg.start - 1]) : undefined;
-  let layout = paginateStory(st, geom, { pr, end: endItems, afterBreak, sectionAfter });
+  const layAll = (story: Story) => layRegions(story, colDef, boxAt, { pr, end: endItems, afterBreak, sectionAfter });
+  let slots = layAll(st);
   // Word's footnote numbers restarted on each page (w:numRestart eachPage): the page a reference lands on decides its
   // number; laid out once more with those numbers when one changed
   if (pr?.foot?.restart === "page") {
     const fixed = new Map<NoteRef, number>();
-    for (const items of layout) {
-      let n = pr.foot.start ?? 1;
-      for (const it of items) if (it.kind === "para") for (const r of it.p.runs) if (r.note?.kind === "foot" && !r.note.custom && !fixed.has(r.note)) fixed.set(r.note, n++);
+    let n = pr.foot.start ?? 1;
+    let pg = -1;
+    for (const sl of slots) {
+      if (sl.page !== pg) (pg = sl.page), (n = pr.foot.start ?? 1);
+      for (const it of sl.items) if (it.kind === "para") for (const r of it.p.runs) if (r.note?.kind === "foot" && !r.note.custom && !fixed.has(r.note)) fixed.set(r.note, n++);
     }
     const again = numberNotes(st.paras, { ...before }, pr, fixed);
     if (again !== st.paras) {
       st = { ...st, paras: again };
-      layout = paginateStory(st, geom, { pr, end: endItems, afterBreak, sectionAfter });
+      slots = layAll(st);
     }
   }
   const lists = sameLists(segPages, st.lists);
   const outPages: Page[] = [];
-  const count = Math.max(layout.length, 1);
+  const count = Math.max(1, ...slots.map((x) => x.page + 1));
   const objOffsets = st.inline?.size ? inlineOffsets(st.paras) : new Map<string, { para: string; offset: number }>();
   for (let k = 0; k < Math.max(count, segPages.length); k++) {
     const old = segPages[k];
@@ -1492,50 +1514,64 @@ export function reflowSegment(pages: readonly Page[], start: number, story?: Sto
     }
     let page = old ?? flowPageLike(last, seg.start + k + 1);
     if (freeMoved && page.nodes.some((n) => freeMoved!.has(n))) page = { ...page, nodes: page.nodes.map((n) => freeMoved!.get(n) ?? n) };
-    const box = boxAt(k);
     const oldFrames = page.nodes.filter((n): n is TextNode => n.type === "TEXT" && !!n.flow).sort(flowSort);
     const flowNodes: SceneNode[] = [];
-    let run: TextParagraph[] = [];
-    let runY = 0;
     let fi = 0;
-    const closeRun = () => {
-      if (!run.length) return;
-      flowNodes.push(frameFor(oldFrames[fi++], st.proto, lists, run, box.x, box.y + runY, box.w));
-      run = [];
-    };
-    // note areas: the page's footnotes at the foot of the body, endnotes where they fall
+    // note areas: the page's footnotes at the foot of the body (of each column), endnotes where they fall
     const oldNotes = new Map(page.nodes.filter((n) => n.notes).map((n) => [n.id, n]));
     const noteNodes: SceneNode[] = [];
-    let ends: TextParagraph[] = [];
-    let endY = 0;
-    const closeEnds = () => {
-      if (!ends.length) return;
-      noteNodes.push(noteFrame(`${page.id}:en`, "end", oldNotes, st.proto, ends, box.x, box.y + endY, box.w));
-      ends = [];
-    };
-    for (const it of layout[k] ?? []) {
-      if (it.kind === "para") {
-        if (!run.length) runY = it.y;
-        run.push(it.p);
-      } else if (it.kind === "obj") {
-        closeRun();
-        const x = it.node.type === "TABLE" ? box.x + tableShift(it.node, box.w) : Math.max(box.x, Math.min(it.node.transform.x, box.x + box.w - 1));
-        flowNodes.push(placed(it.node, x, box.y + it.y - visBox(it.node).dy));
-      } else if (it.kind === "foot") {
-        const top = box.y + box.h - it.h;
-        if (it.sep.len > 0) noteNodes.push(sepNode(`${page.id}:fnsep`, "foot", box.x, top + it.sep.lineY, it.sep, oldNotes.get(`${page.id}:fnsep`)));
-        if (it.paras.length) noteNodes.push(noteFrame(`${page.id}:fn`, "foot", oldNotes, st.proto, it.paras, box.x, top + it.sep.h, box.w));
-      } else {
-        if (it.sep) {
-          closeEnds();
-          if (it.sep.len > 0) noteNodes.push(sepNode(`${page.id}:ensep`, "end", box.x, box.y + it.y - it.sep.h + it.sep.lineY, it.sep, oldNotes.get(`${page.id}:ensep`)));
+    const bodyBottom = boxAt(k).y + boxAt(k).h;
+    // the page's columns in reading order (region by region): column c of the page is TextNode.flowCol c
+    const mine = slots.filter((x) => x.page === k);
+    mine.forEach((sl, c) => {
+      const box = sl.box;
+      const sfx = c ? String(c) : "";
+      const inCol = <T extends SceneNode>(n: T): T => inColumn(n, c);
+      let run: TextParagraph[] = [];
+      let runY = 0;
+      const closeRun = () => {
+        if (!run.length) return;
+        flowNodes.push(inCol(frameFor(oldFrames[fi++], st.proto, lists, run, box.x, box.y + runY, box.w)));
+        run = [];
+      };
+      let ends: TextParagraph[] = [];
+      let endY = 0;
+      const closeEnds = () => {
+        if (!ends.length) return;
+        noteNodes.push(noteFrame(`${page.id}:en${sfx}`, "end", oldNotes, st.proto, ends, box.x, box.y + endY, box.w));
+        ends = [];
+      };
+      for (const it of sl.items) {
+        if (it.kind === "para") {
+          if (!run.length) runY = it.y;
+          run.push(it.p);
+        } else if (it.kind === "obj") {
+          closeRun();
+          const x = it.node.type === "TABLE" ? box.x + tableShift(it.node, box.w) : Math.max(box.x, Math.min(it.node.transform.x, box.x + box.w - 1));
+          flowNodes.push(inCol(placed(it.node, x, box.y + it.y - visBox(it.node).dy)));
+        } else if (it.kind === "foot") {
+          // (at the foot of the page's body, also below a region whose columns were balanced higher up)
+          const top = (sl.last ? bodyBottom : box.y + box.h) - it.h;
+          if (it.sep.len > 0) noteNodes.push(sepNode(`${page.id}:fnsep${sfx}`, "foot", box.x, top + it.sep.lineY, it.sep, oldNotes.get(`${page.id}:fnsep${sfx}`)));
+          if (it.paras.length) noteNodes.push(noteFrame(`${page.id}:fn${sfx}`, "foot", oldNotes, st.proto, it.paras, box.x, top + it.sep.h, box.w));
+        } else {
+          if (it.sep) {
+            closeEnds();
+            if (it.sep.len > 0) noteNodes.push(sepNode(`${page.id}:ensep${sfx}`, "end", box.x, box.y + it.y - it.sep.h + it.sep.lineY, it.sep, oldNotes.get(`${page.id}:ensep${sfx}`)));
+          }
+          if (!ends.length) endY = it.y;
+          ends.push(it.p);
         }
-        if (!ends.length) endY = it.y;
-        ends.push(it.p);
       }
+      closeRun();
+      closeEnds();
+    });
+    // the rule between columns (Word w:sep, 한글 colLine): from the region's top on the page as far down as its columns go
+    let rule = 0;
+    for (const sl of mine) {
+      if (!sl.rule) continue;
+      noteNodes.push(colRuleNode(`${page.id}:colsep${++rule === 1 ? "1" : rule}`, sl.rule.x, sl.rule.top, sl.rule.len, oldNotes.get(`${page.id}:colsep${rule === 1 ? "1" : rule}`)));
     }
-    closeRun();
-    closeEnds();
     if (st.inline?.size) for (const fr of flowNodes.filter((n): n is TextNode => n.type === "TEXT")) placeInline(fr, st, flowNodes, objOffsets);
     // free objects keep their place in the stacking order: those below the first flow node stay below
     const firstFlow = page.nodes.findIndex(isFlowNode);
@@ -1565,6 +1601,143 @@ export function reflowSegment(pages: readonly Page[], start: number, story?: Sto
     if ((was?.spaceAfter ?? -1) !== (now?.spaceAfter ?? -1) && isFlowSegment(res, segmentAt(res, end))) res = reflowSegment(res, end);
   }
   return res;
+}
+
+/** One laid-out column of a page run: the page (in the run), its box, what goes in it. */
+interface Slot {
+  page: number;
+  box: { x: number; y: number; w: number; h: number };
+  items: Placed[];
+  /** the region's last page column: its footnotes go to the page's foot */
+  last: boolean;
+  /** the rule before this column (Word w:sep): x, top and length (page coordinates) */
+  rule?: { x: number; top: number; len: number };
+}
+
+/**
+ * The regions of a story: from its start, and from each paragraph with `contSect` (이어서 구역), with their columns;
+ * objects go with the paragraph they stand before (those after the story's end with the last region).
+ */
+function storyRegions(st: Story, first: PageColumns | undefined): { story: Story; cols: PageColumns | undefined }[] {
+  const cuts = st.paras.map((p, i) => (i > 0 && p.contSect ? i : -1)).filter((i) => i > 0);
+  const firstCols = st.paras[0]?.contSect ? st.paras[0].contSect.columns : first;
+  if (!cuts.length) return [{ story: st, cols: firstCols }];
+  const bounds = [0, ...cuts, st.paras.length];
+  return bounds.slice(0, -1).map((a, r) => {
+    const paras = st.paras.slice(a, bounds[r + 1]);
+    const ids = new Set(paras.map((q) => q.id));
+    const lastR = r === bounds.length - 2;
+    const objs = st.objs.filter((o) => ids.has(o.before) || (lastR && o.before === STORY_END));
+    return { story: { ...st, paras, objs }, cols: r === 0 ? firstCols : paras[0].contSect!.columns };
+  });
+}
+
+/** The columns of a page run, region by region (see reflowSegment): balanced where another region follows on the page. */
+function layRegions(st: Story, first: PageColumns | undefined, boxAt: (k: number) => { x: number; y: number; w: number; h: number }, opts: NoteOpts): Slot[] {
+  const regions = storyRegions(st, first);
+  const out: Slot[] = [];
+  let P0 = 0, T0 = 0;
+  regions.forEach((rg, r) => {
+    const cols = rg.cols && rg.cols.n > 1 ? rg.cols : undefined;
+    const n = columnBoxes({ x: 0, w: 1000 }, cols).length;
+    const lastR = r === regions.length - 1;
+    const nopts: NoteOpts = r === 0 ? { ...opts, ...(lastR ? {} : { end: [] }) } : { pr: opts.pr, ...(lastR ? { end: opts.end } : {}) };
+    const geomOf = (lastP: number, H?: number) => (k: number) => {
+      const pg = P0 + Math.floor(k / n), c = k % n;
+      const b = boxAt(pg);
+      const top = pg === P0 ? T0 : 0;
+      const cb = columnBoxes(b, cols)[c];
+      const h = H !== undefined && pg === lastP ? H : b.h - top;
+      return { box: { x: cb.x, y: b.y + top, w: cb.w, h: Math.max(1, h) }, ...(n > 1 ? { col: c } : {}) };
+    };
+    let lay = paginateStory(rg.story, geomOf(-1), nopts);
+    const lastP = P0 + Math.floor((Math.max(1, lay.length) - 1) / n);
+    // balanced columns before the next region (Word's continuous section break): the lowest height of the last page's
+    // columns that still holds what goes there
+    if (!lastR && n > 1) {
+      const full = boxAt(lastP).h - (lastP === P0 ? T0 : 0);
+      const fits = (H: number) => {
+        const l = paginateStory(rg.story, geomOf(lastP, H), nopts);
+        return P0 + Math.floor((Math.max(1, l.length) - 1) / n) === lastP ? l : null;
+      };
+      let lo = 0, hi = full, best = lay;
+      for (let i = 0; i < 16 && hi - lo > 0.5; i++) {
+        const mid = (lo + hi) / 2;
+        const l = fits(mid);
+        if (l) (hi = mid), (best = l);
+        else lo = mid;
+      }
+      lay = best;
+    }
+    const geom = geomOf(-1);
+    let used = 0;
+    const regionSlots: Slot[] = [];
+    lay.forEach((items, k) => {
+      const g = geom(k);
+      const pg = P0 + Math.floor(k / n);
+      const sl: Slot = { page: pg, box: g.box, items, last: lastR || pg !== lastP };
+      regionSlots.push(sl);
+      // (Word's section break mark before the next region — TextParagraph.sectMark — takes no room: not its space after)
+      if (pg === lastP) for (const it of items) if (it.kind !== "foot") used = Math.max(used, (it as { y: number; h: number }).y + (it as { y: number; h: number }).h - (it.kind === "para" && it.p.sectMark && it.p.runs.every((x) => !x.text) ? it.p.spaceAfter : 0));
+    });
+    // the rule between columns: per page of the region, as tall as its columns go there
+    if (cols?.line && n > 1) {
+      const byPage = new Map<number, Slot[]>();
+      for (const sl of regionSlots) byPage.set(sl.page, [...(byPage.get(sl.page) ?? []), sl]);
+      for (const [pg, sls] of byPage) {
+        const len = Math.max(0, ...sls.map((x) => Math.max(0, ...x.items.filter((it) => it.kind !== "foot").map((it) => (it as { y: number; h: number }).y + (it as { y: number; h: number }).h))));
+        if (len <= 0) continue;
+        const cbs = columnBoxes(boxAt(pg), cols);
+        sls.forEach((sl, i) => {
+          const c = i % n;
+          if (c > 0 && cbs[c]) sl.rule = { x: Math.round(((cbs[c - 1].x + cbs[c - 1].w + cbs[c].x) / 2) * 100) / 100, top: sl.box.y, len: Math.round(len * 100) / 100 };
+        });
+      }
+    }
+    out.push(...regionSlots);
+    // the next region: below this one on its last page
+    T0 = (lastP === P0 ? T0 : 0) + used;
+    P0 = lastP;
+  });
+  return out;
+}
+
+const colMemo = new WeakMap<SceneNode, Map<number, SceneNode>>();
+/** `n` laid out in column `c` (the same object each time, so an unchanged page stays the same) */
+function inColumn<T extends SceneNode>(n: T, c: number): T {
+  if ((n.flowCol ?? 0) === c) return n;
+  let m = colMemo.get(n);
+  const hit = m?.get(c);
+  if (hit) return hit as T;
+  const out = { ...n } as T;
+  if (c) out.flowCol = c;
+  else delete out.flowCol;
+  if (!m) colMemo.set(n, (m = new Map()));
+  m.set(c, out);
+  return out;
+}
+
+/** The vertical rule between two columns (screen, print and every export draw it like any line; never body content). */
+function colRuleNode(id: string, x: number, y: number, len: number, old?: SceneNode): SceneNode {
+  if (old && old.type === "VECTOR" && old.transform.x === x && old.transform.y === y && old.contours[0]?.nodes[1]?.anchor[1] === len) return old;
+  const pt = (v: number): [number, number] => [0, v];
+  return {
+    id,
+    name: "column rule",
+    visible: true,
+    locked: true,
+    opacity: 1,
+    blendMode: "NORMAL",
+    transform: { x, y, rotation: 0, scale: 1 },
+    type: "VECTOR",
+    contours: [{ closed: false, nodes: [0, len].map((v) => ({ anchor: pt(v), handleIn: pt(v), handleOut: pt(v), isCorner: true })) }],
+    fill: null,
+    stroke: "#000000",
+    strokeWidth: 0.75,
+    fillRule: "nonzero",
+    strokeCap: "butt",
+    notes: "foot",
+  } as SceneNode;
 }
 
 /** The last paragraph of a page's body when the body ends with text there (not a table or picture), else none. */
@@ -1896,7 +2069,10 @@ export function posAt(lines: readonly FlowLine[], page: number, x: number, y: nu
   for (const fl of lines) {
     if (fl.page !== page) continue;
     const top = fl.node.transform.y + fl.line.y;
-    const d = y < top ? top - y : y > top + fl.line.height ? y - top - fl.line.height : 0;
+    const left = fl.node.transform.x, right = left + fl.node.width;
+    // (several columns: the line of the column under the point — beside it counts more than above or below)
+    const dx = x < left - 4 ? left - x : x > right + 4 ? x - right : 0;
+    const d = (y < top ? top - y : y > top + fl.line.height ? y - top - fl.line.height : 0) + dx * 4;
     if (d < bd) (bd = d), (best = fl);
     if (d === 0) break;
   }

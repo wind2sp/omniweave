@@ -53,7 +53,7 @@ import { t as tr } from "../../i18n";
 import { effectLstXml, pptxNeedsPicture, readEffectLst } from "./pptxFx";
 import { avOf, custContours, flipContours, presetContours } from "./pptxGeom";
 import { drawChart, readChart } from "./pptxChart";
-import { withAnimTiming } from "./pptxAnim";
+import { readMainSeq, withAnimTiming } from "./pptxAnim";
 import type { Effect } from "../../core/style/types";
 import { applyLstStyle, emptyStyle, LEVELS, paraLevel, resolveFace, runLevel, slideAscentOf, splitScripts, themeFontsOf, type ListStyle, type ThemeFonts } from "./pptxText";
 
@@ -1394,6 +1394,8 @@ function readDeck(files: Record<string, Uint8Array>, bytes: Uint8Array, name: st
     const tree = descendants(slide, "spTree")[0];
     ctx.clips = new Map();
     const trace: SlideTrace = { inh: nodes.length, bg: bgPicture, els: [] };
+    /** shape id → the nodes read from it (its animations play on them) */
+    const bySpid = new Map<string, string[]>();
     if (tree)
       children(tree).forEach((el, k) => {
         const at = nodes.length;
@@ -1401,10 +1403,19 @@ function readDeck(files: Record<string, Uint8Array>, bytes: Uint8Array, name: st
         if (nodes.length > at) {
           const box = inheritedBox(el, [layout, master]);
           trace.els.push({ k, n: nodes.length - at, ...(box ? { box } : {}) });
+          const spid = descendants(el, "cNvPr")[0] && attr(descendants(el, "cNvPr")[0], "id");
+          if (spid) bySpid.set(spid, nodes.slice(at).map((n) => n.id));
         }
       });
     mediaTiming(slide, ctx.clips);
     page.nodes = nodes;
+    // the slide's animations (its main sequence), so they show, play and can be edited here (io/formats/pptxAnim.ts)
+    const XS = (globalThis as { XMLSerializer?: typeof XMLSerializer }).XMLSerializer;
+    const anims = XS ? readMainSeq(slide, bySpid, (e) => new XS().serializeToString(e)) : null;
+    if (anims) {
+      page.animations = anims;
+      page.pptxTiming = true;
+    }
     if (attr(slide.documentElement, "show") === "0") page.hidden = true;
     if (layoutPath) page.layout = layoutPath;
     const sec = sectionAt.get(attr(sid, "id") ?? "");

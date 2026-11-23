@@ -1,5 +1,6 @@
 // Global keyboard shortcuts. Ignored while typing in a field, presenting, or editing text.
 
+import { PAGE_EDITORS } from "../appKeys";
 import { useEffect } from "react";
 import type { Mode } from "../../core/store";
 import { currentPage, selectedNodes, useStore } from "../../core/store";
@@ -158,11 +159,13 @@ export function globalKey(e: KeyboardEvent) {
   }
   // 열기 (Ctrl+O) also while typing in the document body or a text box, as in Word / 한글 (QA ui-audit #40: no reaction
   // while the caret was in the text) — not from another field (the name box, a panel's number)
-  const inDocText = !isTyping(e.target) || !!(e.target as HTMLElement | null)?.closest?.(".flow-editor, .rich-editor");
-  if (!modal && mod && !e.altKey && !e.shiftKey && want === "file.open" && inDocText) {
+  // (새로 만들기 Ctrl+N likewise — the browser would open a window of its own)
+  const inDocText = !isTyping(e.target) || !!(e.target as HTMLElement | null)?.closest?.(PAGE_EDITORS);
+  if (!modal && mod && !e.altKey && !e.shiftKey && (want === "file.open" || want === "file.new") && inDocText) {
     e.preventDefault();
     (document.activeElement as HTMLElement | null)?.blur?.();
-    void openAny();
+    if (want === "file.open") void openAny();
+    else useUI.getState().set({ welcome: true });
     return;
   }
   // 되돌리기 / 다시 실행 while the caret is in a text but the focus is on the ribbon (a page setup just chosen there):

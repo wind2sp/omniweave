@@ -11,6 +11,7 @@ import { Icon } from "./Icons";
 import { Seg, cx } from "./controls";
 import { useUI } from "./uiStore";
 import { combineToPdf } from "../pageActions";
+import { claimDrop } from "../fileDrop";
 import { t, useT } from "../../i18n";
 
 export interface QuickTool {
@@ -118,6 +119,7 @@ function ToolsBody({ toolId, onClose, onSwitch }: { toolId: string; onClose: () 
 
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    claimDrop(e);
     setOver(false);
     if (dragFrom.current !== null) return;
     const files = await Promise.all(Array.from(e.dataTransfer.files).map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));

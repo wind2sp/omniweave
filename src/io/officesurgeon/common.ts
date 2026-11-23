@@ -112,6 +112,10 @@ export const paraPropsKey = (p: TextParagraph) => {
   // a Word multiple (DOCX import; core/lineSpacing.ts): appended only when the paragraph is drawn with one
   const wm = wordMultipleOf(p);
   if (wm !== undefined) base.push({ wm });
+  // 단 나누기: appended only when the paragraph has one (older hashes stay)
+  if (p.colBreak) base.push({ cb: p.colBreak });
+  // 이어서 구역 that begins here (its columns; the Office Surgeon writes them into the section's own w:sectPr)
+  if (p.contSect) base.push({ cs: p.contSect.columns ? [p.contSect.columns.n, Math.round(p.contSect.columns.gap), p.contSect.columns.widths?.map(Math.round) ?? null, !!p.contSect.columns.line] : 1 });
   return JSON.stringify(base);
 };
 

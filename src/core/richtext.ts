@@ -423,6 +423,19 @@ export function pasteData(paras: TextParagraph[], sel: Range, base: RunFormat, h
 
 /** Delete the characters in the range, joining paragraphs. The first paragraph keeps its properties. */
 export function deleteRange(paras: TextParagraph[], r0: Range): { paras: TextParagraph[]; pos: Pos } {
+  const out = deleteRangeOnly(paras, r0);
+  // an 이어서 구역 whose first paragraph was joined into the one before: it begins at the paragraph after the join (the
+  // section break stays where the file has it — QA docx-flow, the mark paragraph joined with the next)
+  const r = clampRange(paras, r0);
+  if (r.end.p > r.start.p && out.paras.length < paras.length) {
+    const gone = paras.slice(r.start.p + 1, r.end.p + 1).find((q) => q.contSect)?.contSect;
+    const next = out.paras[r.start.p + 1];
+    if (gone && !out.paras[r.start.p].contSect && next && !next.contSect) out.paras[r.start.p + 1] = { ...next, contSect: gone };
+  }
+  return out;
+}
+
+function deleteRangeOnly(paras: TextParagraph[], r0: Range): { paras: TextParagraph[]; pos: Pos } {
   const r = clampRange(paras, r0);
   if (collapsed(r)) return { paras, pos: r.start };
   // recording changes: the text stays, struck through (the caret after it, where typing replaces it — Word)
@@ -641,6 +654,14 @@ export function splitParagraph(paras: TextParagraph[], pos0: Pos, opts: { body?:
   // keeping the paragraph's id, whose w:sectPr the in-place DOCX save keeps; the new paragraph is an ordinary line.
   // Enter in the empty mark paragraph made two empty marks of no line: nothing showed, the caret vanished)
   delete nextP.sectMark;
+  // 단 나누기: one before the paragraph stays with its first part, one after it goes with the end
+  delete nextP.colBreak;
+  // (an 이어서 구역 begins with the first part)
+  delete nextP.contSect;
+  if (p.colBreak === "after") {
+    nextP.colBreak = "after";
+    delete leftP.colBreak;
+  }
   if (trackingOn()) leftP.markRev = ownRevNear(p, pos.o, "ins") ?? newRevision("ins");
   let out = [...paras.slice(0, pos.p), leftP, nextP, ...paras.slice(pos.p + 1)];
   if (inList || nextP.list) {
@@ -1022,7 +1043,7 @@ function flowTextNodes(pages: readonly Page[]): TextNode[] {
   const out: TextNode[] = [];
   for (const pg of pages)
     if (pg.kind === "DOCUMENT")
-      for (const n of [...pg.nodes].sort((a, b) => a.transform.y - b.transform.y || a.transform.x - b.transform.x)) if (n.type === "TEXT") out.push(n);
+      for (const n of [...pg.nodes].sort((a, b) => (a.flowCol ?? 0) - (b.flowCol ?? 0) || a.transform.y - b.transform.y || a.transform.x - b.transform.x)) if (n.type === "TEXT") out.push(n);
   return out;
 }
 

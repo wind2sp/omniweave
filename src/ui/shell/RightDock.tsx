@@ -412,7 +412,7 @@ function AnimTab() {
                   />
                   <IconBtn icon="up" size="sm" tip={t("dock.moveUp")} disabled={i === 0} onClick={() => editAnims(t("dock.anim.reorder"), (l) => void ([l[i - 1], l[i]] = [l[i], l[i - 1]]))} />
                   <IconBtn icon="down" size="sm" tip={t("dock.moveDown")} disabled={i === page.animations.length - 1} onClick={() => editAnims(t("dock.anim.reorder"), (l) => void ([l[i], l[i + 1]] = [l[i + 1], l[i]]))} />
-                  <IconBtn icon="trash" size="sm" tip={t("dock.delete")} className="danger" onClick={() => editAnims(t("dock.anim.delete"), (l) => l.filter((x) => x.id !== a.id))} />
+                  <IconBtn icon="trash" size="sm" tip={t("dock.delete")} className="danger" onClick={() => editAnims(t("dock.anim.delete"), (l) => l.filter((x) => x.id !== a.id && !(a.pptx && x.pptx?.g === a.pptx.g)))} />
                 </span>
               </li>
             );

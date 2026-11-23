@@ -14,11 +14,12 @@ import { getBlob } from "../../core/assets";
 import { hashString } from "../../core/hash";
 import type { NoteRef, OfficeSourceBlock, OfficeSourceMeta, Page, TableCell, TableNode, TextParagraph, TextRun } from "../../core/types";
 import { t } from "../../i18n";
-import type { PageSetup } from "../../core/pageSetup";
+import { sameColumns, type PageSetup } from "../../core/pageSetup";
 import { layoutDiff, legacyLayout } from "./layout";
 import { HF_MAP_VERSION, applyDocxHF, hfAddedToOldMap, hfChanged, type HFCompare } from "./hf";
 import {
   DOCX_PAGE_BREAK,
+  DOCX_COL_BREAK,
   DOCX_NOTE_TYPES,
   docxNoteRunXml,
   docxNoteId,
@@ -27,6 +28,7 @@ import {
   docxRuns,
   flowNotes,
   useDocxNoteIds,
+  docxColsXml,
   docxPageXml,
   parseDocxFlow,
   type OfficeImportReport,
@@ -408,6 +410,23 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
   }
   // changed paper / margins: only those sections' w:pgSz and w:pgMar
   if (diff.setups.size) bodyXml = patchSectPrs(bodyXml, xml.slice(body.openEnd, body.closeStart), diff.setups, rep.layout.sections);
+  // 이어서 구역 (TextParagraph.contSect): the same ones as the original's — their changed columns into their own w:sectPr
+  // only; one added or taken out is written anew
+  {
+    const contOf = (ps: TextParagraph[]) => ps.flatMap((p) => (p.contSect ? [p.contSect] : []));
+    const was = contOf(origItems.flatMap((it) => (it.kind === "p" ? [it.p] : [])));
+    const now = contOf(flow.flatMap((it) => (it.kind === "p" ? [it.p] : [])));
+    if (was.length !== now.length || was.some((c, i) => c.src !== now[i].src)) throw new SurgeryUnavailable("continuous sections");
+    const cols = new Map<number, PageSetup>();
+    now.forEach((c, i) => c.src !== undefined && !sameColumns(was[i].columns, c.columns) && cols.set(c.src, { width: 0, height: 0, margins: { top: 0, right: 0, bottom: 0, left: 0, header: 0, footer: 0 }, ...(c.columns ? { columns: c.columns } : {}) }));
+    if (cols.size) {
+      let i = 0;
+      bodyXml = bodyXml.replace(SECTPR, (sect) => {
+        const s = cols.get(i++);
+        return s ? sectPrWithCols(sect, s) : sect;
+      });
+    }
+  }
   const changed = new Map<string, Uint8Array>();
   const hfWarnings: string[] = [];
   // changed headers / footers: only their parts, references and settings
@@ -786,14 +805,31 @@ function patchSectPrs(bodyXml: string, origBody: string, setups: Map<number, Pag
     if (src === undefined || src >= found.length) throw new SurgeryUnavailable("section settings");
     bySrc.set(src, s);
   }
+  const origOf = new Map<number, PageSetup>();
+  for (const sec of sections) if (sec.src !== undefined) origOf.set(sec.src, sec.setup);
   let out = "", last = 0;
   found.forEach((m, i) => {
     const s = bySrc.get(i);
     if (!s) return;
-    out += bodyXml.slice(last, m.index) + sectPrWithPage(m[0], s);
+    let x = sectPrWithPage(m[0], s);
+    // 단 changed: only the w:cols (Word's own form), in CT_SectPr order after w:pgNumType
+    if (!sameColumns(origOf.get(i)?.columns, s.columns)) x = sectPrWithCols(x, s);
+    out += bodyXml.slice(last, m.index) + x;
     last = m.index! + m[0].length;
   });
   return out + bodyXml.slice(last);
+}
+
+function sectPrWithCols(sect: string, s: PageSetup): string {
+  const x = sect.replace(/<w:cols\b[^>]*?(?:\/>|>[\s\S]*?<\/w:cols>)/, "");
+  let at = -1;
+  for (const n of ["formProt", "vAlign", "noEndnote", "titlePg", "textDirection", "bidi", "rtlGutter", "docGrid", "printerSettings"]) {
+    const m = new RegExp(`<w:${n}\\b`).exec(x);
+    if (m && (at < 0 || m.index < at)) at = m.index;
+  }
+  if (at < 0) at = x.lastIndexOf("</w:sectPr>");
+  if (at < 0) throw new SurgeryUnavailable("section settings");
+  return x.slice(0, at) + docxColsXml(s.columns) + x.slice(at);
 }
 
 /** A w:sectPr with new paper size and margins, in CT_SectPr order (after the header / footer references, notes and type). */
@@ -1117,7 +1153,8 @@ class DocxWriter {
     const runs = docxBodyRuns(p, !!list || !!p.list);
     // comments and the paragraph mark's tracked change (a new paragraph has no move range: moves as deletion / insertion)
     const pPr = docxPPr(p, level ? this.headingStyle(Number(level)) : "", numPr);
-    return `<w:p>${this.review ? docxPPrReview(pPr, p, false) : pPr}${runsXml(runs, [], this.review ? docxCommentMarks(p, runs, this.review) : [])}</w:p>`;
+    const cb = (at: "before" | "after") => (p.colBreak === at ? DOCX_COL_BREAK : "");
+    return `<w:p>${this.review ? docxPPrReview(pPr, p, false) : pPr}${cb("before")}${runsXml(runs, [], this.review ? docxCommentMarks(p, runs, this.review) : [])}${cb("after")}</w:p>`;
   }
 
   /** A changed paragraph written into its original element (`el` in the text, `dom` the same element parsed). */
@@ -1125,6 +1162,8 @@ class DocxWriter {
     const s = this.xml;
     const fmts: (TextRun | null)[] = [];
     const read = docxParagraph(dom, this.ctx, fmts);
+    // a column break added / removed: the paragraph is written anew (the original's break run cannot be placed)
+    if ((read.para.colBreak ?? "") !== (p.colBreak ?? "")) return this.freshPara(p);
     const pre = this.model < MODEL_WORD_MULTIPLE ? preWordMultipleView(read.para, p) : read.para;
     const origPara = this.legacyModel ? legacyParaView(pre) : pre;
     const origList = read.list;

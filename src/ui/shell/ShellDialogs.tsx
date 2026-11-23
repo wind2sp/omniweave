@@ -12,6 +12,7 @@ import { FindReplace, SymbolDialog, WordCount } from "./MenuDialogs";
 import { PdfFindBar } from "../pdf/PdfFind";
 import { SizeDialog } from "./SizeDialog";
 import { PageSetupDialog } from "./PageSetupDialog";
+import { ColumnsDialog } from "./ColumnsDialog";
 import { CanvasSizeDialog } from "./CanvasSizeDialog";
 import { PageNumberDialog } from "./HeaderFooterDialog";
 import { ListDialog, ParagraphDialog } from "./ParagraphDialogs";
@@ -311,6 +312,7 @@ export function ShellDialogs() {
   if (which === "symbol") return <SymbolDialog />;
   if (which === "sizePdf") return <SizeDialog />;
   if (which === "pageSetup") return <PageSetupDialog />;
+  if (which === "columns") return <ColumnsDialog />;
   if (which === "canvasSize") return <CanvasSizeDialog />;
   if (which === "paragraph") return <ParagraphDialog />;
   if (which === "listFormat") return <ListDialog />;

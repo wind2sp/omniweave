@@ -34,7 +34,7 @@ import { DEFAULT_MARGINS, normalizeLegacyBreaks } from "../core/pageSetup";
 import { withWordDefaults } from "../core/lineSpacing";
 import { hfAreaAt } from "../core/headerFooter";
 import { fieldNow } from "../core/headerFooter";
-import type { OmwDocument, Page, TextParagraph, TextRun } from "../core/types";
+import type { OmwDocument, Page, PageColumns, TextParagraph, TextRun } from "../core/types";
 import type { ListDef } from "../core/style/types";
 import type { ListCtx } from "../core/lists";
 import { setRichApi, useRichStatus, type RichApi } from "./RichTextEditor";
@@ -45,7 +45,7 @@ import { PAGE_GAP, docModeNow } from "./docView";
 import { bodyBox } from "../core/pageSetup";
 import { OBJ_CHAR, newParagraph as makeParagraph, newText, uid, type AssetRef, type SceneNode } from "../core/types";
 import { nodeBounds } from "../core/loom";
-import { objSize } from "../core/flow";
+import { nodeOrder, objSize } from "../core/flow";
 import { applyNoteAreaEdits, newNoteRun, type NoteKind } from "../core/notes";
 import { skipHidden } from "../core/review";
 
@@ -436,6 +436,16 @@ function del(dir: -1 | 1, word: boolean) {
     return applyParas(res.paras, res.pos);
   }
   const at = r.start;
+  // at the start of an 이어서 구역: Backspace removes the section break (its text joins the part before)
+  if (dir < 0 && at.o === 0 && at.p > 0 && paras[at.p]?.contSect) {
+    const next = paras.map((q, i) => (i === at.p ? (({ contSect: _c, ...rest }) => rest)(q) : q));
+    return applyParas(next, at, at, tx("docflow.hist.contSectOff"));
+  }
+  // at the start of a paragraph after a column break: Backspace removes the break (Word)
+  if (dir < 0 && at.o === 0 && paras[at.p]?.colBreak === "before") {
+    const next = paras.map((q, i) => (i === at.p ? (({ colBreak: _c, ...rest }) => rest)(q) : q));
+    return applyParas(next, at, at, tx("docflow.hist.colBreakOff"));
+  }
   // at the start of the run: Backspace removes the page break before it (Word); at its end Delete the one after
   if (dir < 0 && at.p === 0 && at.o === 0) return joinRuns(c.start, "before");
   if (dir > 0 && at.p === paras.length - 1 && at.o === RT.paraText(paras[at.p]).length) return joinRuns(c.start, "after");
@@ -667,6 +677,8 @@ export function onKeyDown(e: KeyboardEvent) {
     case "Enter":
       done();
       if (mod && !sh && !e.altKey) return void flowBreak("page");
+      // 단 나누기 (Word Ctrl+Shift+Enter)
+      if (mod && sh && !e.altKey) return void insertColumnBreak();
       if (!mod && e.altKey && sh) return void flowBreak("section");
       if (sh) return insert("\n", null, true);
       return newParagraph();
@@ -727,6 +739,75 @@ export function changedAt(before: readonly TextParagraph[], after: readonly Text
     o = Math.max(o, Math.min(pre, y.length));
   }
   return { p, o };
+}
+
+/**
+ * 단 나누기 at the caret (Word Ctrl+Shift+Enter): the text after it goes on in the next column (the next page on a page of
+ * one column). At a paragraph's start the paragraph itself moves on.
+ */
+export function insertColumnBreak(): boolean {
+  materializeTail();
+  const st = story();
+  if (!st) return false;
+  let paras = st.paras;
+  const r = RT.clampRange(paras, selRange());
+  let at = r.start;
+  if (!RT.collapsed(r)) ({ paras, pos: at } = RT.deleteRange(paras, r));
+  let pos = at;
+  if (at.o > 0) {
+    const res = RT.splitParagraph(paras, at, { body: RT.bodyFormat(paras), lc: lc() });
+    paras = res.paras;
+    pos = res.pos;
+  }
+  paras = paras.map((q, i) => (i === pos.p ? { ...q, colBreak: "before" as const } : q));
+  pending = null;
+  applyParas(paras, pos, pos, tx("docflow.hist.colBreak"));
+  return true;
+}
+
+/**
+ * 구역 나누기 (이어서) at the caret (Word's continuous section break): a section of the body starts there on the same
+ * page, with the columns of the part it is in (change them with 레이아웃 › 단); the columns before it are balanced.
+ */
+export function insertContinuousBreak(): boolean {
+  materializeTail();
+  const st = story();
+  if (!st) return false;
+  let paras = st.paras;
+  const r = RT.clampRange(paras, selRange());
+  let at = r.start;
+  if (!RT.collapsed(r)) ({ paras, pos: at } = RT.deleteRange(paras, r));
+  const cols = currentRegion()?.cols ?? pageColumnsHere();
+  const res = RT.splitParagraph(paras, at, { body: RT.bodyFormat(paras), lc: lc() });
+  paras = res.paras.map((q, i) => (i === res.pos.p ? { ...q, contSect: cols ? { columns: cols } : {} } : q));
+  pending = null;
+  applyParas(paras, res.pos, res.pos, tx("docflow.hist.contSect"));
+  return true;
+}
+
+/** The columns of the run's first page (the first part of its section). */
+function pageColumnsHere(): PageColumns | undefined {
+  const c = ctx();
+  const cols = c?.pages[c.start]?.columns;
+  return cols && cols.n > 1 ? cols : undefined;
+}
+
+/** The 이어서 구역 the caret is in: its first paragraph (story index) and columns; null in the section's first part. */
+export function currentRegion(): { at: number; cols: PageColumns | undefined } | null {
+  const c = ctx();
+  if (!c) return null;
+  const p = RT.clampRange(c.story.paras, selRange()).start.p;
+  for (let i = p; i >= 0; i--) if (c.story.paras[i]?.contSect) return { at: i, cols: c.story.paras[i].contSect!.columns };
+  return null;
+}
+
+/** 단 of the 이어서 구역 starting at story paragraph `at` (one undo step). */
+export function setRegionColumns(at: number, cols: PageColumns | undefined): boolean {
+  const st = story();
+  if (!st?.paras[at]?.contSect) return false;
+  const paras = st.paras.map((q, i) => (i === at ? { ...q, contSect: { ...q.contSect, ...(cols && cols.n > 1 ? { columns: cols } : { columns: undefined }) } } : q));
+  applyParas(paras, F().anchor, F().focus, tx("pagesetup.hist.columns"));
+  return true;
 }
 
 /** Undo / redo from outside the body's input (a ribbon button has the focus) while the caret is in the body. */
@@ -1215,7 +1296,7 @@ export function selectFlowMatch(pageId: string, nodeId: string, p: number, start
   let sp = -1, base = 0, last = 0;
   let at: { a: Pos; b: Pos } | null = null;
   for (let k = seg.start; k < seg.end && !at; k++)
-    for (const n of pages[k].nodes.filter((x) => x.flow === true).sort((a, b) => a.transform.y - b.transform.y || a.transform.x - b.transform.x)) {
+    for (const n of pages[k].nodes.filter((x) => x.flow === true).sort(nodeOrder)) {
       if (n.type !== "TEXT") continue;
       n.paragraphs.forEach((q, j) => {
         if (q.flowCont && sp >= 0) base += last;

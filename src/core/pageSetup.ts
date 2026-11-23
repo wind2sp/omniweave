@@ -8,7 +8,7 @@
 
 import { layoutTable } from "./table";
 import { layoutText } from "./text";
-import type { Page, PageMargins, SceneNode, TextNode, TextParagraph } from "./types";
+import type { Page, PageColumns, PageMargins, SceneNode, TextNode, TextParagraph } from "./types";
 
 /** px per mm at 96 dpi */
 export const PX_PER_MM = 96 / 25.4;
@@ -31,13 +31,44 @@ export interface PageSetup {
   width: number;
   height: number;
   margins: PageMargins;
+  /** 단 (columns); omitted = one column */
+  columns?: PageColumns;
 }
 
-export const setupOf = (p: Pick<Page, "width" | "height" | "margins">): PageSetup => ({ width: p.width, height: p.height, margins: marginsOf(p) });
+export const setupOf = (p: Pick<Page, "width" | "height" | "margins"> & { columns?: PageColumns }): PageSetup => ({ width: p.width, height: p.height, margins: marginsOf(p), ...(p.columns && p.columns.n > 1 ? { columns: p.columns } : {}) });
+
+/** Word's default gap between columns: 1.27 cm (w:space 720 twips) */
+export const DEFAULT_COL_GAP = 48;
+
+/** The columns of a body box (x, width each), left to right: one column without `cols` (or with one). */
+export function columnBoxes(box: { x: number; w: number }, cols: PageColumns | undefined): { x: number; w: number }[] {
+  const n = Math.max(1, Math.min(16, Math.round(cols?.n ?? 1)));
+  if (n === 1 || !cols) return [{ x: box.x, w: box.w }];
+  // the columns' own widths (Word w:col / 한글 colSz) scaled into the body when they do not add up to it
+  if (cols.widths && cols.widths.length === n) {
+    const gaps = Array.from({ length: n - 1 }, (_, i) => Math.max(0, cols.gaps?.[i] ?? cols.gap));
+    const sum = cols.widths.reduce((a, b) => a + b, 0) + gaps.reduce((a, b) => a + b, 0);
+    const k = sum > 0 ? box.w / sum : 1;
+    const out: { x: number; w: number }[] = [];
+    let x = box.x;
+    for (let i = 0; i < n; i++) {
+      const w = Math.max(16, cols.widths[i] * k);
+      out.push({ x, w });
+      x += w + (gaps[i] ?? 0) * k;
+    }
+    return out;
+  }
+  const gap = Math.max(0, Math.min(cols.gap, (box.w - 16 * n) / (n - 1)));
+  const w = (box.w - gap * (n - 1)) / n;
+  return Array.from({ length: n }, (_, i) => ({ x: box.x + i * (w + gap), w }));
+}
+
+const colsKey = (c: PageColumns | undefined) => (c && c.n > 1 ? JSON.stringify([c.n, Math.round(c.gap), c.widths?.map(Math.round) ?? null, c.gaps?.map(Math.round) ?? null, !!c.line]) : "1");
+export const sameColumns = (a: PageColumns | undefined, b: PageColumns | undefined) => colsKey(a) === colsKey(b);
 
 const near = (a: number, b: number, tol = 0.5) => Math.abs(a - b) <= tol;
 export const sameMargins = (a: PageMargins, b: PageMargins) => (["top", "right", "bottom", "left", "header", "footer"] as const).every((k) => near(a[k], b[k]));
-export const sameSetup = (a: PageSetup, b: PageSetup) => near(a.width, b.width) && near(a.height, b.height) && sameMargins(a.margins, b.margins);
+export const sameSetup = (a: PageSetup, b: PageSetup) => near(a.width, b.width) && near(a.height, b.height) && sameMargins(a.margins, b.margins) && sameColumns(a.columns, b.columns);
 
 /** Margins as stored: undefined when they equal the defaults (old files keep no field). */
 export const storedMargins = (m: PageMargins): PageMargins | undefined => (sameMargins(m, DEFAULT_MARGINS) ? undefined : { ...m });
@@ -178,6 +209,10 @@ export function applySetupInPlace(p: MutablePage, setup: PageSetup) {
   const m = storedMargins(setup.margins);
   if (m) p.margins = m;
   else delete p.margins;
+  // 단: only when the setup says (columns of one = none); a setup without them (paper, margins applied to the document)
+  // leaves each section's own columns as they are
+  if (setup.columns && setup.columns.n > 1) (p as { columns?: PageColumns }).columns = { ...setup.columns };
+  else if (setup.columns) delete (p as { columns?: PageColumns }).columns;
   const box = bodyBox(p);
   for (const n of p.nodes) {
     if (!isBody(n, old)) continue;
@@ -220,6 +255,7 @@ export function breakPageInPlace(
     animations: [],
   };
   if (pg.margins) next.margins = { ...pg.margins };
+  if (pg.columns) next.columns = { ...pg.columns };
   if (kind === "section") next.breakBefore = "section";
   // a page made from an Office file stays part of it ("save as the same type"); its block map stays on the first page
   if (pg.source) {

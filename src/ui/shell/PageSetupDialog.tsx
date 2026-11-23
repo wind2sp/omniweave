@@ -125,7 +125,9 @@ export function PageSetupDialog() {
           disabled={bad || !start}
           data-autofocus
           onClick={() => {
-            if (applyPageSetup(setup, scope)) close();
+            // (the section's 단 stay its own: the columns dialog sets them)
+            const { columns: _c, ...rest } = setup;
+            if (applyPageSetup(rest, scope)) close();
           }}
         >
           {t("pagesetup.apply")}

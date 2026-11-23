@@ -1158,7 +1158,7 @@ async function surgeSlide(pkg: Pkg, doc: OmwDocument, job: SlideJob, si: number,
     }
   }
   // the page's animations (Omniweave's): added to the slide's main sequence (io/formats/pptxAnim.ts)
-  if (page.animations?.length) out = putAnimTiming(out, page, spids);
+  if (page.animations?.length || page.pptxTiming) out = putAnimTiming(out, page, spids);
   pkg.put(part, out);
   if (addedRels.length) {
     const rs = pkg.text(relsPart) ?? relsXml([]);
@@ -1171,8 +1171,9 @@ async function surgeSlide(pkg: Pkg, doc: OmwDocument, job: SlideJob, si: number,
 function putAnimTiming(out: string, page: Page, spids: ReadonlyMap<string, number>): string {
   const r = rootOf(out);
   const tm = childNamed(out, r, "timing");
-  if (tm) return splice(out, tm, withAnimTiming(elText(out, tm), page, spids));
-  const x = withAnimTiming("", page, spids);
+  // (raw: effects read from this slide and unchanged go back as PowerPoint wrote them)
+  if (tm) return splice(out, tm, withAnimTiming(elText(out, tm), page, spids, true));
+  const x = withAnimTiming("", page, spids, true);
   if (!x) return out;
   const ext = childNamed(out, r, "extLst");
   const at = ext ? ext.start : r.closeStart;

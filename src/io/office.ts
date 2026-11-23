@@ -20,7 +20,7 @@ import { t as tx } from "../i18n";
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from "fflate";
 import { DEFAULT_MARGINS, bodyBox, hardBreakBefore, legacyWordPages, paperOf, sectionsOf, setupOf, storedMargins, type PageSetup, type PaperId } from "../core/pageSetup";
 import { formerRun, markerLength, plainFormat, renumber } from "../core/richtext";
-import { endCut, joinSplit, joinTable, unpiece } from "../core/flow";
+import { endCut, joinSplit, joinTable, nodeOrder, unpiece } from "../core/flow";
 import { HWPX_NUMFMT_IN, MAX_LEVELS, fromHwpxLevelText, hwpxLevelKept, isBulletLevel, levelIndent, levelOf, resolveDef, toHwpxLevelText, type ListFormat, type ListSeed } from "../core/lists";
 import type { ListDef, ListLevel } from "../core/style/types";
 import { TABLE_LINE, coverMap, spanOf } from "../core/table";
@@ -28,7 +28,7 @@ import { graphemes, hwpLinesSig, layoutText, lineHeightOf, measure, runFont } fr
 import { fontLineRatio, paraLineRatio, wordMultipleOf } from "../core/lineSpacing";
 import { toPx } from "../core/style/len";
 import type { Len } from "../core/style/types";
-import { DEFAULT_RUN, PAGE_PRESETS, type AssetRef, newPage, newParagraph, newText, uid, type Align, type FieldKind, type PageNumFormat, type PageNumPos, type SectionHF, type Page, type PageMargins, type ParaLineHeight, type ParaList, type TableCell, type TableNode, type TextNode, type TextParagraph, type TextRun, type NoteKindPr, type NoteNumFormat, type NotePr, type NoteRef, type ParaBorderLine, type ParaBorders, type DocComment, type MemoShape } from "../core/types";
+import { DEFAULT_RUN, PAGE_PRESETS, type AssetRef, newPage, newParagraph, newText, uid, type Align, type FieldKind, type PageNumFormat, type PageNumPos, type SectionHF, type Page, type PageColumns, type PageMargins, type ParaLineHeight, type ParaList, type TableCell, type TableNode, type TextNode, type TextParagraph, type TextRun, type NoteKindPr, type NoteNumFormat, type NotePr, type NoteRef, type ParaBorderLine, type ParaBorders, type DocComment, type MemoShape } from "../core/types";
 import { hwpxNotePr, noteMarkText } from "../core/notes";
 import { attr, child, children, descendants, esc, parseXml, textOf } from "./xml";
 import { HWPX_MEDIA, NS_R, NS_WP, REL_IMAGE, docxDrawingXml, docxPicOf, docxPicPara, hwpxPicOf, hwpxPicXml, itemTops, picFormat, picMedia, picPixels, picTargets, topDrawings, topPics, type OfficePic, type PicMedia } from "./officeDrawing";
@@ -737,6 +737,7 @@ export function docxParagraph(
   // but the break (Word's Ctrl+Enter) is only the break
   let brBefore = onOff("pageBreakBefore");
   let brAfter = false, brRun = false;
+  let colBr: TextParagraph["colBreak"];
   const jc = pGet("jc");
   const align = JC[(jc && attr(jc, "val")) || "left"] ?? "LEFT";
   const spacing = S ? pAttr("spacing", "line") : pPr && child(pPr, "spacing");
@@ -897,7 +898,8 @@ export function docxParagraph(
           brRun = true;
           if (runs.some((x) => x.text) || text) brAfter = true;
           else brBefore = true;
-        } else text += type === "textWrapping" ? "\n" : " ";
+        } else if (type === "column") colBr = runs.some((x) => x.text) || text ? "after" : "before";
+        else text += type === "textWrapping" ? "\n" : " ";
       }
     }
     if (!text) {
@@ -995,6 +997,8 @@ export function docxParagraph(
   if (S && pGet("widowControl") && !onOff("widowControl")) para.widowControl = false;
   if (heading) para.role = `h${heading}` as TextParagraph["role"];
   if (review) Object.assign(para, docxParaRevs(pPr));
+  // 단 나누기 (w:br type=column): the next column before / after the paragraph's text
+  if (colBr) para.colBreak = colBr;
   const pageBreak = brRun && !ptext ? "only" : brBefore ? "before" : brAfter ? "after" : undefined;
   // a numbered heading (heading styles linked to a list): outline numbering
   if (heading && plist) ctx.listDefs?.get(info!.abs) && (ctx.listDefs.get(info!.abs)!.outline = true);
@@ -1382,7 +1386,41 @@ export function docxSetup(sectPr: Element | undefined): PageSetup {
   // Word lays lines out in the exact body width (A4 11906 twips = 793.73 px, not the 794 px preset): a body 0.2 pt wider
   // keeps a syllable Word moves down (Gulim 10 pt lines end within 0.1 pt of the margin). The paper preset is still
   // recognised (paperOf, within 1.5 px) and written back as its own twips.
-  return { width: Math.round((w / 15) * 100) / 100, height: Math.round((h / 15) * 100) / 100, margins };
+  const columns = docxColumns(sectPr && child(sectPr, "cols"));
+  return { width: Math.round((w / 15) * 100) / 100, height: Math.round((h / 15) * 100) / 100, margins, ...(columns ? { columns } : {}) };
+}
+
+/** A w:sectPr ending a continuous section (Word: w:type continuous, the paper and margins of its page, its columns). */
+export const docxContSectPr = (s: PageSetup, cols: PageColumns | undefined) => `<w:sectPr><w:type w:val="continuous"/>${docxPageXml(s)}${cols && cols.n > 1 ? docxColsXml(cols) : ""}</w:sectPr>`;
+
+/** 단 of a w:cols (Word: num, space = the gap, 720 twips when absent; sep = a rule; w:col = the columns' own widths). */
+export function docxColumns(cols: Element | undefined | null): PageColumns | undefined {
+  if (!cols) return undefined;
+  const own = children(cols, "col");
+  const eq = !/^(0|false|off)$/.test(attr(cols, "equalWidth") ?? "1");
+  const n = !eq && own.length > 1 ? own.length : Math.round(Number(attr(cols, "num") ?? "1"));
+  if (!(n > 1)) return undefined;
+  const sp = Number(attr(cols, "space"));
+  const gap = twPx(Number.isFinite(sp) && sp >= 0 ? sp : 720);
+  const out: PageColumns = { n, gap };
+  if (!eq && own.length === n) {
+    out.widths = own.map((c) => twPx(Number(attr(c, "w")) || 0));
+    out.gaps = own.slice(0, -1).map((c) => {
+      const v = Number(attr(c, "space"));
+      return twPx(Number.isFinite(v) && v >= 0 ? v : sp >= 0 ? sp : 720);
+    });
+  }
+  if (/^(1|true|on)$/.test(attr(cols, "sep") ?? "")) out.line = true;
+  return out;
+}
+
+/** w:cols of a section's 단: Word's own form (num / space / sep; w:col with w:w / w:space for columns of their own widths). */
+export function docxColsXml(c: PageColumns | undefined): string {
+  if (!c || c.n < 2) return `<w:cols w:space="720"/>`;
+  const sep = c.line ? ' w:sep="1"' : "";
+  if (c.widths?.length === c.n)
+    return `<w:cols w:num="${c.n}" w:space="${twip(c.gap)}"${sep} w:equalWidth="0">${c.widths.map((w, i) => `<w:col w:w="${twip(w)}"${i < c.n - 1 ? ` w:space="${twip(c.gaps?.[i] ?? c.gap)}"` : ""}/>`).join("")}</w:cols>`;
+  return `<w:cols w:num="${c.n}" w:space="${twip(c.gap)}"${sep}/>`;
 }
 
 /** Paper presets in each format's own units (portrait), so A4 is written exactly as Word / 한글 write it. */
@@ -1436,6 +1474,33 @@ export function hwpxSetup(secPr: Element | undefined): PageSetup {
     height: huPx(h),
     margins: { top: huPx(top + header), right: huPx(n(mg, "right", 8504)), bottom: huPx(bottom + footer), left: huPx(n(mg, "left", 8504) + gutter), header: huPx(top), footer: huPx(bottom) },
   };
+}
+
+/** 단 of an hp:colPr (colCount, sameGap / colSz in HWPUNIT, colLine = a rule); one column: none. */
+export function hwpxColumns(cp: Element | undefined): PageColumns | undefined {
+  if (!cp) return undefined;
+  const n = Math.round(Number(attr(cp, "colCount")));
+  if (!(n > 1)) return undefined;
+  const out: PageColumns = { n, gap: huPx(Number(attr(cp, "sameGap")) || 0) };
+  const sz = children(cp, "colSz");
+  if (attr(cp, "sameSz") === "0" && sz.length === n) {
+    out.widths = sz.map((e) => huPx(Number(attr(e, "width")) || 0));
+    out.gaps = sz.slice(0, -1).map((e) => huPx(Number(attr(e, "gap")) || 0));
+    out.gap = out.gaps[0] ?? out.gap;
+  }
+  const ln = child(cp, "colLine");
+  if (ln && (attr(ln, "type") ?? "NONE").toUpperCase() !== "NONE") out.line = true;
+  return out;
+}
+
+/** hp:colPr of a section's 단 (한글's own form; one column as 한글 writes it). */
+export function hwpxColPrXml(c: PageColumns | undefined): string {
+  if (!c || c.n < 2) return `<hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="1" sameSz="1" sameGap="0"/>`;
+  const hu = (px: number) => Math.max(0, Math.round(px * HU));
+  const line = c.line ? `<hp:colLine type="SOLID" width="0.12 mm" color="#000000"/>` : "";
+  if (c.widths?.length === c.n)
+    return `<hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="${c.n}" sameSz="0" sameGap="0">${line}${c.widths.map((w, i) => `<hp:colSz width="${hu(w)}" gap="${i < c.n - 1 ? hu(c.gaps?.[i] ?? c.gap) : 0}"/>`).join("")}</hp:colPr>`;
+  return `<hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="${c.n}" sameSz="1" sameGap="${hu(c.gap)}">${line}</hp:colPr>`;
 }
 
 /** hp:pagePr of a page setup (shared with the Office Surgeon); the inverse of hwpxSetup. */
@@ -1673,6 +1738,15 @@ export function parseDocxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
         if (!hf) delete last.hf;
         Object.assign(last, own);
       } else if (!last || (type !== "continuous" && start < items.length)) sections.push({ start, ...own });
+      else if (type === "continuous" && start < items.length) {
+        // 이어서 구역: on the same page as the section before; its columns from its first paragraph on (the body flow
+        // balances the columns before it — TextParagraph.contSect)
+        const at = out.slice(start, s.end).find((it) => it.kind === "p");
+        if (at?.kind === "p") {
+          const columns = docxColumns(s.sectPr && child(s.sectPr, "cols"));
+          at.p.contSect = { ...(columns ? { columns } : {}), src };
+        }
+      }
       start = s.end;
     });
     if (evenOdd && sections[0] && !sections[0].hf?.evenOdd) sections[0].hf = { ...(sections[0].hf ?? {}), evenOdd: true };
@@ -2440,7 +2514,10 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
     let fileStart: number | null = items.length;
     children(sec.documentElement, "p").forEach((p, pIndex) => {
       const before = items.length;
-      if (attr(p, "pageBreak") === "1" || attr(p, "columnBreak") === "1" || paraPr.get(attr(p, "paraPrIDRef") ?? "")?.pageBreakBefore) breaks.add(before);
+      // 단 나누기 (columnBreak) in a section of several columns: the next column; in one column a page break, as before
+      const colBr = attr(p, "columnBreak") === "1";
+      const multi = (secs[secs.length - 1]?.setup.columns?.n ?? 1) > 1;
+      if (attr(p, "pageBreak") === "1" || (colBr && !multi) || paraPr.get(attr(p, "paraPrIDRef") ?? "")?.pageBreakBefore) breaks.add(before);
       const secPr = children(p, "run").flatMap((r) => children(r, "secPr"))[0];
       if (secPr) {
         // default tab stops: tabStopVal in HWPUNIT (tabStop beside it is twice that, like the hp:default margins)
@@ -2451,6 +2528,11 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
       if (secPr || fileStart !== null) {
         const at = fileStart ?? before;
         const setup = secPr ? hwpxSetup(secPr) : secs[secs.length - 1]?.setup ?? hwpxSetup(undefined);
+        // 단 of the section: the hp:colPr control beside its hp:secPr
+        if (secPr) {
+          const cols = hwpxColumns(children(p, "run").flatMap((r) => children(r, "ctrl")).flatMap((c) => children(c, "colPr"))[0]);
+          if (cols) setup.columns = cols;
+        }
         const src = secPr ? secOrd++ : undefined;
         const last = secs[secs.length - 1];
         if (last && last.start === at) Object.assign(last, { setup, src });
@@ -2468,6 +2550,15 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
         }
       }
       visitP(p, items, false, { part: s, b: pIndex });
+      if (colBr && multi && items[before]?.kind === "p") (items[before] as { p: TextParagraph }).p.colBreak = "before";
+      // a 단 definition in the text (not the section's own, beside its hp:secPr): an 이어서 구역 from this paragraph on
+      if (!secPr && items[before]?.kind === "p") {
+        const cp = children(p, "run").flatMap((r) => children(r, "ctrl")).flatMap((c) => children(c, "colPr"))[0];
+        if (cp) {
+          const columns = hwpxColumns(cp);
+          (items[before] as { p: TextParagraph }).p.contSect = columns ? { columns } : {};
+        }
+      }
       counts.push(items.length - before);
     });
     // a section file without settings still starts a new section (with the settings before it)
@@ -2684,7 +2775,7 @@ export function collectFlow(pages: Page[], starts?: number[]): FlowItem[] {
   pages.forEach((p, pi) => {
     starts?.push(out.length);
     // (the note areas the body flow lays out are not body text: the notes are written from their references)
-    for (const n of [...p.nodes].filter((x) => !x.notes).sort((a, b) => a.transform.y - b.transform.y || a.transform.x - b.transform.x))
+    for (const n of [...p.nodes].filter((x) => !x.notes).sort(nodeOrder))
       if (n.type === "TEXT")
         for (const p of n.paragraphs) {
           // a paragraph cut at a page end by the body flow (core/flow.ts) is written as the one paragraph it is
@@ -3070,7 +3161,9 @@ export function docxTableXml(t: TableNode, para: (p: TextParagraph) => string, t
 }
 
 /** A w:sectPr for a section with this page setup. */
-export const docxSectPr = (s: PageSetup, hf?: DocxSectHFXml) => (hf ? `<w:sectPr>${hf.refs}${docxPageXml(s)}${hf.pgNumType}${hf.titlePg}</w:sectPr>` : `<w:sectPr>${docxPageXml(s)}</w:sectPr>`);
+// (CT_SectPr order: references, pgSz, pgMar, pgNumType, cols, titlePg; w:cols only for a section of several columns)
+const colsOf = (s: PageSetup) => (s.columns && s.columns.n > 1 ? docxColsXml(s.columns) : "");
+export const docxSectPr = (s: PageSetup, hf?: DocxSectHFXml) => (hf ? `<w:sectPr>${hf.refs}${docxPageXml(s)}${hf.pgNumType}${colsOf(s)}${hf.titlePg}</w:sectPr>` : `<w:sectPr>${docxPageXml(s)}${colsOf(s)}</w:sectPr>`);
 
 // ───────── DOCX headers / footers out (exportDocx, Office Surgeon) ─────────
 
@@ -3161,6 +3254,8 @@ export const DOCX_HF_TYPES = {
   settings: { rel: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings", ct: "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml" },
 };
 /** Word's Ctrl+Enter: a paragraph holding only a page break (read back as just the break). */
+/** 단 나누기 as Word writes it (Ctrl+Shift+Enter): a run of its own in the paragraph */
+export const DOCX_COL_BREAK = '<w:r><w:br w:type="column"/></w:r>';
 export const DOCX_PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
 
 /** Options of the DOCX / HWPX writers: the document's assets (pictures), where their bytes are, notes for the save. */
@@ -3266,7 +3361,7 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
     const runs = docxBodyRuns(p, !!list || !!m);
     const shadow = shadowed.has(p);
     const marks = cmarks ? docxCommentMarks(p, runs, cmarks).filter((x) => !x.xml.includes('w:id=""')) : [];
-    return `<w:p>${pPr}${anchorRuns.get(p) ?? ""}${marks.length ? withInserts(runs, marks, (r) => docxRuns([r], undefined, shadow)) : docxRuns(runs, undefined, shadow)}</w:p>`;
+    return `<w:p>${pPr}${p.colBreak === "before" ? DOCX_COL_BREAK : ""}${anchorRuns.get(p) ?? ""}${marks.length ? withInserts(runs, marks, (r) => docxRuns([r], undefined, shadow)) : docxRuns(runs, undefined, shadow)}${p.colBreak === "after" ? DOCX_COL_BREAK : ""}</w:p>`;
   };
   const table = (t: TableNode) => docxTableXml(t, para);
   // page layout: a section ends with a w:sectPr in its last paragraph (an empty paragraph when it ends with a table
@@ -3285,9 +3380,28 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
     });
     return sec.parts.length || sec.titlePg || sec.fmt || sec.start != null ? docxSectHFXml(sec, ids) : undefined;
   });
-  const sectOf = (k: number) => docxSectPr(lay.sections[k], hfXml[k]);
+  // 이어서 구역 (TextParagraph.contSect) within a section of pages: the first part ends with the section's own w:sectPr
+  // (headers, numbering — the parts after it link to it, as Word writes them); each later part ends with a w:sectPr of
+  // type continuous and its columns
+  const regionEnd = new Map<number, { n: number; cols: PageColumns | undefined }>();
+  const sectOf = (k: number) => {
+    const r = regionEnd.get(k);
+    return r && r.n > 0 ? docxContSectPr(lay.sections[k], r.cols) : docxSectPr(r ? { ...lay.sections[k], columns: r.cols } : lay.sections[k], hfXml[k]);
+  };
   const chunks: { xml: string; tbl?: boolean; p?: TextParagraph; sect?: boolean }[] = [];
+  let curSec = -1;
+  let secItems = 0; // items written in the current section of pages
+  const endRegion = (p: TextParagraph) => {
+    const r = regionEnd.get(curSec) ?? { n: 0, cols: lay.sections[curSec]?.columns };
+    const setup = lay.sections[curSec];
+    const sect = r.n === 0 ? docxSectPr({ ...setup, ...(r.cols ? { columns: r.cols } : {}) }, hfXml[curSec]) : docxContSectPr(setup, r.cols);
+    const last = chunks[chunks.length - 1];
+    if (last?.p && !last.sect) Object.assign(last, { xml: para(last.p, sect), sect: true });
+    else chunks.push({ xml: `<w:p><w:pPr>${sect}</w:pPr></w:p>`, sect: true });
+    regionEnd.set(curSec, { n: r.n + 1, cols: p.contSect?.columns });
+  };
   lay.pages.forEach((pg, i) => {
+    if (pg.section !== curSec) (curSec = pg.section), (secItems = 0);
     if (pg.begin === "section") {
       const sect = sectOf(lay.pages[i - 1].section);
       const last = chunks[chunks.length - 1];
@@ -3300,6 +3414,13 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
     }
     for (let k = pg.from; k < pg.to; k++) {
       const it = flow[k];
+      // a continuous section begins here: the part before it ends
+      if (it.kind === "p" && it.p.contSect) {
+        if (secItems > 0) endRegion(it.p);
+        // (at the section's start: its first part has these columns)
+        else regionEnd.set(curSec, { n: 0, cols: it.p.contSect.columns });
+      }
+      secItems++;
       for (const x of picBefore.get(k) ?? []) chunks.push({ xml: x });
       chunks.push(it.kind === "p" ? { xml: para(it.p), p: it.p } : { xml: table(it.t), tbl: true });
       for (const x of picAfter.get(k) ?? []) chunks.push({ xml: x });
@@ -3674,7 +3795,13 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
   const NS = HWPX_NS;
   let pid = 0, tid = 0;
   const hu = (px: number) => Math.round(px * 75); // px → HWPUNIT (1/7200 inch)
+  // 단 나누기: hp:p columnBreak on the paragraph that starts the next column (after one ending with Word's break)
+  let colNext = false;
   const pXml = (p: TextParagraph, prefix = "", pageBreak = false, fmt: PageNumFormat = "decimal"): string => {
+    const colBreak = p.colBreak === "before" || colNext;
+    colNext = p.colBreak === "after";
+    // 이어서 구역: a 단 definition at the paragraph's start (한글's own way of changing columns on the page)
+    if (p.contSect && !prefix.includes("<hp:secPr")) prefix = `<hp:run charPrIDRef="${charId(p.runs[0] ?? DEFAULT_RUN)}"><hp:ctrl>${hwpxColPrXml(p.contSect.columns)}</hp:ctrl></hp:run>` + prefix;
     const level = p.role && /^h([1-6])$/.exec(p.role)?.[1];
     const runList = lists.has(p) || p.list ? bodyRuns(p) : p.runs;
     // header / footer fields: 쪽 번호 / 전체 쪽수 as 한글's automatic numbers, the others as their text; a note
@@ -3691,7 +3818,7 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
       headingStyle[n] ??= { para: ppr, char: charId(p.runs[0] ?? DEFAULT_RUN) };
       style = n;
     }
-    return `<hp:p id="${pid++}" paraPrIDRef="${ppr}" styleIDRef="${style}" pageBreak="${pageBreak ? 1 : 0}" columnBreak="0" merged="0">${prefix}${runs}</hp:p>`;
+    return `<hp:p id="${pid++}" paraPrIDRef="${ppr}" styleIDRef="${style}" pageBreak="${pageBreak ? 1 : 0}" columnBreak="${colBreak ? 1 : 0}" merged="0">${prefix}${runs}</hp:p>`;
   };
   // footnotes / endnotes: 한글's controls, numbered in document order (the note being written: its kind and number)
   const noteN = { foot: 0, end: 0 };
@@ -3772,7 +3899,7 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
   const secPrOf = (setup: PageSetup, run: TextRun, k = 0) => {
     const sec = hwSecs[k];
     const on = (b: boolean | undefined) => (b ? 1 : 0);
-    return `<hp:run charPrIDRef="${charId(run)}"><hp:secPr id="" textDirection="HORIZONTAL" spaceColumns="1134" tabStop="8000" tabStopVal="4000" tabStopUnit="HWPUNIT" outlineShapeIDRef="1" memoShapeIDRef="\u0004${k}\u0004" textVerticalWidthHead="0" masterPageCnt="0"><hp:grid lineGrid="0" charGrid="0" wonggojiFormat="0"/><hp:startNum pageStartsOn="BOTH" page="${sec?.start ?? 0}" pic="0" tbl="0" equation="0"/><hp:visibility hideFirstHeader="${on(sec?.hideHeader)}" hideFirstFooter="${on(sec?.hideFooter)}" hideFirstMasterPage="0" border="SHOW_ALL" fill="SHOW_ALL" hideFirstPageNum="${on(sec?.hideNum)}" hideFirstEmptyLine="0" showLineNumber="0"/><hp:lineNumberShape restartType="0" countBy="0" distance="0" startNumber="0"/>${hwpxPagePrXml(setup)}${NOTE_PR}${PAGE_BORDERS}</hp:secPr><hp:ctrl><hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="1" sameSz="1" sameGap="0"/></hp:ctrl>${hfCtrls(k, setup)}</hp:run>`;
+    return `<hp:run charPrIDRef="${charId(run)}"><hp:secPr id="" textDirection="HORIZONTAL" spaceColumns="1134" tabStop="8000" tabStopVal="4000" tabStopUnit="HWPUNIT" outlineShapeIDRef="1" memoShapeIDRef="\u0004${k}\u0004" textVerticalWidthHead="0" masterPageCnt="0"><hp:grid lineGrid="0" charGrid="0" wonggojiFormat="0"/><hp:startNum pageStartsOn="BOTH" page="${sec?.start ?? 0}" pic="0" tbl="0" equation="0"/><hp:visibility hideFirstHeader="${on(sec?.hideHeader)}" hideFirstFooter="${on(sec?.hideFooter)}" hideFirstMasterPage="0" border="SHOW_ALL" fill="SHOW_ALL" hideFirstPageNum="${on(sec?.hideNum)}" hideFirstEmptyLine="0" showLineNumber="0"/><hp:lineNumberShape restartType="0" countBy="0" distance="0" startNumber="0"/>${hwpxPagePrXml(setup)}${NOTE_PR}${PAGE_BORDERS}</hp:secPr><hp:ctrl>${hwpxColPrXml(setup.columns)}</hp:ctrl>${hfCtrls(k, setup)}</hp:run>`;
   };
   const itemXml = (it: FlowItem, prefix: string, pageBreak: boolean) => {
     if (it.kind === "p") return pXml(it.p, prefix, pageBreak);

@@ -1,6 +1,7 @@
 // In-place table cell editor: double-click a cell; Tab / Shift+Tab move across, Enter moves down,
 // Shift+Enter inserts a line break, Esc cancels. Every committed cell is one undoable step.
 
+import { isAppChord } from "./appKeys";
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { draftPage, findPage, useStore } from "../core/store";
@@ -109,7 +110,8 @@ export function CellEditor({ target, onMove, onDone }: { target: CellTarget; onM
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         // Ctrl+Tab / Ctrl+Shift+Tab switch document tabs (shell/shortcuts.ts), as in every other editor
-        if (e.ctrlKey && e.key === "Tab") return;
+        // (열기 / 저장 / 새로 / 닫기 / 찾기 / 인쇄 too: the app's; a save blurs this editor first, which commits the cell)
+        if (isAppChord(e.nativeEvent)) return;
         e.stopPropagation();
         if (e.key === "Escape") {
           e.preventDefault();

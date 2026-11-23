@@ -7,19 +7,19 @@
 import type { ReactNode } from "react";
 import { findPage, useStore } from "../../core/store";
 import type { RibbonContext } from "./ribbonContext";
-import type { Align, TextNode } from "../../core/types";
-import { PAPERS, PX_PER_MM, marginsOf, paperPx, type PageSetup } from "../../core/pageSetup";
+import type { Align, PageColumns, TextNode } from "../../core/types";
+import { DEFAULT_COL_GAP, PAPERS, PX_PER_MM, marginsOf, paperPx, type PageSetup } from "../../core/pageSetup";
 import { PX_PER } from "../../core/units";
 import { hfEditNode, parseHfId } from "../../core/headerFooter";
 import { useRichStatus } from "../RichTextEditor";
 import { useCellSel } from "../CellEditor";
-import { useDocView } from "../docFlow";
+import { flowActive, insertColumnBreak, insertContinuousBreak, useDocView } from "../docFlow";
 import { insertToc, toggleFormatMarks } from "../docExtrasUi";
 import { command, enabled } from "../commands";
 import { docLengthUnit, fontScale } from "../editModes";
 import { fitPageView, fitWidthView } from "../docView";
 import { viewportNow } from "../actions";
-import { applyPageSetup } from "../pageSetupActions";
+import { applyPageSetup, columnsHere, setColumns } from "../pageSetupActions";
 import { toggleGrid, toggleGuides, toggleRulers } from "../aids";
 import { ColorField, IconBtn, Menu, NumField, Select, Seg, cx, type MenuItem } from "./controls";
 import { Icon, type IconName } from "./Icons";
@@ -312,6 +312,31 @@ function LayoutPanel() {
   if (!page) return <div className="rpanel" />;
   const m = marginsOf(page);
   const setup = (patch: Partial<PageSetup>) => applyPageSetup({ width: page.width, height: page.height, margins: m, ...patch }, "document");
+  // 단 (Word's presets: one, two, three, left / right = two of 1 : 2; the rule and the break)
+  const bodyW = page.width - m.left - m.right;
+  // (where the caret is: its 이어서 구역's columns, else the section's — read when the menu opens)
+  const colItems = (): MenuItem[] => {
+  const cols = columnsHere();
+  const gap = cols?.gap ?? DEFAULT_COL_GAP;
+  const uneven = (left: boolean): PageColumns => {
+    const w = bodyW - gap;
+    const a = Math.round((w / 3) * 100) / 100, b = Math.round((w - a) * 100) / 100;
+    return { n: 2, gap, widths: left ? [a, b] : [b, a], gaps: [gap], ...(cols?.line ? { line: true } : {}) };
+  };
+  const isUneven = (left: boolean) => !!cols?.widths && cols.n === 2 && (left ? cols.widths[0] < cols.widths[1] : cols.widths[0] > cols.widths[1]);
+  return [
+    { label: t("docmode.cols.one"), checked: !cols, onSelect: () => setColumns(undefined) },
+    { label: t("docmode.cols.two"), checked: cols?.n === 2 && !cols.widths, onSelect: () => setColumns({ n: 2, gap, ...(cols?.line ? { line: true } : {}) }) },
+    { label: t("docmode.cols.three"), checked: cols?.n === 3 && !cols.widths, onSelect: () => setColumns({ n: 3, gap, ...(cols?.line ? { line: true } : {}) }) },
+    { label: t("docmode.cols.left"), checked: isUneven(true), onSelect: () => setColumns(uneven(true)) },
+    { label: t("docmode.cols.right"), checked: isUneven(false), onSelect: () => setColumns(uneven(false)) },
+    { sep: true },
+    { label: t("docmode.cols.line"), checked: !!cols?.line, disabled: !cols, onSelect: () => cols && setColumns({ ...cols, ...(cols.line ? { line: undefined } : { line: true }) }) },
+    { label: t("docmode.cols.break"), kbd: "Ctrl+Shift+Enter", disabled: !flowActive(), onSelect: () => void insertColumnBreak() },
+    { sep: true },
+    { label: t("docmode.cols.more"), onSelect: () => useUI.getState().set({ shellDialog: "columns" }) },
+  ];
+  };
   const landscape = page.width > page.height;
   const mm = (v: number) => Math.round((v / PX_PER_MM) * 10) / 10;
   const marginItems: MenuItem[] = [
@@ -349,10 +374,11 @@ function LayoutPanel() {
           { label: t("docmode.landscape"), checked: landscape, onSelect: () => !landscape && setup({ width: page.height, height: page.width }) },
         ]} />
         <Menu className="rbig" tip={t("docmode.sizeTip")} button={<><Icon name="paper" size={20} /><span>{t("docmode.size")}</span></>} items={[...paperItems, { sep: true }, { label: t("docmode.margins.custom"), onSelect: () => useUI.getState().set({ shellDialog: "pageSetup" }) }]} />
-        <BigBtn icon="columns" label={t("docmode.columns")} tip={t("docmode.coming")} disabled onClick={() => {}} />
+        <Menu className="rbig" tip={t("docmode.cols.tip")} button={<><Icon name="columns" size={20} /><span>{t("docmode.columns")}</span></>} items={colItems} />
         <Menu className="rbig" tip={t("docmode.breaksTip")} button={<><Icon name="pageBreak" size={20} /><span>{t("docmode.breaks")}</span></>} items={() => [
           { label: t("docmode.pageBreak"), kbd: "Ctrl+Enter", disabled: !can("insert.pageBreak"), onSelect: () => run("insert.pageBreak") },
-          { label: t("docmode.sectionBreak"), kbd: "Alt+Shift+Enter", disabled: !can("insert.sectionBreak"), onSelect: () => run("insert.sectionBreak") },
+          { label: t("docmode.sectionBreakNext"), kbd: "Alt+Shift+Enter", disabled: !can("insert.sectionBreak"), onSelect: () => run("insert.sectionBreak") },
+          { label: t("docmode.sectionBreakCont"), disabled: !flowActive(), onSelect: () => void insertContinuousBreak() },
         ]} />
         <BigBtn icon="doc" label={t("docmode.pageSetup")} onClick={() => run("page.setup")} />
         <div className="rcol">

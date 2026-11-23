@@ -129,5 +129,6 @@
   "engine.doc.look.oldMerge": "旧形式の横方向の結合セル",
   "engine.doc.look.pageBorder": "ページ罫線",
   "engine.doc.look.sectionMid": "段落の途中のセクション区切り",
-  "engine.odp.skipped": "読み込めないオブジェクト {n} 個（グラフ・OLE など）"
+  "engine.odp.skipped": "読み込めないオブジェクト {n} 個（グラフ・OLE など）",
+  "doc.confirm.saveInstead": "{from} は元の形式で保存できません（Omniweave はこの形式を書き出せません）。\n同じ内容を {to} として保存しますか?\n\n作業ファイル（.omw）で保存するには［名前を付けて保存］を使ってください。"
 }

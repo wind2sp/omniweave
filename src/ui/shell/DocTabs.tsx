@@ -8,6 +8,7 @@ import { moveTab, setPinned, switchTo, tabTitle, useSessions, type TabMeta } fro
 import { DEFAULT_TITLE } from "../../core/types";
 import { docTitle, useT } from "../../i18n";
 import { openAndRemember } from "../actions";
+import { claimDrop } from "../fileDrop";
 import { useTabWorking } from "../progress";
 import { closeOtherTabs, closeTab, closeTabsToRight, closeAllTabs } from "../tabs";
 import { Icon, type IconName } from "./Icons";
@@ -300,6 +301,7 @@ export function DocTabs() {
         onDrop={async (e) => {
           if (from.current || !e.dataTransfer.files.length) return;
           e.preventDefault();
+          claimDrop(e);
           for (const f of Array.from(e.dataTransfer.files)) await openAndRemember({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) });
         }}
       >

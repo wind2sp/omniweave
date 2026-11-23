@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useStore } from "../../core/store";
 import type { OmwDocument, Page, TextNode } from "../../core/types";
 import { layoutText } from "../../core/text";
+import { nodeOrder } from "../../core/flow";
 import { paraText, textStats, type TextStats } from "../../core/textSearch";
 import { fitCurrent } from "../actions";
 import { editModeOf } from "../editModes";
@@ -29,7 +30,7 @@ export interface HeadingItem {
 /** Pages that edit as documents under the current work mode. */
 export const docPages = (doc: OmwDocument, mode = S().mode) => doc.pages.filter((p) => editModeOf(mode, p) === "DOCUMENT");
 
-const textNodes = (p: Page) => p.nodes.filter((n): n is TextNode => n.type === "TEXT" && n.visible).sort((a, b) => a.transform.y - b.transform.y || a.transform.x - b.transform.x);
+const textNodes = (p: Page) => p.nodes.filter((n): n is TextNode => n.type === "TEXT" && n.visible).sort(nodeOrder);
 
 /** The headings of the document pages, in reading order (pages, then text boxes top to bottom). */
 export function docOutline(doc: OmwDocument, mode = S().mode): HeadingItem[] {

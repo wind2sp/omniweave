@@ -9,6 +9,7 @@ import { applyTransform } from "../../core/geom";
 import { draftPage, findPage, useStore } from "../../core/store";
 import type { PdfNode } from "../../core/types";
 import { t as tr, useT } from "../../i18n";
+import { isAppChord } from "../appKeys";
 import { fileFormValues, pdfFormInfo, widgetRectOnNode, type PdfFormInfo } from "../../io/pdf";
 import type { FormField, FormValue } from "../../io/pdfsurgeon/forms";
 import { Icon } from "../shell/Icons";
@@ -221,6 +222,12 @@ function FieldEditor({ spot, value, onCommit, onDone, onMove }: { spot: Spot; va
     else onDone();
   };
   const keys = (e: React.KeyboardEvent) => {
+    // the app's chords (열기 · 저장 · 새로 · 닫기 · 찾기 · 인쇄 · tab keys): the value typed is kept first, then the key
+    // goes on to the app's shortcuts (ui/shell/shortcuts.ts) — it used to stop here, so nothing happened
+    if (isAppChord(e.nativeEvent)) {
+      if (!done.current && !cancelled.current) commitNow();
+      return;
+    }
     e.stopPropagation();
     if (e.key === "Escape") {
       e.preventDefault();

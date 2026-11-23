@@ -8,6 +8,7 @@ import type { PageKind } from "../../core/types";
 import { t as tr, useLang, useT } from "../../i18n";
 import { isTauri } from "../../io/platform";
 import { newFileFromPage, openAndRemember, openAny, openRecentFile, openSample } from "../actions";
+import { claimDrop } from "../fileDrop";
 import { cx } from "./controls";
 import { Modal } from "./Dialogs";
 import { Icon, LogoMark, type IconName } from "./Icons";
@@ -307,6 +308,7 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
 
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    claimDrop(e);
     setOver(false);
     const files = Array.from(e.dataTransfer.files);
     if (!files.length) return;

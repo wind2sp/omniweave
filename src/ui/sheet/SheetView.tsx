@@ -41,6 +41,7 @@ import {
 } from "./sheetActions";
 import { NoteEditor, NoteTip, SheetDialogs } from "./SheetDialogs";
 import { fill, fillDir, insertOrDelete, openDlg, passesValidation, toggleFilter, useSheetDlg, validationAt } from "./sheetEdit";
+import { isAppChord } from "../appKeys";
 
 const S = () => useStore.getState();
 
@@ -449,6 +450,13 @@ function SheetGrid({ page }: { page: Page }) {
       if (editing) commitEdit(null);
       return switchSheet(k === "PageUp" ? -1 : 1);
     }
+    // the app's chords (열기 · 저장 · 새로 · 닫기 · 찾기 · 인쇄 · Ctrl+Tab): a cell being typed is entered first, then the
+    // key goes on to the app's shortcuts (ui/shell/shortcuts.ts; Ctrl+F / H open the sheet's own Find there). While
+    // editing every key used to stop here, so Ctrl+S / O / N / W / P did nothing (or the browser's own command ran).
+    if (isAppChord(e.nativeEvent)) {
+      if (editing && !commitEdit(null)) return stop();
+      return;
+    }
     if (ctrl && e.shiftKey && NUMBER_KEYS[e.code]) {
       stop();
       if (editing) commitEdit(null);
@@ -735,6 +743,11 @@ function SheetGrid({ page }: { page: Page }) {
           }}
           onChange={(e) => setEditing((ed) => (ed ? { ...ed, text: e.target.value } : { a: addr(sel.ar, sel.ac), r: sel.ar, c: sel.ac, text: e.target.value, mode: "edit", fromBar: true }))}
           onKeyDown={(e) => {
+            // the app's chords: what is typed in the bar is entered first, then the key goes on to the app
+            if (!e.nativeEvent.isComposing && isAppChord(e.nativeEvent)) {
+              if (editing && !commitEdit(null)) e.preventDefault();
+              return;
+            }
             e.stopPropagation();
             if (e.nativeEvent.isComposing) return;
             if (e.key === "Enter") {

@@ -3,7 +3,7 @@
 // as they are when it is put in (Word's TOC field is updated by hand too); the marks are a screen-only ¶ at the end
 // of every paragraph of the document body.
 
-import { caretBox, flowLines, gatherStory, isFlowPageAt, segmentAt } from "../core/flow";
+import { caretBox, flowLines, gatherStory, isFlowPageAt, nodeOrder, segmentAt } from "../core/flow";
 import { formatPageNumber, hfInfo } from "../core/headerFooter";
 import { useStore } from "../core/store";
 import { newTable, uid, type OmwDocument, type Page, type TableCell, type TextParagraph } from "../core/types";
@@ -20,7 +20,7 @@ export function tocEntries(doc: Pick<OmwDocument, "pages">): { level: number; te
   const seen = new Set<string>();
   pages.forEach((pg, i) => {
     if (pg.kind !== "DOCUMENT") return;
-    const frames = pg.nodes.filter((n) => n.type === "TEXT" && n.flow).sort((a, b) => a.transform.y - b.transform.y);
+    const frames = pg.nodes.filter((n) => n.type === "TEXT" && n.flow).sort(nodeOrder);
     for (const n of frames) {
       if (n.type !== "TEXT") continue;
       for (const p of n.paragraphs) {

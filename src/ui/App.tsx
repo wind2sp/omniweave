@@ -11,7 +11,8 @@ import { activeSessionId, claimTab, isPristineActive, newSession } from "../core
 import { anyDirty, confirmAllSaved } from "./tabs";
 import { TabDialogs } from "./shell/TabDialogs";
 import { isTauri } from "../io/platform";
-import { fitCurrent, isDocProtected, openDemoIfRequested, openInTab, openStartupFile } from "./actions";
+import { fitCurrent, isDocProtected, openAndRemember, openDemoIfRequested, openInTab, openStartupFile } from "./actions";
+import { dropClaimed, droppedFiles } from "./fileDrop";
 import { CanvasView } from "./CanvasView";
 import { NotesPane, SlideSorter } from "./shell/SlideMode";
 import { useSlideUI } from "./slideActions";
@@ -307,16 +308,25 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
     }
   }, [ui.leftOpen, ui.rightOpen]);
 
-  // don't let a file dropped outside the canvas navigate the window away
+  // a file dropped anywhere opens as a document of its own (the page canvas places pictures itself; places with a
+  // drop of their own claim it, ui/fileDrop.ts) — never navigating the window away, never doing nothing
   useEffect(() => {
-    const stop = (e: DragEvent) => {
+    const over = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
     };
-    window.addEventListener("dragover", stop);
-    window.addEventListener("drop", stop);
+    const drop = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      e.preventDefault();
+      if (dropClaimed(e) || !e.dataTransfer.files.length) return;
+      void droppedFiles(e.dataTransfer).then(async (files) => {
+        for (const f of files) await openAndRemember(f);
+      });
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", drop);
     return () => {
-      window.removeEventListener("dragover", stop);
-      window.removeEventListener("drop", stop);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("drop", drop);
     };
   }, []);
 
