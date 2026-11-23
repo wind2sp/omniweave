@@ -44,6 +44,7 @@ import { imageSize, isHeic } from "../io/formats/sniff";
 import { journalClear } from "../io/journal";
 import { activeSessionId, claimTab, isPristineActive, newSession, registerSessionPart, removeSession, setOpenedPath, setTabBusy, switchTo, tabForPath } from "../core/sessions";
 import { packOmw, unpackOmw } from "../io/omw";
+import { reflowPages } from "../core/flow";
 import { FILTERS, isTauri, openFiles, saveFile, type OpenedFile } from "../io/platform";
 import { elevatePdfText } from "../io/pdf";
 import { t } from "../i18n";
@@ -455,7 +456,9 @@ export async function importFile(f: OpenedFile, opts: ImportOptions = {}): Promi
         bytes = r.value;
         secretId = rememberSecret(r.password);
       }
-      const { doc, report, history } = unpackOmw(bytes);
+      const { doc: stored, report, history } = unpackOmw(bytes);
+      // columns an older version edited (io/omwLegacy.ts): laid out in their columns again
+      const doc = report.relayout ? { ...stored, pages: reflowPages(stored.pages) } : stored;
       S().load(doc, f.path);
       omwSecretId = secretId;
       if (history.length) resetHistory(doc, t("doc.history.open"), history);
@@ -463,7 +466,10 @@ export async function importFile(f: OpenedFile, opts: ImportOptions = {}): Promi
       S().notify(
         problems
           ? t("doc.toast.openedSkipped", { n: problems })
-          : t("doc.toast.openedVerified", { name: f.name, ms: Math.round(performance.now() - t0) }),
+          : // made by a newer version (features, document fields or a graph version this one does not know)
+            report.unknown.length
+            ? t("doc.toast.openedNewer", { name: f.name })
+            : t("doc.toast.openedVerified", { name: f.name, ms: Math.round(performance.now() - t0) }),
       );
       setTimeout(fitCurrent);
       return doc.pages;

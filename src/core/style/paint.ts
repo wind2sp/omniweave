@@ -15,7 +15,10 @@ export function fillsFromLegacy(fill: string | null | undefined): Paint[] {
 
 /**
  * The single colour a format with only solid fills (and the dual-written legacy field) shows for `fills`: the top
- * visible paint's colour — a solid's colour, a gradient's first stop, a pattern's foreground. Null = no fill.
+ * visible paint's colour — a solid's colour, a gradient's opacity-weighted average (gradientFallbackHex: what an app
+ * version that cannot draw the gradient shows instead), a pattern's foreground. Null = no fill. Its callers are only
+ * such stand-ins (the legacy `fill` / `stroke` fields, a text run's plain colour); format writers keep their own
+ * gradient values.
  */
 export function representativeColor(fills: readonly Paint[] | undefined): Color | null {
   if (!fills?.length) return null;
@@ -24,12 +27,41 @@ export function representativeColor(fills: readonly Paint[] | undefined): Color 
     case "solid":
       return p.color;
     case "gradient":
-      return p.stops[0]?.color ?? null;
+      return p.stops.length ? { hex: gradientFallbackHex(p.stops) } : null;
     case "pattern":
       return p.fg ?? p.bg ?? null;
     default:
       return null;
   }
+}
+
+/**
+ * The plain colour that stands in for a gradient where only a plain colour can be drawn (the legacy `fill` / `stroke`
+ * field, which app versions before 0.2.2 draw instead of the gradient): its colours averaged along the gradient,
+ * weighted by their opacity (linear between stops), so a gradient that fades out leans to its visible colours; one
+ * that is wholly transparent gives its darkest colour. Its first stop alone would make a white → transparent green
+ * gradient white (unseen on white paper) and a two-colour one its first colour.
+ */
+export function gradientFallbackHex(stops: readonly { at: number; color: { hex: string; a?: number } }[]): string {
+  const ss = [...stops].sort((p, q) => p.at - q.at);
+  if (!ss.length) return "#000000";
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) || 0);
+  const pts = ss.map((s) => ({ t: Math.min(1, Math.max(0, s.at)), c: rgb(s.color.hex), a: Math.min(1, Math.max(0, s.color.a ?? 1)) }));
+  // the end colours hold to 0 and 1
+  if (pts[0].t > 0) pts.unshift({ ...pts[0], t: 0 });
+  if (pts[pts.length - 1].t < 1) pts.push({ ...pts[pts.length - 1], t: 1 });
+  const sum = [0, 0, 0];
+  let w = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1], q = pts[i], L = q.t - p.t;
+    if (L <= 0) continue;
+    // ∫ colour × alpha and ∫ alpha over the segment, both linear in t
+    for (let k = 0; k < 3; k++) sum[k] += (L * (p.c[k] * (2 * p.a + q.a) + q.c[k] * (p.a + 2 * q.a))) / 6;
+    w += (L * (p.a + q.a)) / 2;
+  }
+  const hex = (c: number[]) => "#" + c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("");
+  if (w < 1e-6) return hex([...pts].sort((p, q) => p.c[0] * 0.3 + p.c[1] * 0.59 + p.c[2] * 0.11 - (q.c[0] * 0.3 + q.c[1] * 0.59 + q.c[2] * 0.11))[0].c);
+  return hex(sum.map((v) => v / w));
 }
 
 /** fills → the legacy hex string (dual-write: old app versions keep drawing the first colour). */

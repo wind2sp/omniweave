@@ -78,6 +78,12 @@ interface NodeBase {
   /** body flow in a section of several columns (단, Page.columns): the column it is laid out in (omitted = the first) */
   flowCol?: number;
   /**
+   * In a saved .omw only: body flow of a page run with several columns, written without `flow` so that Omniweave 0.2.0
+   * and 0.2.1 (which order the flow by position and know no columns) keep it as fixed text boxes instead of re-flowing
+   * it out of order. Reading turns it back into `flow` (io/omwLegacy.ts).
+   */
+  flowHeld?: true;
+  /**
    * A page's note area as the body flow laid it out (core/flow.ts): the footnotes at the foot of the page or the
    * endnotes after the document's end, and their separator line. Made again whenever the flow runs; never body content
    * (the notes live in their reference runs, TextRun.note).

@@ -29,6 +29,7 @@ import { plainText } from "../core/text";
 import { vectorToSvgD } from "../core/vector";
 import type { OmwDocument, SceneNode } from "../core/types";
 import { OMW_CONTAINER, migrateGraph, requiredVersion, storedVersion, type MigrationReport } from "./omwMigrate";
+import { columnsLostAt, featuresOf, holdColumnFlow, releaseColumnFlow, unknownContent } from "./omwLegacy";
 import { PSD_RECIPE, PSD_RECIPES, derivableFor, derivationPortable, derivePsdTiles, derivesAsImported, psdSources, recipeFor, registerDerivedHashes, type DerivedIndex } from "./omwDerive";
 import { decodeTile, encodeTile } from "./tileCodec";
 
@@ -105,8 +106,14 @@ function usedAssets(docs: OmwDocument[], table: Record<string, { id: string; has
   return used;
 }
 
-export function packOmw(doc: OmwDocument, history: HistoryEntry[] = [], opts: PackOptions = {}): { bytes: Uint8Array; stats: PackStats } {
+export function packOmw(doc0: OmwDocument, history0: HistoryEntry[] = [], opts: PackOptions = {}): { bytes: Uint8Array; stats: PackStats } {
   const container = opts.container ?? OMW_CONTAINER;
+  // body flow in columns is written held, so that 0.2.0 / 0.2.1 do not re-flow it out of order (io/omwLegacy.ts)
+  const doc = holdColumnFlow(doc0);
+  const history = history0.map((e) => {
+    const d = holdColumnFlow(e.doc);
+    return d === e.doc ? e : { ...e, doc: d };
+  });
   const withHistory = history.length > 1;
   // assets nobody uses (a deleted image, a replaced PDF) are left out; ids and hashes are both looked for, in every
   // field of every saved state (nodes, pages, page sources, document styles…), so nothing still in use is dropped
@@ -160,6 +167,11 @@ export function packOmw(doc: OmwDocument, history: HistoryEntry[] = [], opts: Pa
     ...(container === 2 ? { container: 2 } : {}),
     engine: "Loom/1",
     generator: "Omniweave 0.1.0",
+    // the features the document uses (io/omwLegacy.ts): a version that does not know one says so on opening
+    ...(() => {
+      const f = featuresOf(saved);
+      return f.length ? { features: f } : {};
+    })(),
     title: saved.title,
     created: saved.created,
     modified: saved.modified,
@@ -269,6 +281,12 @@ export interface UnpackResult {
     container: number;
     /** tiles rebuilt from an original file in the package (verified like stored ones) */
     derivedTiles: number;
+    /** body flow in columns was stored held for older versions (io/omwLegacy.ts) and is flow again */
+    columnsHeld: boolean;
+    /** what the file holds that this version does not know (features, document fields, a newer version) */
+    unknown: string[];
+    /** the document flow should be laid out again (columns an older version edited; see unpackOmw) */
+    relayout: boolean;
   };
 }
 
@@ -344,7 +362,8 @@ export function unpackOmw(bytes: Uint8Array): UnpackResult {
   const version = migrated.report;
   // a newer app's file remembers its version, so saving it here never writes a lower number (requiredVersion)
   const keepVersion = (d: OmwDocument): OmwDocument => (version.newer ? { ...d, version: version.from } : d);
-  const doc = keepVersion(migrated.graph);
+  const released = releaseColumnFlow(keepVersion(migrated.graph));
+  const doc = released.doc;
   let history: HistoryEntry[] = [];
   let historySkipped = 0;
   if (files["history/index.cbor"] && files["history/nodes.cbor"]) {
@@ -356,11 +375,18 @@ export function unpackOmw(bytes: Uint8Array): UnpackResult {
       const r = unpackHistory(index, decode(files["history/nodes.cbor"]), getTile, sharedNodes);
       // assets only older states use (a deleted image you can go back to)
       for (const e of r.entries) for (const a of Object.values(e.doc.assets)) loadAsset(a);
-      history = version.newer ? r.entries.map((e) => ({ ...e, doc: keepVersion(e.doc) })) : r.entries;
+      history = r.entries.map((e) => {
+        const d = releaseColumnFlow(version.newer ? keepVersion(e.doc) : e.doc).doc;
+        return d === e.doc ? e : { ...e, doc: d };
+      });
       historySkipped = r.skipped;
     } catch {
       historySkipped = -1; // unreadable history never blocks opening the document
     }
   }
-  return { doc, history, report: { ...report, missingAssets, corruptAssets, rootMatches, historySkipped, version, container, derivedTiles: derivedUsed.size } };
+  const unknown = unknownContent(manifest.features, doc, version.newer);
+  // laid out again on opening: held columns an older version saved (it wrote its own manifest, without features — its
+  // edits there were made as text boxes), or columns an older version re-flowed into one (0.2.0 / 0.2.1 files)
+  const relayout = (released.held && !Array.isArray(manifest.features)) || columnsLostAt(doc.pages).length > 0;
+  return { doc, history, report: { ...report, missingAssets, corruptAssets, rootMatches, historySkipped, version, container, derivedTiles: derivedUsed.size, columnsHeld: released.held, unknown, relayout } };
 }

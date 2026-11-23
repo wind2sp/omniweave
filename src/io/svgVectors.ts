@@ -13,6 +13,7 @@ import polygonClipping, { type MultiPolygon, type Polygon } from "polygon-clippi
 import { nodeBounds } from "../core/loom";
 import { flatten, paintBox } from "../core/vector";
 import type { Paint } from "../core/style/types";
+import { gradientFallbackHex } from "../core/style/paint";
 import { newText, newVector, uid, type TextNode, type Contour, type LayerGroup, type SceneNode, type Vec2, type VectorAnchor, type VectorNode } from "../core/types";
 
 type M = [number, number, number, number, number, number]; // a b c d e f
@@ -674,15 +675,15 @@ export function svgToVectors(text: string): SvgArtwork | null {
         const gp = gradientPaint(urlId(s.fill) ?? "", segsToContours(segs, I), cm, contours, s.fillOpacity);
         if (!gp || gp.type !== "gradient") return void (unsupported = true);
         (v as VectorNode & { fills?: Paint[] }).fills = [gp];
-        // the plain fill older readers and exports use: the gradient's first colour
-        v.fill = gp.stops[0].color.hex;
+        // the plain fill older readers and exports use: the gradient's opacity-weighted average colour
+        v.fill = gradientFallbackHex(gp.stops);
       } else v.fill = withAlpha(s.fill, s.fillOpacity);
       if (s.stroke && s.stroke.startsWith("url(")) {
         // a gradient stroke: over the same box as a fill (SVG's objectBoundingBox is the geometry's)
         const gp = gradientPaint(urlId(s.stroke) ?? "", segsToContours(segs, I), cm, contours, s.strokeOpacity);
         if (!gp || gp.type !== "gradient") return void (unsupported = true);
         (v as VectorNode & { strokes?: { paint: Paint; width: number }[] }).strokes = [{ paint: gp, width: s.strokeWidth * det(cm) }];
-        v.stroke = gp.stops[0].color.hex;
+        v.stroke = gradientFallbackHex(gp.stops);
       } else v.stroke = withAlpha(s.stroke, s.strokeOpacity);
       v.strokeWidth = s.strokeWidth * det(cm);
       v.fillRule = s.fillRule;

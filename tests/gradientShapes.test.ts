@@ -35,7 +35,8 @@ describe("SVG gradients, clip paths and masks open as objects", () => {
     const [a, b] = art.nodes as GV[];
     expect(a.fills?.[0]).toMatchObject({ type: "gradient", kind: "linear", from: [0, 0], to: [1, 0] });
     expect((a.fills![0] as any).stops.map((s: any) => s.color.hex)).toEqual(["#ff0000", "#0000ff"]);
-    expect(a.fill).toBe("#ff0000");
+    // the plain colour older versions draw: the opacity-weighted average, not the first stop
+    expect(a.fill).toBe("#800080");
     // the radial gradient took its stops from the gradient it points to
     expect(b.fills?.[0]).toMatchObject({ kind: "radial" });
     expect((b.fills![0] as any).from[0]).toBeCloseTo(0.5, 2);
@@ -57,7 +58,7 @@ describe("SVG gradients, clip paths and masks open as objects", () => {
     expect(art).not.toBeNull();
     const [s, r] = art.nodes as (GV & { strokes?: { paint: Paint }[] })[];
     expect(s.strokes?.[0].paint).toMatchObject({ type: "gradient", kind: "linear" });
-    expect(s.stroke).toBe("#ff0000");
+    expect(s.stroke).toBe("#800080");
     const f = r.fills![0] as any;
     expect(f.focal[0]).toBeCloseTo(0.25, 3);
     expect(f.focalRadius).toBeCloseTo(0.2, 3);
@@ -219,5 +220,23 @@ describe("PDF shadings read back", () => {
     expect(f.focal[1]).toBeCloseTo(0.4, 2);
     expect(f.focalRadius).toBeCloseTo(0.1, 3);
     expect(f.stops.map((s: any) => s.color.hex)).toEqual(["#ffffff", "#ff8800", "#ff8800", "#330000"]);
+  });
+});
+
+describe("the plain colour standing in for a gradient (versions before 0.2.2 draw only that)", () => {
+  it("is the opacity-weighted average; a wholly transparent gradient gives its darkest colour", async () => {
+    const { gradientFallbackHex } = await import("../src/core/style/paint");
+    const st = (hex: string, at: number, a?: number) => ({ at, color: { hex, ...(a !== undefined ? { a } : {}) } });
+    expect(gradientFallbackHex([st("#ff0000", 0), st("#0000ff", 1)])).toBe("#800080");
+    // white → transparent green: leans white but keeps a visible green (not white, which vanishes on white paper)
+    const wg = gradientFallbackHex([st("#ffffff", 0), st("#22aa55", 1, 0)]);
+    expect(wg).toBe("#b5e3c6");
+    expect(wg).not.toBe("#ffffff");
+    expect(gradientFallbackHex([st("#ffffff", 0, 0), st("#103080", 1, 0)])).toBe("#103080");
+    expect(gradientFallbackHex([st("#123456", 0.3)])).toBe("#123456");
+  });
+  it("SVG and Illustrator gradients get it as their plain fill / stroke", () => {
+    const art = svgToVectors(SVG(`<defs><radialGradient id="r"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#22aa55" stop-opacity="0"/></radialGradient></defs><circle cx="50" cy="50" r="40" fill="url(#r)"/>`))!;
+    expect((art.nodes[0] as GV).fill).toBe("#b5e3c6");
   });
 });

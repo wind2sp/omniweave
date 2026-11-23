@@ -45,7 +45,7 @@ describe(".omw versions", () => {
     expect(report.version.steps).toEqual([]);
     const n = back.pages[0].nodes[0] as any;
     expect(n.fills).toEqual([grad]);
-    expect(n.fill).toBe("#ff0000");
+    expect(n.fill).toBe("#808000"); // the gradient's opacity-weighted average (what older versions draw)
   });
 
   it("document-level style fields pass through hydrate, count in the root only when present, and survive history packing", () => {

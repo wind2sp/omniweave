@@ -35,6 +35,7 @@
   "doc.toast.openCancelled": "開くのをキャンセルしました",
   "doc.toast.openedSkipped": "開きましたが、破損したチャンク {n} 個をスキップしました（残りは整合性チェックに合格）",
   "doc.toast.openedVerified": "{name} — 整合性チェック合格、{ms}ms",
+  "doc.toast.openedNewer": "{name} — 新しいバージョンで作成されたため、一部の内容を表示できない場合があります。アプリを最新版に更新してください",
   "doc.toast.videoPlaced": "ビデオ {name} — プロパティパネルで再生・トリミングでき、スライドショーで再生されます",
   "doc.toast.videoPlacedDur": "ビデオ {name} · {s} 秒 — プロパティパネルで再生・トリミングでき、スライドショーで再生されます",
   "doc.toast.audioPlaced": "オーディオ {name} — プロパティパネルで再生・トリミングでき、スライドショーで再生されます",

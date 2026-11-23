@@ -84,8 +84,8 @@ describe("Paint", () => {
     expect(isLegacyFill(fillsFromLegacy("#123456"))).toBe(true);
   });
   const grad: Paint = { type: "gradient", kind: "linear", stops: [{ at: 0, color: { hex: "#ff0000" } }, { at: 1, color: { hex: "#0000ff" }, mid: 0.5 }], from: [0, 0], to: [1, 0], spread: "pad" };
-  it("a gradient dual-writes its first stop to the legacy field and is not legacy-representable", () => {
-    expect(representativeColor([grad])).toEqual({ hex: "#ff0000" });
+  it("a gradient dual-writes its opacity-weighted average colour to the legacy field and is not legacy-representable", () => {
+    expect(representativeColor([grad])).toEqual({ hex: "#800080" });
     expect(isLegacyFill([grad])).toBe(false);
   });
   it("normalisation and equality", () => {
@@ -163,7 +163,7 @@ describe("node readers and lazy write patches", () => {
     const g: Paint = { type: "gradient", kind: "radial", stops: [{ at: 0, color: { hex: "#ffffff" } }, { at: 1, color: { hex: "#000000" } }], from: [0.5, 0.5], to: [1, 0.5] };
     const after = applyStylePatch(v, vectorFillPatch([g]));
     expect((after as any).fills).toEqual([g]);
-    expect(after.fill).toBe("#ffffff");
+    expect(after.fill).toBe("#808080");
     expect(fillsOf(after)).toEqual([g]);
     // back to a plain colour: the unified field goes away again
     expect("fills" in applyStylePatch(after, vectorFillPatch(fillsFromLegacy("#000000")))).toBe(false);

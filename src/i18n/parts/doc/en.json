@@ -35,6 +35,7 @@
   "doc.toast.openCancelled": "Open canceled",
   "doc.toast.openedSkipped": "Opened, but skipped {n} damaged chunk(s) (the rest passed the integrity check)",
   "doc.toast.openedVerified": "{name} — integrity check passed, {ms} ms",
+  "doc.toast.openedNewer": "{name} — made with a newer version: some of its content may not show. Update the app to the latest version",
   "doc.toast.videoPlaced": "Video {name} — play and trim it in the Properties panel; it plays in slideshows",
   "doc.toast.videoPlacedDur": "Video {name} · {s} s — play and trim it in the Properties panel; it plays in slideshows",
   "doc.toast.audioPlaced": "Audio {name} — play and trim it in the Properties panel; it plays in slideshows",

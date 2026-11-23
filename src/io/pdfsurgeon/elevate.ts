@@ -10,6 +10,7 @@ import { analyzePage, patternGradient, shadingGradient, type ImageDraw, type Pag
 import { parseOps } from "./syntax";
 import { paintBox } from "../../core/vector";
 import type { Paint } from "../../core/style/types";
+import { gradientFallbackHex } from "../../core/style/paint";
 import { apply, inv, mul, toM, viewportMatrix, type M } from "./matrix";
 import { cssFont, measure } from "../../core/text";
 import { embeddedFontFamily } from "./pdfFonts";
@@ -245,7 +246,7 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
         fill = { ...mp, stops: mp.stops.map((s) => ({ ...s, color: { hex: g.stops[0].hex, a: Math.round(f.alpha(lum(s.color.hex)) * 1000) / 1000 } })) };
       }
       const node = newVector(contours, (x.layer ? x.layer + " · " : "") + t("engine.default.gradientShape"));
-      node.fill = g.stops[0].hex;
+      node.fill = fill.type === "gradient" ? gradientFallbackHex(fill.stops) : g.stops[0].hex;
       node.stroke = null;
       node.strokeWidth = 0;
       node.fillRule = prev.evenOdd ? "evenodd" : "nonzero";
@@ -317,11 +318,11 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
         const pt = patterned.get(k);
         if (pt?.fill?.type === "gradient") {
           (node as VectorNode & { fills?: Paint[] }).fills = [pt.fill];
-          node.fill = pt.fill.stops[0].color.hex;
+          node.fill = gradientFallbackHex(pt.fill.stops);
         }
         if (pt?.stroke?.type === "gradient") {
           (node as VectorNode & { strokes?: { paint: Paint; width: number }[] }).strokes = [{ paint: pt.stroke, width: node.strokeWidth }];
-          node.stroke = pt.stroke.stops[0].color.hex;
+          node.stroke = gradientFallbackHex(pt.stroke.stops);
         }
         return { id, path: x as PathPaint, node, ...(pt ? { pattern: true } : {}) };
       });
