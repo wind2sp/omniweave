@@ -14,6 +14,7 @@ import { canvasCropAvailable, croppableSelection, startCanvasCrop, startCrop } f
 import { imageTarget } from "./imageActions";
 import { addLayer, deleteLayers, duplicateLayers } from "./layers";
 import { removeBackgroundSelection } from "./matteActions";
+import { flipCanvas, rotateCanvas180 } from "./canvasActions";
 import { allClipped, clipToggleUsable, groupSelection, toggleClipping, ungroupSelection, ungroupUsable } from "./groups";
 import { allHidden, allLocked, copyToSystem, hasClipboard, insertImageFile, insertMediaFile, insertTable, mergeDown, mergeDownPair, openSplit, pasteFromMenu, rasterizeSelected, rasterizeTarget, rotateSelected90, selectInverse, toggleHide, toggleLock } from "./menuActions";
 import { extractPages, insertFromFiles, openOrganizer, rotatePages } from "./pageActions";
@@ -229,7 +230,10 @@ export const COMMANDS: Command[] = [
   // the image mode's 이미지 menu (UI_TOP_REDESIGN.md §3): crop the whole canvas (the toolbox's crop tool C with nothing
   // selected) and the canvas size (page setup of the image page)
   { id: "image.cropCanvas", icon: "crop", when: canvasCropAvailable, run: startCanvasCrop },
-  { id: "image.canvasSize", dialog: true, when: () => !!curPage(), run: () => UI().set({ shellDialog: "pageSetup" }) },
+  { id: "image.canvasSize", dialog: true, when: () => !!curPage(), run: () => UI().set({ shellDialog: "canvasSize" }) },
+  { id: "image.flipCanvasH", icon: "flipH", when: () => !!curPage(), run: () => flipCanvas("h") },
+  { id: "image.flipCanvasV", icon: "flipV", when: () => !!curPage(), run: () => flipCanvas("v") },
+  { id: "image.rotateCanvas180", when: () => !!curPage(), run: rotateCanvas180 },
   { id: "image.brush", icon: "brush", run: () => chooseTool("brush") },
   { id: "image.eraser", icon: "eraser", run: () => chooseTool("eraser") },
 

@@ -4,6 +4,7 @@
 // 256px tiles, creating new tile threads; untouched tiles keep their identity.
 
 import { invertTransform, type Rect } from "../core/geom";
+import type { Transform } from "../core/types";
 import { isBlank, makeTile } from "../core/loom";
 import type { BrushSettings } from "../core/store";
 import { TILE, type PixelTile, type RasterNode } from "../core/types";
@@ -39,6 +40,17 @@ function dab(radius: number, hardness: number, color: string): OffscreenCanvas |
   return c;
 }
 
+/** Node-local size the stroke mask needs to cover the page (0, 0, pageW, pageH): at least the page size. */
+export function maskSize(tr: Transform, pageW: number, pageH: number): { w: number; h: number } {
+  let mx = pageW, my = pageH;
+  for (const p of [[0, 0], [pageW, 0], [0, pageH], [pageW, pageH]] as [number, number][]) {
+    const [x, y] = invertTransform(tr, p);
+    if (Number.isFinite(x)) mx = Math.max(mx, x);
+    if (Number.isFinite(y)) my = Math.max(my, y);
+  }
+  return { w: Math.min(16384, Math.ceil(mx)), h: Math.min(16384, Math.ceil(my)) };
+}
+
 export class Stroke {
   readonly mask: OffscreenCanvas | HTMLCanvasElement;
   private mctx: Ctx;
@@ -53,8 +65,11 @@ export class Stroke {
     readonly brush: BrushSettings,
     readonly erase: boolean,
   ) {
-    // the mask (coloured dabs, max alpha 1) lives in node-local space covering the page area (plus margin for transforms)
-    this.mask = makeCanvas(pageW, pageH);
+    // the mask (coloured dabs, max alpha 1) lives in node-local space covering the page area: a layer with more pixels
+    // than its place on the page (a rasterized photo scaled down) needs a larger mask, or strokes on its right / lower
+    // part were cut off; at most 16384 px a side
+    const s = maskSize(node.transform, pageW, pageH);
+    this.mask = makeCanvas(s.w, s.h);
     this.mctx = ctx2d(this.mask);
   }
 

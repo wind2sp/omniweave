@@ -2,18 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { applyTransform, invertTransform, rectFromPoints, type Rect } from "../core/geom";
 import { localBounds, nodeBounds } from "../core/loom";
-import { groupIndex, lockedInTree, pickableOn } from "../core/layerTree";
+import { pickableOn } from "../core/layerTree";
 import { currentPage, draftPage, masterOf, toolDone, useStore } from "../core/store";
 import { HF_EDIT_EVENT, hfAreaAt, hfEditNode, hfNodeId, parseHfId, renderMasterOf } from "../core/headerFooter";
 import { distanceToContour, pointInContours } from "../core/vector";
-import { TILE, newRaster, newText, type Page, type RasterNode, type SceneNode, type TableNode, type TextNode, type Vec2 } from "../core/types";
+import { TILE, newText, type Page, type SceneNode, type TableNode, type TextNode, type Vec2 } from "../core/types";
 import { Stroke } from "../render/brush";
 import { WeaveCache, type WeaveStats } from "../render/weave";
 import { drawFidelity } from "./fidelity";
 import { addToDictionary, drawSpelling, ignoreAll, replaceWord, spellAt, suggestionsFor } from "./spell";
 import { PopMenu } from "./shell/DocTabs";
 import type { MenuItem } from "./shell/controls";
-import { importFile, nodesAt, setViewportSize, fitCurrent, placeImage, viewIsFitted } from "./actions";
+import { importFile, nodesAt, setViewportSize, fitCurrent, placeImage, viewIsFitted, viewportNow, keepCentre } from "./actions";
+import { followCanvasSize, followsCanvas } from "./viewFollow";
 import { TouchNav, applyStep, doubleTapView, isDoubleTap } from "./touchNav";
 import { CellEditor, useCellSel, type CellTarget } from "./CellEditor";
 import { pickForMenu, tableMenuItems } from "./tableMenu";
@@ -36,7 +37,7 @@ import { Rulers } from "./Rulers";
 import { uiScaleFactor, useUI } from "./shell/uiStore";
 import { CORNERS, EDGES, boxCenter, boxSize, handleCursor, handlePoint, insideBox, pickHandle, pointerTarget, type Handle } from "../core/transform";
 import { liveResize, liveRotate, selectionBox, useXform, type SelBox } from "./xform";
-import { cropFrame, cropRatioValue, isCanvasCrop, setCropAngle, useCrop } from "./cropTool";
+import { cropFrame, cropRatioValue, dragCropRect, isCanvasCrop, setCropAngle, useCrop } from "./cropTool";
 import { moveCrop, resizeCrop } from "../core/crop";
 import { t as tr } from "../i18n";
 import { caretAtPoint, clickTextAction, docHooks } from "./editModes";
@@ -49,7 +50,8 @@ import { attachCanvas, cadCanvas } from "./cad/hooks";
 import { useCadScreenNow } from "./editModes";
 import { isOpaqueColor } from "../render/weave";
 import { vectorPath } from "../render/draw";
-import { applyGradient, clipToSelection, deselect, lassoSelect, marqueeSelect, opFromMods, pickColorAt, usePixelSel, wandSelect, activeMask } from "./pixelSelect";
+import { revealTransparencyInPlace } from "./transparency";
+import { applyGradient, clipToSelection, deselect, paintTarget, lassoSelect, marqueeSelect, opFromMods, pickColorAt, usePixelSel, wandSelect, activeMask } from "./pixelSelect";
 import { addAnchorAt, constrain45, deleteAnchorAt, drawnLine, enterIsolation, exitIsolation, isolationFilter, useDesign } from "./designTools";
 import { countPress, type PressCount } from "../core/clickCount";
 import { zoomAt } from "./shell/ops";
@@ -105,6 +107,7 @@ type Drag =
   | { kind: "xform"; sb: SelBox; handle: Handle | null; startAngle: number; ix?: SnapIndex }
   | { kind: "crop"; handle: Handle | null; rect0: Rect; q0: Vec2 }
   | { kind: "cropRotate"; angle0: number; a0: number; c: Vec2 }
+  | { kind: "cropNew"; rect0: Rect; q0: Vec2 }
   | { kind: "stroke"; stroke: Stroke }
   | { kind: "shape"; shape: "rect" | "ellipse"; start: Vec2; cur: Vec2; ix?: SnapIndex }
   // pen family and direct selection (ui/pathCanvas.ts)
@@ -232,21 +235,6 @@ function checker(c: CanvasRenderingContext2D, dpr: number): CanvasPattern | null
   g.fillRect(s, s, s, s);
   checkerPattern = { dpr, pat: c.createPattern(cv, "repeat") };
   return checkerPattern.pat;
-}
-
-function targetRaster(page: Page): RasterNode {
-  const s = S();
-  // a layer in a locked (or hidden) group is not painted on, like a locked layer
-  const pick = pickableOn(page);
-  const idx = groupIndex(page.groups);
-  const sel = page.nodes.find((n) => s.selection.includes(n.id) && n.type === "RASTER" && !lockedInTree(n, idx));
-  if (sel) return sel as RasterNode;
-  const top = [...page.nodes].reverse().find((n) => n.type === "RASTER" && pick(n));
-  if (top) return top as RasterNode;
-  const r = newRaster();
-  s.commit(tr("shell.hist.addRasterLayer"), (d) => void draftPage(d, page.id)?.nodes.push(r as any));
-  S().set({ selection: [r.id] });
-  return r;
 }
 
 export function CanvasView() {
@@ -890,7 +878,7 @@ export function CanvasView() {
       const rect = useCrop.getState().rect!;
       const box = { t: cf, lb: rect };
       const pk = pickHandle(box, p, HANDLE_PX / s.view.zoom, isCanvasCrop() ? { rotateReach: ROTATE_PX / s.view.zoom } : { rotate: false });
-      want = pk?.kind === "handle" ? handleCursor(pk.handle, cf.rotation) : pk?.kind === "rotate" ? ROTATE_CURSOR : insideBox(box, p) ? "move" : "default";
+      want = pk?.kind === "handle" ? handleCursor(pk.handle, cf.rotation) : pk?.kind === "rotate" ? ROTATE_CURSOR : !useCrop.getState().drawn || !insideBox(box, p) ? "crosshair" : "move";
       if (el.style.cursor !== want) el.style.cursor = want;
       return;
     }
@@ -947,6 +935,7 @@ export function CanvasView() {
     // is exactly one screen pixel at 125 % / 150 % scaling too; Math.round(clientWidth × dpr) could be a
     // pixel off and the whole canvas was then resampled (blurred) by the compositor.
     // docs/design/RENDER_CRISPNESS.md
+    let seen = false;
     const ro = new ResizeObserver((entries) => {
       const el = wrap.current!;
       const dpr = window.devicePixelRatio || 1;
@@ -963,8 +952,13 @@ export function CanvasView() {
         if (cv.width !== pw) cv.width = pw;
         if (cv.height !== ph) cv.height = ph;
       }
+      const before = viewportNow();
       setViewportSize(w, h);
       if (viewIsFitted()) fitCurrent();
+      // zoomed in by hand: the window's centre stays put (image / design; the document mode scrolls its own way)
+      else if (seen && before.w > 1 && before.h > 1 && w > 1 && h > 1 && (before.w !== w || before.h !== h) && followsCanvas(currentEditMode()))
+        S().set({ view: keepCentre(S().view, w - before.w, h - before.h) });
+      seen = w > 1 && h > 1;
       invalidate();
     });
     try {
@@ -978,8 +972,10 @@ export function CanvasView() {
     const unsubCells = useCellSel.subscribe(invalidate);
     const unsubUi = useUI.subscribe((a, b) => (a.grid !== b.grid || a.guides !== b.guides || a.guidesLocked !== b.guidesLocked || a.grids !== b.grids) && invalidate());
     setTimeout(fitCurrent, 50);
+    const unfollow = followCanvasSize();
     return () => {
       ro.disconnect();
+      unfollow();
       unsub();
       unsubAids();
       unsubUi();
@@ -1069,9 +1065,9 @@ export function CanvasView() {
       // drag is dropped — everything goes back to how it was at the press and no history step is left (the free
       // transform and crop sessions themselves stay open; a second Esc ends them)
       const dd = drag.current;
-      if (e.key === "Escape" && dd && (dd.kind === "move" || dd.kind === "xform" || dd.kind === "guide" || dd.kind === "crop" || dd.kind === "cropRotate")) {
+      if (e.key === "Escape" && dd && (dd.kind === "move" || dd.kind === "xform" || dd.kind === "guide" || dd.kind === "crop" || dd.kind === "cropNew" || dd.kind === "cropRotate")) {
         drag.current = null;
-        if (dd.kind === "crop") useCrop.getState().set({ rect: dd.rect0 });
+        if (dd.kind === "crop" || dd.kind === "cropNew") useCrop.getState().set({ rect: dd.rect0 });
         else if (dd.kind === "cropRotate") setCropAngle(dd.angle0);
         else S().cancelGesture();
         if (dd.kind === "xform") useXform.getState().set({ readout: null });
@@ -1401,7 +1397,9 @@ export function CanvasView() {
         const c = applyTransform(tf, [rect.x + rect.w / 2, rect.y + rect.h / 2]);
         drag.current = { kind: "cropRotate", angle0: useCrop.getState().angle, a0: Math.atan2(p[1] - c[1], p[0] - c[0]), c };
       }
-      else if (insideBox(box, p)) drag.current = { kind: "crop", handle: null, rect0: rect, q0 };
+      // inside a drawn box: move it; outside, or before a box is drawn: draw a new one (Photoshop)
+      else if (insideBox(box, p) && useCrop.getState().drawn) drag.current = { kind: "crop", handle: null, rect0: rect, q0 };
+      else drag.current = { kind: "cropNew", rect0: rect, q0 };
       return;
     }
 
@@ -1591,8 +1589,12 @@ export function CanvasView() {
       case "eraser": {
         // Alt+click with the brush picks a colour (Photoshop)
         if (e.altKey && s.tool === "brush" && currentEditMode() === "IMAGE") return void pickColorAt(p);
-        const raster = targetRaster(currentPage()!);
-        const stroke = new Stroke(raster, page.width, page.height, s.brush, s.tool === "eraser");
+        // the active layer (pictures are rasterized first); none for the eraser: nothing happens (a notice says why)
+        const raster = paintTarget(currentPage()!, s.tool === "eraser", currentEditMode() === "IMAGE");
+        if (!raster) return;
+        // the brush size is in canvas pixels: a layer with more pixels than its place (a scaled photo) gets a larger dab
+        const k = Math.abs(raster.transform.scale) || 1;
+        const stroke = new Stroke(raster, page.width, page.height, k === 1 ? s.brush : { ...s.brush, size: s.brush.size / k }, s.tool === "eraser");
         stroke.add({ x: p[0], y: p[1], p: e.pointerType === "pen" ? e.pressure || 0.5 : 1 });
         drag.current = { kind: "stroke", stroke };
         invalidate();
@@ -1719,7 +1721,18 @@ export function CanvasView() {
         const rect = d.handle
           ? resizeCrop(d.rect0, d.handle, q, full, { ratio: cropRatioValue(), sx: tf.scale, sy: tf.scaleY ?? tf.scale, fromCenter: e.altKey })
           : moveCrop(d.rect0, q[0] - d.q0[0], q[1] - d.q0[1], full);
-        useCrop.getState().set({ rect });
+        useCrop.getState().set({ rect, drawn: true });
+        break;
+      }
+      case "cropNew": {
+        const tf = cropFrame();
+        const full = useCrop.getState().full;
+        if (!tf || !full) break;
+        const rect = dragCropRect(d.q0, invertTransform(tf, p), full, cropRatioValue());
+        // a click (no drag) keeps the box as it was
+        const k = s.view.zoom * (tf.scale || 1);
+        if (rect.w * k < 2 || rect.h * k < 2) useCrop.getState().set({ rect: d.rect0 });
+        else useCrop.getState().set({ rect, drawn: true });
         break;
       }
       case "cropRotate": {
@@ -1827,6 +1840,7 @@ export function CanvasView() {
         flowPointerUp();
         break;
       case "crop":
+      case "cropNew":
       case "cropRotate":
         break;
       case "guide":
@@ -1904,8 +1918,10 @@ export function CanvasView() {
         const id = d.stroke.node.id;
         if (tiles)
           s.commit(d.stroke.erase ? tr("cmd.image.eraser") : tr("cmd.image.brush"), (doc) => {
-            const n = draftPage(doc, s.pageId)?.nodes.find((x) => x.id === id) as any;
+            const dp = draftPage(doc, s.pageId);
+            const n = dp?.nodes.find((x) => x.id === id) as any;
             if (n) n.tiles = tiles;
+            if (dp && d.stroke.erase) revealTransparencyInPlace(dp);
           });
         invalidate();
         break;

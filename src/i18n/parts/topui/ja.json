@@ -94,5 +94,8 @@
   "topui.slide.sorter": "スライド一覧",
   "topui.slide.notes": "ノート",
   "cmd.image.cropCanvas": "切り抜き(カンバス)",
-  "cmd.image.canvasSize": "カンバスサイズ"
+  "cmd.image.canvasSize": "カンバスサイズ",
+  "cmd.image.flipCanvasH": "カンバスを左右に反転",
+  "cmd.image.flipCanvasV": "カンバスを上下に反転",
+  "cmd.image.rotateCanvas180": "カンバスを 180° 回転"
 }

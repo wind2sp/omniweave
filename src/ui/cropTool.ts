@@ -30,10 +30,12 @@ interface CropState {
   /** canvas crop: straighten angle (degrees, the box's rotation on the page) and the page point it turns about */
   angle: number;
   pivot: Vec2;
+  /** the box was drawn or changed in this session: until then a drag on the picture draws a new box (Photoshop) */
+  drawn: boolean;
   set: (p: Partial<CropState>) => void;
 }
 
-export const useCrop = create<CropState>((set) => ({ id: null, rect: null, full: null, ratio: "free", custom: [3, 2], angle: 0, pivot: [0, 0], set: (p) => set(p) }));
+export const useCrop = create<CropState>((set) => ({ id: null, rect: null, full: null, ratio: "free", custom: [3, 2], angle: 0, pivot: [0, 0], drawn: false, set: (p) => set(p) }));
 const C = () => useCrop.getState();
 
 let original: Rect | undefined;
@@ -97,7 +99,7 @@ export function startCrop() {
     const dn = draftPage(d, s.pageId)?.nodes.find((x) => x.id === n.id) as Croppable | undefined;
     if (dn) delete dn.crop;
   });
-  C().set({ id: n.id, full, rect: n.crop ? { ...n.crop } : { ...full }, ratio: "free", angle: 0, pivot: [0, 0] });
+  C().set({ id: n.id, full, rect: n.crop ? { ...n.crop } : { ...full }, ratio: "free", angle: 0, pivot: [0, 0], drawn: !!n.crop });
   open();
   s.notify(t("image.crop.hint"));
 }
@@ -111,7 +113,7 @@ export function startCanvasCrop() {
   S().beginGesture();
   // the box may go well past the page (the canvas grows), not without end
   const full = { x: -4 * W, y: -4 * H, w: 9 * W, h: 9 * H };
-  C().set({ id: CANVAS_CROP, full, rect: { x: 0, y: 0, w: W, h: H }, ratio: "free", angle: 0, pivot: [W / 2, H / 2] });
+  C().set({ id: CANVAS_CROP, full, rect: { x: 0, y: 0, w: W, h: H }, ratio: "free", angle: 0, pivot: [W / 2, H / 2], drawn: false });
   open();
   S().notify(t("image.canvasCrop.hint"));
 }
@@ -130,7 +132,7 @@ function finish() {
   unsub?.();
   unsub = null;
   storeHooks.interrupt = null;
-  C().set({ id: null, rect: null, full: null, angle: 0 });
+  C().set({ id: null, rect: null, full: null, angle: 0, drawn: false });
 }
 
 export function applyCrop() {
@@ -274,4 +276,23 @@ export function setCropAngle(angle: number) {
   const c: Vec2 = [cx * Math.cos(a0) - cy * Math.sin(a0) + f.x, cx * Math.sin(a0) + cy * Math.cos(a0) + f.y];
   // the box centre stays where it is on the page; the frame now turns about it
   C().set({ angle: a, pivot: c, rect: { x: c[0] - rect.w / 2, y: c[1] - rect.h / 2, w: rect.w, h: rect.h } });
+}
+
+/**
+ * A new crop box dragged from `a` to `b` (box frame), kept inside `full`; with a ratio (W / H in the frame's units)
+ * the height follows the width. Photoshop: a drag outside the box — or anywhere before the first box is drawn —
+ * draws a new box; a drag inside a drawn box moves it. Before (2026-11-23) the first box was the whole canvas, so
+ * every drag on the picture moved that box and Enter shifted the picture instead of cropping it.
+ */
+export function dragCropRect(a: Vec2, b: Vec2, full: Rect, ratio: number | null = null): Rect {
+  const cl = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  const ax = cl(a[0], full.x, full.x + full.w), ay = cl(a[1], full.y, full.y + full.h);
+  let bx = cl(b[0], full.x, full.x + full.w), by = cl(b[1], full.y, full.y + full.h);
+  if (ratio && ratio > 0) {
+    const w = Math.abs(bx - ax);
+    by = ay + Math.sign(by - ay || 1) * (w / ratio);
+    by = cl(by, full.y, full.y + full.h);
+    bx = ax + Math.sign(bx - ax || 1) * Math.abs(by - ay) * ratio;
+  }
+  return { x: Math.min(ax, bx), y: Math.min(ay, by), w: Math.abs(bx - ax), h: Math.abs(by - ay) };
 }

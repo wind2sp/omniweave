@@ -56,13 +56,22 @@ const S = () => useStore.getState();
 /** count message: `<key>_one` when n is 1 (English singular), `<key>` otherwise */
 const tn = (key: string, n: number, vars: Record<string, string | number> = {}) => t(n === 1 ? `${key}_one` : key, { n, ...vars });
 
+/**
+ * Most a fit enlarges a small canvas (Photoshop's 화면에 맞춤 zooms an icon-sized canvas up too): 16× shows a 16 px
+ * canvas at 256 px. It was 4×, and a 64 px or 16 px canvas then sat as a speck in the middle of the window.
+ */
+export const FIT_ZOOM_MAX = 16;
+
+/** The whole page centred in a viewW × viewH window with a 40 px margin, at most FIT_ZOOM_MAX. */
+export function fitPageIn(page: { width: number; height: number }, viewW: number, viewH: number) {
+  const zoom = Math.max(0.01, Math.min((viewW - 80) / page.width, (viewH - 80) / page.height, FIT_ZOOM_MAX));
+  return { zoom, panX: (viewW - page.width * zoom) / 2, panY: (viewH - page.height * zoom) / 2 };
+}
+
 export function fitView(viewW: number, viewH: number) {
   const page = currentPage();
   if (!page) return;
-  if (!docFitHook?.(page, viewW, viewH)) {
-    const zoom = Math.min((viewW - 80) / page.width, (viewH - 80) / page.height, 4);
-    S().set({ view: { zoom, panX: (viewW - page.width * zoom) / 2, panY: (viewH - page.height * zoom) / 2 } });
-  }
+  if (!docFitHook?.(page, viewW, viewH)) S().set({ view: fitPageIn(page, viewW, viewH) });
   lastFit = S().view;
 }
 
@@ -82,6 +91,12 @@ let viewport = { w: 1200, h: 800 };
 export function setViewportSize(w: number, h: number) {
   viewport = { w, h };
 }
+
+/**
+ * The view after the window grew / shrank by (dw, dh) without being fitted: the point at the window's centre stays at
+ * the centre (Photoshop, Illustrator), so a canvas the user zoomed into does not slide towards a corner.
+ */
+export const keepCentre = (v: { zoom: number; panX: number; panY: number }, dw: number, dh: number) => ({ ...v, panX: v.panX + dw / 2, panY: v.panY + dh / 2 });
 export const fitCurrent = () => fitView(viewport.w, viewport.h);
 
 // ───────── file ─────────

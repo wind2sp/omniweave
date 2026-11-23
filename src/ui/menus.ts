@@ -118,7 +118,7 @@ export const IMAGE_MENUS: { id: string; entries: Entry[] }[] = [
       // 이미지 크기 키우기(업스케일) — image-upscale, right after the canvas size (Photoshop's 이미지 크기 / 캔버스 크기)
       "image.upscale",
       "-",
-      { sub: "topui.menu.rotation", icon: "rotate", entries: ["page.rotateRight", "page.rotateLeft"] },
+      { sub: "topui.menu.rotation", icon: "rotate", entries: ["page.rotateRight", "page.rotateLeft", "image.rotateCanvas180", "-", "image.flipCanvasH", "image.flipCanvasV"] },
       "object.flipH", "object.flipV", "-",
       "image.cropCanvas", { cmd: "object.crop", label: "topui.menu.cropLayer" }, "-",
       { sub: "topui.menu.adjust", icon: "sliders", entries: [{ gen: "adjust" }] },
@@ -150,7 +150,7 @@ export const DESIGN_MENUS: { id: string; entries: Entry[] }[] = [
       { h: "menu.head.align" }, "object.alignLeft", "object.alignHCenter", "object.alignRight", "object.alignTop", "object.alignVCenter", "object.alignBottom", "object.distH", "object.distV", "-",
       ...ORDER, "-",
       { h: "menu.head.path" }, "object.union", "object.subtract", "object.intersect", "object.exclude", "-",
-      "object.trace", "image.rasterize", "image.upscale", "-", "page.setup", "page.addMaster",
+      "object.trace", "image.rasterize", "image.upscale", "-", "image.canvasSize", "page.setup", "page.addMaster",
     ],
   },
   // 텍스트 편집(승격): an Illustrator / EPS file opens as a PDF page in the design mode (no PDF tabs) — its text is here

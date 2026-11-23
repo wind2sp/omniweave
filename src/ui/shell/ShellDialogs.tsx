@@ -11,6 +11,7 @@ import { cx } from "./controls";
 import { FindReplace, SymbolDialog, WordCount } from "./MenuDialogs";
 import { SizeDialog } from "./SizeDialog";
 import { PageSetupDialog } from "./PageSetupDialog";
+import { CanvasSizeDialog } from "./CanvasSizeDialog";
 import { PageNumberDialog } from "./HeaderFooterDialog";
 import { ListDialog, ParagraphDialog } from "./ParagraphDialogs";
 import { UI_SCALES, useUI } from "./uiStore";
@@ -308,6 +309,7 @@ export function ShellDialogs() {
   if (which === "symbol") return <SymbolDialog />;
   if (which === "sizePdf") return <SizeDialog />;
   if (which === "pageSetup") return <PageSetupDialog />;
+  if (which === "canvasSize") return <CanvasSizeDialog />;
   if (which === "paragraph") return <ParagraphDialog />;
   if (which === "listFormat") return <ListDialog />;
   if (which === "pageNumber") return <PageNumberDialog />;

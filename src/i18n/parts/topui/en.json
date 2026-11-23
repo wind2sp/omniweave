@@ -94,5 +94,8 @@
   "topui.slide.sorter": "Slide Sorter",
   "topui.slide.notes": "Notes",
   "cmd.image.cropCanvas": "Crop (canvas)",
-  "cmd.image.canvasSize": "Canvas Size"
+  "cmd.image.canvasSize": "Canvas Size",
+  "cmd.image.flipCanvasH": "Flip Canvas Horizontal",
+  "cmd.image.flipCanvasV": "Flip Canvas Vertical",
+  "cmd.image.rotateCanvas180": "Rotate Canvas 180°"
 }

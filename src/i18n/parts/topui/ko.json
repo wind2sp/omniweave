@@ -94,5 +94,8 @@
   "topui.slide.sorter": "여러 슬라이드",
   "topui.slide.notes": "슬라이드 노트",
   "cmd.image.cropCanvas": "자르기(캔버스)",
-  "cmd.image.canvasSize": "캔버스 크기"
+  "cmd.image.canvasSize": "캔버스 크기",
+  "cmd.image.flipCanvasH": "캔버스 좌우 뒤집기",
+  "cmd.image.flipCanvasV": "캔버스 상하 뒤집기",
+  "cmd.image.rotateCanvas180": "캔버스 180° 회전"
 }

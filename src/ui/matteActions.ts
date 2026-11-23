@@ -18,6 +18,7 @@ import type { MatteHint } from "../core/image/matte/hints";
 import { draftPage, findPage, useStore } from "../core/store";
 import { newImage, newRaster, type AssetRef, type ImageNode, type OmwDocument, type NodeMatte, type RasterNode, type SceneNode } from "../core/types";
 import { imageTarget, loadSource } from "./imageActions";
+import { revealTransparencyInPlace } from "./transparency";
 import { t as tr } from "../i18n";
 
 const S = () => useStore.getState();
@@ -232,6 +233,8 @@ export async function removeBackgroundSelection(opts: MatteOptions = {}, edit?: 
       for (const a of assets) d.assets[a.id] = a;
       const pg = draftPage(d, t.pageId);
       if (!pg) return;
+      // a photo (JPG) opened on a white canvas: the removed background shows as transparent, not as that white
+      revealTransparencyInPlace(pg);
       if (edit) {
         const at = pg.nodes.findIndex((n) => n.id === edit.cutout.id);
         if (at >= 0) pg.nodes[at] = node as any;

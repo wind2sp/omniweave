@@ -35,7 +35,12 @@ export interface ImageTarget {
   node: ImageTargetNode;
 }
 
-/** First selected raster layer or image on the current page. */
+/**
+ * First selected raster layer or image on the current page. With nothing selected, the page's only picture / painted
+ * raster layer (shown, unlocked) — an opened PNG / JPG / one-layer image is "the active layer" as in Photoshop, so
+ * 배경 지우기 and the filters work right after opening it. Before 2026-11-23 they stayed greyed out until the layer was
+ * clicked, which looked like background removal did not work at all. With several such layers one must be picked.
+ */
 export function imageTarget(): ImageTarget | null {
   const s = S();
   const page = findPage(s.doc, s.pageId);
@@ -44,7 +49,32 @@ export function imageTarget(): ImageTarget | null {
     const n = page.nodes.find((x) => x.id === id);
     if (n && (n.type === "RASTER" || n.type === "IMAGE")) return { pageId: page.id, node: n };
   }
-  return null;
+  if (s.selection.length) return null;
+  // a one-colour fill (the '캔버스 확장' layer of 캔버스 크기, a solid colour layer) is not a picture: it does not count
+  const only = page.nodes.filter((n) => n.visible && !n.locked && (n.type === "IMAGE" || (n.type === "RASTER" && Object.keys(n.tiles).length > 0 && !solidFill(n))));
+  return only.length === 1 ? { pageId: page.id, node: only[0] as ImageTargetNode } : null;
+}
+
+const solidCache = new WeakMap<object, boolean>();
+/** Every painted pixel of the raster has the same colour and alpha (a flat fill, holes allowed). Cached per tile map. */
+export function solidFill(n: RasterNode): boolean {
+  const hit = solidCache.get(n.tiles);
+  if (hit !== undefined) return hit;
+  let ref = -1, solid = true;
+  outer: for (const t of Object.values(n.tiles)) {
+    const d = t.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      const v = ((d[i] << 24) | (d[i + 1] << 16) | (d[i + 2] << 8) | d[i + 3]) >>> 0;
+      if (ref < 0) ref = v;
+      else if (v !== ref) {
+        solid = false;
+        break outer;
+      }
+    }
+  }
+  solidCache.set(n.tiles, solid);
+  return solid;
 }
 
 export interface ImageSource {

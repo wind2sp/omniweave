@@ -13,7 +13,7 @@ import { SCRIPT_SCALE, graphemes, isLockedFont, layoutText, measure, shadeWidth,
 import { reviewLook } from "../core/review";
 import { contourToSvgD } from "../core/vector";
 import { boxLines, paraBoxes } from "../core/paraBox";
-import { TILE, type MediaNode, type OmwDocument, type PdfNode, type PixelTile, type SceneNode, type TableNode, type TextNode, type VectorNode } from "../core/types";
+import { TILE, type ImageNode, type MediaNode, type OmwDocument, type PdfNode, type PixelTile, type SceneNode, type TableNode, type TextNode, type VectorNode } from "../core/types";
 import { pdfBitmap, pdfBitmapIsExact, pdfBitmapScale, pdfViewHash } from "../io/pdf";
 import { CANVAS_BLEND, fillParts } from "../core/style/blend";
 import { pixelGrid } from "./crisp";
@@ -220,6 +220,14 @@ function halved(pic: ImageBitmap | OffscreenCanvas | HTMLCanvasElement, dw: numb
   }
   halves.set(pic, { key, c: c! });
   return c!;
+}
+
+/** Pixel size of a picture node's decoded image (null while it is still decoding — env.incomplete is then set). */
+export function pictureSize(n: ImageNode, env: DrawEnv): { w: number; h: number } | null {
+  const a = env.doc.assets[n.assetId];
+  const bmp = a ? imageFor(a.hash, a.mime, env, a.exifIgnored) : null;
+  const w = (bmp as { width?: number } | null)?.width, h = (bmp as { height?: number } | null)?.height;
+  return w && h ? { w, h } : null;
 }
 
 function imageFor(hash: string, mime: string, env: DrawEnv, exifIgnored = false): Decoded | null {
@@ -579,11 +587,17 @@ export function drawNode(ctx: Ctx, n: SceneNode, env: DrawEnv, o?: NodeOverride,
       const tx0 = Math.floor(local.x / TILE), ty0 = Math.floor(local.y / TILE);
       const tx1 = Math.floor((local.x + local.w) / TILE), ty1 = Math.floor((local.y + local.h) / TILE);
       ctx.imageSmoothingEnabled = env.scale < 1;
+      // reduced (smoothed), each tile's edge is a half-covered device pixel: tile by tile, two half-covered edges
+      // leave a faint line along every 256 px seam (clear on a flat colour). A tile with a neighbour to its right /
+      // below is drawn one device pixel longer under it, so the seam is covered (2026-11-23)
+      const ov = env.scale < 1 && env.scale > 0 ? 1 / env.scale : 0;
       for (const [k, tile] of Object.entries(n.tiles)) {
         const i = k.indexOf("_");
         const tx = +k.slice(0, i), ty = +k.slice(i + 1);
         if (tx < tx0 || tx > tx1 || ty < ty0 || ty > ty1) continue;
-        ctx.drawImage(tileCanvas(tile), tx * TILE, ty * TILE);
+        const ex = ov && n.tiles[`${tx + 1}_${ty}`] ? ov : 0, ey = ov && n.tiles[`${tx}_${ty + 1}`] ? ov : 0;
+        if (ex || ey) ctx.drawImage(tileCanvas(tile), 0, 0, TILE, TILE, tx * TILE, ty * TILE, TILE + ex, TILE + ey);
+        else ctx.drawImage(tileCanvas(tile), tx * TILE, ty * TILE);
       }
       break;
     }

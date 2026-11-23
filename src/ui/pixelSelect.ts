@@ -11,19 +11,21 @@
 // brush stroke), so every edit is one undo step and untouched tiles keep their identity.
 
 import { create } from "zustand";
-import { invertTransform } from "../core/geom";
+import { applyTransform, invertTransform } from "../core/geom";
+import { localBounds } from "../core/loom";
 import { combine, ellipseMask, invertMask, maskBounds, maskOutline, polygonMask, rectMask, wandMask, type SelMask, type SelOp } from "../core/image/pixelSelection";
 import { renderMasterOf } from "../core/headerFooter";
 import { currentPage, draftPage, useStore } from "../core/store";
 import { IDENTITY, newRaster, type Page, type RasterNode, type SceneNode, type Transform } from "../core/types";
 import { groupIndex, lockedInTree, pickableOn } from "../core/layerTree";
 import { Stroke, canvasToTiles } from "../render/brush";
-import { ctx2d, drawNode, makeCanvas, type Ctx, type DrawEnv } from "../render/draw";
+import { ctx2d, drawNode, makeCanvas, pictureSize, type Ctx, type DrawEnv } from "../render/draw";
 import { renderPageCanvas } from "../render/weave";
 import { cmykSampled, cmykSampleTile } from "../render/cmykView";
 import { pristinePsdView } from "../core/fidelity/overlay";
 import { TILE } from "../core/tile";
 import { t } from "../i18n";
+import { revealTransparencyInPlace } from "./transparency";
 
 const S = () => useStore.getState();
 
@@ -319,6 +321,28 @@ export function activeLayer(page: Page): SceneNode | null {
 
 const PIXEL_TYPES = new Set<SceneNode["type"]>(["RASTER", "IMAGE", "PDF", "VECTOR", "TEXT"]);
 
+/** Largest side of a rasterized layer (px): a canvas past this cannot be made in every browser. */
+const RASTER_MAX = 16384;
+
+/**
+ * Pixels per local unit when a layer becomes pixels: a picture keeps its own pixels (its image width over its width on
+ * the layer), anything else 1. Never more than RASTER_MAX on a side.
+ */
+export function rasterResolution(lb: { w: number; h: number }, nodeW: number, imageW: number): number {
+  let k = nodeW > 0 && imageW > 0 ? imageW / nodeW : 1;
+  if (!(k > 0) || !Number.isFinite(k)) k = 1;
+  const side = Math.max(lb.w, lb.h) * k;
+  return side > RASTER_MAX ? k * (RASTER_MAX / side) : k;
+}
+
+/** The raster's transform: its pixel (0, 0) at the layer's local (lb.x, lb.y), k pixels per local unit, same turn / flip. */
+export function rasterPlacement(tr: Transform, lb: { x: number; y: number }, k: number): Transform {
+  const [x, y] = applyTransform(tr, [lb.x, lb.y]);
+  const out: Transform = { ...tr, x, y, scale: tr.scale / k };
+  if (tr.scaleY !== undefined) out.scaleY = tr.scaleY / k;
+  return out;
+}
+
 /**
  * Turn a placed picture / shape / text layer into a pixel layer (Photoshop "Rasterize Layer") so pixel edits can
  * apply to it. One undo step; the picture's original stays in the document's assets (undo brings the layer back).
@@ -327,15 +351,25 @@ const PIXEL_TYPES = new Set<SceneNode["type"]>(["RASTER", "IMAGE", "PDF", "VECTO
 export function rasterizeLayer(page: Page, n: SceneNode): RasterNode | null {
   if (n.type === "RASTER") return n;
   if (!PIXEL_TYPES.has(n.type)) return null;
-  const w = Math.max(1, Math.round(page.width)), h = Math.max(1, Math.round(page.height));
+  // the layer's own frame and resolution (2026-11-23): before, it was drawn at the canvas size and 100 %, so a picture
+  // larger than its place (a photo scaled down) lost resolution and the parts outside the canvas were cut off
+  const env: DrawEnv = { doc: S().doc, clip: { x: 0, y: 0, w: 1, h: 1 }, scale: 1, incomplete: false, onResourceReady: () => {} };
+  const lb = localBounds(n);
+  const px = n.type === "IMAGE" ? pictureSize(n, env) : null;
+  const k = rasterResolution(lb, n.type === "IMAGE" ? n.width : 0, px?.w ?? 0);
+  const w = Math.max(1, Math.ceil(lb.w * k)), h = Math.max(1, Math.ceil(lb.h * k));
+  env.clip = { ...lb };
+  env.scale = k;
   const cv = makeCanvas(w, h);
-  const env: DrawEnv = { doc: S().doc, clip: { x: 0, y: 0, w, h }, scale: 1, incomplete: false, onResourceReady: () => {} };
-  drawNode(ctx2d(cv), n, env, undefined, { bare: true });
+  const g = ctx2d(cv);
+  g.scale(k, k);
+  g.translate(-lb.x, -lb.y);
+  drawNode(g, { ...n, visible: true, transform: { ...IDENTITY } } as SceneNode, env, undefined, { bare: true });
   if (env.incomplete) {
     S().notify(t("imgmode.msg.notReady"));
     return null;
   }
-  const r: RasterNode = { ...newRaster(n.name), id: n.id, visible: n.visible, locked: n.locked, opacity: n.opacity, blendMode: n.blendMode, groupId: n.groupId, clip: n.clip, effects: n.effects, tiles: canvasToTiles(cv) };
+  const r: RasterNode = { ...newRaster(n.name), id: n.id, visible: n.visible, locked: n.locked, opacity: n.opacity, blendMode: n.blendMode, groupId: n.groupId, clip: n.clip, effects: n.effects, tiles: canvasToTiles(cv), transform: rasterPlacement(n.transform, lb, k) };
   if (!r.groupId) delete r.groupId;
   if (!r.clip) delete r.clip;
   if (!r.effects) delete r.effects;
@@ -356,6 +390,46 @@ function editRaster(page: Page, create: boolean): RasterNode | null {
   const r = newRaster(t("ribbon.layer.name", { n: page.nodes.filter((x) => x.type === "RASTER").length + 1 }));
   S().commit(t("shell.hist.addRasterLayer"), (d) => void draftPage(d, page.id)?.nodes.push(r as any));
   S().set({ selection: [r.id] });
+  return r;
+}
+
+/**
+ * The layer the brush / eraser paints on (Photoshop: the active layer).
+ *  - the selected unlocked pixel layer; a selected picture (an opened PNG / JPG is one) is rasterized first — before
+ *    2026-11-23 a picture was passed over, the eraser made an empty raster layer above it and erased nothing there;
+ *  - nothing selected: the brush uses the top raster layer, the eraser the top layer with pixels (raster or picture);
+ *  - the brush makes a new raster layer when there is none; the eraser never does (there is nothing to erase on it):
+ *    null, with a notice saying why.
+ * `imageMode` — the image edit mode, where the brush paints on a selected picture as well (other modes: the eraser only).
+ */
+export function paintTarget(page: Page, erase: boolean, imageMode: boolean, rasterize: (page: Page, n: SceneNode) => RasterNode | null = rasterizeLayer): RasterNode | null {
+  const s = S();
+  const idx = groupIndex(page.groups);
+  const pick = pickableOn(page);
+  const pixels = (n: SceneNode) => n.type === "RASTER" || n.type === "IMAGE";
+  const selected = page.nodes.filter((n) => s.selection.includes(n.id) && pixels(n));
+  const open = selected.find((n) => !lockedInTree(n, idx));
+  if (open) {
+    if (open.type === "RASTER") return open;
+    if (erase || imageMode) return rasterize(page, open);
+  } else if (selected.length && erase) {
+    s.notify(t("imgmode.msg.layerLocked"));
+    return null;
+  }
+  const top = [...page.nodes].reverse().find((n) => pick(n) && (erase ? (n.type === "RASTER" && Object.keys(n.tiles).length > 0) || (imageMode && n.type === "IMAGE") : n.type === "RASTER"));
+  if (top) {
+    if (top.type === "RASTER") return top;
+    const r = rasterize(page, top);
+    if (r) s.set({ selection: [r.id] });
+    return r;
+  }
+  if (erase) {
+    s.notify(t("imgmode.msg.nothingToErase"));
+    return null;
+  }
+  const r = newRaster();
+  s.commit(t("shell.hist.addRasterLayer"), (d) => void draftPage(d, page.id)?.nodes.push(r as any));
+  s.set({ selection: [r.id] });
   return r;
 }
 
@@ -417,8 +491,10 @@ function paintThroughSelection(label: string, draw: (g: Ctx, page: Page) => void
   const tiles = stroke.commit();
   if (!tiles) return false;
   S().commit(label, (d) => {
-    const n = draftPage(d, pg.id)?.nodes.find((x) => x.id === raster.id) as any;
+    const dp = draftPage(d, pg.id);
+    const n = dp?.nodes.find((x) => x.id === raster.id) as any;
     if (n) n.tiles = tiles;
+    if (dp && opts.erase) revealTransparencyInPlace(dp);
   });
   return true;
 }
