@@ -174,6 +174,7 @@ export function ReviewTab() {
           ariaLabel={t("review.view")}
           onChange={setReviewViewNow}
           options={[
+            { value: "simple", label: t("review.view.simple"), tip: t("review.view.simpleTip") },
             { value: "markup", label: t("review.view.markup"), tip: t("review.view.markupTip") },
             { value: "final", label: t("review.view.final"), tip: t("review.view.finalTip") },
           ]}

@@ -19,7 +19,7 @@ import { useUI } from "./shell/uiStore";
 
 type Kind = "img" | "doc" | "show" | "table";
 const KINDS: [Kind, string[]][] = [
-  ["img", ["png", "jpg", "webp", "svg", "psd", "pdf-image"]],
+  ["img", ["png", "jpg", "webp", "svg", "dxf", "psd", "pdf-image"]],
   ["doc", ["pdf", "docx", "doc", "hwpx", "hwp", "md", "html", "txt"]],
   ["show", ["pptx", "ppt"]],
   ["table", ["xlsx", "xls", "csv", "srt"]],
@@ -40,6 +40,7 @@ export function exportBlocked(id: string, pages: Page[] = useStore.getState().do
   if (id === "xlsx" && pages.some((p) => p.sheet)) return null;
   if ((id === "csv" || id === "md" || id === "txt" || id === "html") && pages.some((p) => p.sheet && usedRange(p.sheet).r1 >= 0)) return null;
   if (id === "xlsx" || id === "csv") return collectTables(pages).length ? null : t("menu.export.noTable");
+  if (id === "dxf") return pages.some((p) => p.nodes.some((n) => n.type === "VECTOR" || n.type === "TEXT")) ? null : t("mobile.ed.why.noDrawing");
   if (id === "srt") return cuesFromPages(pages).cues.length ? null : t("menu.export.noCues");
   if (id === "md" || id === "txt" || id === "html") return pagesToText(pages).trim() ? null : t("menu.export.noText");
   return null;
@@ -69,10 +70,12 @@ function targets(): { same: Target | null; first: Target[]; groups: [Kind, Targe
     if (id === "hwp" && !hwp5Source(pages)) return null;
     // DOC / XLS / PPT: only for a document opened from such a file, kept as it was (io/formats/legacyWrite.ts)
     if ((LEGACY_KINDS as readonly string[]).includes(id) && !legacySource(pages, id as LegacyKind)) return null;
-    const note = partialNote(id, pages);
+    const note = partialNote(id, pages) ?? (id === "dxf" && pages.some((p) => p.source?.format === "dwg") ? t("dxfwrite.export.dwgNote") : null);
     return { id, label: x.label, hint: note ? `${x.hint} · ${note}` : x.hint, blocked: exportBlocked(id, pages) };
   };
-  const first = FIRST[currentEditMode()].map(as).filter((x): x is Target => !!x);
+  // a drawing (DXF / DWG) offers DXF first: the format AutoCAD opens (DWG itself is not written — said in the hint)
+  const cad = pages.some((p) => p.source?.cad);
+  const first = (cad ? ["dxf", ...FIRST[currentEditMode()]] : FIRST[currentEditMode()]).map(as).filter((x): x is Target => !!x);
   const taken = new Set(first.map((x) => x.id));
   const groups = KINDS.map(([k, ids]) => [k, ids.filter((id) => !taken.has(id)).map(as).filter((x): x is Target => !!x)] as [Kind, Target[]]).filter(([, l]) => l.length);
   return { same: as("same"), first, groups };

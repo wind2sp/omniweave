@@ -1480,6 +1480,12 @@ export function reflowSegment(pages: readonly Page[], start: number, story?: Sto
   const afterBreak = seg.start > 0 && !pages[seg.start].breakBefore;
   // (a run that begins a new section: its top overlaps the space after of the section before's last paragraph)
   const sectionAfter = seg.start > 0 && pages[seg.start].breakBefore === "section" ? lastBodyPara(pages[seg.start - 1]) : undefined;
+  // an empty paragraph that ends a part before an 이어서 구역 holds its section break: no line, as Word lays it out (and as
+  // the file written from it reads again — TextParagraph.sectMark)
+  // (not right after a table: Word gives that paragraph its line — Word 2021, omni-fid-table-ind with a break after its table)
+  const afterTable = (q: TextParagraph) => st.objs.some((o) => o.before === q.id && o.node.type === "TABLE");
+  if (st.paras.some((q, i) => i > 0 && q.contSect && !st.paras[i - 1].sectMark && st.paras[i - 1].runs.every((r) => !r.text) && !afterTable(st.paras[i - 1])))
+    st = { ...st, paras: st.paras.map((q, i) => (st.paras[i + 1]?.contSect && !q.sectMark && q.runs.every((r) => !r.text) && !afterTable(q) ? { ...q, sectMark: true as const } : q)) };
   const layAll = (story: Story) => layRegions(story, colDef, boxAt, { pr, end: endItems, afterBreak, sectionAfter });
   let slots = layAll(st);
   // Word's footnote numbers restarted on each page (w:numRestart eachPage): the page a reference lands on decides its
@@ -1641,7 +1647,16 @@ function layRegions(st: Story, first: PageColumns | undefined, boxAt: (k: number
     const cols = rg.cols && rg.cols.n > 1 ? rg.cols : undefined;
     const n = columnBoxes({ x: 0, w: 1000 }, cols).length;
     const lastR = r === regions.length - 1;
-    const nopts: NoteOpts = r === 0 ? { ...opts, ...(lastR ? {} : { end: [] }) } : { pr: opts.pr, ...(lastR ? { end: opts.end } : {}) };
+    // (a region on the page after another: its top overlaps the space after of the part before's last paragraph — Word's
+    // spacing, as at a section's top; the section break mark itself takes no room)
+    // (the section break mark included: its space after is what overlaps — Word 2021, omni-fid-spacing-sect / -top)
+    const prevLast = r > 0 ? regions[r - 1].story.paras[regions[r - 1].story.paras.length - 1] : undefined;
+    // an empty mark paragraph (no line, its space after not counted in `used`): the space before of the next
+    // part's first paragraph loses as much as the mark's space after (Word: after 10, mark 4, before 20 → 26 pt; mark 10 → 20 pt)
+    const markEnd = !!prevLast?.sectMark && prevLast.runs.every((x) => !x.text);
+    // (Word's "max" spacing only: with doNotUseHTMLParagraphAutoSpacing the spaces add up — omni-fid-spacing-sect-sum)
+    if (r > 0 && T0 > 0 && markEnd && st.proto?.wordSpacing === "max") T0 = Math.max(0, T0 - Math.min(prevLast!.spaceAfter, rg.story.paras[0]?.spaceBefore ?? 0));
+    const nopts: NoteOpts = r === 0 ? { ...opts, ...(lastR ? {} : { end: [] }) } : { pr: opts.pr, ...(lastR ? { end: opts.end } : {}), ...(T0 > 0 && prevLast && !markEnd ? { sectionAfter: prevLast } : {}) };
     const geomOf = (lastP: number, H?: number) => (k: number) => {
       const pg = P0 + Math.floor(k / n), c = k % n;
       const b = boxAt(pg);

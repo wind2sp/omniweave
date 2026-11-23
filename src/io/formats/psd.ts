@@ -1402,6 +1402,10 @@ export function importPsdPage(bytes: Uint8Array, name: string, title: string, as
     },
   });
   const page = newPage("DESIGN", img.width, img.height, title);
+  // a PSD's canvas is transparent (Photoshop's checkerboard): a hidden or erased layer shows nothing behind it, a PNG
+  // export keeps the transparency, and a Screen / Lighten … layer blends with what is really below it, not with a
+  // white sheet (2026-11-23: on white, screen layers vanished; an all-hidden PSD showed white)
+  page.background = "transparent";
   const links: PsdLayerLink[] = [];
   let pixelLayers = 0;
   let hiddenKinds = 0, textish = 0, effects = 0, unclipped = 0;

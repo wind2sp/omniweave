@@ -307,3 +307,45 @@ export function unpackHistory(
   }
   return { entries, skipped };
 }
+
+/** Bytes a raster tile adds to a saved file, roughly (a 256 × 256 PNG of photo pixels). */
+const TILE_BYTES = 64 * 1024;
+
+/**
+ * The newest history entries a saved file keeps: as many as fit a budget of what history adds beyond the document
+ * itself (pictures and pixel tiles only earlier steps use) — max(4 MB, twice the document's own). The document is
+ * saved whole either way; only the oldest steps drop out (2026-11-23: an 800 × 600 photo after 48 steps was 7.1 MB,
+ * most of it full copies of the picture from early filter steps).
+ */
+export function historyForFile(entries: HistoryEntry[], doc: OmwDocument): HistoryEntry[] {
+  const seenAssets = new Set<string>(), seenTiles = new Set<string>();
+  let own = 0;
+  // pictures the pages use (an edit makes a new picture; the old one stays in the asset table for undo)
+  const assetsOf = (d: OmwDocument) => d.pages.flatMap((p) => p.nodes.flatMap((n) => { const id = (n as { assetId?: string }).assetId; const a = id ? d.assets[id] : undefined; return a ? [a] : []; }));
+  for (const a of assetsOf(doc)) if (!seenAssets.has(a.hash)) (seenAssets.add(a.hash), (own += a.size || 0));
+  const tilesOf = (d: OmwDocument, out: Set<string>) => {
+    for (const p of d.pages) for (const n of p.nodes) if (n.type === "RASTER") for (const tile of Object.values(n.tiles)) out.add(tile.hash);
+  };
+  tilesOf(doc, seenTiles);
+  own += seenTiles.size * TILE_BYTES;
+  const budget = Math.max(4 * 1024 * 1024, 2 * own);
+  let extra = 0;
+  let from = entries.length;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const d = entries[i].doc;
+    let add = 0;
+    const newAssets: string[] = [];
+    for (const a of assetsOf(d)) if (!seenAssets.has(a.hash)) (seenAssets.add(a.hash), newAssets.push(a.hash), (add += a.size || 0));
+    const ts = new Set<string>();
+    tilesOf(d, ts);
+    const newTiles = [...ts].filter((h) => !seenTiles.has(h));
+    add += newTiles.length * TILE_BYTES;
+    // the newest steps are always kept (the last one is the document itself)
+    if (extra + add > budget && entries.length - i > 2) break;
+    extra += add;
+    for (const h of newAssets) seenAssets.add(h);
+    for (const h of newTiles) seenTiles.add(h);
+    from = i;
+  }
+  return from === 0 ? entries : entries.slice(from);
+}

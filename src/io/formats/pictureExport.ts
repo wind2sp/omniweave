@@ -92,7 +92,9 @@ export function pictureUnedited(doc: Pick<OmwDocument, "assets">, page: Page): U
 }
 
 /** A picture's own pixels (1:1) for a picture page; other pages twice their size, as the PNG export. */
-export const pictureScale = (page: Page) => (page.source && PICTURE_SOURCE.has(page.source.format) ? 1 : 2);
+/** Pages that are pixels at 1 px a unit (a picture or a Photoshop file): they export at their own size, not 2×. */
+const PIXEL_SOURCE = new Set<string>([...PICTURE_SOURCE, "psd", "psb", "gif", "bmp", "tif", "tiff", "avif", "heic", "ico"]);
+export const pictureScale = (page: Page) => (page.source && PIXEL_SOURCE.has(page.source.format) ? 1 : 2);
 
 export type EncodeImage = (doc: OmwDocument, page: Page, o: { mime: string; quality: number; background: string | null; scale: number }) => Promise<Uint8Array>;
 

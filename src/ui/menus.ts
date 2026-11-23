@@ -118,7 +118,7 @@ export const IMAGE_MENUS: { id: string; entries: Entry[] }[] = [
       // 이미지 크기 키우기(업스케일) — image-upscale, right after the canvas size (Photoshop's 이미지 크기 / 캔버스 크기)
       "image.upscale",
       "-",
-      { sub: "topui.menu.rotation", icon: "rotate", entries: ["page.rotateRight", "page.rotateLeft", "image.rotateCanvas180", "-", "image.flipCanvasH", "image.flipCanvasV"] },
+      { sub: "topui.menu.rotation", icon: "rotate", entries: [{ cmd: "page.rotateRight", label: "canvas.rotateRight" }, { cmd: "page.rotateLeft", label: "canvas.rotateLeft" }, "image.rotateCanvas180", "-", "image.flipCanvasH", "image.flipCanvasV"] },
       "object.flipH", "object.flipV", "-",
       "image.cropCanvas", { cmd: "object.crop", label: "topui.menu.cropLayer" }, "-",
       { sub: "topui.menu.adjust", icon: "sliders", entries: [{ gen: "adjust" }] },
@@ -174,7 +174,10 @@ export const BACKSTAGE: { id: string; entries: string[] }[] = [
 
 export function commandItem(c: Command): MenuItem {
   const checked = c.checked?.();
-  return { label: commandLabel(c), icon: checked === undefined ? c.icon : undefined, kbd: c.kbd, checked, disabled: !enabled(c), onSelect: c.run };
+  const on = enabled(c);
+  // a greyed command says why on hover (the item stays hoverable)
+  const why = on ? null : c.whyNot?.() ?? null;
+  return { label: commandLabel(c), icon: checked === undefined ? c.icon : undefined, kbd: c.kbd, checked, disabled: !on, onSelect: c.run, ...(why ? { tip: why } : {}) };
 }
 
 /** Menu items of `entries`, built when the menu opens (enabled / checked state is read then). */

@@ -28,7 +28,10 @@ export interface Composer {
   text?: string;
 }
 
-export const useReview = create<{ view: ReviewView; active: string | null; tracking: boolean; composer: Composer | null }>(() => ({ view: "markup", active: null, tracking: false, composer: null }));
+export const useReview = create<{ view: ReviewView; active: string | null; tracking: boolean; composer: Composer | null }>(() => ({ view: "simple", active: null, tracking: false, composer: null }));
+// the app opens documents in Word's own default view, 단순 태그 (simple markup): deleted text takes no room, as in Word
+// (QA 11-23: a tracked document's lines stood 18 pt lower than Word's)
+setReviewView("simple");
 
 const S = () => useStore.getState();
 

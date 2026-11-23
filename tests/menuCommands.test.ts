@@ -204,22 +204,28 @@ describe("rotate 90°", () => {
 });
 
 describe("merge down / rasterize applicability", () => {
-  it("merge down needs a simple, visible, unlocked raster right below the selected one", () => {
+  it("merge down needs a visible, unlocked layer right below the selected one (any pixels, picture, shape or text)", () => {
     const lo = solid(4, 4, [255, 0, 0, 255]);
     const up = solid(4, 4, [0, 0, 255, 255], 2, 0.5);
     const tx = newText("x");
     load([lo, up, tx]);
     expect(mergeDownPair(page(), [up.id])).not.toBeNull();
     expect(mergeDownPair(page(), [lo.id])).toBeNull(); // nothing below
-    expect(mergeDownPair(page(), [tx.id])).toBeNull(); // not a raster
+    // 2026-11-23: a text / picture / shape layer merges too (drawn into pixels) — before, only plain rasters did
+    expect(mergeDownPair(page(), [tx.id])).not.toBeNull();
     expect(mergeDownPair(page(), [up.id, lo.id])).toBeNull();
     S().set({ selection: [up.id] });
     expect(cmd("image.mergeDown").when!()).toBe(true);
     S().set({ selection: [tx.id] });
-    expect(cmd("image.mergeDown").when!()).toBe(false);
-    for (const change of [{ locked: true }, { visible: false }, { transform: { x: 0, y: 0, rotation: 15, scale: 1 } }, { transform: { x: 0, y: 0, rotation: 0, scale: 2 } }]) {
+    expect(cmd("image.mergeDown").when!()).toBe(true);
+    for (const change of [{ locked: true }, { visible: false }]) {
       load([{ ...lo, ...change }, up]);
       expect(mergeDownPair(page(), [up.id]), JSON.stringify(change)).toBeNull();
+    }
+    // turned or scaled pixels: merged by drawing (not tile by tile)
+    for (const change of [{ transform: { x: 0, y: 0, rotation: 15, scale: 1 } }, { transform: { x: 0, y: 0, rotation: 0, scale: 2 } }]) {
+      load([{ ...lo, ...change }, up]);
+      expect(mergeDownPair(page(), [up.id]), JSON.stringify(change)).not.toBeNull();
     }
   });
 

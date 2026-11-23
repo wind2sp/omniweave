@@ -12,7 +12,8 @@ import { setAnnotTool, usePdfAnnot } from "./pdf/PdfAnnotLayer";
 import { addCenterGuides, clearGuides, toggleGrid, toggleGuides, toggleGuidesLocked, toggleRulers, toggleSnap, useAids } from "./aids";
 import { alignSelected, distributeSelected } from "./arrange";
 import { canvasCropAvailable, croppableSelection, startCanvasCrop, startCrop } from "./cropTool";
-import { imageTarget } from "./imageActions";
+import { imageTarget, solidFill } from "./imageActions";
+import { canCrop } from "../core/crop";
 import { addLayer, deleteLayers, duplicateLayers } from "./layers";
 import { removeBackgroundSelection } from "./matteActions";
 import { flipCanvas, rotateCanvas180 } from "./canvasActions";
@@ -79,6 +80,27 @@ const textSel = () => selectedNodes().some((n) => n.type === "TEXT");
 const pageIndex = () => S().doc.pages.findIndex((p) => p.id === S().pageId);
 const curPage = () => S().doc.pages.find((p) => p.id === S().pageId);
 const curNodes = () => curPage()?.nodes.length ?? 0;
+
+/**
+ * With nothing selected, the page's only layer (shown, unlocked; an empty or one-colour fill layer does not count) —
+ * Photoshop's active layer: layer commands (flip, rotate, crop, rasterize …) act on it instead of staying greyed out.
+ */
+const soleLayer = () => {
+  if (S().selection.length) return null;
+  const c = curPage()?.nodes.filter((n) => n.visible && !n.locked && !(n.type === "RASTER" && (!Object.keys(n.tiles).length || solidFill(n)))) ?? [];
+  return c.length === 1 ? c[0] : null;
+};
+const selOrSole = () => hasSel() || !!soleLayer();
+/** Run `f` on the selection, selecting the page's only layer first when nothing is selected. */
+const withSole = (f: () => void) => () => {
+  const n = soleLayer();
+  if (n) S().set({ selection: [n.id] });
+  f();
+};
+/** Why a layer command is greyed out (said on its menu row). */
+const whyLayer = () => (!curNodes() ? t("cmd.why.noLayer") : S().selection.length ? t("cmd.why.locked") : t("cmd.why.pickLayer"));
+const whyPicture = () =>
+  selectedNodes().some((n) => n.type === "VECTOR" || n.type === "TEXT") ? t("cmd.why.notPicture") : !curNodes() ? t("cmd.why.noLayer") : t("cmd.why.pickPicture");
 
 /** Hyperlinks are not in Omniweave yet: Ctrl+K says so in the modes where it means 하이퍼링크 (keymap.ts). */
 export function linkMissing() {
@@ -186,12 +208,12 @@ export const COMMANDS: Command[] = [
   { id: "insert.media", icon: "media", dialog: true, when: () => !!curPage(), run: () => void insertMediaFile() },
 
   // object
-  { id: "object.transform", icon: "transform", when: hasSel, run: startTransformSession },
-  { id: "object.rotateCW", icon: "rotate", when: hasSel, run: () => rotateSelected90(1) },
-  { id: "object.rotateCCW", icon: "rotateLeft", when: hasSel, run: () => rotateSelected90(-1) },
-  { id: "object.flipH", icon: "flipH", when: hasSel, run: () => flipSelected("h") },
-  { id: "object.flipV", icon: "flipV", when: hasSel, run: () => flipSelected("v") },
-  { id: "object.crop", when: () => !!croppableSelection(), run: startCrop },
+  { id: "object.transform", icon: "transform", when: selOrSole, whyNot: whyLayer, run: withSole(startTransformSession) },
+  { id: "object.rotateCW", icon: "rotate", when: selOrSole, whyNot: whyLayer, run: withSole(() => rotateSelected90(1)) },
+  { id: "object.rotateCCW", icon: "rotateLeft", when: selOrSole, whyNot: whyLayer, run: withSole(() => rotateSelected90(-1)) },
+  { id: "object.flipH", icon: "flipH", when: selOrSole, whyNot: whyLayer, run: withSole(() => flipSelected("h")) },
+  { id: "object.flipV", icon: "flipV", when: selOrSole, whyNot: whyLayer, run: withSole(() => flipSelected("v")) },
+  { id: "object.crop", when: () => !!croppableSelection() || canCrop(soleLayer()), whyNot: whyPicture, run: withSole(startCrop) },
   { id: "object.lock", when: hasSel, checked: allLocked, run: toggleLock },
   { id: "object.hide", when: hasSel, checked: allHidden, run: toggleHide },
   { id: "object.alignLeft", icon: "objLeft", when: hasSel, run: () => alignSelected("left") },
@@ -210,25 +232,25 @@ export const COMMANDS: Command[] = [
   { id: "object.subtract", icon: "subtract", when: vectors2, run: () => runPathfinder("subtract") },
   { id: "object.intersect", icon: "intersect", when: vectors2, run: () => runPathfinder("intersect") },
   { id: "object.exclude", icon: "exclude", when: vectors2, run: () => runPathfinder("exclude") },
-  { id: "object.trace", icon: "pen", dialog: true, when: () => !!imageTarget(), run: () => useImageUI.getState().set({ kind: "trace" }) },
+  { id: "object.trace", icon: "pen", dialog: true, when: () => !!imageTarget(), whyNot: whyPicture, run: () => useImageUI.getState().set({ kind: "trace" }) },
 
   // image (layers; adjustments and filters come from the image-op registry, see imageMenu.ts)
   { id: "image.newLayer", icon: "plus", run: addLayer },
   { id: "image.duplicateLayer", icon: "copy", when: hasSel, run: duplicateLayers },
   { id: "image.deleteLayer", icon: "trash", when: hasSel, run: deleteLayers },
-  { id: "image.mergeDown", when: () => !!mergeDownPair(curPage(), S().selection), run: mergeDown },
+  { id: "image.mergeDown", when: () => !!mergeDownPair(curPage(), S().selection), whyNot: () => (S().selection.length === 1 ? t("cmd.why.merge") : t("cmd.why.pickLayer")), run: mergeDown },
   { id: "image.groupLayers", icon: "folder", when: hasSel, run: groupSelection },
   { id: "image.ungroupLayers", when: ungroupUsable, run: ungroupSelection },
   { id: "image.clippingMask", icon: "clipMask", when: clipToggleUsable, checked: allClipped, run: () => toggleClipping() },
-  { id: "image.rasterize", icon: "raster", when: () => !!rasterizeTarget(curPage(), S().selection), run: () => void rasterizeSelected() },
+  { id: "image.rasterize", icon: "raster", when: () => !!rasterizeTarget(curPage(), S().selection) || (!!soleLayer() && !!rasterizeTarget(curPage(), [soleLayer()!.id])), whyNot: () => (S().selection.length > 1 ? t("cmd.why.oneLayer") : selectedNodes().some((n) => n.type === "RASTER") ? t("cmd.why.alreadyPixels") : whyLayer()), run: withSole(() => void rasterizeSelected()) },
   // a PSD smart object's content in a tab of its own (Photoshop's Edit Contents; ui/smartObject.ts)
   { id: "image.editSmart", icon: "image", when: () => !!smartTarget(), run: () => void openSmartObject() },
   // background removal on the selected raster / image: one click (automatic type), or the refine dialog
-  { id: "image.removeBackground", icon: "sparkle", when: () => !!imageTarget(), run: () => void removeBackgroundSelection() },
-  { id: "image.upscale", icon: "image", dialog: true, when: () => !!imageTarget(), run: () => useImageUI.getState().set({ kind: "upscale" }) },
+  { id: "image.removeBackground", icon: "sparkle", when: () => !!imageTarget(), whyNot: whyPicture, run: () => void removeBackgroundSelection() },
+  { id: "image.upscale", icon: "image", dialog: true, when: () => !!imageTarget(), whyNot: whyPicture, run: () => useImageUI.getState().set({ kind: "upscale" }) },
   // text recognition (the PDF ribbon's 글자 인식 and the picture menu's), by name in command search too
-  { id: "image.ocr", icon: "search", dialog: true, when: () => !!imageTarget(), run: () => useImageUI.getState().set({ kind: "ocr" }) },
-  { id: "image.removeBackgroundDialog", dialog: true, when: () => !!imageTarget(), run: () => useImageUI.getState().set({ kind: "matte" }) },
+  { id: "image.ocr", icon: "search", dialog: true, when: () => !!imageTarget(), whyNot: whyPicture, run: () => useImageUI.getState().set({ kind: "ocr" }) },
+  { id: "image.removeBackgroundDialog", dialog: true, when: () => !!imageTarget(), whyNot: whyPicture, run: () => useImageUI.getState().set({ kind: "matte" }) },
   // the image mode's 이미지 menu (UI_TOP_REDESIGN.md §3): crop the whole canvas (the toolbox's crop tool C with nothing
   // selected) and the canvas size (page setup of the image page)
   { id: "image.cropCanvas", icon: "crop", when: canvasCropAvailable, run: startCanvasCrop },

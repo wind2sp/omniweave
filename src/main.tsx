@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { fontsChanged, setMeasure } from "./core/text";
+import { fontsChanged } from "./core/text";
 import { initLang } from "./i18n";
 import { installUiFonts } from "./io/pretendard";
 import { isMobile } from "./io/platform";
@@ -10,14 +10,10 @@ import { initPwa } from "./web/pwa";
 // browser only: offline service worker, install offer, files opened with the installed app (src/web/pwa.ts)
 initPwa();
 
-// Real glyph metrics for the text engine (core/text.ts falls back to an estimate
-// outside the DOM). Installed before the first layout so cached layouts are correct.
-const measureCtx = document.createElement("canvas").getContext("2d");
-if (measureCtx)
-  setMeasure((text, font) => {
-    measureCtx.font = font;
-    return measureCtx.measureText(text).width;
-  });
+// Real glyph metrics for the text engine come from core/text.ts's own canvas measurer, which measures small text large
+// and scales it: the fonts' linear advances, as Word lays text out. (A measurer here used the canvas at the text's own
+// size, and fonts with hinted widths — 굴림, 돋움, 바탕 — reported whole pixels: 굴림 10 pt 13 px a syllable instead of
+// 13.33, a syllable more on a line than Word — QA 11-23, omni-fid-gulim.)
 
 /** Wait (briefly) for the bundled Pretendard faces so the first paint measures real glyphs. Regular/Bold come
  *  from the packed TTFs (io/pretendard.ts), Medium/SemiBold from styles.css. */

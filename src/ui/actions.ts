@@ -9,7 +9,7 @@ import { encryptHwpx } from "../io/crypto/hwpx";
 import { askProtection } from "./shell/SecurityDialogs";
 import { askPictureOptions } from "./shell/ImageExportDialog";
 import { forgetRecent, rememberRecent } from "./shell/recent";
-import { resetHistory, useHistory } from "../core/history";
+import { historyForFile, resetHistory, useHistory } from "../core/history";
 import { ANIM_PRESETS, type AnimPreset } from "../core/anim";
 import { nodeBounds } from "../core/loom";
 import { detachCopies, pickableOn, reorderInGroups } from "../core/layerTree";
@@ -709,7 +709,7 @@ export async function saveDoc(as = false, forceProtect = false) {
   }
   const t0 = performance.now();
   const h = useHistory.getState();
-  const packed = await withProgress(t("progress.save"), () => packOmw(s.doc, h.includeInFile ? h.entries : []));
+  const packed = await withProgress(t("progress.save"), () => packOmw(s.doc, h.includeInFile ? historyForFile(h.entries, s.doc) : []));
   const stats = packed.stats;
   let prot: Awaited<ReturnType<typeof protectOutput>>;
   try {
@@ -981,8 +981,10 @@ export async function elevatePdf() {
   if (pdfNode.covers.length) return S().notify(t("doc.toast.alreadyElevated"));
   const asset = s.doc.assets[pdfNode.assetId];
   S().notify(t("doc.toast.analyzingPdf"));
-  const { nodes, covers } = await elevatePdfText(asset.hash, pdfNode.pageIndex, page.width);
+  const { nodes, covers, keptShapes } = await elevatePdfText(asset.hash, pdfNode.pageIndex, page.width);
   if (!nodes.length) return S().notify(t("doc.toast.nothingToEdit"));
+  // shapes that could not become objects (gradient fills, paths under them) are said, not left to be discovered
+  const kept = keptShapes ? " " + t("doc.toast.elevatedKept", { n: keptShapes }) : "";
   s.commit(t("doc.history.elevatePdf"), (d) => {
     const pg = draftPage(d, page.id)!;
     const n = pg.nodes.find((x) => x.id === pdfNode.id) as any;
@@ -990,7 +992,7 @@ export async function elevatePdf() {
     pg.nodes.push(...(nodes as any));
   });
   const nText = nodes.filter((n) => n.type === "TEXT").length, nVec = nodes.filter((n) => n.type === "VECTOR").length;
-  S().notify(t(nVec ? "doc.toast.elevatedVec" : "doc.toast.elevated", { lines: nText, vectors: nVec }));
+  S().notify(t(nVec ? "doc.toast.elevatedVec" : "doc.toast.elevated", { lines: nText, vectors: nVec }) + kept);
 }
 
 export function addAnimation(preset: AnimPreset, trigger: "ON_CLICK" | "WITH_PREVIOUS" | "AFTER_PREVIOUS" = "ON_CLICK") {

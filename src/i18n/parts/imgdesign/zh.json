@@ -144,5 +144,17 @@
   "canvas.size.anchor.5": "右",
   "canvas.size.anchor.6": "左下",
   "canvas.size.anchor.7": "下",
-  "canvas.size.anchor.8": "右下"
+  "canvas.size.anchor.8": "右下",
+  "cmd.why.pickLayer": "请先选择图层（有多个图层）",
+  "cmd.why.noLayer": "此页面没有图层",
+  "cmd.why.locked": "所选图层已锁定或隐藏",
+  "cmd.why.pickPicture": "请选择图片或像素图层",
+  "cmd.why.notPicture": "不能用于矢量或文字图层——请先栅格化",
+  "cmd.why.merge": "正下方需要同一组中可见且未锁定的图层",
+  "cmd.why.oneLayer": "请只选择一个图层",
+  "cmd.why.alreadyPixels": "已经是像素图层",
+  "design.name.brush": "画笔描边",
+  "design.msg.eraserMissed": "橡皮擦没有经过路径——请在路径上拖动",
+  "canvas.rotateRight": "画布向右旋转 90°",
+  "canvas.rotateLeft": "画布向左旋转 90°"
 }

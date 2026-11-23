@@ -70,7 +70,9 @@ function CurveEditor({ points, onChange, hist, color }: { points: number[]; onCh
         let idx = pts.findIndex((p) => Math.abs(p[0] - x) < 8 && Math.abs(p[1] - y) < 12);
         if (idx < 0) {
           if (pts.some((p) => p[0] === x)) return;
-          const list = [...pts, [x, lut[x]] as [number, number]].sort((a, b) => a[0] - b[0]);
+          // a click off the curve puts the point where it was clicked (the curve bends to it, as in Photoshop);
+          // before 2026-11-23 the point went onto the curve at that x, so the curve did not change at all
+          const list = [...pts, [x, y] as [number, number]].sort((a, b) => a[0] - b[0]);
           idx = list.findIndex((p) => p[0] === x);
           emit(list);
         }

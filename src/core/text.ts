@@ -423,19 +423,30 @@ const CJK_CHAR = /[가-힯぀-ヿ一-鿿ᄀ-ᇿ]/; // i18n: keep
  * A justified Word line (TextNode.justifyShrink) keeps a word (or syllable) that runs past the end by its spaces shrinking:
  * when the overrun is at most 40 % of the word and 20 % of the line's spaces (measured in Word 2021: kept up to 0.37
  * of the word / 17 % of the spaces, moved down from 0.42 of the word). Spaces next to Hangul set half-width
- * (`cjk`, TextNode.cjkSpace) do not shrink: Korean lines in 맑은 고딕 keep their breaks.
+ * (`cjk`, TextNode.cjkSpace), a lone space after a syllable as well, do not shrink: Korean lines in 맑은 고딕 keep their breaks
+ * (Word 2021, 굴림 + Arial 10 pt: "자 1,234,567" then "이" moves down — QA 11-23, omni-word-hangul-fonts).
+ * A syllable inside a word (after a syllable, digit or letter) squeezes in only up to a quarter of it (바탕 11 pt keeps
+ * "숫자" 0.13 over, 굴림 + Arial 12 pt moves "부서"'s "서" down at 0.35); one that starts a word up to half of it
+ * (맑은 고딕 10.5 pt keeps "달 동" with "동" 0.44 over).
  */
 function shrinkFits(cur: Piece[], over: number, word: string, wordW: number, cjk: boolean): boolean {
-  if (!word || over > wordW * 0.4) return false;
+  const syllable = CJK_CHAR.test(word[0] ?? "");
+  const limit = !syllable ? 0.4 : /\s$/.test(cur[cur.length - 1]?.text ?? " ") ? 0.5 : 0.25;
+  if (!word || over > wordW * limit) return false;
   let spaces = 0;
   cur.forEach((p, i) => {
     const vis = p.text.replace(/\s+$/, "");
     if (vis === p.text) return;
-    if (cjk && (CJK_CHAR.test(vis.slice(-1)) || CJK_CHAR.test((cur[i + 1]?.text ?? word)[0] ?? ""))) return;
-    spaces += p.width - advance(vis, p.font, p.letterSpacing, runScale(p.run));
+    const w = p.width - advance(vis, p.font, p.letterSpacing, runScale(p.run));
+    if (!(cjk && (CJK_CHAR.test((vis || cur[i - 1]?.text || "").slice(-1)) || CJK_CHAR.test((cur[i + 1]?.text ?? word)[0] ?? "")))) spaces += w;
   });
   return over <= spaces * 0.2;
 }
+/**
+ * What a line's text may run past its width and still fit: one twip (Word's own unit; an AutoFit column is its text's
+ * width rounded down to twips — omni-fid-cambria "합계 Total" fits its cell by 0.01 px).
+ */
+const FIT_EPS = 1 / 15;
 /** punctuation that may hang past the line end (Word w:overflowPunct) */
 const HANG = /[,.、。，．]+$/;
 /**
@@ -801,7 +812,7 @@ export function layoutText(node: TextNode): TextLayout {
         const glue = cur.length > 0 && (joined.has(ti) || (ti === 0 && glued(cur[cur.length - 1].text, tok, node.wordBreak)));
         if (!glue) glueFrom = cur.length;
         // (a run that is only spaces never starts a line: spaces past the end hang, also after a line kept tight)
-        if (!forced && vis && x - spaceW * cond + fitW > lineMax && cur.length && !(node.justifyShrink && para.align === "JUSTIFY" && shrinkFits(cur, x + fitW - lineMax, vis, fitW, !!node.cjkSpace))) {
+        if (!forced && vis && x - spaceW * cond + fitW > lineMax + FIT_EPS && cur.length && !(node.justifyShrink && para.align === "JUSTIFY" && shrinkFits(cur, x + fitW - lineMax, vis, fitW, !!node.cjkSpace))) {
           if (glue && glueFrom > 0) {
             // the word began in an earlier run on this line: it goes to the next line whole
             const moved = cur.splice(glueFrom);

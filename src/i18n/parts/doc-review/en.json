@@ -4,6 +4,8 @@
   "review.tab": "Review",
   "review.view": "View",
   "review.view.markup": "Show changes",
+  "review.view.simple": "Simple",
+  "review.view.simpleTip": "Simple markup (Word's default): the text as if the changes were accepted, laid out like Word",
   "review.view.final": "Final",
   "review.view.markupTip": "Inserted text is underlined and deleted text struck through, in each author's colour",
   "review.view.finalTip": "Shows the document as if every change were accepted (deleted text hidden). The file is not changed",

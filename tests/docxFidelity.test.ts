@@ -156,6 +156,20 @@ describe("line breaking (core/text.ts)", () => {
     expect(lay([{ text: "aa bb cc dd ee ff" }], 132, { justifyShrink: true }, { align: "JUSTIFY" })).toEqual(["aa bb cc dd ee ff"]);
     expect(lay([{ text: "aa bb cc dd ee ff" }], 132, {}, { align: "JUSTIFY" })).toEqual(["aa bb cc dd ee ", "ff"]);
   });
+  it("justifyShrink: a syllable inside a word squeezes in up to a quarter of it, one that starts a word up to half (Word 2021, 굴림·바탕·맑은 고딕)", () => {
+    const o = { justifyShrink: true, wordBreak: "normal" as const };
+    const J = { align: "JUSTIFY" as const };
+    // 6 words + 6 spaces = 138 px, "가" to 148, "나" to 158: 2 px over (0.2 of it) is kept, 3 px (0.3) moves down
+    expect(lay([{ text: "aa bb cc dd ee ff 가나" }], 156, o, J)[0]).toBe("aa bb cc dd ee ff 가나");
+    expect(lay([{ text: "aa bb cc dd ee ff 가나" }], 155, o, J)[0]).toBe("aa bb cc dd ee ff 가");
+    // 10 letters + 10 spaces = 130 px: a syllable starting a word 4.5 px over (0.45) is kept, a Latin word is not
+    expect(lay([{ text: "a b c d e f g h i j 가" }], 135.5, o, J)).toEqual(["a b c d e f g h i j 가"]);
+    expect(lay([{ text: "a b c d e f g h i j k" }], 135.5, o, J)[0]).toBe("a b c d e f g h i j ");
+  });
+  it("a line may run a twip past its width (AutoFit columns are their text's width rounded down to twips)", () => {
+    expect(lay([{ text: "aa bb" }], 42.95)).toEqual(["aa bb"]);
+    expect(lay([{ text: "aa bb" }], 42.9)).toEqual(["aa ", "bb"]);
+  });
   it("autoSpace: a quarter of the size between Hangul and Latin letters / digits, the word kept whole", () => {
     setMeasure(fixed);
     const t: TextNode = { ...newText("", 500), autoSpace: { alpha: true, digit: true }, paragraphs: [{ ...newParagraph(""), runs: [{ ...DEFAULT_RUN, fontSize: 10, text: "제1조 끝" }] }] };

@@ -78,5 +78,6 @@
   "menu.export.kind.doc": "Document",
   "menu.export.kind.show": "Presentation",
   "menu.export.kind.table": "Table",
-  "cmd.help.storeUpdates": "Updates: Microsoft Store"
+  "cmd.help.storeUpdates": "Updates: Microsoft Store",
+  "menu.toast.mergedAsPixels": "Drew the picture / shape layers into pixels and merged them (Ctrl+Z undoes)"
 }

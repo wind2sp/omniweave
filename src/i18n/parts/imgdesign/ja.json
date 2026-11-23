@@ -144,5 +144,17 @@
   "canvas.size.anchor.5": "右",
   "canvas.size.anchor.6": "左下",
   "canvas.size.anchor.7": "下",
-  "canvas.size.anchor.8": "右下"
+  "canvas.size.anchor.8": "右下",
+  "cmd.why.pickLayer": "先にレイヤーを選んでください（レイヤーが複数あります）",
+  "cmd.why.noLayer": "このページにはレイヤーがありません",
+  "cmd.why.locked": "選んだレイヤーはロックまたは非表示です",
+  "cmd.why.pickPicture": "画像・ピクセルレイヤーを選んでください",
+  "cmd.why.notPicture": "ベクター・テキストレイヤーには使えません — 先にラスタライズしてください",
+  "cmd.why.merge": "すぐ下に表示中・ロックなしのレイヤーが同じグループに必要です",
+  "cmd.why.oneLayer": "レイヤーを 1 つだけ選んでください",
+  "cmd.why.alreadyPixels": "すでにピクセルレイヤーです",
+  "design.name.brush": "ブラシストローク",
+  "design.msg.eraserMissed": "消しゴムがパスの上を通っていません — パスの上をなぞってください",
+  "canvas.rotateRight": "カンバスを右に 90° 回転",
+  "canvas.rotateLeft": "カンバスを左に 90° 回転"
 }

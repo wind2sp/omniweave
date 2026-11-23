@@ -56,6 +56,40 @@ function rasterPropsHash(n: RasterNode): string {
 
 const boundsCache = new WeakMap<object, { epoch: number; rect: Rect }>();
 
+const contentCache = new WeakMap<object, Rect>();
+/**
+ * The painted part of a raster layer (pixels with any alpha), node-local — not the 256 px tiles around it
+ * (localBounds keeps the tile box: the PSD writer and others place layers by it). Flip and 90° rotation turn a layer
+ * about the middle of this, as Photoshop does (2026-11-23: a flipped 800 px photo turned about the middle of its
+ * 1024 px of tiles and moved 224 px). Cached per tile map.
+ */
+export function rasterContentBounds(n: RasterNode): Rect {
+  const hit = contentCache.get(n.tiles);
+  if (hit) return hit;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [k, tile] of Object.entries(n.tiles)) {
+    const i = k.indexOf("_");
+    const ox = +k.slice(0, i) * TILE, oy = +k.slice(i + 1) * TILE;
+    // skip a tile entirely inside what is found already
+    if (ox >= x0 && oy >= y0 && ox + TILE <= x1 && oy + TILE <= y1) continue;
+    const d = tile.data;
+    for (let y = 0; y < TILE; y++) {
+      const row = y * TILE * 4;
+      for (let x = 0; x < TILE; x++) {
+        if (!d[row + x * 4 + 3]) continue;
+        const px = ox + x, py = oy + y;
+        if (px < x0) x0 = px;
+        if (px + 1 > x1) x1 = px + 1;
+        if (py < y0) y0 = py;
+        if (py + 1 > y1) y1 = py + 1;
+      }
+    }
+  }
+  const r = x1 > x0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : { x: 0, y: 0, w: 0, h: 0 };
+  contentCache.set(n.tiles, r);
+  return r;
+}
+
 /** Local bounds of what is shown: cropped images / raster layers / PDF pages report their crop. */
 export function localBounds(n: SceneNode): Rect {
   if ((n.type === "RASTER" || n.type === "IMAGE" || n.type === "PDF") && n.crop) return visibleBounds(n);

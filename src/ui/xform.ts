@@ -1,7 +1,7 @@
 // Free transform glue: the selection box on the current page and live resize / rotate inside a
 // store gesture (one undo step per drag). The maths is in core/transform.ts.
 
-import { localBounds, nodeBounds } from "../core/loom";
+import { localBounds, nodeBounds, rasterContentBounds } from "../core/loom";
 import { currentPage, draftPage, findPage, useStore } from "../core/store";
 import { boxCenter, boxSize, flipNodeScreen, keepRatio, resizeFactors, resizeNode, rotatedAbout, scaleNodeAbout, type Box, type Handle } from "../core/transform";
 import type { OmwDocument, Page, SceneNode, Vec2 } from "../core/types";
@@ -116,7 +116,9 @@ export function flipSelected(axis: "h" | "v") {
   s.commit(axis === "h" ? t("ribbon.flipH") : t("ribbon.flipV"), (d) => {
     draftPage(d, s.pageId)?.nodes.forEach((n) => {
       if (!ids.has(n.id)) return;
-      n.transform = flipNodeScreen(n as SceneNode, localBounds(n as SceneNode), axis) as any;
+      // a pixel layer turns about its painted part, not its 256 px tiles (Photoshop)
+      const sn = n as SceneNode;
+      n.transform = flipNodeScreen(sn, sn.type === "RASTER" && !sn.crop ? rasterContentBounds(sn) : localBounds(sn), axis) as any;
       if (c) {
         // several objects: mirror their positions across the selection's centre too
         const b = nodeBounds(n as SceneNode);

@@ -2,6 +2,7 @@
 // segmented controls, selects, dropdown menus and the floating tooltip layer.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { Icon, type IconName } from "./Icons";
 import type { Live } from "./ops";
 import { useT } from "../../i18n";
@@ -490,16 +491,24 @@ export function Menu({ button, items, tip, kbd, className, align = "left", disab
       >
         {button}
       </button>
-      {open && (
-        <div ref={pop} className="menu-pop" role="menu" style={pos ? { left: pos.left, top: pos.top, maxHeight: pos.maxHeight } : { visibility: "hidden", left: 0, top: 0 }} onKeyDown={onListKey}>
-          {rows(list, false)}
-        </div>
-      )}
-      {open && sub && subItems.length > 0 && (
-        <div ref={subPop} className="menu-pop menu-sub" role="menu" style={sub.pos ? { left: sub.pos.left, top: sub.pos.top, maxHeight: sub.pos.maxHeight } : { visibility: "hidden", left: 0, top: 0 }} onKeyDown={onSubKey}>
-          {rows(subItems, true)}
-        </div>
-      )}
+      {/* the pop-ups go to <body>: inside a dialog that is still animating in (a CSS transform), position: fixed is
+          relative to the dialog, and the first menu opened there showed at the window's top-left (CAD layer colours) */}
+      {open &&
+        createPortal(
+          <div ref={pop} className="menu-pop" role="menu" style={pos ? { left: pos.left, top: pos.top, maxHeight: pos.maxHeight } : { visibility: "hidden", left: 0, top: 0 }} onKeyDown={onListKey}>
+            {rows(list, false)}
+          </div>,
+          document.body,
+        )}
+      {open &&
+        sub &&
+        subItems.length > 0 &&
+        createPortal(
+          <div ref={subPop} className="menu-pop menu-sub" role="menu" style={sub.pos ? { left: sub.pos.left, top: sub.pos.top, maxHeight: sub.pos.maxHeight } : { visibility: "hidden", left: 0, top: 0 }} onKeyDown={onSubKey}>
+            {rows(subItems, true)}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

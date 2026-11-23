@@ -55,6 +55,7 @@ import { vectorPath } from "../render/draw";
 import { revealTransparencyInPlace } from "./transparency";
 import { applyGradient, clipToSelection, deselect, paintTarget, lassoSelect, marqueeSelect, opFromMods, pickColorAt, usePixelSel, wandSelect, activeMask } from "./pixelSelect";
 import { addAnchorAt, constrain45, deleteAnchorAt, drawnLine, enterIsolation, exitIsolation, isolationFilter, useDesign } from "./designTools";
+import { brushPath, eraseVectorsOnPage, hasErasablePaths } from "./designPaint";
 import { countPress, type PressCount } from "../core/clickCount";
 import { zoomAt } from "./shell/ops";
 import { isPathTool, nudgeAnchors, pathHitAt, selectedAnchors, setInsideTest, shownPaths, useAnchors } from "./pathTools";
@@ -110,6 +111,7 @@ type Drag =
   | { kind: "xform"; sb: SelBox; handle: Handle | null; startAngle: number; ix?: SnapIndex }
   | { kind: "crop"; handle: Handle | null; rect0: Rect; q0: Vec2 }
   | { kind: "cropRotate"; angle0: number; a0: number; c: Vec2 }
+  | { kind: "vecPaint"; erase: boolean; pts: Vec2[] }
   | { kind: "cropNew"; rect0: Rect; q0: Vec2 }
   | { kind: "stroke"; stroke: Stroke }
   | { kind: "shape"; shape: "rect" | "ellipse"; start: Vec2; cur: Vec2; ix?: SnapIndex }
@@ -535,6 +537,22 @@ export function CanvasView() {
       o.stroke();
       o.setLineDash([4, 4]);
       o.strokeStyle = "#000";
+      o.stroke();
+      o.restore();
+    }
+    if (d?.kind === "vecPaint" && d.pts.length) {
+      // the stroke as it is drawn: the brush colour, or the eraser's grey track
+      o.save();
+      o.lineWidth = Math.max(1, S().brush.size * S().view.zoom);
+      o.lineCap = o.lineJoin = "round";
+      o.strokeStyle = d.erase ? "rgba(128,128,128,0.45)" : S().brush.color;
+      o.beginPath();
+      d.pts.forEach((q, i) => {
+        const sq = pageToScreen(q);
+        if (i) o.lineTo(sq[0], sq[1]);
+        else o.moveTo(sq[0], sq[1]);
+      });
+      if (d.pts.length === 1) o.lineTo(pageToScreen(d.pts[0])[0] + 0.01, pageToScreen(d.pts[0])[1]);
       o.stroke();
       o.restore();
     }
@@ -1600,6 +1618,12 @@ export function CanvasView() {
       case "eraser": {
         // Alt+click with the brush picks a colour (Photoshop)
         if (e.altKey && s.tool === "brush" && currentEditMode() === "IMAGE") return void pickColorAt(p);
+        // design mode (Illustrator): the paintbrush draws a path, the eraser cuts paths
+        if (currentEditMode() === "DESIGN" && (s.tool === "brush" || hasErasablePaths(page.id))) {
+          drag.current = { kind: "vecPaint", erase: s.tool === "eraser", pts: [p] };
+          invalidate();
+          return;
+        }
         // the active layer (pictures are rasterized first); none for the eraser: nothing happens (a notice says why)
         const raster = paintTarget(currentPage()!, s.tool === "eraser", currentEditMode() === "IMAGE");
         if (!raster) return;
@@ -1787,7 +1811,8 @@ export function CanvasView() {
         invalidate();
         break;
       }
-      case "lasso": {
+      case "lasso":
+      case "vecPaint": {
         const last = d.pts[d.pts.length - 1];
         if (Math.hypot(p[0] - last[0], p[1] - last[1]) * s.view.zoom >= 2) d.pts.push(p);
         invalidate();
@@ -1908,6 +1933,18 @@ export function CanvasView() {
         else if (d.op === "replace") deselect();
         invalidate();
         break;
+      case "vecPaint": {
+        if (d.erase) eraseVectorsOnPage(s.pageId, d.pts, s.brush.size);
+        else {
+          const v = brushPath(d.pts, s.brush.color, s.brush.size, s.view.zoom);
+          if (v) {
+            s.commit(tr("cmd.image.brush"), (doc) => void draftPage(doc, s.pageId)?.nodes.push(v as any));
+            S().set({ selection: [v.id] });
+          }
+        }
+        invalidate();
+        break;
+      }
       case "gradient":
         if (Math.hypot(d.b[0] - d.a[0], d.b[1] - d.a[1]) * s.view.zoom > 3) applyGradient(d.a, d.b);
         invalidate();

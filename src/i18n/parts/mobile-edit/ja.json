@@ -122,5 +122,6 @@
   "mobile.ed.psdBig": "大きな画像です({w}×{h}) — 動作が遅くなることがあります",
   "mobile.ed.notEditable": "このファイルは画像としてのみ開きます(編集できる内容がありません)",
   "dxfwrite.export.label": "DXF図面(.dxf)",
-  "dxfwrite.export.hint": "このページの線・文字をレイヤーごとにDXF R12で — 塗り・線種・線幅は含まれません"
+  "dxfwrite.export.hint": "このページの線・文字をレイヤーごとにDXF R12で — 塗り・線種・線幅は含まれません",
+  "dxfwrite.export.dwgNote": "DWG では保存しません — DXF で書き出せば AutoCAD で開けます"
 }

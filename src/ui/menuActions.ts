@@ -6,7 +6,8 @@ import { docHooks } from "./editModes";
 import { mergeRasterTiles, simpleRaster } from "../core/image/merge";
 import { dissolveReady, loadDissolveField } from "../core/style/blend";
 import { currentPage, draftPage, findPage, selectedNodes, useStore } from "../core/store";
-import { nodeBounds } from "../core/loom";
+import { nodeBounds, rasterContentBounds } from "../core/loom";
+import { applyTransform } from "../core/geom";
 import { findMatches, replaceAllInDoc } from "../core/textSearch";
 import { reflowPages } from "../core/flow";
 import { current } from "immer";
@@ -251,7 +252,10 @@ export function rotateSelected90(dir: 1 | -1) {
   const s = S();
   const sb = selectionBox(currentPage(), s.selection);
   if (!sb) return s.notify(t("menu.toast.selectToRotate"));
-  const c = boxCenter(sb.box);
+  // one pixel layer turns about the middle of its painted part, not of its 256 px tiles (Photoshop)
+  const one = !sb.multi && sb.nodes[0]?.type === "RASTER" && !sb.nodes[0].crop ? sb.nodes[0] : null;
+  const cb = one ? rasterContentBounds(one) : null;
+  const c = one && cb && cb.w > 0 ? applyTransform(one.transform, [cb.x + cb.w / 2, cb.y + cb.h / 2]) : boxCenter(sb.box);
   const ids = new Set(sb.nodes.map((n) => n.id));
   s.commit(t(dir > 0 ? "cmd.object.rotateCW" : "cmd.object.rotateCCW"), (d) => {
     draftPage(d, s.pageId)?.nodes.forEach((n) => {
@@ -329,27 +333,81 @@ export function insertSymbol(ch: string): "caret" | "node" | null {
 
 // ───────── image: merge down, rasterize ─────────
 
-/** The selected raster and the raster right below it, when Merge down can combine them exactly. */
-export function mergeDownPair(page: Page | undefined, selection: string[]): { upper: RasterNode; lower: RasterNode } | null {
+/** Layers Merge down can combine: pixels, and pictures / shapes / text / PDF pages (drawn into pixels first). */
+const MERGEABLE = new Set<SceneNode["type"]>(["RASTER", "IMAGE", "VECTOR", "TEXT", "PDF"]);
+
+/** Plain pixel layers that merge tile by tile, exactly (no turn, scale or crop). */
+const exactPair = (upper: SceneNode, lower: SceneNode) => upper.type === "RASTER" && lower.type === "RASTER" && simpleRaster(upper) && simpleRaster(lower);
+
+/**
+ * The selected layer and the layer right below it, when Merge down can combine them: both shown and unlocked, in one
+ * group. Two plain pixel layers merge exactly; any other pair (an opened photo is a picture layer — before 2026-11-23
+ * that kept Merge down greyed out) is drawn into one pixel layer.
+ */
+export function mergeDownPair(page: Page | undefined, selection: string[]): { upper: SceneNode; lower: SceneNode } | null {
   if (!page || selection.length !== 1) return null;
   const i = page.nodes.findIndex((n) => n.id === selection[0]);
   if (i < 1) return null;
   const upper = page.nodes[i], lower = page.nodes[i - 1];
-  if (upper.type !== "RASTER" || lower.type !== "RASTER") return null;
+  if (!MERGEABLE.has(upper.type) || !MERGEABLE.has(lower.type)) return null;
   if (upper.locked || lower.locked || !upper.visible || !lower.visible) return null;
+  if (upper.type === "RASTER" && upper.adjust) return null;
+  if (lower.type === "RASTER" && lower.adjust) return null;
   // groups / clipping: only within one group; a clipped layer merges into its base (or into a clipped layer
   // below on the same base); an unclipped layer cannot merge into a clipped one (that would clip it)
   if ((upper.groupId ?? "") !== (lower.groupId ?? "")) return null;
   if (lower.clip && !upper.clip) return null;
-  return simpleRaster(upper) && simpleRaster(lower) ? { upper, lower } : null;
+  // a clipped layer onto its base is merged only tile by tile (clipped compositing)
+  if (upper.clip && !lower.clip && !exactPair(upper, lower)) return null;
+  return { upper, lower };
+}
+
+/** Merge a pair that is not two plain pixel layers: both drawn (blend, opacity) into one pixel layer in the lower's place. */
+async function mergeByDrawing(pageId: string, upperId: string, lowerId: string) {
+  const s = S();
+  const cur = findPage(s.doc, pageId);
+  const lo = cur?.nodes.find((n) => n.id === lowerId), up = cur?.nodes.find((n) => n.id === upperId);
+  if (!cur || !lo || !up) return;
+  const b1 = nodeBounds(lo), b2 = nodeBounds(up);
+  const x0 = Math.floor(Math.min(b1.x, b2.x)), y0 = Math.floor(Math.min(b1.y, b2.y));
+  const x1 = Math.ceil(Math.max(b1.x + b1.w, b2.x + b2.w)), y1 = Math.ceil(Math.max(b1.y + b1.h, b2.y + b2.h));
+  const at = (n: SceneNode, o: Partial<SceneNode>) => ({ ...n, ...o, transform: { ...n.transform, x: n.transform.x - x0, y: n.transform.y - y0 } }) as SceneNode;
+  // the lower layer's own blend mode stays on the result (it blends with what is below); its opacity is baked in
+  const pair = [at(lo, { blendMode: "NORMAL", clip: undefined, groupId: undefined }), at(up, { clip: undefined, groupId: undefined })];
+  let raster: RasterNode;
+  try {
+    const r = await rasterizeNode(s.doc, { ...cur, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) } as Page, pair);
+    if (!r) return S().notify(t("menu.toast.rasterizeEmpty"));
+    const made = rasterFromRgba(downsample(decodePngRgba(r.png), r.w, r.h), r.w, r.h, lo.name);
+    raster = { ...made, id: lo.id, visible: true, locked: false, opacity: 1, blendMode: lo.blendMode, transform: { x: r.x + x0, y: r.y + y0, rotation: 0, scale: 1 } };
+    if (lo.groupId) raster.groupId = lo.groupId;
+    if (lo.clip) raster.clip = true;
+  } catch (e: any) {
+    return S().notify(t("menu.toast.rasterizeFailed", { error: String(e?.message ?? e) }));
+  }
+  // either layer changed while it was drawn: drop the result quietly
+  const now = findPage(S().doc, pageId);
+  if (now?.nodes.find((n) => n.id === lowerId) !== lo || now?.nodes.find((n) => n.id === upperId) !== up) return;
+  S().commit(t("menu.hist.mergeDown"), (d) => {
+    const pg = draftPage(d, pageId);
+    if (!pg) return;
+    const i = pg.nodes.findIndex((n) => n.id === lowerId);
+    if (i < 0) return;
+    pg.nodes[i] = raster as any;
+    pg.nodes = pg.nodes.filter((n) => n.id !== upperId);
+    pg.animations = pg.animations.filter((a) => a.targetNodeId !== upperId);
+  });
+  S().set({ selection: [lowerId] });
+  S().notify(t("menu.toast.mergedAsPixels"));
 }
 
 export function mergeDown() {
   const s = S();
   const page = currentPage();
-  const pair = mergeDownPair(page, s.selection);
-  if (!page || !pair) return s.notify(t("menu.toast.cannotMerge"));
-  const { upper, lower } = pair;
+  const pair0 = mergeDownPair(page, s.selection);
+  if (!page || !pair0) return s.notify(t("menu.toast.cannotMerge"));
+  if (!exactPair(pair0.upper, pair0.lower)) return void mergeByDrawing(page.id, pair0.upper.id, pair0.lower.id);
+  const upper = pair0.upper as RasterNode, lower = pair0.lower as RasterNode;
   // dissolve dots are baked for good: wait for Photoshop's thresholds (loaded on demand, core/style/blend.ts)
   if (upper.blendMode === "DISSOLVE" && !dissolveReady()) {
     loadDissolveField().then(mergeDown, () => s.notify(t("menu.toast.cannotMerge")));

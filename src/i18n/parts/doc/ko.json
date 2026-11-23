@@ -221,5 +221,6 @@
   "doc.print.copiesInfo": "(한 부 {s}장 × {c}부)",
   "doc.print.cancel": "취소",
   "doc.print.savePdf": "PDF로 저장",
-  "doc.toast.adjustBaked": "조정 레이어는 이 형식에 담을 수 없어, 조정이 닿는 레이어를 그림으로 굳혀 넣었습니다"
+  "doc.toast.adjustBaked": "조정 레이어는 이 형식에 담을 수 없어, 조정이 닿는 레이어를 그림으로 굳혀 넣었습니다",
+  "doc.toast.elevatedKept": "그레이디언트로 칠한 도형 등 {n}개는 아직 개체로 바꿀 수 없어 배경 그림에 남았어요."
 }

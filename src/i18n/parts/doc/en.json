@@ -221,5 +221,6 @@
   "doc.print.copiesInfo": "({s} sheets per copy × {c} copies)",
   "doc.print.cancel": "Cancel",
   "doc.print.savePdf": "Save as PDF",
-  "doc.toast.adjustBaked": "This format has no adjustment layers, so the layers they affect were placed as a picture"
+  "doc.toast.adjustBaked": "This format has no adjustment layers, so the layers they affect were placed as a picture",
+  "doc.toast.elevatedKept": "{n} shapes (gradient fills and the like) cannot become objects yet and stay in the background picture."
 }

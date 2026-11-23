@@ -86,7 +86,8 @@ export function simulateParagraph(para: TextParagraph, boxWidth: number, opts: S
         const w = width(t, run, font, ci) + spaceExtra(t, run, font, runScale(run), para.spaceEm);
         const vis = t.replace(/\s+$/, "");
         const visW = vis === t ? w : width(vis, run, font, ci);
-        const fits = (at: number) => at + visW <= maxW || (condense > 0 && at - spaceW * condense + visW <= maxW);
+        // (a twip past the width still fits: layoutText's FIT_EPS)
+        const fits = (at: number) => at + visW <= maxW + 1 / 15 || (condense > 0 && at - spaceW * condense + visW <= maxW + 1 / 15);
         const glue = si === 0 && ti === 0 && count > 0 && glued(lastTok, t, wordBreak);
         if (!glue) g = { ci, x, count, lastEnd, max: maxSize, wordMax: 0 };
         // (layoutText: a token that is only spaces never starts a line)

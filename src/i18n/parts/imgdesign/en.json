@@ -144,5 +144,17 @@
   "canvas.size.anchor.5": "Right",
   "canvas.size.anchor.6": "Bottom left",
   "canvas.size.anchor.7": "Bottom",
-  "canvas.size.anchor.8": "Bottom right"
+  "canvas.size.anchor.8": "Bottom right",
+  "cmd.why.pickLayer": "Pick a layer first (there are several)",
+  "cmd.why.noLayer": "This page has no layers",
+  "cmd.why.locked": "The selected layer is locked or hidden",
+  "cmd.why.pickPicture": "Pick a picture or pixel layer",
+  "cmd.why.notPicture": "Not for vector or text layers — rasterize first",
+  "cmd.why.merge": "The layer right below must be shown, unlocked and in the same group",
+  "cmd.why.oneLayer": "Pick a single layer",
+  "cmd.why.alreadyPixels": "It is a pixel layer already",
+  "design.name.brush": "Brush stroke",
+  "design.msg.eraserMissed": "The eraser did not pass over a path — drag it across one",
+  "canvas.rotateRight": "Rotate Canvas 90° Right",
+  "canvas.rotateLeft": "Rotate Canvas 90° Left"
 }

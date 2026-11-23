@@ -78,5 +78,6 @@
   "menu.export.kind.doc": "文書",
   "menu.export.kind.show": "プレゼンテーション",
   "menu.export.kind.table": "表",
-  "cmd.help.storeUpdates": "更新: Microsoft Store"
+  "cmd.help.storeUpdates": "更新: Microsoft Store",
+  "menu.toast.mergedAsPixels": "画像・図形レイヤーをピクセルにして結合しました（Ctrl+Z で元に戻す）"
 }

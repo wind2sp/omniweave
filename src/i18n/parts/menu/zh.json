@@ -78,5 +78,6 @@
   "menu.export.kind.doc": "文档",
   "menu.export.kind.show": "演示",
   "menu.export.kind.table": "表格",
-  "cmd.help.storeUpdates": "更新：Microsoft Store"
+  "cmd.help.storeUpdates": "更新：Microsoft Store",
+  "menu.toast.mergedAsPixels": "已将图片/形状图层绘制为像素并合并（Ctrl+Z 撤销）"
 }

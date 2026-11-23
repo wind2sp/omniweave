@@ -560,7 +560,7 @@ export async function importPdf(bytes: Uint8Array, name: string, format: "pdf" |
  * UI that the page is already elevated. Falls back to the cover-rectangle method when the engine
  * cannot read the page or finds no editable text.
  */
-export async function elevatePdfText(assetHash: string, pageIndex: number, pageW: number): Promise<{ nodes: SceneNode[]; covers: PdfCover[] }> {
+export async function elevatePdfText(assetHash: string, pageIndex: number, pageW: number): Promise<{ nodes: SceneNode[]; covers: PdfCover[]; keptShapes?: number }> {
   try {
     const sd = await surgeonDoc(assetHash);
     const r = elevatePage(sd, pageIndex, { prefix: surgeonPrefix(assetHash), vectors: "auto" });
@@ -568,7 +568,7 @@ export async function elevatePdfText(assetHash: string, pageIndex: number, pageW
     if (r.nodes.length) {
       // warm the stripped background so the first paint after elevation is already clean
       void openStripped(assetHash, pageIndex).catch((e) => console.error("PDF Surgeon background", e));
-      return { nodes: r.nodes, covers: [{ ...SURGEON_MARK }] };
+      return { nodes: r.nodes, covers: [{ ...SURGEON_MARK }], keptShapes: r.keptShapes };
     }
   } catch (e) {
     console.warn("PDF Surgeon could not elevate this page; using cover rectangles", e);

@@ -2,11 +2,12 @@
 //
 // Shapes (path, rect, circle, ellipse, line, polyline, polygon) become VectorNodes with their fill, stroke, width,
 // fill rule and opacity; <g> elements with an id or label become layer groups; transforms are baked into the
-// points. A file that uses what paths cannot hold here (text, embedded images, <use>, gradients / patterns,
-// filters, clip paths, masks) returns null, and the caller keeps it as one picture — nothing is lost or approximated.
+// points. <text> becomes an editable text box (its font, size, weight, colour and anchor), <use> repeats the shape it
+// points to. A file that uses what paths cannot hold here (embedded images, gradients / patterns, filters, clip
+// paths, masks) returns null, and the caller keeps it as one picture — nothing is lost or approximated.
 
 import { t } from "../i18n";
-import { newVector, uid, type Contour, type LayerGroup, type SceneNode, type Vec2, type VectorAnchor, type VectorNode } from "../core/types";
+import { newText, newVector, uid, type TextNode, type Contour, type LayerGroup, type SceneNode, type Vec2, type VectorAnchor, type VectorNode } from "../core/types";
 
 type M = [number, number, number, number, number, number]; // a b c d e f
 
@@ -310,7 +311,45 @@ function styleOf(el: Element, parent: Style): Style {
 }
 
 /** Elements whose look paths cannot carry here: the file stays one picture when any is drawn. */
-const UNSUPPORTED = new Set(["text", "image", "use", "foreignObject", "filter", "clipPath", "mask", "pattern", "switch"]);
+const UNSUPPORTED = new Set(["image", "foreignObject", "filter", "clipPath", "mask", "pattern", "switch", "textPath"]);
+
+/**
+ * An SVG <text> as a text box: one line (tspans joined), the font, size, weight, slant and fill colour it is drawn
+ * with, placed so its baseline sits where the SVG puts it and its anchor (start / middle / end) stays. Null for an
+ * empty one or a fill that is not a plain colour.
+ */
+function svgText(el: Element, m: M, s: Style, inherited: Record<string, string>): TextNode | null {
+  const a = { ...inherited, ...attrs(el) };
+  const text = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+  if (!text || (s.fill && s.fill.startsWith("url("))) return null;
+  const first = el.getElementsByTagName("tspan")[0];
+  const num = (v: string | null | undefined) => (v != null && isFinite(parseFloat(v)) ? parseFloat(v) : NaN);
+  const x0 = num(el.getAttribute("x") ?? first?.getAttribute("x")), y0 = num(el.getAttribute("y") ?? first?.getAttribute("y"));
+  const x = isFinite(x0) ? x0 : 0, y = isFinite(y0) ? y0 : 0;
+  const k = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
+  const size = (num(a["font-size"]) || 16) * k;
+  const family = (a["font-family"] ?? "").split(",")[0].replace(/["']/g, "").trim();
+  const weight = a["font-weight"] ?? "";
+  const bold = weight === "bold" || weight === "bolder" || parseFloat(weight) >= 600;
+  const italic = a["font-style"] === "italic" || a["font-style"] === "oblique";
+  const anchor = a["text-anchor"] === "middle" ? "CENTER" : a["text-anchor"] === "end" ? "RIGHT" : "LEFT";
+  // a box wide enough for the line (no wrapping), anchored as the SVG anchors it
+  const w = Math.max(24, text.length * size * 0.62 + size);
+  const n = newText(text, w, { fontSize: size, color: withAlpha(s.fill ?? "#000000", s.fillOpacity) ?? "#000000", bold, italic, ...(family ? { fontFamily: family } : {}) });
+  for (const p of n.paragraphs) p.align = anchor;
+  const lx = anchor === "CENTER" ? -w / 2 : anchor === "RIGHT" ? -w : 0;
+  // the baseline of the first line ≈ 0.8 of a line below the box top
+  const [px, py] = ap(m, x, y);
+  const rot = Math.atan2(m[1], m[0]);
+  const ox = lx, oy = -size * 0.95;
+  n.transform = { x: px + ox * Math.cos(rot) - oy * Math.sin(rot), y: py + ox * Math.sin(rot) + oy * Math.cos(rot), rotation: (rot * 180) / Math.PI, scale: 1 };
+  n.name = el.getAttribute("id") || text.slice(0, 24);
+  n.opacity = s.opacity;
+  return n;
+}
+
+/** Text attributes a <text> takes from the groups around it. */
+const TEXT_INHERIT = ["font-size", "font-family", "font-weight", "font-style", "text-anchor"];
 
 function shapeSegs(el: Element): Seg[] | null {
   const g = (k: string) => parseFloat(el.getAttribute(k) ?? "0") || 0;
@@ -390,9 +429,46 @@ export function svgToVectors(text: string): SvgArtwork | null {
   const nodes: SceneNode[] = [];
   const groups: LayerGroup[] = [];
   let unsupported = false;
-  const walk = (el: Element, m: M, st: Style, groupId: string | null) => {
-    for (const ch of Array.from(el.childNodes).filter((x): x is Element => x.nodeType === 1)) {
+  const byId = new Map<string, Element>();
+  for (const e of Array.from(doc.getElementsByTagName("*"))) {
+    const id = e.getAttribute("id");
+    if (id && !byId.has(id)) byId.set(id, e);
+  }
+  let useDepth = 0;
+  const walk = (el: Element, m: M, st: Style, groupId: string | null, ta: Record<string, string> = {}, only?: Element[]) => {
+    for (const ch of only ?? Array.from(el.childNodes).filter((x): x is Element => x.nodeType === 1)) {
       const tag = ch.localName;
+      const chAttrs = attrs(ch);
+      const cta = { ...ta };
+      for (const k of TEXT_INHERIT) if (chAttrs[k] != null) cta[k] = chAttrs[k];
+      if (tag === "use") {
+        // <use href="#id" x y>: the referenced shape again, moved (at most 8 deep: a loop of uses is cut there)
+        const ref = (ch.getAttribute("href") ?? ch.getAttribute("xlink:href") ?? "").replace(/^#/, "");
+        const target = byId.get(ref);
+        if (!target || useDepth > 8) continue;
+        const us = styleOf(ch, st);
+        if (!us.display) continue;
+        const um = mul(mul(m, parseTransform(ch.getAttribute("transform"))), [1, 0, 0, 1, parseFloat(ch.getAttribute("x") ?? "0") || 0, parseFloat(ch.getAttribute("y") ?? "0") || 0]);
+        useDepth++;
+        walk(ch, um, us, groupId, cta, target.localName === "symbol" ? Array.from(target.childNodes).filter((x): x is Element => x.nodeType === 1) : [target]);
+        useDepth--;
+        if (unsupported) return;
+        continue;
+      }
+      if (tag === "text") {
+        const s = styleOf(ch, st);
+        if (!s.display) continue;
+        if ((s.fill && s.fill.startsWith("url(")) || chAttrs["clip-path"] || chAttrs.mask || chAttrs.filter) {
+          unsupported = true;
+          return;
+        }
+        const tn = svgText(ch, mul(m, parseTransform(ch.getAttribute("transform"))), s, cta);
+        if (tn) {
+          if (groupId) tn.groupId = groupId;
+          nodes.push(tn);
+        }
+        continue;
+      }
       if (tag === "defs" || tag === "title" || tag === "desc" || tag === "metadata" || tag === "style" || tag === "symbol" || tag === "linearGradient" || tag === "radialGradient") continue;
       if (UNSUPPORTED.has(tag)) {
         unsupported = true;
@@ -412,8 +488,8 @@ export function svgToVectors(text: string): SvgArtwork | null {
         if (label && tag === "g") {
           gid = uid("grp");
           groups.push({ id: gid, name: label, parentId: groupId, visible: true, locked: false, opacity: s.opacity, blendMode: "PASS_THROUGH" });
-          walk(ch, cm, { ...s, opacity: 1 }, gid);
-        } else walk(ch, cm, s, gid);
+          walk(ch, cm, { ...s, opacity: 1 }, gid, cta);
+        } else walk(ch, cm, s, gid, cta);
         if (unsupported) return;
         continue;
       }

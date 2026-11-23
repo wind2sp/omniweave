@@ -122,5 +122,6 @@
   "mobile.ed.psdBig": "Large picture ({w}×{h}) — editing may be slow",
   "mobile.ed.notEditable": "This file opens only as a picture (nothing to edit)",
   "dxfwrite.export.label": "DXF drawing (.dxf)",
-  "dxfwrite.export.hint": "Lines and text of this page by layer as DXF R12 — fills, line types and weights are left out"
+  "dxfwrite.export.hint": "Lines and text of this page by layer as DXF R12 — fills, line types and weights are left out",
+  "dxfwrite.export.dwgNote": "DWG is not written — export DXF, which AutoCAD opens"
 }

@@ -221,5 +221,6 @@
   "doc.print.copiesInfo": "（每份 {s} 张 × {c} 份）",
   "doc.print.cancel": "取消",
   "doc.print.savePdf": "另存为 PDF",
-  "doc.toast.adjustBaked": "此格式不支持调整图层，受影响的图层已作为图片置入"
+  "doc.toast.adjustBaked": "此格式不支持调整图层，受影响的图层已作为图片置入",
+  "doc.toast.elevatedKept": "{n} 个形状（渐变填充等）暂时无法转换为对象，仍保留在背景图片中。"
 }

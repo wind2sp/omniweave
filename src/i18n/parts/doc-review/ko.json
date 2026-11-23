@@ -4,6 +4,8 @@
   "review.tab": "검토",
   "review.view": "보기",
   "review.view.markup": "변경 표시",
+  "review.view.simple": "단순 표시",
+  "review.view.simpleTip": "단순 태그(Word 기본): 변경을 받아들인 것처럼 보이고 Word와 같은 줄로 배치",
   "review.view.final": "최종본",
   "review.view.markupTip": "넣은 글자는 밑줄, 지운 글자는 취소선으로 작성자 색을 입혀 보여 줍니다",
   "review.view.finalTip": "모든 변경을 받아들인 모습으로 보여 줍니다(지운 글자 숨김). 파일은 바뀌지 않습니다",

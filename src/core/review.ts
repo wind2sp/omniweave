@@ -14,7 +14,7 @@ export type { Revision } from "./types";
 // ── view ──
 
 /** markup = changes drawn in colour with their lines (Word '모든 변경 내용'); final = as if every change were accepted */
-export type ReviewView = "markup" | "final";
+export type ReviewView = "markup" | "simple" | "final";
 
 let view: ReviewView = "markup";
 export const reviewView = (): ReviewView => view;
@@ -78,7 +78,8 @@ export const isOwnInsertion = (rev: Revision | undefined): boolean => isOwnRevis
 export const isRemoved = (r: Pick<TextRun, "rev">): boolean => r.rev?.kind === "del" || r.rev?.kind === "moveFrom";
 
 /** The run takes no room and is not drawn in the current view. */
-export const hiddenInView = (r: Pick<TextRun, "rev">): boolean => view === "final" && isRemoved(r);
+// (simple = Word's '단순 태그', its default on opening a file: the text as if accepted, laid out the same as final)
+export const hiddenInView = (r: Pick<TextRun, "rev">): boolean => view !== "markup" && isRemoved(r);
 
 /**
  * The offset `o` of the paragraph moved past the text the view hides right next to it in direction `dir` (the final
@@ -86,7 +87,7 @@ export const hiddenInView = (r: Pick<TextRun, "rev">): boolean => view === "fina
  * text the reader cannot see. `o` itself when nothing is hidden there.
  */
 export function skipHidden(p: Pick<TextParagraph, "runs">, o: number, dir: -1 | 1): number {
-  if (view !== "final") return o;
+  if (view === "markup") return o;
   for (let moved = true; moved; ) {
     moved = false;
     let acc = 0;

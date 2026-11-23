@@ -4,6 +4,8 @@
   "review.tab": "审阅",
   "review.view": "视图",
   "review.view.markup": "显示修订",
+  "review.view.simple": "简单标记",
+  "review.view.simpleTip": "简单标记（Word 默认）：按接受修订后的样子显示，与 Word 同样排行",
   "review.view.final": "最终状态",
   "review.view.markupTip": "插入的文字加下划线，删除的文字加删除线，并以作者颜色显示",
   "review.view.finalTip": "按接受全部修订后的样子显示（隐藏删除的文字）。文件不会改变",

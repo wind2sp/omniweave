@@ -122,5 +122,6 @@
   "mobile.ed.psdBig": "图片较大({w}×{h})——可能较慢",
   "mobile.ed.notEditable": "此文件只能作为图片打开（没有可编辑的内容）",
   "dxfwrite.export.label": "DXF 图纸(.dxf)",
-  "dxfwrite.export.hint": "将本页的线条和文字按图层导出为 DXF R12——不含填充、线型和线宽"
+  "dxfwrite.export.hint": "将本页的线条和文字按图层导出为 DXF R12——不含填充、线型和线宽",
+  "dxfwrite.export.dwgNote": "不写入 DWG——导出为 DXF 即可在 AutoCAD 中打开"
 }

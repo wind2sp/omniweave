@@ -1390,6 +1390,64 @@ export function docxSetup(sectPr: Element | undefined): PageSetup {
   return { width: Math.round((w / 15) * 100) / 100, height: Math.round((h / 15) * 100) / 100, margins, ...(columns ? { columns } : {}) };
 }
 
+/**
+ * Word's document-wide text settings a page of this body was read with (the frames' TextNode settings, from the file's
+ * docDefaults / Normal style and settings.xml compat): written back into a new file so Word — and this app reading it
+ * again — lays the text out the same (QA 11-23: a Word document written anew lost them; its pages changed). Only for
+ * bodies read from Word (wordSpacing set); a body made here is written as before.
+ */
+export function docxDocDefaults(pages: readonly Page[]): { styles: string; compat: string } {
+  const proto = pages.flatMap((p) => p.nodes).find((n): n is TextNode => n.type === "TEXT" && !!n.flow) ?? pages.flatMap((p) => p.nodes).find((n): n is TextNode => n.type === "TEXT");
+  if (!proto?.wordSpacing) return { styles: "", compat: notesPrXml(pages) };
+  const off = (n: string) => `<w:${n} w:val="0"/>`;
+  // CT_PPrBase order: wordWrap overflowPunct autoSpaceDE autoSpaceDN
+  const flags = (proto.wordBreak === "normal" ? off("wordWrap") : "") + (proto.hangPunct ? "" : off("overflowPunct")) + (proto.autoSpace?.alpha ? "" : off("autoSpaceDE")) + (proto.autoSpace?.digit ? "" : off("autoSpaceDN"));
+  // the original file's own document defaults when it is at hand (Word's kerning, complex-script size, languages…: what
+  // the model does not hold but Word lays the text out by — QA 11-23, a table moved 11 pt in Word without them)
+  let rPr = proto.lang ? `<w:lang w:val="${esc(proto.lang)}"/>` : "";
+  let pPr = flags;
+  const office = pages.find((p) => p.source?.format === "docx" && p.source.office)?.source?.office;
+  const orig = office && defaultGetBlob(office.hash);
+  if (orig) {
+    try {
+      const st = strFromU8(unzipSync(orig, { filter: (x) => x.name === "word/styles.xml" })["word/styles.xml"]);
+      const r0 = /<w:rPrDefault>\s*<w:rPr>([\s\S]*?)<\/w:rPr>/.exec(st)?.[1];
+      const p0 = /<w:pPrDefault>\s*<w:pPr>([\s\S]*?)<\/w:pPr>/.exec(st)?.[1];
+      if (r0 != null) rPr = r0;
+      if (p0 != null) {
+        // (the flags in CT_PPrBase order: before spacing, ind, jc …)
+        const base = p0.replace(/<w:(wordWrap|overflowPunct|autoSpaceDE|autoSpaceDN)\b[^>]*\/>/g, "");
+        const at = base.search(/<w:(bidi|adjustRightInd|snapToGrid|spacing|ind|contextualSpacing|mirrorIndents|suppressOverlap|jc|textDirection|textAlignment|textboxTightWrap|outlineLvl|divId|cnfStyle|rPr|sectPr|pPrChange)\b/);
+        pPr = at < 0 ? base + flags : base.slice(0, at) + flags + base.slice(at);
+      }
+    } catch {
+      /* the model's own settings */
+    }
+  }
+  const styles = pPr || rPr ? `<w:docDefaults>${rPr ? `<w:rPrDefault><w:rPr>${rPr}</w:rPr></w:rPrDefault>` : ""}${pPr ? `<w:pPrDefault><w:pPr>${pPr}</w:pPr></w:pPrDefault>` : ""}</w:docDefaults>` : "";
+  // CT_Compat order: balanceSingleByteDoubleByteWidth … doNotUseHTMLParagraphAutoSpacing … compatSetting
+  const c =
+    (proto.cjkSpace === "half" ? "<w:balanceSingleByteDoubleByteWidth/>" : "") +
+    (proto.wordSpacing === "sum" ? "<w:doNotUseHTMLParagraphAutoSpacing/>" : "") +
+    (proto.justifyShrink ? '<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>' : "");
+  return { styles, compat: notesPrXml(pages) + (c ? `<w:compat>${c}</w:compat>` : "") };
+}
+
+/** settings.xml w:footnotePr / w:endnotePr of the document's note numbering (format, start, restart) — when set. */
+function notesPrXml(pages: readonly Page[]): string {
+  const pr = pages[0]?.notePr;
+  if (!pr) return "";
+  const one = (kind: "foot" | "end") => {
+    const k = pr[kind];
+    if (!k) return "";
+    const fmt = k.fmt && k.fmt !== (kind === "end" ? "lowerRoman" : "decimal") ? `<w:numFmt w:val="${DOCX_NOTEFMT_OUT[k.fmt]}"/>` : "";
+    const start = k.start && k.start !== 1 ? `<w:numStart w:val="${k.start}"/>` : "";
+    const rs = kind === "foot" && k.restart ? `<w:numRestart w:val="${k.restart === "page" ? "eachPage" : "eachSect"}"/>` : "";
+    return fmt || start || rs ? `<w:${kind}notePr>${fmt}${start}${rs}</w:${kind}notePr>` : "";
+  };
+  return one("foot") + one("end");
+}
+
 /** A w:sectPr ending a continuous section (Word: w:type continuous, the paper and margins of its page, its columns). */
 export const docxContSectPr = (s: PageSetup, cols: PageColumns | undefined) => `<w:sectPr><w:type w:val="continuous"/>${docxPageXml(s)}${cols && cols.n > 1 ? docxColsXml(cols) : ""}</w:sectPr>`;
 
@@ -1703,7 +1761,8 @@ export function parseDocxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
     sectionEnds.forEach((s, i) => {
       const next = sectionEnds[i + 1]?.sectPr ?? child(body, "sectPr");
       const type = next && child(next, "type");
-      if (s.mark && s.end < items.length && type && attr(type, "val") === "continuous") s.mark.sectMark = true;
+      // (not right after a table: Word gives that paragraph its line)
+      if (s.mark && s.end < items.length && type && attr(type, "val") === "continuous" && items[s.end - 2]?.kind !== "table") s.mark.sectMark = true;
     });
   const defs = usedDefs(plists, ctx.listDefs);
   // w:lvlOverride/w:startOverride: the first item of that level of the w:num starts there
@@ -3033,8 +3092,11 @@ export const DOCX_NOTE_TYPES = {
 };
 
 /** A whole footnotes.xml / endnotes.xml: Word's separator and continuation separator, then `notes`. */
-export function docxNotesPartXml(kind: "foot" | "end", notes: string): string {
-  const sep = (type: string, el: string) => `<w:${kind}note w:type="${type}" w:id="${type === "separator" ? -1 : 0}"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:${el}/></w:r></w:p></w:${kind}note>`;
+export function docxNotesPartXml(kind: "foot" | "end", notes: string, sepPara?: TextParagraph): string {
+  // (the separator paragraph as the file it was read from had it: its height is the room above the notes — QA 11-23)
+  const sepP = (el: string) =>
+    sepPara ? `<w:p>${docxPPr(sepPara, "", "")}<w:r><w:rPr>${docxRPr(sepPara.runs[0] ?? DEFAULT_RUN)}</w:rPr><w:${el}/></w:r></w:p>` : `<w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:${el}/></w:r></w:p>`;
+  const sep = (type: string, el: string) => `<w:${kind}note w:type="${type}" w:id="${type === "separator" ? -1 : 0}">${sepP(el)}</w:${kind}note>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:${kind}notes ${W_NS}>${sep("separator", "separator")}${sep("continuationSeparator", "continuationSeparator")}${notes}</w:${kind}notes>`;
 }
 
@@ -3154,7 +3216,10 @@ export function docxTableXml(t: TableNode, para: (p: TextParagraph) => string, t
             return tc(ci, inner?.get(c) ?? (docxCellParas(t, c, header, para) || "<w:p/>"), fill, cs, rs > 1 ? '<w:vMerge w:val="restart"/>' : "", c.vAlign);
           })
           .join("");
-        return `<w:tr>${header ? "<w:trPr><w:tblHeader/></w:trPr>" : ""}${cells}</w:tr>`;
+        // the row's own height (Word w:trHeight, TableCell.minHeight: at least) — QA 11-23: a Word table written anew lost it
+        const mh = Math.max(0, ...r.map((c) => c.minHeight ?? 0));
+        const trPr = (mh > 0 ? `<w:trHeight w:val="${twip(mh)}"/>` : "") + (header ? "<w:tblHeader/>" : "");
+        return `<w:tr>${trPr ? `<w:trPr>${trPr}</w:trPr>` : ""}${cells}</w:tr>`;
       })
       .join("");
     return `<w:tbl>${tblPr ?? `<w:tblPr><w:tblW w:w="0" w:type="auto"/>${t.wordAlign ? `<w:jc w:val="${t.wordAlign.jc}"/>` : ""}${border}<w:tblLayout w:type="fixed"/>${mar}</w:tblPr>`}<w:tblGrid>${t.colWidths.map((w) => `<w:gridCol w:w="${twip(w)}"/>`).join("")}</w:tblGrid>${rows}</w:tbl>`;
@@ -3300,10 +3365,12 @@ export function exportDocx(pages: Page[], opts: OfficeExportOptions = {}): Uint8
 }
 
 function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
+  const docDefaults = docxDocDefaults(pages);
   const starts: number[] = [];
   const flow = collectFlow(pages, starts);
   // footnotes / endnotes: w:id 1, 2 … per kind in document order (word/footnotes.xml, word/endnotes.xml)
-  const noteList = flowNotes(flow);
+  // (notes referenced in table cells too, in document order — QA 11-23: a footnote in a Word table cell was dropped)
+  const noteList = flow.flatMap((it): NoteRef[] => (it.kind === "p" ? it.p.runs.flatMap((r) => (r.note ? [r.note] : [])) : it.t.rows.flatMap((row) => row.flatMap((c) => (c.richText ?? []).flatMap((q) => q.runs.flatMap((r) => (r.note ? [r.note] : [])))))));
   const noteIds = new Map<NoteRef, string>();
   const noteN = { foot: 0, end: 0 };
   for (const n of noteList) if (!noteIds.has(n)) noteIds.set(n, String(++noteN[n.kind]));
@@ -3459,9 +3526,9 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
     ),
     // heading styles so paragraphs exported with pStyle HeadingN show up as headings (navigation pane, outline)
     "word/styles.xml": strToU8(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>` +
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${docDefaults.styles}<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>` +
         [1, 2, 3, 4, 5, 6]
-          .map((n) => `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:outlineLvl w:val="${n - 1}"/></w:pPr><w:rPr><w:b/></w:rPr></w:style>`)
+          .map((n) => `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:outlineLvl w:val="${n - 1}"/></w:pPr></w:style>`)
           .join("") +
         `</w:styles>`,
     ),
@@ -3483,6 +3550,17 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
     files["[Content_Types].xml"] = strToU8(ct);
     files["word/_rels/document.xml.rels"] = strToU8(rels);
   }
+  // the document's own settings Word lays text out by (docDefaults, compat — docxDocDefaults): settings.xml when there are
+  // any and no header part brought it
+  if (docDefaults.compat && !evenOdd) {
+    let ct = strFromU8(files["[Content_Types].xml"] as Uint8Array);
+    let rels = strFromU8(files["word/_rels/document.xml.rels"] as Uint8Array);
+    files["word/settings.xml"] = strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${W_NS}>${docDefaults.compat}</w:settings>`);
+    ct = ct.replace("</Types>", `<Override PartName="/word/settings.xml" ContentType="${DOCX_HF_TYPES.settings.ct}"/></Types>`);
+    rels = rels.replace("</Relationships>", `<Relationship Id="rIdSettings" Type="${DOCX_HF_TYPES.settings.rel}" Target="settings.xml"/></Relationships>`);
+    files["[Content_Types].xml"] = strToU8(ct);
+    files["word/_rels/document.xml.rels"] = strToU8(rels);
+  }
   // header / footer parts (and settings.xml for different odd and even pages): only when there are any, so documents
   // without them are written byte for byte as before
   if (hfParts.length || evenOdd) {
@@ -3495,7 +3573,7 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
       rels = rels.replace("</Relationships>", `<Relationship Id="${p.id}" Type="${DOCX_HF_TYPES[p.area].rel}" Target="${p.name}"/></Relationships>`);
     }
     if (evenOdd) {
-      add("word/settings.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${W_NS}><w:evenAndOddHeaders/></w:settings>`);
+      add("word/settings.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${W_NS}><w:evenAndOddHeaders/>${docDefaults.compat}</w:settings>`);
       ct = ct.replace("</Types>", `<Override PartName="/word/settings.xml" ContentType="${DOCX_HF_TYPES.settings.ct}"/></Types>`);
       rels = rels.replace("</Relationships>", `<Relationship Id="rIdSettings" Type="${DOCX_HF_TYPES.settings.rel}" Target="settings.xml"/></Relationships>`);
     }
@@ -3511,7 +3589,7 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
       const mine = [...noteIds].filter(([n]) => n.kind === kind);
       if (!mine.length) continue;
       const T = DOCX_NOTE_TYPES[kind];
-      files[T.part] = strToU8(docxNotesPartXml(kind, mine.map(([n, id]) => docxNoteXml(kind, id, n.paras, (p) => para(p))).join("")));
+      files[T.part] = strToU8(docxNotesPartXml(kind, mine.map(([n, id]) => docxNoteXml(kind, id, n.paras, (p) => para(p))).join(""), pages[0]?.notePr?.[kind]?.para));
       ct = ct.replace("</Types>", `<Override PartName="/${T.part}" ContentType="${T.ct}"/></Types>`);
       rels = rels.replace("</Relationships>", `<Relationship Id="rId${kind === "foot" ? "Foot" : "End"}notes" Type="${T.rel}" Target="${T.part.slice(5)}"/></Relationships>`);
     }

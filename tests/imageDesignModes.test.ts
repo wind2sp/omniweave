@@ -92,8 +92,9 @@ describe("SVG artwork as editable paths", () => {
     expect(c.fill).toBeNull();
     expect(c.stroke).toBe("blue");
   });
-  it("text, images and gradients keep the file as one picture", () => {
-    expect(svgToVectors(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>Hi</text></svg>`)).toBeNull();
+  it("images and gradients keep the file as one picture (text no longer does: it becomes a text box)", () => {
+    expect(svgToVectors(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><image href="a.png" width="5" height="5"/></svg>`)).toBeNull();
+    expect(svgToVectors(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>Hi</text></svg>`)?.nodes[0].type).toBe("TEXT");
     expect(svgToVectors(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5" fill="url(#g)"/></svg>`)).toBeNull();
   });
 });
