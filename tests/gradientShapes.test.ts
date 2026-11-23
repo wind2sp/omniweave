@@ -41,7 +41,7 @@ describe("SVG gradients, clip paths and masks open as objects", () => {
     expect((b.fills![0] as any).from[0]).toBeCloseTo(0.5, 2);
     expect((b.fills![0] as any).to[0]).toBeCloseTo(1, 2);
   });
-  it("a clip path cuts a filled shape; a white mask works as a clip; a grey mask or a gradient stroke keeps one picture", () => {
+  it("a clip path cuts a filled shape; a white mask works as a clip; a grey mask keeps one picture", () => {
     const art = svgToVectors(SVG(`<defs><clipPath id="c"><rect x="0" y="0" width="50" height="50"/></clipPath><mask id="m"><rect x="0" y="0" width="30" height="100" fill="white"/></mask></defs>
       <rect x="20" y="20" width="100" height="100" fill="#0a0" clip-path="url(#c)"/><rect x="0" y="60" width="100" height="20" fill="#00a" mask="url(#m)"/>`))!;
     expect(art.nodes.length).toBe(2);
@@ -49,7 +49,18 @@ describe("SVG gradients, clip paths and masks open as objects", () => {
     expect(Math.max(...xs(art.nodes[0] as VectorNode))).toBeCloseTo(50, 3);
     expect(Math.max(...xs(art.nodes[1] as VectorNode))).toBeCloseTo(30, 3);
     expect(svgToVectors(SVG(`<defs><mask id="m"><rect width="30" height="30" fill="#888"/></mask></defs><rect width="10" height="10" fill="#000" mask="url(#m)"/>`))).toBeNull();
-    expect(svgToVectors(SVG(`<defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/></linearGradient></defs><path d="M0 0L10 10" stroke="url(#g)"/>`))).toBeNull();
+  });
+  it("a gradient stroke and a radial gradient with a focus come in as they are", () => {
+    const art = svgToVectors(SVG(`<defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#00f"/></linearGradient>
+      <radialGradient id="r" fx="0.25" fy="0.5" fr="0.1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient></defs>
+      <path d="M0 0L100 0" stroke="url(#g)" stroke-width="4" fill="none"/><rect x="0" y="20" width="100" height="100" fill="url(#r)"/>`))!;
+    expect(art).not.toBeNull();
+    const [s, r] = art.nodes as (GV & { strokes?: { paint: Paint }[] })[];
+    expect(s.strokes?.[0].paint).toMatchObject({ type: "gradient", kind: "linear" });
+    expect(s.stroke).toBe("#ff0000");
+    const f = r.fills![0] as any;
+    expect(f.focal[0]).toBeCloseTo(0.25, 3);
+    expect(f.focalRadius).toBeCloseTo(0.2, 3);
   });
 });
 
@@ -96,14 +107,117 @@ describe("Illustrator gradient shapes", () => {
     const doc = await sg.openSurgeonDoc(bytes);
     const m = el.modelPage(doc, 0, { prefix: "omw", vectors: "auto" });
     const grads = m.vectors.filter((v) => v.shade);
-    expect(grads.length).toBe(4);
-    // the soft-masked shape is not elevated as a plain solid path either
-    expect(m.vectors.length).toBe(4);
-    expect(grads.map((v) => ((v.node as GV).fills![0] as any).kind).sort()).toEqual(["linear", "linear", "radial", "radial"]);
+    // the fading one (an opacity mask) comes up too, with opacity stops as Illustrator shows them; the ring's
+    // gradient stroke (a shading pattern) as a gradient stroke
+    expect(grads.length).toBe(5);
+    expect(m.vectors.length).toBe(6);
+    expect(grads.map((v) => ((v.node as GV).fills![0] as any).kind).sort()).toEqual(["linear", "linear", "linear", "radial", "radial"]);
+    const fade = grads.map((v) => (v.node as GV).fills![0] as any).find((f) => f.stops.some((s: any) => s.color.a !== undefined));
+    expect(fade.stops.map((s: any) => s.color.a)).toEqual([1, 0.115]);
+    const ring = m.vectors.find((v) => v.pattern)!;
+    expect((ring.node as any).strokes[0].paint.stops.map((s: any) => s.color.hex)).toEqual(["#7800c8", "#00c8a0"]);
     const out = await sg.strippedForView(doc, 0, { prefix: "omw", vectors: "auto" });
     const back = el.modelPage(await sg.openSurgeonDoc(out), 0, { prefix: "omw", vectors: false });
     const shadings = back.analysis.items.filter((x) => x.kind === "image" && x.name.startsWith("sh:"));
-    // the soft-masked one is still drawn by the background
-    expect(shadings.length).toBe(1);
+    expect(shadings.length).toBe(0);
+  });
+});
+
+describe("gradients written back (AI save, PDF export)", () => {
+  it("an edited gradient shape and gradient stroke are saved into the AI and read back as edited", async () => {
+    const sg = await import("../src/io/pdfsurgeon");
+    const bytes = new Uint8Array(readFileSync("qa/samples/store-sample/ko/omni-store-design.ai"));
+    const doc = await sg.openSurgeonDoc(bytes);
+    const el = sg.elevatePage(doc, 0, { prefix: "omw", vectors: "auto" });
+    const nodes = structuredClone(el.nodes) as (GV & { strokes?: { paint: any }[] })[];
+    // the 45° rectangle: moved 30 px right, now green → blue
+    const rect = nodes.find((n) => n.type === "VECTOR" && (n.fills?.[0] as any)?.stops?.[0]?.color.hex === "#ffc800")!;
+    rect.transform = { ...rect.transform, x: rect.transform.x + 30 };
+    (rect.fills![0] as any).stops = [{ at: 0, color: { hex: "#00ff00" } }, { at: 1, color: { hex: "#0000ff" } }];
+    // the ring: its gradient stroke now red → yellow
+    const ring = nodes.find((n) => n.type === "VECTOR" && n.strokes?.[0])!;
+    ring.strokes![0].paint = { ...ring.strokes![0].paint, stops: [{ at: 0, color: { hex: "#ff0000" } }, { at: 1, color: { hex: "#ffff00" } }] };
+    // the fading rectangle (an opacity mask): moved 20 px up, still fading
+    const fade = nodes.find((n) => n.type === "VECTOR" && (n.fills?.[0] as any)?.stops?.some((x: any) => x.color.a !== undefined))!;
+    fade.transform = { ...fade.transform, y: fade.transform.y - 20 };
+    const { bytes: out, report } = await sg.saveSurgical(doc, [{ pageIndex: 0, nodes, elevated: true }], { prefix: "omw", vectors: "auto" });
+    expect(report.skipped.filter((x) => /그레이디언트|gradient/i.test(x))).toEqual([]);
+    expect(report.editedVectors).toBe(3);
+    const again = sg.elevatePage(await sg.openSurgeonDoc(out), 0, { prefix: "omw", vectors: "auto" });
+    const vs = again.nodes.filter((n) => n.type === "VECTOR") as (GV & { strokes?: { paint: any }[] })[];
+    const r2 = vs.find((n) => (n.fills?.[0] as any)?.stops?.[0]?.color.hex === "#00ff00")!;
+    expect(r2).toBeTruthy();
+    expect((r2.fills![0] as any).stops.map((x: any) => x.color.hex)).toEqual(["#00ff00", "#0000ff"]);
+    const xs = (n: VectorNode) => n.contours[0].nodes.map((q) => q.anchor[0] + n.transform.x);
+    expect(Math.min(...xs(r2))).toBeCloseTo(Math.min(...xs(rect)), 0);
+    expect(vs.filter((n) => (n.fills?.[0] as any)?.stops?.[0]?.color.hex === "#ffc800").length).toBe(0);
+    const ring2 = vs.find((n) => n.strokes?.[0])!;
+    expect(ring2.strokes![0].paint.stops.map((x: any) => x.color.hex)).toEqual(["#ff0000", "#ffff00"]);
+    expect(vs.length).toBe(6);
+    const fade2 = vs.find((n) => (n.fills?.[0] as any)?.stops?.some((x: any) => x.color.a !== undefined))!;
+    expect((fade2.fills![0] as any).stops.map((x: any) => x.color.a)).toEqual([1, 0.115]);
+    const ys = (n: VectorNode) => n.contours[0].nodes.map((q) => q.anchor[1] + n.transform.y);
+    expect(Math.min(...ys(fade2))).toBeCloseTo(Math.min(...ys(fade)), 0);
+  });
+
+  it("vector PDF export draws gradient fills and strokes as shadings", async () => {
+    const { exportPdfVector } = await import("../src/io/pdfVector");
+    const doc = newDocument();
+    const p = newPage("DESIGN", 120, 60);
+    const v = newVector([{ closed: true, nodes: [corner(10, 10), corner(110, 10), corner(110, 30), corner(10, 30)] }], "omni-grad") as GV & { strokes?: { paint: Paint; width: number }[] };
+    v.fill = "#ff0000";
+    v.fills = [{ type: "gradient", kind: "linear", from: [0, 0], to: [1, 0], stops: [{ at: 0, color: { hex: "#ff0000" } }, { at: 1, color: { hex: "#0000ff" } }] }];
+    v.stroke = "#00ff00";
+    v.strokeWidth = 2;
+    v.strokes = [{ paint: { type: "gradient", kind: "radial", from: [0.5, 0.5], to: [1, 0.5], focal: [0.4, 0.5], focalRadius: 0.1, stops: [{ at: 0, color: { hex: "#00ff00" } }, { at: 1, color: { hex: "#000000", a: 0.5 } }] }, width: 2 }];
+    p.nodes.push(v);
+    doc.pages = [p];
+    const pdf = await exportPdfVector(doc, [p]);
+    const { PDFDocument, PDFName, PDFDict } = await import("pdf-lib");
+    const d = await PDFDocument.load(pdf);
+    const res = d.getPage(0).node.Resources()!;
+    const sh = res.lookup(PDFName.of("Shading"), PDFDict);
+    const types = sh.keys().map((k) => (sh.lookup(k) as any).lookup(PDFName.of("ShadingType")).asNumber()).sort();
+    expect(types).toEqual([2, 3]);
+    // the radial one keeps its focus (start circle off-centre, radius > 0)
+    const radial = sh.keys().map((k) => sh.lookup(k) as any).find((x) => x.lookup(PDFName.of("ShadingType")).asNumber() === 3);
+    const c = radial.lookup(PDFName.of("Coords")).asArray().map((x: any) => x.asNumber());
+    expect(c[0]).toBeLessThan(c[3]);
+    expect(c[2]).toBeGreaterThan(0);
+    // pixels: red on the left of the fill, blue on the right (pdf.js)
+    const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pg = await (await pdfjs.getDocument({ data: pdf.slice(), isEvalSupported: false }).promise).getPage(1);
+    const vp = pg.getViewport({ scale: 4 / 3 });
+    const cnv = cv.createCanvas(Math.ceil(vp.width), Math.ceil(vp.height));
+    const g = cnv.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, cnv.width, cnv.height);
+    await pg.render({ canvasContext: g as any, viewport: vp }).promise;
+    const px = (x: number, y: number) => Array.from(g.getImageData(x, y, 1, 1).data).slice(0, 3);
+    expect(px(14, 20)[0]).toBeGreaterThan(200);
+    expect(px(106, 20)[2]).toBeGreaterThan(200);
+  });
+});
+
+describe("PDF shadings read back", () => {
+  it("a two-circle radial gradient survives PDF export → open → elevate with its focus", async () => {
+    const { exportPdfVector } = await import("../src/io/pdfVector");
+    const sg = await import("../src/io/pdfsurgeon");
+    const doc = newDocument();
+    const p = newPage("DESIGN", 200, 200);
+    const v = newVector([{ closed: true, nodes: [corner(20, 20), corner(180, 20), corner(180, 180), corner(20, 180)] }], "omni-focal") as GV;
+    v.fill = "#ffffff";
+    v.fills = [{ type: "gradient", kind: "radial", from: [0.5, 0.5], to: [1, 0.5], focal: [0.3, 0.4], focalRadius: 0.1, stops: [{ at: 0, color: { hex: "#ffffff" } }, { at: 0.5, color: { hex: "#ff8800" } }, { at: 1, color: { hex: "#330000" } }] }];
+    p.nodes.push(v);
+    doc.pages = [p];
+    const pdf = await exportPdfVector(doc, [p]);
+    const el = sg.elevatePage(await sg.openSurgeonDoc(pdf), 0, { prefix: "omw", vectors: true });
+    const g = el.nodes.find((n): n is GV => n.type === "VECTOR" && !!(n as GV).fills)!;
+    const f = g.fills![0] as any;
+    expect(f.kind).toBe("radial");
+    expect(f.focal[0]).toBeCloseTo(0.3, 2);
+    expect(f.focal[1]).toBeCloseTo(0.4, 2);
+    expect(f.focalRadius).toBeCloseTo(0.1, 3);
+    expect(f.stops.map((s: any) => s.color.hex)).toEqual(["#ffffff", "#ff8800", "#ff8800", "#330000"]);
   });
 });

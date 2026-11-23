@@ -19,6 +19,8 @@ export interface StreamUnit {
   formRef: PDFRef | null;
   /** how many times this unit is drawn on the page (edits are only safe when 1) */
   uses: number;
+  /** its default space in page px (the page matrix, or the CTM a form starts with): where pattern matrices apply */
+  space?: M;
 }
 
 export interface ColorState {
@@ -27,6 +29,8 @@ export interface ColorState {
   /** approximate sRGB, null for patterns/shadings */
   hex: string | null;
   pattern: boolean;
+  /** the pattern resource painted with (`/P0 scn`), when a pattern */
+  patternName?: string;
 }
 
 export interface Glyph {
@@ -146,6 +150,7 @@ const MAX_OPS = 2_000_000;
 export function analyzePage(doc: SurgeonDoc, pageMatrix: M, pageResources: PDFDict | undefined, content: Uint8Array, hiddenOcgs: Set<string>): PageAnalysis {
   const a: PageAnalysis = { units: new Map(), items: [], notes: [] };
   const page = makeUnit(a, "page", content, pageResources, null);
+  if (page) page.space = pageMatrix;
   if (!page) return a;
   const st: GState = { ctm: pageMatrix, fill: BLACK, stroke: BLACK_S, fillSpace: "DeviceGray", strokeSpace: "DeviceGray", lw: 1, font: null, fontRes: "", tfs: 0, tc: 0, tw: 0, tz: 100, tl: 0, ts: 0, tr: 0 };
   run(doc, a, page, st, [], hiddenOcgs, new Set(), 0);
@@ -259,7 +264,8 @@ function setColor(doc: SurgeonDoc, unit: StreamUnit, st: GState, op: string, arg
     const sp = colorSpace(doc, unit.resources, spaceName);
     const pat = args.some((x) => x instanceof PdfName);
     const csOp = stroke ? "CS" : "cs";
-    cs = { replay: `${serialize(new PdfName(spaceName))} ${csOp} ${args.map(serialize).join(" ")} ${op}`, hex: pat || sp.pattern ? null : sp.toHex(nums), pattern: pat || sp.pattern };
+    const pn = args.find((x): x is PdfName => x instanceof PdfName);
+    cs = { replay: `${serialize(new PdfName(spaceName))} ${csOp} ${args.map(serialize).join(" ")} ${op}`, hex: pat || sp.pattern ? null : sp.toHex(nums), pattern: pat || sp.pattern, ...(pn ? { patternName: pn.name } : {}) };
   }
   if (lower === "g" || lower === "rg" || lower === "k") {
     const fam = lower === "g" ? "DeviceGray" : lower === "rg" ? "DeviceRGB" : "DeviceCMYK";
@@ -561,6 +567,7 @@ function drawForm(doc: SurgeonDoc, a: PageAnalysis, st: GState, ref: PDFObject |
   if (!unit) return;
   const m = toM(numArray(doc.ctx, dget(doc.ctx, xo.dict, "Matrix"))) ?? I;
   const inner: GState = { ...st, ctm: mul(m, st.ctm) };
+  unit.space ??= inner.ctm;
   const oc = dget(doc.ctx, xo.dict, "OC");
   const extra: Marked[] = [];
   if (oc) {
@@ -581,7 +588,10 @@ export interface ShadeGradient {
   /** linear: start / end · radial: centre and a point on the circle (shading space) */
   p0: [number, number];
   p1: [number, number];
-  stops: { at: number; hex: string }[];
+  /** radial with two circles: the start circle's centre and radius (shading space; the end circle is p0 / p1) */
+  focal?: [number, number];
+  r0?: number;
+  stops: { at: number; hex: string; c: number[] }[];
 }
 
 /**
@@ -590,7 +600,11 @@ export interface ShadeGradient {
  * shadings (meshes, sampled functions, two-circle radial), which stay in the page background.
  */
 export function shadingGradient(doc: SurgeonDoc, res: PDFDict | undefined, name: string): ShadeGradient | null {
-  const o = look(doc.ctx, resCategory(doc, res, "Shading", name));
+  return shadingObjGradient(doc, res, look(doc.ctx, resCategory(doc, res, "Shading", name)));
+}
+
+/** A shading dictionary / stream as a gradient (see shadingGradient). */
+export function shadingObjGradient(doc: SurgeonDoc, res: PDFDict | undefined, o: PDFObject | undefined): ShadeGradient | null {
   const d = o instanceof PDFStream ? o.dict : dictOf(o);
   if (!d) return null;
   const type = numOf(dget(doc.ctx, d, "ShadingType"));
@@ -609,13 +623,28 @@ export function shadingGradient(doc: SurgeonDoc, res: PDFDict | undefined, name:
   for (const s of samples) {
     const hex = cs.toHex(s.c);
     if (!hex) return null;
-    stops.push({ at: (s.t - dom[0]) / (dom[1] - dom[0] || 1), hex });
+    stops.push({ at: (s.t - dom[0]) / (dom[1] - dom[0] || 1), hex, c: s.c });
   }
   if (type === 2) return { kind: "linear", p0: [coords[0], coords[1]], p1: [coords[2], coords[3]], stops };
-  // radial: only one circle grown from its centre (r0 = 0, same centres) is a plain radial gradient
+  // radial: the end circle is p0 / p1; a start circle that is not the end circle's centre point is kept as the focus
+  // (canvas, SVG and PDF all draw two-circle radial gradients the same way)
   const [x0, y0, r0, x1, y1, r1] = coords;
-  if (Math.abs(x0 - x1) > 1e-6 || Math.abs(y0 - y1) > 1e-6 || r0 > 1e-6) return null;
-  return { kind: "radial", p0: [x1, y1], p1: [x1 + r1, y1], stops };
+  if (r1 <= 1e-9 || r0 < 0 || r0 > r1) return null;
+  const plain = Math.abs(x0 - x1) <= 1e-6 && Math.abs(y0 - y1) <= 1e-6 && r0 <= 1e-6;
+  return { kind: "radial", p0: [x1, y1], p1: [x1 + r1, y1], ...(plain ? {} : { focal: [x0, y0] as [number, number], r0 }), stops };
+}
+
+/**
+ * A shading pattern (`/P0 scn`, PatternType 2) as a gradient, and the pattern matrix that places its shading space in
+ * the default space of the page or form it is used on. Null for tiling patterns and shadings shadingGradient refuses.
+ */
+export function patternGradient(doc: SurgeonDoc, res: PDFDict | undefined, name: string): { g: ShadeGradient; matrix: M } | null {
+  const o = look(doc.ctx, resCategory(doc, res, "Pattern", name));
+  const d = o instanceof PDFStream ? o.dict : dictOf(o);
+  if (!d || numOf(dget(doc.ctx, d, "PatternType")) !== 2) return null;
+  const g = shadingObjGradient(doc, res, look(doc.ctx, dget(doc.ctx, d, "Shading")));
+  if (!g) return null;
+  return { g, matrix: toM(numArray(doc.ctx, dget(doc.ctx, d, "Matrix"))) ?? I };
 }
 
 /** Colour space from an object (array / name) that is not under a /ColorSpace resource name. */
@@ -625,7 +654,7 @@ function colorSpaceObj(doc: SurgeonDoc, o: PDFObject | undefined): ReturnType<ty
 }
 
 /** Colour stops of a function over [t0, t1]: exponential (type 2) or stitching (type 3) of those. */
-function fnSamples(doc: SurgeonDoc, fn: PDFObject | undefined, t0: number, t1: number, depth = 0): { t: number; c: number[] }[] | null {
+export function fnSamples(doc: SurgeonDoc, fn: PDFObject | undefined, t0: number, t1: number, depth = 0): { t: number; c: number[] }[] | null {
   const d = fn instanceof PDFStream ? fn.dict : dictOf(fn);
   if (!d || depth > 4) return null;
   const type = numOf(dget(doc.ctx, d, "FunctionType"));

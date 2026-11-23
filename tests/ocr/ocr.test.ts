@@ -203,6 +203,19 @@ describe("recognition decoding", () => {
     const r = restoreSpaces({ text: "가나다라", conf: 0.9, chars }, img, { em: 30 });
     expect(r.text).toBe("가나 다라");
   });
+  it("a narrow '1' among tabular digits is no word space: \"1 23\" reads 123, a real gap still splits", () => {
+    const W = 260, img = newImg(W, 40);
+    img.data.fill(255);
+    // em 30: '1' is a 3 px stem in a wide tabular cell (12 px of paper to the 2), letters / digits 4 px apart, a real
+    // word space 14 px, "45" after a 45 px gap
+    const boxes: [string, number, number][] = [["A", 4, 18], ["B", 22, 36], ["C", 40, 54], ["D", 58, 72], ["1", 86, 89], ["2", 101, 114], ["3", 118, 131], ["4", 176, 189], ["5", 193, 206]];
+    for (const [, a, b] of boxes) for (let y = 8; y < 32; y++) for (let x = a; x < b; x++) img.data.fill(0, (y * W + x) * 4, (y * W + x) * 4 + 3);
+    const chars = boxes.map(([ch, a, b]) => ({ ch, p: 0.9, x0: a, x1: b }));
+    expect(restoreSpaces({ text: "ABCD123 45", conf: 0.9, chars }, img, { em: 30 }).text).toBe("ABCD 123 45");
+    // the model wrote a space after the 1 itself
+    const withSpace = [...chars.slice(0, 5), { ch: " ", p: 0.6, x0: 89, x1: 101 }, ...chars.slice(5)];
+    expect(restoreSpaces({ text: "ABCD1 2345", conf: 0.9, chars: withSpace }, img, { em: 30 }).text).toBe("ABCD 123 45");
+  });
 });
 
 describe("page preprocessing and layout", () => {

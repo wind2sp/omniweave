@@ -168,16 +168,35 @@ export function restoreSpaces(line: LineText, crop: Img, opts: { factor?: number
   // a word space leaves ≈ 0.35–0.45 em of paper (space + side bearings), a syllable gap ≈ 0.05–0.12 em and the gap
   // inside 이 / 니 (consonant | vowel) up to ≈ 0.2 em: 0.3 em was best on the synthetic set (0.15–0.38 tried)
   const minGap = opts.em ? Math.max(opts.em * (opts.factor ?? 0.3), med * 1.8, 2) : Math.max(H * 0.22, med * 2.2, 3);
+  // between two digits a narrow figure ("1") in a tabular font leaves a wide blank on its own: a space there needs a
+  // clearly wider gap, and a space the model put between digits over a narrow blank is dropped ("1 23" → "123")
+  const digit = (ch: string) => /^[0-9]$/.test(ch);
+  const digitGap = Math.max(minGap * 1.7, (opts.em ?? H) * 0.5);
+  const blank = (a: OcrChar, b: OcrChar) => {
+    let best = 0, run = 0;
+    for (let x = Math.max(0, Math.round((a.x0 + a.x1) / 2)); x < Math.min(W, Math.round((b.x0 + b.x1) / 2)); x++) {
+      run = ink[x] ? 0 : run + 1;
+      if (run > best) best = run;
+    }
+    return best;
+  };
   const out: OcrChar[] = [];
+  let changed = false;
   line.chars.forEach((c, i) => {
+    const prev = out[out.length - 1], n = line.chars[i + 1];
+    if (c.ch === " " && prev && n && digit(prev.ch) && digit(n.ch) && blank(prev, n) < digitGap) {
+      changed = true;
+      return;
+    }
     out.push(c);
-    if (i + 1 >= line.chars.length) return;
-    const n = line.chars[i + 1];
-    if (c.ch === " " || n.ch === " ") return;
+    if (!n || c.ch === " " || n.ch === " ") return;
     const g = gaps[i];
-    if (g >= minGap) out.push({ ch: " ", p: 0.5, x0: c.x1, x1: n.x0 });
+    if (g >= (digit(c.ch) && digit(n.ch) ? digitGap : minGap)) {
+      out.push({ ch: " ", p: 0.5, x0: c.x1, x1: n.x0 });
+      changed = true;
+    }
   });
-  if (out.length === line.chars.length) return line;
+  if (!changed) return line;
   return { ...line, chars: out, text: out.map((c) => c.ch).join("") };
 }
 

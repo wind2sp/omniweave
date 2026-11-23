@@ -56,8 +56,9 @@
   "doc.toast.alreadyElevated": "テキストはすでに編集可能なオブジェクトに変換されています",
   "doc.toast.analyzingPdf": "PDF コンテンツストリームを解析中…",
   "doc.toast.nothingToEdit": "編集できるテキスト・ベクターがありません（スキャン画像の PDF の可能性があります）",
-  "doc.toast.elevated": "テキスト {lines} 行を元のフォントのまま編集できるようにしました",
-  "doc.toast.elevatedVec": "テキスト {lines} 行・ベクター {vectors} 個を元のフォントのまま編集できるようにしました",
+  "doc.toast.elevated": "テキスト {lines} 行を元のフォントのまま編集できるようにしました。",
+  "doc.toast.elevatedShapes": "図形 {vectors} 個を編集できるようにしました。",
+  "doc.toast.elevatedVec": "テキスト {lines} 行（元のフォントのまま）と図形 {vectors} 個を編集できるようにしました。",
   "doc.toast.selectForAnim": "アニメーションを追加するオブジェクトを選択してください",
   "doc.toast.cannotDeleteAll": "すべてのページを削除することはできません — 1 ページは残してください",
   "doc.toast.pageSizeRange": "ページサイズは 16～16384px の範囲で指定してください",
@@ -222,5 +223,5 @@
   "doc.print.cancel": "キャンセル",
   "doc.print.savePdf": "PDF として保存",
   "doc.toast.adjustBaked": "この形式は調整レイヤーを保持できないため、影響するレイヤーを画像にして入れました",
-  "doc.toast.elevatedKept": "透明度やマスクのかかった図形など {n} 個はまだオブジェクトにできず、背景の画像に残りました。"
+  "doc.toast.elevatedKept": "メッシュグラデーションや複雑なマスク・透明度のかかった図形など {n} 個はまだオブジェクトにできず、背景の画像に残りました。"
 }

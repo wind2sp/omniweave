@@ -56,8 +56,9 @@
   "doc.toast.alreadyElevated": "이미 텍스트가 편집 가능한 개체로 승격되었습니다",
   "doc.toast.analyzingPdf": "PDF 콘텐츠 스트림 분석 중…",
   "doc.toast.nothingToEdit": "편집할 텍스트·벡터가 없습니다 (스캔 이미지 PDF일 수 있습니다)",
-  "doc.toast.elevated": "텍스트 {lines}줄을 원본 글꼴 그대로 편집할 수 있게 열었습니다",
-  "doc.toast.elevatedVec": "텍스트 {lines}줄·벡터 {vectors}개를 원본 글꼴 그대로 편집할 수 있게 열었습니다",
+  "doc.toast.elevated": "텍스트 {lines}줄을 원본 글꼴 그대로 편집할 수 있게 열었습니다.",
+  "doc.toast.elevatedShapes": "도형 {vectors}개를 편집할 수 있게 열었습니다.",
+  "doc.toast.elevatedVec": "텍스트 {lines}줄(원본 글꼴 그대로)과 도형 {vectors}개를 편집할 수 있게 열었습니다.",
   "doc.toast.selectForAnim": "애니메이션을 넣을 개체를 선택하세요",
   "doc.toast.cannotDeleteAll": "모든 페이지를 지울 수는 없습니다 — 한 쪽은 남겨 두세요",
   "doc.toast.pageSizeRange": "페이지 크기는 16~16384px 사이로 정하세요",
@@ -222,5 +223,5 @@
   "doc.print.cancel": "취소",
   "doc.print.savePdf": "PDF로 저장",
   "doc.toast.adjustBaked": "조정 레이어는 이 형식에 담을 수 없어, 조정이 닿는 레이어를 그림으로 굳혀 넣었습니다",
-  "doc.toast.elevatedKept": "투명도·마스크가 걸린 도형 등 {n}개는 아직 개체로 바꿀 수 없어 배경 그림에 남았어요."
+  "doc.toast.elevatedKept": "메시 그레이디언트나 복잡한 마스크·투명도가 걸린 도형 등 {n}개는 아직 개체로 바꿀 수 없어 배경 그림에 남았습니다."
 }

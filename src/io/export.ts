@@ -245,22 +245,26 @@ async function nodeSvgBare(doc: OmwDocument, page: Page, n: SceneNode): Promise<
     const common = `transform="${tr}" opacity="${n.opacity}"`;
     switch (n.type) {
       case "VECTOR": {
-        // a gradient fill (fills[0]) as an SVG gradient in the path's own space (render/draw vectorGradient)
-        const g = (n as VectorNode & { fills?: Paint[] }).fills?.[0];
-        let fill = n.fill ?? "none";
-        if (n.fill && g?.type === "gradient" && (g.kind === "linear" || g.kind === "radial")) {
-          const b = paintBox(n), id = `g_${n.id.replace(/[^\w-]/g, "")}`;
+        // a gradient fill (fills[0]) / stroke (strokes[0]) as an SVG gradient in the path's own space (render/draw
+        // vectorGradient)
+        const grad = (g: Paint | undefined, tag: string): string | null => {
+          if (g?.type !== "gradient" || (g.kind !== "linear" && g.kind !== "radial")) return null;
+          const b = paintBox(n), id = `${tag}_${n.id.replace(/[^\w-]/g, "")}`;
           const at = (u: Vec2) => [b.x + u[0] * b.w, b.y + u[1] * b.h].map((v) => +v.toFixed(3));
           const [x0, y0] = at(g.from), [x1, y1] = at(g.to);
+          const r = +Math.hypot(x1 - x0, y1 - y0).toFixed(3);
           const stops = g.stops.map((s) => `<stop offset="${s.at}" stop-color="${s.color.hex}"${s.color.a !== undefined && s.color.a < 1 ? ` stop-opacity="${s.color.a}"` : ""}/>`).join("");
+          const focus = g.focal ? (([fx, fy]) => ` fx="${fx}" fy="${fy}" fr="${+((g.focalRadius ?? 0) * r).toFixed(3)}"`)(at(g.focal)) : "";
           out.push(
             g.kind === "linear"
               ? `<defs><linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}">${stops}</linearGradient></defs>`
-              : `<defs><radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${x0}" cy="${y0}" r="${+Math.hypot(x1 - x0, y1 - y0).toFixed(3)}">${stops}</radialGradient></defs>`,
+              : `<defs><radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${x0}" cy="${y0}" r="${r}"${focus}>${stops}</radialGradient></defs>`,
           );
-          fill = `url(#${id})`;
-        }
-        out.push(`<path ${common} d="${vectorToSvgD(n)}" fill="${fill}" fill-rule="${n.fillRule}" stroke="${n.stroke ?? "none"}" stroke-width="${n.strokeWidth}" stroke-linejoin="${n.strokeJoin ?? "round"}" stroke-linecap="${n.strokeCap ?? "round"}"${n.strokeDash?.length ? ` stroke-dasharray="${n.strokeDash.join(" ")}"` : ""}/>`);
+          return `url(#${id})`;
+        };
+        const fill = (n.fill && grad((n as VectorNode & { fills?: Paint[] }).fills?.[0], "g")) || (n.fill ?? "none");
+        const stroke = (n.stroke && grad((n as VectorNode & { strokes?: { paint: Paint }[] }).strokes?.[0]?.paint, "gs")) || (n.stroke ?? "none");
+        out.push(`<path ${common} d="${vectorToSvgD(n)}" fill="${fill}" fill-rule="${n.fillRule}" stroke="${stroke}" stroke-width="${n.strokeWidth}" stroke-linejoin="${n.strokeJoin ?? "round"}" stroke-linecap="${n.strokeCap ?? "round"}"${n.strokeDash?.length ? ` stroke-dasharray="${n.strokeDash.join(" ")}"` : ""}/>`);
         break;
       }
       case "TEXT": {

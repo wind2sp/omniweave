@@ -3,9 +3,9 @@
 // Shapes (path, rect, circle, ellipse, line, polyline, polygon) become VectorNodes with their fill, stroke, width,
 // fill rule and opacity; <g> elements with an id or label become layer groups; transforms are baked into the
 // points. <text> becomes an editable text box (its font, size, weight, colour and anchor), <use> repeats the shape it
-// points to. Linear / radial gradient fills become gradient paints over the shape's box; a clip path (or a mask made
+// points to. Linear / radial gradient fills and strokes become gradient paints over the shape's box; a clip path (or a mask made
 // of white opaque shapes) cuts the filled shapes it applies to (2026-11-23). A file that uses what paths cannot hold
-// here (embedded images, patterns, filters, gradient strokes, grey or soft masks, a clip through a stroke) returns
+// here (embedded images, patterns, filters, grey or soft masks, a clip through a stroke) returns
 // null, and the caller keeps it as one picture — nothing is lost or approximated.
 
 import { t } from "../i18n";
@@ -511,7 +511,10 @@ export function svgToVectors(text: string): SvgArtwork | null {
     }
     const cx = num("cx", 0.5), cy = num("cy", 0.5), r = num("r", 0.5);
     const c0 = ap(toPage, cx, cy), c1 = ap(toPage, cx + r, cy);
-    return { type: "gradient", kind: "radial", stops, from: unit(c0), to: unit(c1) };
+    // a focus (fx fy fr) other than the centre: a two-circle radial gradient
+    const fx = num("fx", cx), fy = num("fy", cy), fr = num("fr", 0);
+    const focus = Math.abs(fx - cx) > 1e-9 || Math.abs(fy - cy) > 1e-9 || fr > 1e-9;
+    return { type: "gradient", kind: "radial", stops, from: unit(c0), to: unit(c1), ...(focus ? { focal: unit(ap(toPage, fx, fy)), focalRadius: r > 0 ? Math.min(1, fr / r) : 0 } : {}) };
   };
 
   /** The area a clip-path / mask keeps, on the page (a mask only when it is opaque white shapes — then it is a clip). */
@@ -663,8 +666,6 @@ export function svgToVectors(text: string): SvgArtwork | null {
       }
       const segs = shapeSegs(ch);
       if (!segs) continue;
-      // a gradient stroke has no counterpart here (a gradient fill has: below)
-      if (s.stroke && s.stroke.startsWith("url(")) return void (unsupported = true);
       const contours = segsToContours(segs, cm);
       if (!contours.length) continue;
       const v: VectorNode = newVector(contours, ch.getAttribute("data-name") || ch.getAttribute("id") || shapeName(tag));
@@ -676,7 +677,13 @@ export function svgToVectors(text: string): SvgArtwork | null {
         // the plain fill older readers and exports use: the gradient's first colour
         v.fill = gp.stops[0].color.hex;
       } else v.fill = withAlpha(s.fill, s.fillOpacity);
-      v.stroke = withAlpha(s.stroke, s.strokeOpacity);
+      if (s.stroke && s.stroke.startsWith("url(")) {
+        // a gradient stroke: over the same box as a fill (SVG's objectBoundingBox is the geometry's)
+        const gp = gradientPaint(urlId(s.stroke) ?? "", segsToContours(segs, I), cm, contours, s.strokeOpacity);
+        if (!gp || gp.type !== "gradient") return void (unsupported = true);
+        (v as VectorNode & { strokes?: { paint: Paint; width: number }[] }).strokes = [{ paint: gp, width: s.strokeWidth * det(cm) }];
+        v.stroke = gp.stops[0].color.hex;
+      } else v.stroke = withAlpha(s.stroke, s.strokeOpacity);
       v.strokeWidth = s.strokeWidth * det(cm);
       v.fillRule = s.fillRule;
       // SVG's own defaults are butt caps and miter joins (Omniweave's omitted value is round)

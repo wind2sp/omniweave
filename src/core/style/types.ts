@@ -73,6 +73,10 @@ export type Paint =
       /** unit coordinates of the node's bounding box (0..1), like SVG objectBoundingBox / PPTX lin ang / PS angle */
       from: Vec2;
       to: Vec2;
+      /** radial with two circles (PDF / SVG fx fy fr): the start circle's centre (unit coordinates) and its radius as a
+       *  fraction of the end circle's (from / to) */
+      focal?: Vec2;
+      focalRadius?: number;
       aspect?: number;
       spread?: "pad" | "repeat" | "reflect";
       smooth?: number;

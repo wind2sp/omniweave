@@ -2,14 +2,15 @@
 // linked to the operations they came from. Node ids are deterministic (prefix + page + index), so
 // the original state of every node can be rebuilt from the untouched PDF at save time.
 
-import { PDFName, PDFRef } from "pdf-lib";
+import { PDFArray, PDFName, PDFRef, PDFStream } from "pdf-lib";
 import { t } from "../../i18n";
 import { newText, newVector, type Contour, type TextNode, type TextRun, type VectorAnchor, type VectorNode } from "../../core/types";
-import { dget, dictOf, look, numOf, hasIllustratorData, hiddenOcgs, pageContent, pageResources, pageView, refKey, type SurgeonDoc } from "./document";
-import { analyzePage, shadingGradient, type ImageDraw, type PageAnalysis, type PathPaint, type TextShow } from "./interpret";
+import { dget, dictOf, look, numArray, numOf, streamBytes, hasIllustratorData, hiddenOcgs, pageContent, pageResources, pageView, refKey, type SurgeonDoc } from "./document";
+import { analyzePage, patternGradient, shadingGradient, type ImageDraw, type PageAnalysis, type PathPaint, type ShadeGradient, type StreamUnit, type TextShow } from "./interpret";
+import { parseOps } from "./syntax";
 import { paintBox } from "../../core/vector";
 import type { Paint } from "../../core/style/types";
-import { apply, viewportMatrix, type M } from "./matrix";
+import { apply, inv, mul, toM, viewportMatrix, type M } from "./matrix";
 import { cssFont, measure } from "../../core/text";
 import { embeddedFontFamily } from "./pdfFonts";
 
@@ -28,6 +29,8 @@ export interface TextLine {
 }
 
 export interface VectorItem {
+  /** painted with a shading pattern (a gradient fill / stroke) */
+  pattern?: boolean;
   id: string;
   path: PathPaint;
   node: VectorNode;
@@ -62,29 +65,34 @@ export const isSurgeonId = (id: string, prefix: string, page: number) => id.star
 
 /**
  * Is a soft mask, fill / stroke alpha below 1 or a blend mode other than Normal in force at op `at`? One forward pass
- * per stream unit (q / Q save and restore it; a later gs can switch each part off again), cached.
+ * per stream unit (q / Q save and restore it; a later gs can switch each part off again), cached. `maskState` also
+ * gives the index of the gs operator that set the soft mask in force.
  */
 type MaskUnit = { ops: { op: string; args: unknown[] }[]; resources?: unknown };
-const maskStates = new WeakMap<object, Uint8Array>();
-function maskedAt(doc: SurgeonDoc, unit: MaskUnit | undefined, at: number): boolean {
-  if (!unit) return true;
+const maskStates = new WeakMap<object, { bits: Uint8Array; gsAt: Int32Array }>();
+function maskState(doc: SurgeonDoc, unit: MaskUnit, at: number): { bits: number; gsAt: number } {
   let st = maskStates.get(unit);
   if (!st) {
-    st = new Uint8Array(unit.ops.length);
+    const bits = new Uint8Array(unit.ops.length), gsAt = new Int32Array(unit.ops.length);
     const egs = dictOf(dget(doc.ctx, unit.resources as never, "ExtGState"));
     // bit 1 soft mask, 2 fill alpha, 4 stroke alpha, 8 blend mode
-    let cur = 0;
-    const stack: number[] = [];
+    let cur = 0, smAt = -1;
+    const stack: [number, number][] = [];
     unit.ops.forEach((o, i) => {
-      st![i] = cur;
-      if (o.op === "q") stack.push(cur);
-      else if (o.op === "Q") cur = stack.pop() ?? 0;
+      bits[i] = cur;
+      gsAt[i] = smAt;
+      if (o.op === "q") stack.push([cur, smAt]);
+      else if (o.op === "Q") [cur, smAt] = stack.pop() ?? [0, -1];
       else if (o.op === "gs") {
         const nm = (o.args[0] as { name?: string })?.name;
         const g = nm ? dictOf(egs?.get(PDFName.of(nm)) ? look(doc.ctx, egs.get(PDFName.of(nm))) : undefined) : undefined;
         if (!g) return;
         const sm = g.get(PDFName.of("SMask"));
-        if (sm) cur = sm instanceof PDFName && sm.asString() === "/None" ? cur & ~1 : cur | 1;
+        if (sm) {
+          const none = sm instanceof PDFName && sm.asString() === "/None";
+          cur = none ? cur & ~1 : cur | 1;
+          smAt = none ? -1 : i;
+        }
         const ca = numOf(look(doc.ctx, g.get(PDFName.of("ca")))), CA = numOf(look(doc.ctx, g.get(PDFName.of("CA"))));
         if (ca !== undefined) cur = ca < 1 ? cur | 2 : cur & ~2;
         if (CA !== undefined) cur = CA < 1 ? cur | 4 : cur & ~4;
@@ -92,9 +100,69 @@ function maskedAt(doc: SurgeonDoc, unit: MaskUnit | undefined, at: number): bool
         if (bm instanceof PDFName) cur = ["/Normal", "/Compatible"].includes(bm.asString()) ? cur & ~8 : cur | 8;
       }
     });
+    st = { bits, gsAt };
     maskStates.set(unit, st);
   }
-  return (st[at] ?? 0) !== 0;
+  return { bits: st.bits[at] ?? 0, gsAt: st.gsAt[at] ?? -1 };
+}
+function maskedAt(doc: SurgeonDoc, unit: MaskUnit | undefined, at: number): boolean {
+  return !unit || maskState(doc, unit, at).bits !== 0;
+}
+
+/**
+ * The soft mask in force at a shading as opacity stops over the page (px): a luminosity mask whose group only paints
+ * one axial / radial grey shading, extended at both ends — Illustrator's "opacity mask" of a gradient that fades out.
+ * `illustrator`: the opacity Illustrator shows for its own opacity mask (a non-isolated DeviceGray group drawn with
+ * perceptual intent): its colour management does not take the mask's black to 0 — measured 2026-11-23 against
+ * Illustrator 2026, alpha ≈ 0.115 + 0.885 × grey, where PDF viewers show alpha = grey.
+ */
+function maskFade(doc: SurgeonDoc, unit: StreamUnit, sh: ImageDraw, illustrator: boolean): { g: ShadeGradient; toPage: M; alpha: (lum: number) => number } | null {
+  const ms = maskState(doc, unit, sh.op);
+  if (ms.bits !== 1 || ms.gsAt < 0) return null;
+  const egs = dictOf(dget(doc.ctx, unit.resources as never, "ExtGState"));
+  const nm = (unit.ops[ms.gsAt].args[0] as { name?: string })?.name;
+  const gsd = nm ? dictOf(look(doc.ctx, egs?.get(PDFName.of(nm)))) : undefined;
+  const sm = dictOf(look(doc.ctx, gsd?.get(PDFName.of("SMask"))));
+  const sub = look(doc.ctx, sm?.get(PDFName.of("S")));
+  if (!sm || !(sub instanceof PDFName) || sub.asString() !== "/Luminosity" || sm.has(PDFName.of("TR"))) return null;
+  const bc = look(doc.ctx, sm.get(PDFName.of("BC")));
+  if (bc !== undefined) return null;
+  const form = look(doc.ctx, sm.get(PDFName.of("G")));
+  if (!(form instanceof PDFStream)) return null;
+  let ops: ReturnType<typeof parseOps>;
+  try {
+    ops = parseOps(streamBytes(doc.ctx, form));
+  } catch {
+    return null;
+  }
+  // only state operators and one sh
+  const shOps = ops.filter((o) => o.op === "sh");
+  if (shOps.length !== 1 || ops.some((o) => !["q", "Q", "g", "G", "rg", "RG", "k", "K", "cs", "CS", "sc", "scn", "SC", "SCN", "ri", "gs", "cm", "BX", "EX", "i", "w", "sh"].includes(o.op))) return null;
+  let m: M = toM(numArray(doc.ctx, dget(doc.ctx, form.dict, "Matrix"))) ?? [1, 0, 0, 1, 0, 0];
+  for (const o of ops) {
+    if (o.op === "cm") m = mul(o.args.map(Number) as M, m);
+    if (o.op === "sh") break;
+  }
+  const fres = dictOf(dget(doc.ctx, form.dict, "Resources"));
+  const shName = (shOps[0].args[0] as { name?: string })?.name;
+  if (!shName) return null;
+  const sd = look(doc.ctx, dget(doc.ctx, dictOf(dget(doc.ctx, fres, "Shading")), shName));
+  const extO = look(doc.ctx, dget(doc.ctx, sd instanceof PDFStream ? sd.dict : dictOf(sd), "Extend"));
+  if (!(extO instanceof PDFArray) || extO.asArray().some((e) => String(look(doc.ctx, e)) !== "true")) return null;
+  const g = shadingGradient(doc, fres, shName);
+  if (!g) return null;
+  // the mask's space is the CTM at the gs that set it: the shading's CTM without the cm operators after that gs
+  let after: M = [1, 0, 0, 1, 0, 0];
+  for (let i = ms.gsAt + 1; i < sh.op; i++) {
+    const o = unit.ops[i];
+    if (o.op === "Q" || o.op === "q") return null;
+    if (o.op === "cm") after = mul(o.args.map(Number) as M, after);
+  }
+  const back = inv(after);
+  if (!back) return null;
+  const ctmGs = mul(back, sh.base);
+  const alpha = illustrator ? (l: number) => Math.min(1, 0.115 + 0.885 * l) : (l: number) => l;
+  return { g, toPage: mul(m, ctmGs), alpha };
 }
 
 const marked = new WeakMap<object, boolean>();
@@ -155,21 +223,27 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
     // background, where it was; paths no later background item overlaps are elevated as before.
     // gradient-filled shapes (Illustrator: a clip path, then the shading painted through it): the pair is one object
     const shaded = new Map<number, { clip: PathPaint; node: VectorNode }>();
+    const aiDoc = hasIllustratorData(doc, pageIndex) || illustratorMarked(doc);
     analysis.items.forEach((x, k) => {
       const prev = analysis.items[k - 1];
       if (x.kind !== "image" || !x.name.startsWith("sh:") || x.hidden || !prev || prev.kind !== "path" || !prev.clip || prev.unit !== x.unit || !editableUnit(x.unit)) return;
-      // painted through a soft mask or with transparency (a gradient that fades out): the gradient alone would not
-      // look the same — it stays in the background
-      if (maskedAt(doc, analysis.units.get(x.unit), x.op)) return;
-      const g = shadingGradient(doc, analysis.units.get(x.unit)?.resources, x.name.slice(3));
+      const u = analysis.units.get(x.unit)!;
+      const g = shadingGradient(doc, u.resources, x.name.slice(3));
       const contours = contoursOf(prev);
       if (!g || !contours.length) return;
       const box = paintBox({ contours });
-      const unit = (q: [number, number]): [number, number] => {
-        const [px, py] = apply(x.base, q[0], q[1]);
-        return [(px - box.x) / box.w, (py - box.y) / box.h];
-      };
-      const fill: Paint = { type: "gradient", kind: g.kind, stops: g.stops.map((s) => ({ at: Math.min(1, Math.max(0, s.at)), color: { hex: s.hex } })), from: unit(g.p0), to: unit(g.p1) };
+      let fill = gradientPaint(g, x.base, box);
+      // painted through a soft mask or with transparency: only a fading gradient (a grey luminosity mask over one
+      // colour, Illustrator's opacity mask) becomes opacity stops; anything else stays in the background
+      if (maskedAt(doc, u, x.op)) {
+        const f = maskFade(doc, u, x, aiDoc);
+        const one = new Set(g.stops.map((s) => s.hex.toLowerCase())).size === 1;
+        if (!f || !one) return;
+        const lum = (hex: string) => (parseInt(hex.slice(1, 3), 16) * 0.3 + parseInt(hex.slice(3, 5), 16) * 0.59 + parseInt(hex.slice(5, 7), 16) * 0.11) / 255;
+        const mp = gradientPaint(f.g, f.toPage, box);
+        if (mp.type !== "gradient") return;
+        fill = { ...mp, stops: mp.stops.map((s) => ({ ...s, color: { hex: g.stops[0].hex, a: Math.round(f.alpha(lum(s.color.hex)) * 1000) / 1000 } })) };
+      }
       const node = newVector(contours, (x.layer ? x.layer + " · " : "") + t("engine.default.gradientShape"));
       node.fill = g.stops[0].hex;
       node.stroke = null;
@@ -178,8 +252,28 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
       (node as VectorNode & { fills?: Paint[] }).fills = [fill];
       shaded.set(k, { clip: prev, node });
     });
+    // paths painted with a shading pattern (`/Pattern cs /P0 scn`: Illustrator's gradient stroke, other producers'
+    // gradient fills): gradient fills / strokes of the path's box
+    const patterned = new Map<number, { fill?: Paint; stroke?: Paint }>();
+    analysis.items.forEach((x, k) => {
+      if (x.kind !== "path" || x.clip || x.hidden || x.paintOp === "n" || !(x.fill?.pattern || x.stroke?.pattern)) return;
+      const u = analysis.units.get(x.unit);
+      if (!u?.space) return;
+      const contours = contoursOf(x);
+      if (!contours.length) return;
+      const box = paintBox({ contours });
+      const one = (c: PathPaint["fill"]): Paint | null | undefined => {
+        if (!c?.pattern) return undefined;
+        const pg = c.patternName ? patternGradient(doc, u.resources, c.patternName) : null;
+        return pg ? gradientPaint(pg.g, mul(pg.matrix, u.space!), box) : null;
+      };
+      const fill = one(x.fill), stroke = one(x.stroke);
+      if (fill === null || stroke === null) return;
+      patterned.set(k, { ...(fill ? { fill } : {}), ...(stroke ? { stroke } : {}) });
+    });
     const masked: (boolean | undefined)[] = [];
-    const elevatable = (x: (typeof analysis.items)[number], k = analysis.items.indexOf(x)): boolean => (x.kind === "path" && vectorEligible(x) && editableUnit(x.unit) && !(masked[k] ??= maskedAt(doc, analysis.units.get(x.unit), x.paint))) || shaded.has(k);
+    const eligible = (x: PathPaint, k: number) => vectorEligible(x) || (patterned.has(k) && x.segs.some((s) => s.op !== "m"));
+    const elevatable = (x: (typeof analysis.items)[number], k = analysis.items.indexOf(x)): boolean => (x.kind === "path" && eligible(x, k) && editableUnit(x.unit) && !(masked[k] ??= maskedAt(doc, analysis.units.get(x.unit), x.paint))) || shaded.has(k);
     const above: Box[] = [];
     const keep = new Set<number>();
     let lastClip: Box | null = null;
@@ -219,7 +313,17 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
         const id = vectorId(opts.prefix, pageIndex, i);
         const sh = shaded.get(k);
         if (sh && x.kind === "image") return { id, path: sh.clip, node: { ...sh.node, id }, shade: x };
-        return { id, path: x as PathPaint, node: vectorNode(x as PathPaint, id, i) };
+        const node = vectorNode(x as PathPaint, id, i);
+        const pt = patterned.get(k);
+        if (pt?.fill?.type === "gradient") {
+          (node as VectorNode & { fills?: Paint[] }).fills = [pt.fill];
+          node.fill = pt.fill.stops[0].color.hex;
+        }
+        if (pt?.stroke?.type === "gradient") {
+          (node as VectorNode & { strokes?: { paint: Paint; width: number }[] }).strokes = [{ paint: pt.stroke, width: node.strokeWidth }];
+          node.stroke = pt.stroke.stops[0].color.hex;
+        }
+        return { id, path: x as PathPaint, node, ...(pt ? { pattern: true } : {}) };
       });
   }
   return { pageIndex, analysis, viewport: vp.m, width: vp.width, height: vp.height, lines, vectors, notes };
@@ -478,6 +582,20 @@ export function contoursOf(p: PathPaint): Contour[] {
   }
   if (c && c.nodes.length > 1) out.push(c);
   return out;
+}
+
+/** A shading gradient whose space `toPage` maps into page px, as a paint in units of `box` (page px). */
+function gradientPaint(g: ShadeGradient, toPage: M, box: { x: number; y: number; w: number; h: number }): Paint {
+  const unit = (q: [number, number]): [number, number] => {
+    const [px, py] = apply(toPage, q[0], q[1]);
+    return [(px - box.x) / box.w, (py - box.y) / box.h];
+  };
+  const p: Paint = { type: "gradient", kind: g.kind, stops: g.stops.map((s) => ({ at: Math.min(1, Math.max(0, s.at)), color: { hex: s.hex } })), from: unit(g.p0), to: unit(g.p1) };
+  if (g.focal && p.type === "gradient") {
+    p.focal = unit(g.focal);
+    p.focalRadius = Math.round(((g.r0 ?? 0) / Math.max(1e-9, Math.hypot(g.p1[0] - g.p0[0], g.p1[1] - g.p0[1]))) * 1e4) / 1e4;
+  }
+  return p;
 }
 
 function vectorNode(p: PathPaint, id: string, i: number): VectorNode {

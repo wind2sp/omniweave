@@ -20,6 +20,7 @@ import type { StrokeVariant, strokeGlyphEm } from "./formats/cad/strokeFont";
 import {
   LineCapStyle,
   LineJoinStyle,
+  PDFDict,
   PDFDocument,
   PDFHexString,
   PDFName,
@@ -51,6 +52,7 @@ import {
   setLineCap,
   setLineJoin,
   setLineWidth,
+  setStrokingGrayscaleColor,
   setStrokingRgbColor,
   setTextMatrix,
   setTextRenderingMode,
@@ -60,6 +62,9 @@ import {
   type PDFPage,
 } from "pdf-lib";
 import { getBlob as defaultGetBlob } from "../core/assets";
+import { paintBox } from "../core/vector";
+import type { Paint } from "../core/style/types";
+import { drawableGradient, gradientFades, shadingDict, type GradientPaint } from "./pdfGradient";
 import { renderMasterOf } from "../core/headerFooter";
 import { buildTree, hasStructure, type TreeItem } from "../core/layerTree";
 import { intersects, transformRect } from "../core/geom";
@@ -86,7 +91,7 @@ import {
 import { pdfBytesForNode } from "./pdf";
 import { isSurgeonMark } from "./pdfsurgeon";
 import { zlibSync } from "fflate";
-import { PDFRawStream, type PDFDict } from "pdf-lib";
+import { PDFRawStream } from "pdf-lib";
 import { tidyBeforeSave } from "./pdfOptimize";
 import { filterRows } from "./tileCodec";
 import { PDF_BLEND, loadDissolveField, pageDissolves } from "../core/style/blend";
@@ -301,6 +306,30 @@ class Exporter {
       this.fontNames.set(k, n);
     }
     return n;
+  }
+
+  /** A shading in the current page's resources (gradients, pdfGradient). */
+  shadingName(dict: PDFDict): PDFName {
+    const res = (this.page.node as unknown as { normalizedEntries(): { Resources: PDFDict } }).normalizedEntries().Resources;
+    const ctx = this.pdf.context;
+    let cat = res.lookup(PDFName.of("Shading"));
+    if (!(cat instanceof PDFDict)) {
+      cat = ctx.obj({}) as PDFDict;
+      res.set(PDFName.of("Shading"), cat);
+    }
+    let i = 0;
+    while ((cat as PDFDict).has(PDFName.of(`Sh${i}`))) i++;
+    (cat as PDFDict).set(PDFName.of(`Sh${i}`), ctx.register(dict));
+    return PDFName.of(`Sh${i}`);
+  }
+
+  /** ExtGState with a luminosity soft mask drawn by `maskOps` (local space, bbox) — a fading gradient, a gradient stroke. */
+  maskGs(maskOps: Ops, bbox: [number, number, number, number]): PDFOperator {
+    const ctx = this.pdf.context;
+    const res = (this.page.node as unknown as { normalizedEntries(): { Resources: unknown } }).normalizedEntries().Resources;
+    const form = ctx.register(ctx.formXObject(maskOps, { BBox: bbox, Resources: res, Group: ctx.obj({ Type: "Group", S: "Transparency", I: true, K: false, CS: "DeviceGray" }) } as any));
+    const gs = ctx.register(ctx.obj({ Type: "ExtGState", SMask: ctx.obj({ Type: "Mask", S: "Luminosity", G: form }) }));
+    return setGraphicsState(this.page.node.newExtGState("GS", gs));
   }
 
   xobjectName(ref: PDFRef): PDFName {
@@ -577,8 +606,20 @@ function vectorOps(ex: Exporter, ops: Ops, n: VectorNode, opacity: number) {
   if (!path.length) return;
   const fc = parseColor(n.fill);
   const sc = n.stroke && n.strokeWidth > 0 ? parseColor(n.stroke) : null;
-  const doFill = !!fc && fc.a > 0;
-  const doStroke = !!sc && sc.a > 0;
+  let doFill = !!fc && fc.a > 0;
+  let doStroke = !!sc && sc.a > 0;
+  if (!doFill && !doStroke) return;
+  // gradient fill / stroke (`fills` / `strokes`): PDF shadings (pdfGradient), drawn before the plain paints
+  const gFill = (n as VectorNode & { fills?: Paint[] }).fills?.[0];
+  const gStroke = (n as VectorNode & { strokes?: { paint: Paint }[] }).strokes?.[0]?.paint;
+  if (doFill && drawableGradient(gFill)) {
+    gradientOps(ex, ops, n, gFill, path, opacity, "fill");
+    doFill = false;
+  }
+  if (doStroke && drawableGradient(gStroke)) {
+    gradientOps(ex, ops, n, gStroke, path, opacity, "stroke");
+    doStroke = false;
+  }
   if (!doFill && !doStroke) return;
   ops.push(pushGraphicsState());
   const g = ex.gs(opacity * (fc?.a ?? 1), opacity * (sc?.a ?? 1), n.blendMode);
@@ -592,6 +633,34 @@ function vectorOps(ex: Exporter, ops: Ops, n: VectorNode, opacity: number) {
   else if (doFill) ops.push(fillOp(n.fillRule));
   else ops.push(stroke());
   ops.push(popGraphicsState());
+}
+
+/**
+ * A gradient over a vector's fill or stroke: the shading painted through the path as a clip (fill), or through a
+ * luminosity soft mask of the stroke drawn in white (a stroke cannot be a clip in PDF). Stop opacities: a grey
+ * shading of them as the soft mask (fill; a stroke keeps its stops opaque).
+ */
+function gradientOps(ex: Exporter, ops: Ops, n: VectorNode, g: GradientPaint, path: Ops, opacity: number, mode: "fill" | "stroke") {
+  const b = paintBox(n);
+  const at = (u: [number, number]): [number, number] => [b.x + u[0] * b.w, b.y + u[1] * b.h];
+  const ctx = ex.pdf.context;
+  const sh = ex.shadingName(shadingDict(ctx, g, at));
+  const pad = mode === "stroke" ? n.strokeWidth * 2 + 2 : 2;
+  const bbox: [number, number, number, number] = [b.x - pad, b.y - pad, b.x + b.w + pad, b.y + b.h + pad];
+  ops.push(pushGraphicsState());
+  const gs = ex.gs(opacity, opacity, n.blendMode);
+  if (gs) ops.push(gs);
+  if (mode === "fill") {
+    if (gradientFades(g)) ops.push(ex.maskGs([PDFOperator.of(PON.ShadingFill, [ex.shadingName(shadingDict(ctx, g, at, true))])], bbox));
+    ops.push(...path, n.fillRule === "evenodd" ? clipEvenOdd() : clip(), endPath());
+  } else {
+    const m: Ops = [setStrokingGrayscaleColor(1), setLineWidth(n.strokeWidth), setLineCap(LineCapStyle.Round), setLineJoin(LineJoinStyle.Round)];
+    if (n.strokeDash?.length) m.push(setDashPattern(n.strokeDash, 0));
+    m.push(...path, stroke());
+    // no clip: the soft mask alone bounds the shading (a clip edge under a soft mask leaves a hairline in pdf.js)
+    ops.push(ex.maskGs(m, bbox));
+  }
+  ops.push(PDFOperator.of(PON.ShadingFill, [sh]), popGraphicsState());
 }
 
 /** Optional character formats some layouts carry (read defensively: older layouts lack them). */

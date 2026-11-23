@@ -56,8 +56,9 @@
   "doc.toast.alreadyElevated": "文本已经转换为可编辑对象",
   "doc.toast.analyzingPdf": "正在分析 PDF 内容流…",
   "doc.toast.nothingToEdit": "没有可编辑的文本或矢量（可能是扫描图像 PDF）",
-  "doc.toast.elevated": "已将 {lines} 行文本以原始字体打开为可编辑状态",
-  "doc.toast.elevatedVec": "已将 {lines} 行文本和 {vectors} 个矢量以原始字体打开为可编辑状态",
+  "doc.toast.elevated": "已将 {lines} 行文本以原始字体打开为可编辑状态。",
+  "doc.toast.elevatedShapes": "已将 {vectors} 个形状打开为可编辑状态。",
+  "doc.toast.elevatedVec": "已将 {lines} 行文本（保留原始字体）和 {vectors} 个形状打开为可编辑状态。",
   "doc.toast.selectForAnim": "请选择要添加动画的对象",
   "doc.toast.cannotDeleteAll": "无法删除所有页面 — 请至少保留一页",
   "doc.toast.pageSizeRange": "页面尺寸需在 16~16384px 之间",
@@ -222,5 +223,5 @@
   "doc.print.cancel": "取消",
   "doc.print.savePdf": "另存为 PDF",
   "doc.toast.adjustBaked": "此格式不支持调整图层，受影响的图层已作为图片置入",
-  "doc.toast.elevatedKept": "{n} 个形状（带透明度、蒙版等）暂时无法转换为对象，仍保留在背景图片中。"
+  "doc.toast.elevatedKept": "{n} 个形状（网格渐变、复杂蒙版或透明度等）暂时无法转换为对象，仍保留在背景图片中。"
 }

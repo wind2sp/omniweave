@@ -56,8 +56,9 @@
   "doc.toast.alreadyElevated": "The text has already been converted to editable objects",
   "doc.toast.analyzingPdf": "Analyzing PDF content stream…",
   "doc.toast.nothingToEdit": "No editable text or vectors found (this may be a scanned-image PDF)",
-  "doc.toast.elevated": "Made {lines} line(s) of text editable in their original fonts",
-  "doc.toast.elevatedVec": "Made {lines} line(s) of text and {vectors} vector(s) editable in their original fonts",
+  "doc.toast.elevated": "Made {lines} line(s) of text editable in their original fonts.",
+  "doc.toast.elevatedShapes": "Made {vectors} shape(s) editable.",
+  "doc.toast.elevatedVec": "Made {lines} line(s) of text (in their original fonts) and {vectors} shape(s) editable.",
   "doc.toast.selectForAnim": "Select the objects to animate",
   "doc.toast.cannotDeleteAll": "You cannot delete every page — keep at least one",
   "doc.toast.pageSizeRange": "Set the page size between 16 and 16384 px",
@@ -222,5 +223,5 @@
   "doc.print.cancel": "Cancel",
   "doc.print.savePdf": "Save as PDF",
   "doc.toast.adjustBaked": "This format has no adjustment layers, so the layers they affect were placed as a picture",
-  "doc.toast.elevatedKept": "{n} shapes (with transparency, masks and the like) cannot become objects yet and stay in the background picture."
+  "doc.toast.elevatedKept": "{n} shapes (mesh gradients, complex masks or transparency and the like) cannot become objects yet and stay in the background picture."
 }

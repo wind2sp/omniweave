@@ -8,8 +8,8 @@
 import { PDFDict, PDFName, PDFNumber, PDFRawStream, PDFRef, PDFStream, type PDFFont } from "pdf-lib";
 import { applyTransform, invertTransform, scaleYOf } from "../../core/geom";
 import type { Contour, PdfCover, SceneNode, TextNode, Transform, VectorNode } from "../../core/types";
-import { contentParts, dictOf, inherited, look, pageDict, type SurgeonDoc } from "./document";
-import { BASELINE, LINE_SPACING, isSurgeonId, modelPage, type ElevateOptions, type PageModel, type TextLine, type VectorItem } from "./elevate";
+import { contentParts, dictOf, hasIllustratorData, inherited, look, pageDict, type SurgeonDoc } from "./document";
+import { BASELINE, LINE_SPACING, illustratorMarked, isSurgeonId, modelPage, type ElevateOptions, type PageModel, type TextLine, type VectorItem } from "./elevate";
 import { cloneDict, lastXref, reserveNumbers, writeFull, writeIncremental } from "./incremental";
 import { PdfName, hexOf, num, serialize, type Op } from "./syntax";
 import { apply, inv, mul, rotate, scaleOf, translate, type M } from "./matrix";
@@ -18,6 +18,9 @@ import { dropXmpThumbnail, isIllustratorPdf, stripIllustratorData } from "./ai";
 import { mirrorIllustratorEdits, type AiMirror } from "./aiPrivate";
 import { padTtfSubsetGlyphs } from "../fontkitPatch";
 import type { ColorState } from "./interpret";
+import { paintBox } from "../../core/vector";
+import type { Paint } from "../../core/style/types";
+import { drawableGradient, gradientFades, shadingDict, type GradientPaint } from "../pdfGradient";
 
 export interface PageEditInput {
   /** page index in the original PDF */
@@ -468,7 +471,7 @@ const closeIfNeeded = (path: string, paintOp: string) => path + (paintOp === "s"
  * followed by `q <changed state> <path> <paint> Q` — the inserted `q` inherits exactly the graphics
  * state that was in effect at the original paint operator, so unchanged colours/patterns stay as they were.
  */
-function emitVector(v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) => [number, number], pathOnly: string | null): string | null {
+function emitVector(v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) => [number, number], pathOnly: string | null, paintState = ""): string | null {
   const p = v.path;
   const orig = v.node;
   const baseInv = inv(p.base);
@@ -483,6 +486,7 @@ function emitVector(v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) 
   if ((cur.fill ?? "").toLowerCase() !== (orig.fill ?? "").toLowerCase() && fill) s += colorOpLike(fill, p.fill, false) + "\n";
   if ((cur.stroke ?? "").toLowerCase() !== (orig.stroke ?? "").toLowerCase() && stroke) s += colorOpLike(stroke, p.stroke, true) + "\n";
   if (!close(cur.strokeWidth, orig.strokeWidth, 1e-3)) s += `${num(cur.strokeWidth / (scaleOf(p.base) || 1))} w\n`;
+  s += paintState;
   const sameGeom = geomSig(orig.contours) === geomSig(cur.contours) && sameTransform(orig.transform, cur.transform);
   if (sameGeom) s += pathOnly ?? segOps(p.segs);
   else {
@@ -495,6 +499,80 @@ function emitVector(v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) 
     });
   }
   s += paintOp(!!fill, !!stroke, cur.fillRule === "evenodd") + "\nQ\n";
+  return s;
+}
+
+// ───────── gradient shapes ─────────
+
+const paintsOf = (n: VectorNode, key: "fills" | "strokes"): Paint | undefined =>
+  key === "fills" ? (n as VectorNode & { fills?: Paint[] }).fills?.[0] : (n as VectorNode & { strokes?: { paint: Paint }[] }).strokes?.[0]?.paint;
+const paintsChanged = (a: VectorNode, b: VectorNode, key: "fills" | "strokes") => JSON.stringify(paintsOf(a, key) ?? null) !== JSON.stringify(paintsOf(b, key) ?? null);
+
+/** Node-local point → the analysed page's px (the space the PDF model and its matrices use). */
+const localToPx = (cur: VectorNode, toPx: (p: [number, number]) => [number, number]) => (q: [number, number]): [number, number] => {
+  const page = applyTransform(cur.transform, q);
+  return toPx([page[0], page[1]]);
+};
+
+/** A gradient's unit (box) coordinates of `cur` → page px → `then`. */
+function gradientAt(cur: VectorNode, toPx: (p: [number, number]) => [number, number], then: (px: [number, number]) => [number, number]) {
+  const b = paintBox(cur), L = localToPx(cur, toPx);
+  return (u: [number, number]): [number, number] => then(L([b.x + u[0] * b.w, b.y + u[1] * b.h]));
+}
+
+/**
+ * An edited gradient shape (clip path + sh): `q <path> W n /Sh sh Q` in the user space of the original clip path,
+ * with a new shading. Opacity stops: a luminosity soft mask of their grey shading, written the way Illustrator writes
+ * an opacity mask (a non-isolated grey group, perceptual intent), so Illustrator shows it as it shows its own; for an
+ * Illustrator file the grey is the one Illustrator shows as that opacity (elevate.ts maskFade). Null when it cannot
+ * be written so (no gradient fill, a degenerate matrix).
+ */
+function shadedShape(se: Session, model: PageModel, v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) => [number, number], illustrator: boolean): string | null {
+  const g = paintsOf(cur, "fills");
+  const back = inv(v.path.base);
+  if (!drawableGradient(g) || !back || !cur.fill) return null;
+  const ctx = se.doc.ctx;
+  const user = (px: [number, number]): [number, number] => apply(back, px[0], px[1]);
+  const L = localToPx(cur, toPx);
+  const at = gradientAt(cur, toPx, user);
+  const owner = ownerOf(se, model, v.path.unit);
+  const name = addResource(se, owner, "Shading", ctx.register(shadingDict(ctx, g, at)), "OmwSh");
+  const path = pathOps(cur.contours, (q) => user(L(q)));
+  let gs = "";
+  if (gradientFades(g)) {
+    const grey = (a: number) => (illustrator ? Math.min(1, Math.max(0, (a - 0.115) / 0.885)) : a);
+    const mg: GradientPaint = { ...g, stops: g.stops.map((x) => ({ ...x, color: { hex: x.color.hex, a: Math.round(grey(x.color.a ?? 1) * 1e4) / 1e4 } })) };
+    const form = ctx.stream("q 0 g /Perceptual ri BX /A sh EX Q", {
+      Type: "XObject",
+      Subtype: "Form",
+      BBox: [-32768, 32767, 32767, -32768],
+      Matrix: [1, 0, 0, 1, 0, 0],
+      Resources: { Shading: { A: ctx.register(shadingDict(ctx, mg, at, true)) } },
+      Group: ctx.register(ctx.obj({ Type: "Group", S: "Transparency", I: false, K: false, CS: "DeviceGray" })),
+    });
+    const mask = ctx.obj({ Type: "ExtGState", AIS: false, BM: "Normal", CA: 1, ca: 1, OP: false, op: false, OPM: 1, SA: true, SMask: ctx.register(ctx.obj({ Type: "Mask", S: "Luminosity", G: ctx.register(form) })) });
+    gs = `/${addResource(se, owner, "ExtGState", ctx.register(mask), "OmwGS")} gs\n`;
+  }
+  return `\nq\n${path}${cur.fillRule === "evenodd" ? "W*" : "W"} n\nq\n/Perceptual ri\n${gs}BX\n/${name} sh\nEX\nQ\nQ\n`;
+}
+
+/** The colour operators of a changed gradient fill / stroke of a pattern-painted path: new shading patterns. */
+function patternState(se: Session, model: PageModel, v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) => [number, number]): string | null {
+  const u = model.analysis.units.get(v.path.unit);
+  const back = u?.space ? inv(u.space) : null;
+  if (!back) return null;
+  let s = "";
+  for (const key of ["fills", "strokes"] as const) {
+    if (!paintsChanged(v.node, cur, key)) continue;
+    const g = paintsOf(cur, key);
+    if (!g) continue; // went plain: the plain colour is written by emitVector
+    if (!drawableGradient(g) || gradientFades(g)) return null;
+    const ctx = se.doc.ctx;
+    const sh = shadingDict(ctx, g as GradientPaint, gradientAt(cur, toPx, (px) => apply(back, px[0], px[1])));
+    const ref = ctx.register(ctx.obj({ Type: "Pattern", PatternType: 2, Shading: sh, Matrix: [1, 0, 0, 1, 0, 0] }));
+    const name = addResource(se, ownerOf(se, model, v.path.unit), "Pattern", ref, "OmwP");
+    s += key === "fills" ? `/Pattern cs /${name} scn\n` : `/Pattern CS /${name} SCN\n`;
+  }
   return s;
 }
 
@@ -764,8 +842,18 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
             se.splice(v.shade.unit, { s: su.ops[v.shade.op].s, e: su.ops[v.shade.op].e, text: " " });
             se.report.deletedVectors++;
             block("engine.ai.why.delete");
-          } else if (vectorChanged(v.node, cur) || JSON.stringify((cur as { fills?: unknown }).fills) !== JSON.stringify((v.node as { fills?: unknown }).fills)) {
-            se.report.skipped.push(t("engine.pdf.edit.gradientKept", { name: v.node.name }));
+          } else if (vectorChanged(v.node, cur) || paintsChanged(v.node, cur, "fills")) {
+            // the changed shape and gradient go in where the original was drawn (before its clip path), the
+            // original shading comes out; a fading one (opacity stops) keeps its original look
+            const text = shadedShape(se, model, v, cur, toPx, hasIllustratorData(doc, inp.pageIndex) || illustratorMarked(doc));
+            if (text == null) se.report.skipped.push(t("engine.pdf.edit.gradientKept", { name: v.node.name }));
+            else {
+              const cu = model.analysis.units.get(v.path.unit)!;
+              se.splice(v.path.unit, { s: cu.ops[v.path.first].s, e: cu.ops[v.path.first].s, text });
+              se.splice(v.shade.unit, { s: su.ops[v.shade.op].s, e: su.ops[v.shade.op].e, text: " " });
+              se.report.editedVectors++;
+              block("engine.ai.why.shape");
+            }
           }
           continue;
         }
@@ -783,8 +871,15 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
           block("engine.ai.why.delete");
           continue;
         }
-        if (!vectorChanged(v.node, cur)) continue;
-        const text = emitVector(v, cur, toPx, pathOnly);
+        const gradEdit = v.pattern && (paintsChanged(v.node, cur, "fills") || paintsChanged(v.node, cur, "strokes"));
+        if (!vectorChanged(v.node, cur) && !gradEdit) continue;
+        // a gradient fill / stroke (shading pattern) changed: a new pattern for it
+        const paintState = gradEdit ? patternState(se, model, v, cur, toPx) : "";
+        if (paintState == null) {
+          se.report.skipped.push(t("engine.pdf.edit.gradientKept", { name: v.node.name }));
+          continue;
+        }
+        const text = emitVector(v, cur, toPx, pathOnly, paintState);
         if (text == null) {
           se.report.skipped.push(t("engine.pdf.edit.degenerateMatrix", { name: v.node.name }));
           continue;
@@ -806,7 +901,8 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
           else block("engine.ai.why.shape");
         }
         se.splice(v.path.unit, { ...range, text });
-        edited.push({ id: v.id, name: v.node.name, cur });
+        if (v.pattern) se.report.editedVectors++;
+        else edited.push({ id: v.id, name: v.node.name, cur });
       }
     }
     // nodes that did not come from this PDF page are appended on top

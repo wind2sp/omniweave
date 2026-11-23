@@ -992,7 +992,7 @@ export async function elevatePdf() {
     pg.nodes.push(...(nodes as any));
   });
   const nText = nodes.filter((n) => n.type === "TEXT").length, nVec = nodes.filter((n) => n.type === "VECTOR").length;
-  S().notify(t(nVec ? "doc.toast.elevatedVec" : "doc.toast.elevated", { lines: nText, vectors: nVec }) + kept);
+  S().notify(t(nVec && nText ? "doc.toast.elevatedVec" : nVec ? "doc.toast.elevatedShapes" : "doc.toast.elevated", { lines: nText, vectors: nVec }) + kept);
 }
 
 export function addAnimation(preset: AnimPreset, trigger: "ON_CLICK" | "WITH_PREVIOUS" | "AFTER_PREVIOUS" = "ON_CLICK") {
