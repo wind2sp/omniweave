@@ -49,7 +49,7 @@ jobs:
         # OMW_WEB=1: manifest, home-screen icons and the offline service worker (scripts/web-pwa.mjs) — web build only
         env:
           OMW_WEB: "1"
-          APP_RELEASE_REF: 55362e4ededdc00cdca5424876f89e6b4b7352a4
+          APP_RELEASE_REF: 733a64a34c7505eba1b0f617b10802ce86358960
         run: |
           git fetch --no-tags --depth 1 origin "$APP_RELEASE_REF"
           git worktree add --detach "$RUNNER_TEMP/app-release" "$APP_RELEASE_REF"
