@@ -56,6 +56,8 @@
   "imgmode.msg.notReady": "图像仍在载入，请稍后再试",
   "imgmode.msg.rasterized": "“{name}”已变为像素图层（Ctrl+Z 可撤销）",
   "imgmode.msg.layerLocked": "所选图层已锁定。请先解锁再擦除",
+  "imgmode.msg.layerLockedPaint": "所选图层已锁定。请先解锁再绘画",
+  "imgmode.msg.layerHidden": "所选图层已隐藏。请先显示再绘画或擦除",
   "imgmode.msg.nothingToErase": "没有可擦除的像素图层。请选择要擦除的图层",
 
   "layers.bar": "图层混合模式和不透明度",

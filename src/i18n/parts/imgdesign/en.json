@@ -56,6 +56,8 @@
   "imgmode.msg.notReady": "The picture is still loading. Try again in a moment",
   "imgmode.msg.rasterized": "'{name}' is now a pixel layer (Ctrl+Z undoes it)",
   "imgmode.msg.layerLocked": "The selected layer is locked. Unlock it to erase",
+  "imgmode.msg.layerLockedPaint": "The selected layer is locked. Unlock it to paint",
+  "imgmode.msg.layerHidden": "The selected layer is hidden. Show it to paint or erase",
   "imgmode.msg.nothingToErase": "There is no pixel layer to erase. Pick the layer to erase",
 
   "layers.bar": "Layer blend mode and opacity",

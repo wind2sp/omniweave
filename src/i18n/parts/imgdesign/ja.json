@@ -56,6 +56,8 @@
   "imgmode.msg.notReady": "画像を読み込み中です。少し待ってからもう一度どうぞ",
   "imgmode.msg.rasterized": "「{name}」をピクセルレイヤーにしました（Ctrl+Z で元に戻す）",
   "imgmode.msg.layerLocked": "選んだレイヤーはロックされています。ロックを外してから消してください",
+  "imgmode.msg.layerLockedPaint": "選んだレイヤーはロックされています。ロックを外してから描いてください",
+  "imgmode.msg.layerHidden": "選んだレイヤーは非表示です。表示してから描くか消してください",
   "imgmode.msg.nothingToErase": "消せるピクセルレイヤーがありません。消すレイヤーを選んでください",
 
   "layers.bar": "レイヤーの描画モードと不透明度",

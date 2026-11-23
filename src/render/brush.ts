@@ -51,9 +51,33 @@ export function maskSize(tr: Transform, pageW: number, pageH: number): { w: numb
   return { w: Math.min(16384, Math.ceil(mx)), h: Math.min(16384, Math.ceil(my)) };
 }
 
+/**
+ * How far (node-local px, whole tiles) the page reaches left of / above the layer's own origin: a PSD layer starts at
+ * its content's corner, so painting left of or above that corner lands at negative local coordinates — it was cut
+ * off and the stroke changed nothing (a stroke across a page whose top layer is a small shape).
+ */
+export function maskOrigin(tr: Transform, pageW: number, pageH: number): { ox: number; oy: number } {
+  let nx = 0, ny = 0;
+  for (const p of [[0, 0], [pageW, 0], [0, pageH], [pageW, pageH]] as [number, number][]) {
+    const [x, y] = invertTransform(tr, p);
+    if (Number.isFinite(x)) nx = Math.min(nx, x);
+    if (Number.isFinite(y)) ny = Math.min(ny, y);
+  }
+  return { ox: Math.ceil(-nx / TILE) * TILE, oy: Math.ceil(-ny / TILE) * TILE };
+}
+
 export class Stroke {
+  /** the stroke's dabs in node-local space from (0, 0) (what a live preview drawn at the layer's origin shows) */
   readonly mask: OffscreenCanvas | HTMLCanvasElement;
+  /**
+   * The whole stroke, also left of / above the layer's origin: its (0, 0) is node-local (-ox, -oy). The same canvas
+   * as `mask` when the page does not reach there.
+   */
+  readonly full: OffscreenCanvas | HTMLCanvasElement;
+  readonly ox: number;
+  readonly oy: number;
   private mctx: Ctx;
+  private fctx: Ctx;
   bounds: Rect | null = null;
   private last: StrokePoint | null = null;
   private residual = 0;
@@ -71,6 +95,12 @@ export class Stroke {
     const s = maskSize(node.transform, pageW, pageH);
     this.mask = makeCanvas(s.w, s.h);
     this.mctx = ctx2d(this.mask);
+    const o = maskOrigin(node.transform, pageW, pageH);
+    // at most 16384 px a side in all: the part right of / below the origin comes first
+    this.ox = Math.max(0, Math.min(o.ox, Math.floor((16384 - s.w) / TILE) * TILE));
+    this.oy = Math.max(0, Math.min(o.oy, Math.floor((16384 - s.h) / TILE) * TILE));
+    this.full = this.ox || this.oy ? makeCanvas(s.w + this.ox, s.h + this.oy) : this.mask;
+    this.fctx = this.full === this.mask ? this.mctx : ctx2d(this.full);
   }
 
   private stamp(x: number, y: number, p: number) {
@@ -78,6 +108,7 @@ export class Stroke {
     const d = dab(r, this.brush.hardness, this.erase ? "#000000" : this.brush.color);
     const s = d.width;
     this.mctx.drawImage(d, x - s / 2, y - s / 2);
+    if (this.full !== this.mask) this.fctx.drawImage(d, x - s / 2 + this.ox, y - s / 2 + this.oy);
     const b = { x: x - s / 2, y: y - s / 2, w: s, h: s };
     if (!this.bounds) this.bounds = b;
     else {
@@ -113,7 +144,7 @@ export class Stroke {
   commit(): Record<string, PixelTile> | null {
     if (!this.bounds) return null;
     const b = this.bounds;
-    const colored = this.mask; // dabs are already in brush colour
+    const colored = this.full; // dabs are already in brush colour
 
     const tiles = { ...this.node.tiles };
     const tx0 = Math.floor(b.x / TILE), ty0 = Math.floor(b.y / TILE);
@@ -132,7 +163,7 @@ export class Stroke {
         else wc.clearRect(0, 0, TILE, TILE);
         wc.globalCompositeOperation = this.erase ? "destination-out" : "source-over";
         wc.globalAlpha = this.brush.opacity;
-        wc.drawImage(colored, tx * TILE, ty * TILE, TILE, TILE, 0, 0, TILE, TILE);
+        wc.drawImage(colored, tx * TILE + this.ox, ty * TILE + this.oy, TILE, TILE, 0, 0, TILE, TILE);
         const data = wc.getImageData(0, 0, TILE, TILE).data;
         if (isBlank(data)) {
           if (old) {

@@ -54,4 +54,32 @@ describe("raster tile seams", () => {
       }
     expect(bad).toEqual([]);
   });
+
+  it("a layer at 80 % opacity in Multiply shows no darker line along its seams (no seam pixel painted twice)", async () => {
+    const { drawNode } = await import("../src/render/draw");
+    const n = flat(2, 2, [200, 40, 60]);
+    const doc = newDocument();
+    const bad: string[] = [];
+    for (const z of [1, 1.175, 1.5]) {
+      const W = Math.ceil(2 * TILE * z) + 4;
+      const c = cv.createCanvas(W, W);
+      const g = c.getContext("2d") as any;
+      g.fillStyle = "#8080ff";
+      g.fillRect(0, 0, W, W);
+      g.setTransform(z, 0, 0, z, 0.37, 0.37);
+      g.globalAlpha = 0.8;
+      g.globalCompositeOperation = "multiply";
+      drawNode(g, n, { doc, clip: { x: 0, y: 0, w: 2 * TILE, h: 2 * TILE }, scale: z, incomplete: false, onResourceReady: () => {} } as any);
+      const img = g.getImageData(0, 0, W, W).data as Uint8ClampedArray;
+      const ref = Array.from(img.subarray(((10 * W) + 10) * 4, ((10 * W) + 10) * 4 + 3));
+      let worst = 0;
+      for (let y = 4; y < W - 4; y++)
+        for (let x = 4; x < W - 4; x++) {
+          const i = (y * W + x) * 4;
+          worst = Math.max(worst, Math.abs(img[i] - ref[0]), Math.abs(img[i + 1] - ref[1]), Math.abs(img[i + 2] - ref[2]));
+        }
+      if (worst > 2) bad.push(`${Math.round(z * 100)}%: ${worst}`);
+    }
+    expect(bad).toEqual([]);
+  });
 });

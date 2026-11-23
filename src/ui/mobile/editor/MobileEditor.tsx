@@ -473,7 +473,8 @@ function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress,
       ctx.scale(n.transform.scale, n.transform.scaleY ?? n.transform.scale);
       ctx.globalAlpha = d.stroke.erase ? 0.45 : S().brush.opacity;
       if (d.stroke.erase) ctx.globalCompositeOperation = "destination-out";
-      ctx.drawImage(d.stroke.mask as CanvasImageSource, 0, 0);
+      // the whole stroke, also where it went left of / above the layer's origin (a PSD layer's origin is its content's corner)
+      ctx.drawImage(d.stroke.full as CanvasImageSource, -d.stroke.ox, -d.stroke.oy);
       ctx.restore();
     }
   }, [size, view, painted, page, k, overlay]);

@@ -56,6 +56,8 @@
   "imgmode.msg.notReady": "그림을 아직 읽는 중이에요. 잠시 후 다시 해 주세요",
   "imgmode.msg.rasterized": "'{name}'을(를) 픽셀 레이어로 바꿨어요 (Ctrl+Z로 되돌리기)",
   "imgmode.msg.layerLocked": "고른 레이어가 잠겨 있어요. 잠금을 풀고 지워 주세요",
+  "imgmode.msg.layerLockedPaint": "고른 레이어가 잠겨 있어요. 잠금을 풀고 칠해 주세요",
+  "imgmode.msg.layerHidden": "고른 레이어가 숨겨져 있어요. 보이게 한 뒤 칠하거나 지워 주세요",
   "imgmode.msg.nothingToErase": "지울 픽셀 레이어가 없어요. 지울 레이어를 골라 주세요",
 
   "layers.bar": "레이어 혼합 모드·불투명도",

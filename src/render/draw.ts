@@ -631,6 +631,21 @@ export function drawNode(ctx: Ctx, n: SceneNode, env: DrawEnv, o?: NodeOverride,
         if (tx < tx0 || tx > tx1 || ty < ty0 || ty > ty1) continue;
         shown.push([tx, ty, tile]);
       }
+      // axis-aligned on the device (no rotation, no flip): each tile goes onto whole device pixels, its edges rounded
+      // the same way as its neighbours' — no seam pixel covered in part, and no pixel painted twice (the strips below
+      // put the seam pixel down twice, which a layer at reduced opacity or in Multiply showed as a dark line)
+      const dm = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
+      if (dm && Math.abs(dm.b) < 1e-9 && Math.abs(dm.c) < 1e-9 && dm.a > 0 && dm.d > 0) {
+        const X = (lx: number) => Math.round(dm.a * lx + dm.e), Y = (ly: number) => Math.round(dm.d * ly + dm.f);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        for (const [tx, ty, tile] of shown) {
+          const x0 = X(tx * TILE), x1 = X((tx + 1) * TILE), y0 = Y(ty * TILE), y1 = Y((ty + 1) * TILE);
+          if (x1 > x0 && y1 > y0) ctx.drawImage(tileCanvas(tile), x0, y0, x1 - x0, y1 - y0);
+        }
+        ctx.restore();
+        break;
+      }
       if (ox && oy)
         for (const [tx, ty, tile] of shown) {
           const r = !!n.tiles[`${tx + 1}_${ty}`], b = !!n.tiles[`${tx}_${ty + 1}`];

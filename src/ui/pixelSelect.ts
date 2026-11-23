@@ -17,7 +17,7 @@ import { borderMask, colorRangeMask, contractMask, expandMask, featherMask, comb
 import { renderMasterOf } from "../core/headerFooter";
 import { currentPage, draftPage, useStore } from "../core/store";
 import { IDENTITY, newRaster, type Page, type RasterNode, type SceneNode, type Transform } from "../core/types";
-import { groupIndex, lockedInTree, pickableOn } from "../core/layerTree";
+import { groupIndex, lockedInTree, pickableOn, shownInTree } from "../core/layerTree";
 import { Stroke, canvasToTiles } from "../render/brush";
 import { ctx2d, drawNode, makeCanvas, pictureSize, type Ctx, type DrawEnv } from "../render/draw";
 import { renderPageCanvas } from "../render/weave";
@@ -426,12 +426,14 @@ export function paintTarget(page: Page, erase: boolean, imageMode: boolean, rast
   const pick = pickableOn(page);
   const pixels = (n: SceneNode) => n.type === "RASTER" || n.type === "IMAGE";
   const selected = page.nodes.filter((n) => s.selection.includes(n.id) && pixels(n));
-  const open = selected.find((n) => !lockedInTree(n, idx));
+  const open = selected.find((n) => !lockedInTree(n, idx) && shownInTree(n, idx));
   if (open) {
     if (open.type === "RASTER") return open;
     if (erase || imageMode) return rasterize(page, open);
-  } else if (selected.length && erase) {
-    s.notify(t("imgmode.msg.layerLocked"));
+  } else if (selected.length) {
+    // the chosen layer is locked or hidden: nothing is painted (Photoshop), and not some other layer instead
+    const locked = selected.some((n) => lockedInTree(n, idx));
+    s.notify(t(locked ? (erase ? "imgmode.msg.layerLocked" : "imgmode.msg.layerLockedPaint") : "imgmode.msg.layerHidden"));
     return null;
   }
   const top = [...page.nodes].reverse().find((n) => pick(n) && (erase ? (n.type === "RASTER" && Object.keys(n.tiles).length > 0) || (imageMode && n.type === "IMAGE") : n.type === "RASTER"));
@@ -468,12 +470,13 @@ export function maskCanvas(m: SelMask) {
 }
 
 /** Keep only the part of a stroke mask (node-local canvas) inside the selection. */
-export function clipToSelection(target: OffscreenCanvas | HTMLCanvasElement, tr: Transform) {
+export function clipToSelection(target: OffscreenCanvas | HTMLCanvasElement, tr: Transform, ox = 0, oy = 0) {
   const m = activeMask();
   if (!m) return;
   const g = ctx2d(target);
   g.save();
-  g.setTransform(matrixOf(tr).invertSelf());
+  // the target's (0, 0) is node-local (-ox, -oy) (a brush stroke reaching left of / above the layer's origin)
+  g.setTransform(new DOMMatrix().translateSelf(ox, oy).multiplySelf(matrixOf(tr).invertSelf()));
   g.globalCompositeOperation = "destination-in";
   g.drawImage(maskCanvas(m), 0, 0);
   g.restore();
@@ -498,12 +501,13 @@ function paintThroughSelection(label: string, draw: (g: Ctx, page: Page) => void
   if (!raster) return false;
   const pg = currentPage()!;
   const stroke = new Stroke(raster, pg.width, pg.height, { ...S().brush, opacity: opts.opacity ?? 1 }, !!opts.erase);
-  const g = ctx2d(stroke.mask);
+  // the whole page, also left of / above the layer's origin (Stroke.full: its (0, 0) is node-local (-ox, -oy))
+  const g = ctx2d(stroke.full);
   g.save();
-  g.setTransform(matrixOf(raster.transform).invertSelf());
+  g.setTransform(new DOMMatrix().translateSelf(stroke.ox, stroke.oy).multiplySelf(matrixOf(raster.transform).invertSelf()));
   draw(g, pg);
   g.restore();
-  clipToSelection(stroke.mask, raster.transform);
+  clipToSelection(stroke.full, raster.transform, stroke.ox, stroke.oy);
   const area = usePixelSel.getState().bounds && activeMask() ? usePixelSel.getState().bounds! : { x: 0, y: 0, w: pg.width, h: pg.height };
   stroke.bounds = localRect(raster.transform, area);
   const tiles = stroke.commit();

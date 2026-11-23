@@ -456,16 +456,18 @@ export function CanvasView() {
       o.scale(n.transform.scale, n.transform.scaleY ?? n.transform.scale);
       o.globalAlpha = d.stroke.erase ? 0.35 : s.brush.opacity;
       const m = activeMask();
+      // the whole stroke, also left of / above the layer's origin (render/brush Stroke.full)
+      const { full, ox, oy } = d.stroke;
       if (m) {
         // image mode: the live stroke shows only inside the selection (as it will be committed)
-        const tmp = clipPreview(d.stroke.mask.width, d.stroke.mask.height);
+        const tmp = clipPreview(full.width, full.height);
         const g = tmp.getContext("2d")!;
         g.globalCompositeOperation = "copy";
-        g.drawImage(d.stroke.mask, 0, 0);
+        g.drawImage(full, 0, 0);
         g.globalCompositeOperation = "source-over";
-        clipToSelection(tmp, n.transform);
-        o.drawImage(tmp, 0, 0);
-      } else o.drawImage(d.stroke.mask, 0, 0);
+        clipToSelection(tmp, n.transform, ox, oy);
+        o.drawImage(tmp, -ox, -oy);
+      } else o.drawImage(full, -ox, -oy);
       o.restore();
     }
 
@@ -1961,7 +1963,7 @@ export function CanvasView() {
       }
       case "stroke": {
         // image mode: a stroke paints only inside the pixel selection
-        clipToSelection(d.stroke.mask, d.stroke.node.transform);
+        clipToSelection(d.stroke.full, d.stroke.node.transform, d.stroke.ox, d.stroke.oy);
         const tiles = d.stroke.commit();
         const id = d.stroke.node.id;
         if (tiles)
