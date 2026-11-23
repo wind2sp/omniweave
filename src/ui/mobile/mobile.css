@@ -1079,3 +1079,44 @@ html.phone-desk .bs-main {
     display: none;
   }
 }
+/* the start screen (새 문서 · 열기 · 서식) on a phone: one column — the three big choices stacked, the categories a row
+   of chips that scrolls sideways, the templates under them; the whole screen scrolls */
+html.phone-desk .modal.start {
+  height: calc(100dvh - 16px - var(--pd-bar));
+}
+html.phone-desk .start-inner {
+  overflow-y: auto;
+}
+html.phone-desk .start-head {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+html.phone-desk .start-hero {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+html.phone-desk .start-main {
+  display: block;
+  flex: none;
+}
+html.phone-desk .start-nav {
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 8px;
+  scrollbar-width: none;
+}
+html.phone-desk .start-cat {
+  flex: none;
+  white-space: nowrap;
+}
+html.phone-desk .start-nav-foot {
+  display: none;
+}
+html.phone-desk .start-body {
+  overflow: visible;
+  padding: 12px;
+}
