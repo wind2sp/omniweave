@@ -23,11 +23,12 @@
       // ?mobile / ?phone preview show the phone shell (ui/mobile) at the real width, edge to edge. Keep this test the
       // same as src/io/platform.ts isMobile ("PC 화면으로 보기" = sessionStorage omniweave.web.layout "desktop", web/phone.ts).
       try {
-        var q = location.search, tauri = "__TAURI_INTERNALS__" in window, pcChoice = false, narrowTouch = false;
-        try { pcChoice = sessionStorage.getItem("omniweave.web.layout") === "desktop"; } catch (e) {}
-        try { narrowTouch = Math.min(screen.width, screen.height) < 600 && matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches; } catch (e) {}
+        var q = location.search, tauri = "__TAURI_INTERNALS__" in window, layout = null, narrowTouch = false;
+        try { layout = sessionStorage.getItem("omniweave.web.layout"); } catch (e) {}
+        // primary pointer coarse on a phone-sized screen; a pen or mouse alongside (Galaxy S Pen) does not make it a PC
+        try { narrowTouch = Math.min(screen.width, screen.height) < 600 && matchMedia("(pointer: coarse)").matches; } catch (e) {}
         var phoneApp = (tauri && /Android|iPhone|iPad/i.test(navigator.userAgent)) || /[?&](mobile|phone)\b/.test(q) ||
-          (!tauri && !/[?&]desktop\b/.test(q) && !pcChoice && narrowTouch);
+          (!tauri && !/[?&]desktop\b/.test(q) && layout !== "desktop" && (layout === "phone" || narrowTouch));
         if (phoneApp) document.querySelector('meta[name="viewport"]').setAttribute("content", "width=device-width, initial-scale=1.0, viewport-fit=cover");
         else if (Math.min(screen.width, screen.height) < 600 || screen.width < 960)
           document.querySelector('meta[name="viewport"]').setAttribute("content", "width=1024, initial-scale=" + Math.min(1, screen.width / 1024).toFixed(3) + ", viewport-fit=cover");

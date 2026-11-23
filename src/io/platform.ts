@@ -38,26 +38,29 @@ export const isMobile: boolean = (() => {
   } catch {
     /* no URL */
   }
-  // "PC 화면으로 보기" (the phone shell's settings; web/phone.ts switchLayout): the desktop editor for this visit
-  if (desktopChosen()) return false;
+  // the visitor's choice for this visit (web/phone.ts switchLayout): "PC 화면으로 보기" = desktop, "휴대폰 화면으로" = phone
+  const chosen = layoutChoice();
+  if (chosen === "desktop") return false;
+  if (chosen === "phone") return true;
   // the web app on a phone (iPhone Safari, Android Chrome, a home-screen app): a narrow touch screen gets the same
   // phone screen as the Android app — tablets and touch laptops keep the desktop editor
   return narrowTouchScreen();
 })();
 
-function desktopChosen(): boolean {
+function layoutChoice(): string | null {
   try {
-    return sessionStorage.getItem(PHONE_LAYOUT_KEY) === "desktop";
+    return sessionStorage.getItem(PHONE_LAYOUT_KEY);
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** A phone-sized touch screen: coarse pointer, no fine one, the short side under 600 CSS px. */
+/** A phone-sized touch screen: primary pointer coarse, the short side under 600 CSS px. A pen or mouse alongside
+ *  (Galaxy S Pen, a Bluetooth mouse) does not make it a PC — the same test as index.html and ui/shell/WebNotice.tsx. */
 export function narrowTouchScreen(): boolean {
   if (typeof window === "undefined" || typeof matchMedia !== "function") return false;
   try {
-    const coarse = matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches;
+    const coarse = matchMedia("(pointer: coarse)").matches;
     const short = Math.min(window.screen?.width ?? window.innerWidth, window.screen?.height ?? window.innerHeight);
     return coarse && short > 0 && short < 600;
   } catch {

@@ -4,14 +4,14 @@
 // editor for this visit (sessionStorage); the desktop editor's phone notice (ui/shell/WebNotice.tsx) switches back.
 // (No imports: io/platform.ts loads this before the first screen.)
 
-/** sessionStorage key: "desktop" = this visit shows the desktop editor on a phone */
+/** sessionStorage key for this visit: "desktop" = the desktop editor on a phone, "phone" = the phone screen even
+ *  where the automatic test says otherwise (so "휴대폰 화면으로" always lands on the phone screen) */
 export const PHONE_LAYOUT_KEY = "omniweave.web.layout";
 
-/** Switch this visit to the desktop editor ("desktop") or back to the phone screen (null), then reload. */
-export function switchLayout(to: "desktop" | null): void {
+/** Switch this visit to the desktop editor ("desktop") or the phone screen ("phone"), then reload. */
+export function switchLayout(to: "desktop" | "phone"): void {
   try {
-    if (to) sessionStorage.setItem(PHONE_LAYOUT_KEY, to);
-    else sessionStorage.removeItem(PHONE_LAYOUT_KEY);
+    sessionStorage.setItem(PHONE_LAYOUT_KEY, to);
   } catch {}
   const u = new URL(location.href);
   for (const k of ["phone", "mobile", "desktop"]) u.searchParams.delete(k);
