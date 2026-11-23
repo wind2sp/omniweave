@@ -11,7 +11,7 @@ import { askPassword } from "../../io/crypto/session";
 export type ViewKind = "pdf" | "pages" | "image" | "media" | "other";
 
 /** Everything the desktop's format registry opens into pages (io/formats): the phone shows the same files. */
-export const PAGE_EXTS = ["docx", "hwpx", "pptx", "ppsx", "xlsx", "xlsm", "omw", "hwp", "doc", "xls", "ppt", "pps", "csv", "tsv", "md", "markdown", "html", "htm", "xhtml", "epub", "srt", "tif", "tiff", "heic", "heif", "bmp", "ico", "avif"];
+export const PAGE_EXTS = ["docx", "hwpx", "pptx", "ppsx", "xlsx", "xlsm", "omw", "hwp", "doc", "xls", "ppt", "pps", "csv", "tsv", "md", "markdown", "html", "htm", "xhtml", "epub", "srt", "tif", "tiff", "heic", "heif", "bmp", "ico", "avif", "odt", "odp"];
 export const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
 /** sound and video: played by the browser (the desktop places them on a slide) */
 export const MEDIA_EXTS = ["mp3", "wav", "ogg", "oga", "flac", "aac", "m4a", "opus", "mp4", "m4v", "webm", "mov", "ogv", "mkv", "avi"];

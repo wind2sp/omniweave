@@ -41,6 +41,8 @@
       { "ext": ["tif",  "tiff"], "name": "TIFF", "mimeType": "image/tiff", "role": "Viewer" },
       { "ext": ["heic",  "heif"], "name": "HEIC", "mimeType": "image/heic", "role": "Viewer" },
       { "ext": ["bmp"], "name": "BMP", "mimeType": "image/bmp", "role": "Viewer" },
+      { "ext": ["odt"], "name": "OpenDocument Text", "mimeType": "application/vnd.oasis.opendocument.text", "role": "Viewer" },
+      { "ext": ["odp"], "name": "OpenDocument Presentation", "mimeType": "application/vnd.oasis.opendocument.presentation", "role": "Viewer" },
       { "ext": ["omw"], "name": "Omniweave Workspace", "mimeType": "application/x-omniweave", "role": "Editor" }
     ]
   }

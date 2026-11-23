@@ -1120,3 +1120,25 @@ html.phone-desk .start-body {
   overflow: visible;
   padding: 12px;
 }
+/* find on PDF pages (pdf/PdfFind.tsx): the bar across the top of the page, under the title row, the field filling it */
+html.phone-desk .pdf-find-bar {
+  top: calc(var(--h-title) + 6px);
+  left: 6px;
+  right: 6px;
+  flex-wrap: wrap;
+  z-index: 65;
+}
+html.phone-desk .pdf-find-bar input:not([type]) {
+  flex: 1 1 140px;
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  font-size: 16px;
+}
+html.phone-desk .pdf-find-bar :is(button, label) {
+  min-width: 44px;
+  min-height: 44px;
+}
+html.phone-desk .pdf-find-status {
+  font-size: 14px;
+}

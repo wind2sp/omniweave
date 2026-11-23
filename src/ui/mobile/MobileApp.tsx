@@ -90,6 +90,9 @@ export function sniffExt(bytes: Uint8Array): string | null {
   if (head(2) === "PK") {
     const text = new TextDecoder("latin1").decode(bytes.subarray(0, Math.min(bytes.length, 65536)));
     if (text.includes("application/hwp+zip") || text.includes("Contents/section")) return "hwpx";
+    // OpenDocument: the first entry is the "mimetype" file, stored as is
+    if (text.includes("application/vnd.oasis.opendocument.text")) return "odt";
+    if (text.includes("application/vnd.oasis.opendocument.presentation")) return "odp";
     if (text.includes("word/")) return "docx";
     if (text.includes("ppt/")) return "pptx";
     if (text.includes("xl/")) return "xlsx";
