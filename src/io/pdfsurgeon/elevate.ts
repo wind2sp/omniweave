@@ -2,11 +2,13 @@
 // linked to the operations they came from. Node ids are deterministic (prefix + page + index), so
 // the original state of every node can be rebuilt from the untouched PDF at save time.
 
-import { PDFRef } from "pdf-lib";
+import { PDFName, PDFRef } from "pdf-lib";
 import { t } from "../../i18n";
 import { newText, newVector, type Contour, type TextNode, type TextRun, type VectorAnchor, type VectorNode } from "../../core/types";
-import { dget, dictOf, hasIllustratorData, hiddenOcgs, pageContent, pageResources, pageView, refKey, type SurgeonDoc } from "./document";
-import { analyzePage, type PageAnalysis, type PathPaint, type TextShow } from "./interpret";
+import { dget, dictOf, look, numOf, hasIllustratorData, hiddenOcgs, pageContent, pageResources, pageView, refKey, type SurgeonDoc } from "./document";
+import { analyzePage, shadingGradient, type ImageDraw, type PageAnalysis, type PathPaint, type TextShow } from "./interpret";
+import { paintBox } from "../../core/vector";
+import type { Paint } from "../../core/style/types";
 import { apply, viewportMatrix, type M } from "./matrix";
 import { cssFont, measure } from "../../core/text";
 import { embeddedFontFamily } from "./pdfFonts";
@@ -29,6 +31,8 @@ export interface VectorItem {
   id: string;
   path: PathPaint;
   node: VectorNode;
+  /** a gradient-filled shape: `path` is its clip path and this the shading (sh) painted through it */
+  shade?: ImageDraw;
 }
 
 export interface ElevateOptions {
@@ -56,6 +60,63 @@ export const textId = (prefix: string, page: number, i: number) => `ps_${prefix}
 export const vectorId = (prefix: string, page: number, i: number) => `ps_${prefix}_${page}_v${i}`;
 export const isSurgeonId = (id: string, prefix: string, page: number) => id.startsWith(`ps_${prefix}_${page}_`);
 
+/**
+ * Is a soft mask, fill / stroke alpha below 1 or a blend mode other than Normal in force at op `at`? One forward pass
+ * per stream unit (q / Q save and restore it; a later gs can switch each part off again), cached.
+ */
+type MaskUnit = { ops: { op: string; args: unknown[] }[]; resources?: unknown };
+const maskStates = new WeakMap<object, Uint8Array>();
+function maskedAt(doc: SurgeonDoc, unit: MaskUnit | undefined, at: number): boolean {
+  if (!unit) return true;
+  let st = maskStates.get(unit);
+  if (!st) {
+    st = new Uint8Array(unit.ops.length);
+    const egs = dictOf(dget(doc.ctx, unit.resources as never, "ExtGState"));
+    // bit 1 soft mask, 2 fill alpha, 4 stroke alpha, 8 blend mode
+    let cur = 0;
+    const stack: number[] = [];
+    unit.ops.forEach((o, i) => {
+      st![i] = cur;
+      if (o.op === "q") stack.push(cur);
+      else if (o.op === "Q") cur = stack.pop() ?? 0;
+      else if (o.op === "gs") {
+        const nm = (o.args[0] as { name?: string })?.name;
+        const g = nm ? dictOf(egs?.get(PDFName.of(nm)) ? look(doc.ctx, egs.get(PDFName.of(nm))) : undefined) : undefined;
+        if (!g) return;
+        const sm = g.get(PDFName.of("SMask"));
+        if (sm) cur = sm instanceof PDFName && sm.asString() === "/None" ? cur & ~1 : cur | 1;
+        const ca = numOf(look(doc.ctx, g.get(PDFName.of("ca")))), CA = numOf(look(doc.ctx, g.get(PDFName.of("CA"))));
+        if (ca !== undefined) cur = ca < 1 ? cur | 2 : cur & ~2;
+        if (CA !== undefined) cur = CA < 1 ? cur | 4 : cur & ~4;
+        const bm = look(doc.ctx, g.get(PDFName.of("BM")));
+        if (bm instanceof PDFName) cur = ["/Normal", "/Compatible"].includes(bm.asString()) ? cur & ~8 : cur | 8;
+      }
+    });
+    maskStates.set(unit, st);
+  }
+  return (st[at] ?? 0) !== 0;
+}
+
+const marked = new WeakMap<object, boolean>();
+/**
+ * An Illustrator file whose page lost its /PieceInfo (re-saved by another tool) still carries Illustrator's "%AI<n>_"
+ * comments: its paths are artwork to edit too. Cached per document.
+ */
+export function illustratorMarked(doc: SurgeonDoc): boolean {
+  let v = marked.get(doc);
+  if (v === undefined) {
+    const b = doc.plain;
+    v = false;
+    for (let i = b.indexOf(0x25); i >= 0 && i + 5 < b.length; i = b.indexOf(0x25, i + 1))
+      if (b[i + 1] === 0x41 && b[i + 2] === 0x49 && b[i + 3] >= 0x30 && b[i + 3] <= 0x39 && b[i + 4] === 0x5f) {
+        v = true;
+        break;
+      }
+    marked.set(doc, v);
+  }
+  return v;
+}
+
 /** Analyse a page and build its elevated nodes (pure: the same PDF always gives the same model). */
 export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptions): PageModel {
   const { view, rotate, userUnit } = pageView(doc, pageIndex);
@@ -75,15 +136,50 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
     const u = analysis.units.get(key);
     return !!u && u.uses === 1 && !(u.formRef && sharedForms.has(refKey(u.formRef)));
   };
-  const lines = buildLines(analysis, editableUnit, opts.prefix, pageIndex, vp.width);
-  const wantVectors = opts.vectors === true || (opts.vectors !== false && hasIllustratorData(doc, pageIndex));
+  // text an image painted later covers (Illustrator's PDF copy: a caption under its own raster preview) is not seen
+  // on the page: elevated, it would be drawn above that image — it stays in the background, where it was
+  const pictures = analysis.items.map((x, k) => [x, k] as const).filter(([x]) => x.kind === "image" && !x.hidden && !x.name.startsWith("sh:"));
+  const lines = buildLines(analysis, editableUnit, opts.prefix, pageIndex, vp.width).filter((l) => {
+    const gs = l.shows.flatMap((s) => s.glyphs);
+    if (!pictures.length || !gs.length) return true;
+    const box = { x0: Math.min(...gs.map((g) => g.x0)), y0: Math.min(...gs.map((g) => g.y0)), x1: Math.max(...gs.map((g) => g.x1)), y1: Math.max(...gs.map((g) => g.y1)) };
+    const first = Math.min(...l.shows.map((s) => analysis.items.indexOf(s)));
+    return !pictures.some(([x, k]) => k > first && x.kind === "image" && overlaps(imageBox(x.base), box));
+  });
+  const wantVectors = opts.vectors === true || (opts.vectors !== false && (hasIllustratorData(doc, pageIndex) || illustratorMarked(doc)));
   let vectors: VectorItem[] = [];
   if (wantVectors) {
     // Paint order: the elevated vectors are drawn above the page background (the PDF without them), so a path
     // painted BELOW something that stays in the background (an image, a gradient (sh), a path we cannot elevate)
     // would cover it once elevated — e.g. an artboard fill under a gradient (ai_layers). Such a path stays in the
     // background, where it was; paths no later background item overlaps are elevated as before.
-    const elevatable = (x: (typeof analysis.items)[number]): boolean => x.kind === "path" && vectorEligible(x) && editableUnit(x.unit);
+    // gradient-filled shapes (Illustrator: a clip path, then the shading painted through it): the pair is one object
+    const shaded = new Map<number, { clip: PathPaint; node: VectorNode }>();
+    analysis.items.forEach((x, k) => {
+      const prev = analysis.items[k - 1];
+      if (x.kind !== "image" || !x.name.startsWith("sh:") || x.hidden || !prev || prev.kind !== "path" || !prev.clip || prev.unit !== x.unit || !editableUnit(x.unit)) return;
+      // painted through a soft mask or with transparency (a gradient that fades out): the gradient alone would not
+      // look the same — it stays in the background
+      if (maskedAt(doc, analysis.units.get(x.unit), x.op)) return;
+      const g = shadingGradient(doc, analysis.units.get(x.unit)?.resources, x.name.slice(3));
+      const contours = contoursOf(prev);
+      if (!g || !contours.length) return;
+      const box = paintBox({ contours });
+      const unit = (q: [number, number]): [number, number] => {
+        const [px, py] = apply(x.base, q[0], q[1]);
+        return [(px - box.x) / box.w, (py - box.y) / box.h];
+      };
+      const fill: Paint = { type: "gradient", kind: g.kind, stops: g.stops.map((s) => ({ at: Math.min(1, Math.max(0, s.at)), color: { hex: s.hex } })), from: unit(g.p0), to: unit(g.p1) };
+      const node = newVector(contours, (x.layer ? x.layer + " · " : "") + t("engine.default.gradientShape"));
+      node.fill = g.stops[0].hex;
+      node.stroke = null;
+      node.strokeWidth = 0;
+      node.fillRule = prev.evenOdd ? "evenodd" : "nonzero";
+      (node as VectorNode & { fills?: Paint[] }).fills = [fill];
+      shaded.set(k, { clip: prev, node });
+    });
+    const masked: (boolean | undefined)[] = [];
+    const elevatable = (x: (typeof analysis.items)[number], k = analysis.items.indexOf(x)): boolean => (x.kind === "path" && vectorEligible(x) && editableUnit(x.unit) && !(masked[k] ??= maskedAt(doc, analysis.units.get(x.unit), x.paint))) || shaded.has(k);
     const above: Box[] = [];
     const keep = new Set<number>();
     let lastClip: Box | null = null;
@@ -106,7 +202,7 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
     for (let k = analysis.items.length - 1; k >= 0; k--) {
       const x = analysis.items[k], bx = boxes[k];
       if (!bx) continue;
-      const up = elevatable(x);
+      const up = elevatable(x, k);
       if (up) {
         // kept in the background: then it is itself something the paths below it must not cover
         if (above.some((o) => overlaps(o, bx))) {
@@ -115,10 +211,16 @@ export function modelPage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOptio
         }
       } else if (x.kind === "image" ? !x.hidden : x.kind === "text" ? true : x.kind === "path" && !x.clip && x.paintOp !== "n" && !x.hidden) above.push(bx);
     }
-    const paths = analysis.items.filter((x, k): x is PathPaint => elevatable(x) && !keep.has(k));
+    const paths = analysis.items.map((x, k) => [x, k] as const).filter(([x, k]) => elevatable(x, k) && !keep.has(k));
     const max = opts.maxVectors ?? 3000;
     if (paths.length > max) notes.push(t("engine.pdf.edit.tooManyPaths", { n: paths.length.toLocaleString(), max: max.toLocaleString() }));
-    else vectors = paths.map((p, i) => ({ id: vectorId(opts.prefix, pageIndex, i), path: p, node: vectorNode(p, vectorId(opts.prefix, pageIndex, i), i) }));
+    else
+      vectors = paths.map(([x, k], i) => {
+        const id = vectorId(opts.prefix, pageIndex, i);
+        const sh = shaded.get(k);
+        if (sh && x.kind === "image") return { id, path: sh.clip, node: { ...sh.node, id }, shade: x };
+        return { id, path: x as PathPaint, node: vectorNode(x as PathPaint, id, i) };
+      });
   }
   return { pageIndex, analysis, viewport: vp.m, width: vp.width, height: vp.height, lines, vectors, notes };
 }

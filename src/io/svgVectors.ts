@@ -3,10 +3,16 @@
 // Shapes (path, rect, circle, ellipse, line, polyline, polygon) become VectorNodes with their fill, stroke, width,
 // fill rule and opacity; <g> elements with an id or label become layer groups; transforms are baked into the
 // points. <text> becomes an editable text box (its font, size, weight, colour and anchor), <use> repeats the shape it
-// points to. A file that uses what paths cannot hold here (embedded images, gradients / patterns, filters, clip
-// paths, masks) returns null, and the caller keeps it as one picture — nothing is lost or approximated.
+// points to. Linear / radial gradient fills become gradient paints over the shape's box; a clip path (or a mask made
+// of white opaque shapes) cuts the filled shapes it applies to (2026-11-23). A file that uses what paths cannot hold
+// here (embedded images, patterns, filters, gradient strokes, grey or soft masks, a clip through a stroke) returns
+// null, and the caller keeps it as one picture — nothing is lost or approximated.
 
 import { t } from "../i18n";
+import polygonClipping, { type MultiPolygon, type Polygon } from "polygon-clipping";
+import { nodeBounds } from "../core/loom";
+import { flatten, paintBox } from "../core/vector";
+import type { Paint } from "../core/style/types";
 import { newText, newVector, uid, type TextNode, type Contour, type LayerGroup, type SceneNode, type Vec2, type VectorAnchor, type VectorNode } from "../core/types";
 
 type M = [number, number, number, number, number, number]; // a b c d e f
@@ -14,6 +20,7 @@ type M = [number, number, number, number, number, number]; // a b c d e f
 const I: M = [1, 0, 0, 1, 0, 0];
 const mul = (m: M, n: M): M => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
 const ap = (m: M, x: number, y: number): Vec2 => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+const kids = (el: Element): Element[] => Array.from(el.childNodes).filter((x): x is Element => x.nodeType === 1);
 
 /** SVG transform attribute → matrix. */
 export function parseTransform(s: string | null): M {
@@ -310,8 +317,22 @@ function styleOf(el: Element, parent: Style): Style {
   };
 }
 
+const NAMED: Record<string, string> = { black: "#000000", white: "#ffffff", red: "#ff0000", green: "#008000", blue: "#0000ff", yellow: "#ffff00", gray: "#808080", grey: "#808080", orange: "#ffa500", purple: "#800080", navy: "#000080", silver: "#c0c0c0", lime: "#00ff00", aqua: "#00ffff", cyan: "#00ffff", fuchsia: "#ff00ff", magenta: "#ff00ff", maroon: "#800000", olive: "#808000", teal: "#008080" };
+/** A CSS colour (#rgb, #rrggbb, rgb(), a basic name) as #rrggbb; black when it cannot be read. */
+function cssHex(c: string): string {
+  const v = c.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(v)) return v;
+  if (/^#[0-9a-f]{3}$/.test(v)) return "#" + v.slice(1).split("").map((x) => x + x).join("");
+  const m = /^rgba?\(\s*([\d.]+)(%?)\s*[, ]\s*([\d.]+)(%?)\s*[, ]\s*([\d.]+)(%?)/.exec(v);
+  if (m) {
+    const ch = (n: string, pc: string) => Math.round(Math.min(255, Math.max(0, pc ? (parseFloat(n) * 255) / 100 : parseFloat(n)))).toString(16).padStart(2, "0");
+    return `#${ch(m[1], m[2])}${ch(m[3], m[4])}${ch(m[5], m[6])}`;
+  }
+  return NAMED[v] ?? "#000000";
+}
+
 /** Elements whose look paths cannot carry here: the file stays one picture when any is drawn. */
-const UNSUPPORTED = new Set(["image", "foreignObject", "filter", "clipPath", "mask", "pattern", "switch", "textPath"]);
+const UNSUPPORTED = new Set(["image", "foreignObject", "filter", "pattern", "switch", "textPath"]);
 
 /**
  * An SVG <text> as a text box: one line (tspans joined), the font, size, weight, slant and fill colour it is drawn
@@ -435,12 +456,168 @@ export function svgToVectors(text: string): SvgArtwork | null {
     if (id && !byId.has(id)) byId.set(id, e);
   }
   let useDepth = 0;
-  const walk = (el: Element, m: M, st: Style, groupId: string | null, ta: Record<string, string> = {}, only?: Element[]) => {
+  const det = (m: M) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+  const urlId = (v: string | null | undefined) => /^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)/.exec(v ?? "")?.[1] ?? null;
+
+  /** A gradient's attribute, following its href chain (SVG gradients inherit attributes and stops). */
+  const gradAttr = (g: Element, k: string, depth = 0): string | null => {
+    if (g.hasAttribute(k)) return g.getAttribute(k);
+    const ref = (g.getAttribute("href") ?? g.getAttribute("xlink:href") ?? "").replace(/^#/, "");
+    const next = byId.get(ref);
+    return next && depth < 8 ? gradAttr(next, k, depth + 1) : null;
+  };
+  const gradStops = (g: Element, depth = 0): Element[] => {
+    const own = Array.from(g.getElementsByTagName("stop"));
+    if (own.length || depth > 8) return own;
+    const next = byId.get((g.getAttribute("href") ?? g.getAttribute("xlink:href") ?? "").replace(/^#/, ""));
+    return next ? gradStops(next, depth + 1) : [];
+  };
+  /**
+   * <linearGradient> / <radialGradient> of a path as a gradient fill over the path's box: the gradient's points (in
+   * the shape's box or in user space, through gradientTransform) go through the shape's transform onto the page and
+   * then into units of the drawn path's box. Null when it is not one of these (a pattern …).
+   */
+  const gradientPaint = (id: string, shapeUser: Contour[], cm: M, out: Contour[], opacity: number): Paint | null => {
+    const g = byId.get(id);
+    if (!g || (g.localName !== "linearGradient" && g.localName !== "radialGradient")) return null;
+    const stops = gradStops(g)
+      .map((st) => {
+        const a = attrs(st);
+        const off = a.offset ?? st.getAttribute("offset") ?? "0";
+        const at = off.endsWith("%") ? parseFloat(off) / 100 : parseFloat(off);
+        const col = paint(a["stop-color"] ?? "#000000", "#000000") ?? "#000000";
+        const op = parseFloat(a["stop-opacity"] ?? "1");
+        const hex = cssHex(col);
+        return { at: Math.min(1, Math.max(0, isFinite(at) ? at : 0)), color: { hex, ...((isFinite(op) ? op : 1) * opacity < 1 ? { a: Math.max(0, (isFinite(op) ? op : 1) * opacity) } : {}) } };
+      })
+      .sort((p, q) => p.at - q.at);
+    if (!stops.length) return null;
+    const userBox = paintBox({ contours: shapeUser });
+    const bbox = (gradAttr(g, "gradientUnits") ?? "objectBoundingBox") !== "userSpaceOnUse";
+    const gt = parseTransform(gradAttr(g, "gradientTransform"));
+    const num = (k: string, d: number) => {
+      const v = gradAttr(g, k);
+      if (v == null) return d;
+      return v.endsWith("%") ? parseFloat(v) / 100 : parseFloat(v);
+    };
+    // gradient space → the shape's user space → page
+    const toUser: M = bbox ? mul([userBox.w, 0, 0, userBox.h, userBox.x, userBox.y], gt) : gt;
+    const toPage = mul(cm, toUser);
+    const box = paintBox({ contours: out });
+    const unit = (p: Vec2): Vec2 => [(p[0] - box.x) / box.w, (p[1] - box.y) / box.h];
+    if (g.localName === "linearGradient") {
+      const p0 = ap(toPage, num("x1", 0), num("y1", 0)), p1 = ap(toPage, num("x2", bbox ? 1 : 0), num("y2", 0));
+      return { type: "gradient", kind: "linear", stops, from: unit(p0), to: unit(p1) };
+    }
+    const cx = num("cx", 0.5), cy = num("cy", 0.5), r = num("r", 0.5);
+    const c0 = ap(toPage, cx, cy), c1 = ap(toPage, cx + r, cy);
+    return { type: "gradient", kind: "radial", stops, from: unit(c0), to: unit(c1) };
+  };
+
+  /** The area a clip-path / mask keeps, on the page (a mask only when it is opaque white shapes — then it is a clip). */
+  const clipArea = (id: string, m: M, isMask: boolean): MultiPolygon | null => {
+    const el = byId.get(id);
+    if (!el) return null;
+    const polys: Polygon[] = [];
+    const add = (ch: Element, mm: M): boolean => {
+      const cm2 = mul(mm, parseTransform(ch.getAttribute("transform")));
+      if (ch.localName === "g") return kids(ch).every((x) => add(x, cm2));
+      if (ch.localName === "use") {
+        const tg = byId.get((ch.getAttribute("href") ?? ch.getAttribute("xlink:href") ?? "").replace(/^#/, ""));
+        return !tg || add(tg, mul(cm2, [1, 0, 0, 1, parseFloat(ch.getAttribute("x") ?? "0") || 0, parseFloat(ch.getAttribute("y") ?? "0") || 0]));
+      }
+      if (isMask) {
+        const a = attrs(ch);
+        const f = (a.fill ?? "").toLowerCase();
+        if (!["#fff", "#ffffff", "white"].includes(f) || parseFloat(a.opacity ?? "1") < 1 || parseFloat(a["fill-opacity"] ?? "1") < 1) return false;
+      }
+      const segs = shapeSegs(ch);
+      if (!segs) return ch.localName === "title" || ch.localName === "desc";
+      for (const ct of segsToContours(segs, cm2)) {
+        const ring = flatten(ct, 0.25).map((q) => [q[0], q[1]] as [number, number]);
+        if (ring.length > 2) polys.push([[...ring, ring[0]]]);
+      }
+      return true;
+    };
+    if (!kids(el).every((ch) => add(ch, m))) return null;
+    return polys.length ? polygonClipping.union(polys[0], ...polys.slice(1)) : [];
+  };
+  const polyOf = (cs: Contour[]): MultiPolygon => {
+    const polys: Polygon[] = cs.filter((c) => c.closed && c.nodes.length > 2).map((c) => {
+      const ring = flatten(c, 0.25).map((q) => [q[0], q[1]] as [number, number]);
+      return [[...ring, ring[0]]];
+    });
+    return polys.length ? polygonClipping.xor(polys[0], ...polys.slice(1)) : [];
+  };
+  const areaOf = (mp: MultiPolygon) => mp.reduce((s, poly) => s + poly.reduce((t, ring, i) => {
+    let a = 0;
+    for (let k = 0, j = ring.length - 1; k < ring.length; j = k++) a += (ring[j][0] + ring[k][0]) * (ring[j][1] - ring[k][1]);
+    return t + (i ? -1 : 1) * Math.abs(a / 2);
+  }, 0), 0);
+  /** A node under a clip: a filled path is cut to it; anything else must already lie inside it (else: one picture). */
+  const clipNode = (n: SceneNode, clip: MultiPolygon | null): SceneNode | null | "unsupported" => {
+    if (!clip) return n;
+    if (!clip.length) return null;
+    if (n.type === "VECTOR" && n.fill && !n.stroke && n.contours.every((c) => c.closed)) {
+      const cut = polygonClipping.intersection(polyOf(n.contours), clip);
+      if (!cut.length) return null;
+      const contours: Contour[] = [];
+      for (const poly of cut) for (const ring of poly) {
+        const pts = ring.slice(0, -1);
+        if (pts.length > 2) contours.push({ closed: true, nodes: pts.map(([x, y]) => ({ anchor: [x, y], handleIn: [x, y], handleOut: [x, y], isCorner: true })) });
+      }
+      // a gradient keeps its look: its units are re-based on the cut path's box
+      const fills = (n as VectorNode & { fills?: Paint[] }).fills;
+      const out = { ...n, contours, fillRule: "evenodd" as const };
+      if (fills?.[0]?.type === "gradient") {
+        const ob = paintBox(n), nb = paintBox({ contours });
+        const re = (u: Vec2): Vec2 => [(ob.x + u[0] * ob.w - nb.x) / nb.w, (ob.y + u[1] * ob.h - nb.y) / nb.h];
+        const g = fills[0];
+        (out as VectorNode & { fills?: Paint[] }).fills = [{ ...g, from: re(g.from), to: re(g.to) }];
+      }
+      return out;
+    }
+    // stroked / open paths and text: kept when they lie wholly inside the clip, otherwise the file stays a picture
+    const b = nodeBounds(n);
+    const box: MultiPolygon = [[[[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h], [b.x, b.y]]]];
+    const inside = areaOf(polygonClipping.intersection(box, clip));
+    if (inside >= areaOf(box) * 0.999) return n;
+    if (inside <= 0) return null;
+    return "unsupported";
+  };
+  const push = (n: SceneNode, clip: MultiPolygon | null, groupId: string | null) => {
+    const r = clipNode(n, clip);
+    if (r === "unsupported") {
+      unsupported = true;
+      return;
+    }
+    if (!r) return;
+    if (groupId) r.groupId = groupId;
+    nodes.push(r);
+  };
+  const withClip = (cur: MultiPolygon | null, a: Record<string, string>, m: M): MultiPolygon | null | "unsupported" => {
+    let clip = cur;
+    for (const [k, isMask] of [["clip-path", false], ["mask", true]] as const) {
+      if (!a[k] || a[k] === "none") continue;
+      const id = urlId(a[k]);
+      const area = id ? clipArea(id, m, isMask) : null;
+      if (!area) return "unsupported";
+      clip = clip ? polygonClipping.intersection(clip, area) : area;
+    }
+    return clip;
+  };
+
+  const walk = (el: Element, m: M, st: Style, groupId: string | null, ta: Record<string, string> = {}, only?: Element[], clip: MultiPolygon | null = null) => {
     for (const ch of only ?? Array.from(el.childNodes).filter((x): x is Element => x.nodeType === 1)) {
       const tag = ch.localName;
       const chAttrs = attrs(ch);
       const cta = { ...ta };
       for (const k of TEXT_INHERIT) if (chAttrs[k] != null) cta[k] = chAttrs[k];
+      if (tag === "defs" || tag === "title" || tag === "desc" || tag === "metadata" || tag === "style" || tag === "symbol" || tag === "linearGradient" || tag === "radialGradient" || tag === "clipPath" || tag === "mask") continue;
+      if (chAttrs.filter) {
+        unsupported = true;
+        return;
+      }
       if (tag === "use") {
         // <use href="#id" x y>: the referenced shape again, moved (at most 8 deep: a loop of uses is cut there)
         const ref = (ch.getAttribute("href") ?? ch.getAttribute("xlink:href") ?? "").replace(/^#/, "");
@@ -449,75 +626,69 @@ export function svgToVectors(text: string): SvgArtwork | null {
         const us = styleOf(ch, st);
         if (!us.display) continue;
         const um = mul(mul(m, parseTransform(ch.getAttribute("transform"))), [1, 0, 0, 1, parseFloat(ch.getAttribute("x") ?? "0") || 0, parseFloat(ch.getAttribute("y") ?? "0") || 0]);
+        const uc = withClip(clip, chAttrs, mul(m, parseTransform(ch.getAttribute("transform"))));
+        if (uc === "unsupported") return void (unsupported = true);
         useDepth++;
-        walk(ch, um, us, groupId, cta, target.localName === "symbol" ? Array.from(target.childNodes).filter((x): x is Element => x.nodeType === 1) : [target]);
+        walk(ch, um, us, groupId, cta, target.localName === "symbol" ? Array.from(target.childNodes).filter((x): x is Element => x.nodeType === 1) : [target], uc);
         useDepth--;
         if (unsupported) return;
         continue;
       }
-      if (tag === "text") {
-        const s = styleOf(ch, st);
-        if (!s.display) continue;
-        if ((s.fill && s.fill.startsWith("url(")) || chAttrs["clip-path"] || chAttrs.mask || chAttrs.filter) {
-          unsupported = true;
-          return;
-        }
-        const tn = svgText(ch, mul(m, parseTransform(ch.getAttribute("transform"))), s, cta);
-        if (tn) {
-          if (groupId) tn.groupId = groupId;
-          nodes.push(tn);
-        }
-        continue;
-      }
-      if (tag === "defs" || tag === "title" || tag === "desc" || tag === "metadata" || tag === "style" || tag === "symbol" || tag === "linearGradient" || tag === "radialGradient") continue;
       if (UNSUPPORTED.has(tag)) {
-        unsupported = true;
-        return;
-      }
-      const a = attrs(ch);
-      if (a["clip-path"] || a.mask || a.filter) {
         unsupported = true;
         return;
       }
       const s = styleOf(ch, st);
       if (!s.display) continue;
       const cm = mul(m, parseTransform(ch.getAttribute("transform")));
+      const nc = withClip(clip, chAttrs, cm);
+      if (nc === "unsupported") return void (unsupported = true);
+      if (tag === "text") {
+        if (s.fill && s.fill.startsWith("url(")) return void (unsupported = true);
+        const tn = svgText(ch, cm, s, cta);
+        if (tn) push(tn, nc, groupId);
+        if (unsupported) return;
+        continue;
+      }
       if (tag === "g" || tag === "a") {
         const label = ch.getAttribute("inkscape:label") || ch.getAttribute("data-name") || ch.getAttribute("id");
         let gid = groupId;
         if (label && tag === "g") {
           gid = uid("grp");
           groups.push({ id: gid, name: label, parentId: groupId, visible: true, locked: false, opacity: s.opacity, blendMode: "PASS_THROUGH" });
-          walk(ch, cm, { ...s, opacity: 1 }, gid, cta);
-        } else walk(ch, cm, s, gid, cta);
+          walk(ch, cm, { ...s, opacity: 1 }, gid, cta, undefined, nc);
+        } else walk(ch, cm, s, gid, cta, undefined, nc);
         if (unsupported) return;
         continue;
       }
       const segs = shapeSegs(ch);
       if (!segs) continue;
-      if ((s.fill && s.fill.startsWith("url(")) || (s.stroke && s.stroke.startsWith("url("))) {
-        unsupported = true;
-        return;
-      }
+      // a gradient stroke has no counterpart here (a gradient fill has: below)
+      if (s.stroke && s.stroke.startsWith("url(")) return void (unsupported = true);
       const contours = segsToContours(segs, cm);
       if (!contours.length) continue;
       const v: VectorNode = newVector(contours, ch.getAttribute("data-name") || ch.getAttribute("id") || shapeName(tag));
       // open paths are not filled in Illustrator's sense only when they have no fill: SVG fills them, so keep it
-      v.fill = withAlpha(s.fill, s.fillOpacity);
+      if (s.fill && s.fill.startsWith("url(")) {
+        const gp = gradientPaint(urlId(s.fill) ?? "", segsToContours(segs, I), cm, contours, s.fillOpacity);
+        if (!gp || gp.type !== "gradient") return void (unsupported = true);
+        (v as VectorNode & { fills?: Paint[] }).fills = [gp];
+        // the plain fill older readers and exports use: the gradient's first colour
+        v.fill = gp.stops[0].color.hex;
+      } else v.fill = withAlpha(s.fill, s.fillOpacity);
       v.stroke = withAlpha(s.stroke, s.strokeOpacity);
-      v.strokeWidth = s.strokeWidth * Math.sqrt(Math.abs(cm[0] * cm[3] - cm[1] * cm[2]));
+      v.strokeWidth = s.strokeWidth * det(cm);
       v.fillRule = s.fillRule;
       // SVG's own defaults are butt caps and miter joins (Omniweave's omitted value is round)
       v.strokeCap = s.cap === "round" || s.cap === "square" ? s.cap : "butt";
       v.strokeJoin = s.join === "round" || s.join === "bevel" ? s.join : "miter";
       const dash = s.dash === "none" ? [] : (s.dash.match(/[\d.]+/g) ?? []).map(Number).filter((x) => x >= 0);
-      if (dash.length && dash.some((x) => x > 0)) v.strokeDash = dash.map((x) => x * Math.sqrt(Math.abs(cm[0] * cm[3] - cm[1] * cm[2])));
+      if (dash.length && dash.some((x) => x > 0)) v.strokeDash = dash.map((x) => x * det(cm));
       v.opacity = s.opacity;
-      if (groupId) v.groupId = groupId;
-      nodes.push(v);
+      push(v, nc, groupId);
+      if (unsupported) return;
     }
-  };
-  walk(svg, root, styleOf(svg, BASE), null);
+  };  walk(svg, root, styleOf(svg, BASE), null);
   if (unsupported || !nodes.length) return null;
   return { width: Math.round(W), height: Math.round(H), nodes, groups };
 }

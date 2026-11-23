@@ -133,7 +133,7 @@ export const IMAGE_MENUS: { id: string; entries: Entry[] }[] = [
       "insert.image", "insert.text", "-", "object.lock", "object.hide", "-", ...ORDER, "-", "view.layersPanel",
     ],
   },
-  { id: "select", entries: [...SELECT_MENU, "-", "image.removeBackground"] },
+  { id: "select", entries: ["select.allPixels", "select.deselectPixels", "select.reselect", "select.inversePixels", "-", "select.colorRange", { sub: "selmod.menu.modify", entries: ["select.border", "select.expand", "select.contract", "select.feather"] }, "-", "image.removeBackground"] },
   { id: "filter", entries: [{ gen: "filters" }, "-", "object.trace"] },
   { id: "view", entries: VIEW_MENU },
 ];

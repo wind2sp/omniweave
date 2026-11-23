@@ -14,6 +14,7 @@ import { SizeDialog } from "./SizeDialog";
 import { PageSetupDialog } from "./PageSetupDialog";
 import { ColumnsDialog } from "./ColumnsDialog";
 import { CanvasSizeDialog } from "./CanvasSizeDialog";
+import { SelectModifyDialog } from "./SelectModifyDialog";
 import { PageNumberDialog } from "./HeaderFooterDialog";
 import { ListDialog, ParagraphDialog } from "./ParagraphDialogs";
 import { UI_SCALES, useUI } from "./uiStore";
@@ -314,6 +315,7 @@ export function ShellDialogs() {
   if (which === "pageSetup") return <PageSetupDialog />;
   if (which === "columns") return <ColumnsDialog />;
   if (which === "canvasSize") return <CanvasSizeDialog />;
+  if (which === "selectModify") return <SelectModifyDialog />;
   if (which === "paragraph") return <ParagraphDialog />;
   if (which === "listFormat") return <ListDialog />;
   if (which === "pageNumber") return <PageNumberDialog />;

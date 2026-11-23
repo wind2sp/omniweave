@@ -107,6 +107,8 @@ export function reconstruct(p: OcrPage, o: ReconstructOptions): SceneNode[] {
   const k = Math.hypot(fr[0], fr[1]), ky = Math.hypot(fr[2], fr[3]);
   const keep = o.keep ?? (() => true);
   const inside = (b: { x: number; y: number; w: number; h: number }) => keep(b.x + b.w / 2, b.y + b.h / 2);
+  // a "line" that read as one or two marks only (a dot from a shape edge, a stray dash) is not text: dropped
+  const noise = (l: object) => { const ch = (l as { chars?: { ch: string }[] }).chars; return !!ch && /^[\p{P}\p{S}\s]{0,2}$/u.test(ch.map((c) => c.ch).join("")); };
   // node origin for content at OCR (x, y) that is w OCR px wide: the node's "down" follows the picture's, its text
   // runs along the matching axis (a mirrored picture gets readable text starting from the mirrored side)
   const vx = fr[2], vy = fr[3];
@@ -130,7 +132,7 @@ export function reconstruct(p: OcrPage, o: ReconstructOptions): SceneNode[] {
   }
   if (o.mode === "layer") {
     for (const l of p.lines) {
-      if (!inside(l.box)) continue;
+      if (!inside(l.box) || noise(l)) continue;
       // size from the line height, shrunk when the text would run past the line box. No letter spacing: PDF
       // readers turn character spacing into spaces ("홍 길 동"), which breaks search.
       const size = Math.max(4, Math.min(l.core.h * EM_PER_CORE * k, (l.box.w * k) / Math.max(0.5, advanceEm(l.text))));
@@ -146,7 +148,7 @@ export function reconstruct(p: OcrPage, o: ReconstructOptions): SceneNode[] {
   }
   for (const b0 of p.blocks) {
     // content outside the node's crop is not shown, so it is not rebuilt either
-    const paragraphs = b0.paragraphs.map((q) => ({ ...q, lines: q.lines.filter((l) => inside(l.box)) })).filter((q) => q.lines.length);
+    const paragraphs = b0.paragraphs.map((q) => ({ ...q, lines: q.lines.filter((l) => inside(l.box) && !noise(l)) })).filter((q) => q.lines.length);
     if (!paragraphs.length) continue;
     const b = { ...b0, paragraphs };
     const t: TextNode = newText("", b.box.w * k * 1.04 + 8);

@@ -11,6 +11,8 @@ import { pdfSearchNode } from "./pdf/PdfFind";
 import { setAnnotTool, usePdfAnnot } from "./pdf/PdfAnnotLayer";
 import { addCenterGuides, clearGuides, toggleGrid, toggleGuides, toggleGuidesLocked, toggleRulers, toggleSnap, useAids } from "./aids";
 import { alignSelected, distributeSelected } from "./arrange";
+import { deselect, hasPixelSelection, invertSelection, reselect, selectAllPixels, usePixelSel } from "./pixelSelect";
+import { useSelModify } from "./shell/SelectModifyDialog";
 import { canvasCropAvailable, croppableSelection, startCanvasCrop, startCrop } from "./cropTool";
 import { imageTarget, solidFill } from "./imageActions";
 import { canCrop } from "../core/crop";
@@ -155,6 +157,16 @@ export const COMMANDS: Command[] = [
   { id: "edit.selectAll", run: selectAll },
   { id: "edit.selectInverse", when: () => curNodes() > 0, run: selectInverse },
   { id: "edit.deselect", when: hasSel, run: () => S().set({ selection: [] }) },
+  // the image mode's 선택 menu (Photoshop): the pixel selection, not the layers
+  { id: "select.allPixels", when: () => !!curPage(), run: selectAllPixels },
+  { id: "select.deselectPixels", when: hasPixelSelection, whyNot: () => t("selmod.needSelection"), run: deselect },
+  { id: "select.inversePixels", when: () => !!curPage(), run: invertSelection },
+  { id: "select.reselect", when: () => usePixelSel.getState().last?.pageId === S().pageId, whyNot: () => t("selmod.noLast"), run: reselect },
+  { id: "select.colorRange", dialog: true, when: () => !!curPage(), run: () => (useSelModify.setState({ kind: "colorRange" }), UI().set({ shellDialog: "selectModify" })) },
+  { id: "select.expand", dialog: true, when: hasPixelSelection, whyNot: () => t("selmod.needSelection"), run: () => (useSelModify.setState({ kind: "expand" }), UI().set({ shellDialog: "selectModify" })) },
+  { id: "select.contract", dialog: true, when: hasPixelSelection, whyNot: () => t("selmod.needSelection"), run: () => (useSelModify.setState({ kind: "contract" }), UI().set({ shellDialog: "selectModify" })) },
+  { id: "select.feather", dialog: true, when: hasPixelSelection, whyNot: () => t("selmod.needSelection"), run: () => (useSelModify.setState({ kind: "feather" }), UI().set({ shellDialog: "selectModify" })) },
+  { id: "select.border", dialog: true, when: hasPixelSelection, whyNot: () => t("selmod.needSelection"), run: () => (useSelModify.setState({ kind: "border" }), UI().set({ shellDialog: "selectModify" })) },
   // (a PDF page: its words are in the file, not in text boxes - the PDF Find bar reads them, ui/pdf/PdfFind.tsx)
   { id: "edit.find", icon: "search", dialog: true, run: () => UI().set({ shellDialog: curPage() && pdfSearchNode(curPage()!) ? "pdfFind" : "find" }) },
   { id: "edit.replace", dialog: true, run: () => UI().set({ shellDialog: "replace" }) },

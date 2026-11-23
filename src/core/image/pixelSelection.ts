@@ -213,3 +213,113 @@ export function maskOutline(m: SelMask, limit = 200_000): number[] | null {
   }
   return out;
 }
+
+// ───────── 선택 › 수정 (Photoshop Select ▸ Modify) and 색상 범위 ─────────
+
+/** Squared distance (px) of every pixel to the nearest pixel where `inside` holds (exact Euclidean, Felzenszwalb). */
+function distance2(w: number, h: number, inside: (i: number) => boolean): Float64Array {
+  const INF = 1e20;
+  const f = new Float64Array(Math.max(w, h)), d = new Float64Array(Math.max(w, h));
+  const v = new Int32Array(Math.max(w, h)), z = new Float64Array(Math.max(w, h) + 1);
+  const out = new Float64Array(w * h);
+  for (let i = 0; i < w * h; i++) out[i] = inside(i) ? 0 : INF;
+  const pass = (n: number, get: (k: number) => number, set: (k: number, val: number) => void) => {
+    for (let q = 0; q < n; q++) f[q] = get(q);
+    let k = 0;
+    v[0] = 0;
+    z[0] = -INF;
+    z[1] = INF;
+    for (let q = 1; q < n; q++) {
+      let s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      while (s <= z[k]) {
+        k--;
+        s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      }
+      k++;
+      v[k] = q;
+      z[k] = s;
+      z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 0; q < n; q++) {
+      while (z[k + 1] < q) k++;
+      d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+    }
+    for (let q = 0; q < n; q++) set(q, d[q]);
+  };
+  for (let x = 0; x < w; x++) pass(h, (y) => out[y * w + x], (y, val) => (out[y * w + x] = val));
+  for (let y = 0; y < h; y++) pass(w, (x) => out[y * w + x], (x, val) => (out[y * w + x] = val));
+  return out;
+}
+
+/** 확대 (Expand): every pixel within `r` px of the selection joins it (round corners, as Photoshop). */
+export function expandMask(m: SelMask, r: number): SelMask {
+  if (!(r > 0)) return m;
+  const d = distance2(m.w, m.h, (i) => m.data[i] >= 128);
+  const out = emptyMask(m.w, m.h);
+  const r2 = r * r;
+  for (let i = 0; i < d.length; i++) out.data[i] = d[i] <= r2 ? 255 : 0;
+  return out;
+}
+
+/** 축소 (Contract): pixels within `r` px of the unselected area leave the selection (the canvas edge does not count). */
+export function contractMask(m: SelMask, r: number): SelMask {
+  if (!(r > 0)) return m;
+  const d = distance2(m.w, m.h, (i) => m.data[i] < 128);
+  const out = emptyMask(m.w, m.h);
+  const r2 = r * r;
+  for (let i = 0; i < d.length; i++) out.data[i] = d[i] > r2 && m.data[i] >= 128 ? 255 : 0;
+  return out;
+}
+
+/** 페더 (Feather): a soft edge `r` px wide (three box blurs ≈ a Gaussian of radius r). */
+export function featherMask(m: SelMask, r: number): SelMask {
+  if (!(r > 0)) return m;
+  const { w, h } = m;
+  let a = Float32Array.from(m.data);
+  let b = new Float32Array(w * h);
+  // box radius for three passes approximating a Gaussian with sigma ≈ r / 2
+  const k = Math.max(1, Math.round(r / 2));
+  const box = (src: Float32Array, dst: Float32Array, horiz: boolean) => {
+    const n = horiz ? w : h, lines = horiz ? h : w;
+    for (let l = 0; l < lines; l++) {
+      const at = (q: number) => (horiz ? l * w + q : q * w + l);
+      let sum = 0;
+      for (let q = -k; q <= k; q++) sum += src[at(Math.min(n - 1, Math.max(0, q)))];
+      for (let q = 0; q < n; q++) {
+        dst[at(q)] = sum / (2 * k + 1);
+        sum += src[at(Math.min(n - 1, q + k + 1))] - src[at(Math.max(0, q - k))];
+      }
+    }
+  };
+  for (let i = 0; i < 3; i++) {
+    box(a, b, true);
+    box(b, a, false);
+  }
+  const out = emptyMask(w, h);
+  for (let i = 0; i < a.length; i++) out.data[i] = Math.round(Math.min(255, Math.max(0, a[i])));
+  return out;
+}
+
+/** 테두리 (Border): a band `r` px wide along the selection's edge. */
+export function borderMask(m: SelMask, r: number): SelMask {
+  const outer = expandMask(m, r / 2), inner = contractMask(m, r / 2);
+  const out = emptyMask(m.w, m.h);
+  for (let i = 0; i < out.data.length; i++) out.data[i] = outer.data[i] >= 128 && inner.data[i] < 128 ? 255 : 0;
+  return out;
+}
+
+/**
+ * 색상 범위 (Color Range): every pixel of the RGBA sample whose colour is within `fuzziness` (0…200, Photoshop's) of
+ * `rgb` — fully at half the fuzziness, fading out to the full fuzziness. Transparent pixels are not selected.
+ */
+export function colorRangeMask(rgba: Uint8ClampedArray | Uint8Array, w: number, h: number, rgb: [number, number, number], fuzziness: number): SelMask {
+  const out = emptyMask(w, h);
+  const full = Math.max(1, fuzziness) * 0.5, edge = Math.max(1, fuzziness);
+  for (let i = 0, p = 0; p < w * h; p++, i += 4) {
+    if (rgba[i + 3] < 8) continue;
+    const d = Math.max(Math.abs(rgba[i] - rgb[0]), Math.abs(rgba[i + 1] - rgb[1]), Math.abs(rgba[i + 2] - rgb[2]));
+    out.data[p] = d <= full ? 255 : d >= edge ? 0 : Math.round((255 * (edge - d)) / (edge - full));
+  }
+  return out;
+}

@@ -11,7 +11,7 @@ import { PDFDocument } from "pdf-lib";
 import type { TextNode, VectorNode } from "../../core/types";
 import { hasIllustratorData, openSurgeonDoc, type SurgeonDoc } from "./document";
 import { isAiWithoutPdfContent } from "./ai";
-import { modelPage, type ElevateOptions } from "./elevate";
+import { illustratorMarked, modelPage, type ElevateOptions } from "./elevate";
 import { t } from "../../i18n";
 import { applyEdits, type PageEditInput, type SaveOptions, type SaveReport } from "./write";
 
@@ -58,9 +58,9 @@ export function elevatePage(doc: SurgeonDoc, pageIndex: number, opts: ElevateOpt
   ];
   tagged.sort((a, b) => a[0] - b[0]);
   // what stays a picture in the background: gradient-filled shapes (a clip path + a shading) and painted paths not elevated
-  const elevated = new Set<object>(m.vectors.map((v) => v.path));
-  const vectorsWanted = opts.vectors === true || (opts.vectors !== false && hasIllustratorData(doc, pageIndex));
-  const keptShapes = !vectorsWanted ? 0 : m.analysis.items.filter((x) => !x.hidden && ((x.kind === "image" && x.name.startsWith("sh:")) || (x.kind === "path" && !x.clip && x.paintOp !== "n" && !elevated.has(x)))).length;
+  const elevated = new Set<object>(m.vectors.flatMap((v) => (v.shade ? [v.path, v.shade] : [v.path])));
+  const vectorsWanted = opts.vectors === true || (opts.vectors !== false && (hasIllustratorData(doc, pageIndex) || illustratorMarked(doc)));
+  const keptShapes = !vectorsWanted ? 0 : m.analysis.items.filter((x) => !x.hidden && ((x.kind === "image" && x.name.startsWith("sh:") && !elevated.has(x)) || (x.kind === "path" && !x.clip && x.paintOp !== "n" && !elevated.has(x)))).length;
   return { nodes: tagged.map(([, n]) => n), textCount: m.lines.length, vectorCount: m.vectors.length, notes: m.notes, keptShapes };
 }
 

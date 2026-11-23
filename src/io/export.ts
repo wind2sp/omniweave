@@ -3,10 +3,11 @@ import { PDFDocument } from "pdf-lib";
 import { isEmptyPh } from "../core/slides";
 import { getBlob } from "../core/assets";
 import { layoutText, pageFontsSettled } from "../core/text";
-import { vectorToSvgD } from "../core/vector";
+import { paintBox, vectorToSvgD } from "../core/vector";
+import type { Paint } from "../core/style/types";
 import { renderMasterOf } from "../core/headerFooter";
 import { nodeBounds, paintBounds } from "../core/loom";
-import type { OmwDocument, Page, SceneNode } from "../core/types";
+import type { OmwDocument, Page, SceneNode, Vec2, VectorNode } from "../core/types";
 import { buildTree, groupIndex, groupPath, hasStructure, type TreeItem } from "../core/layerTree";
 import { svgEffectsFilter } from "./svgFx";
 import { esc } from "./xml";
@@ -243,9 +244,25 @@ async function nodeSvgBare(doc: OmwDocument, page: Page, n: SceneNode): Promise<
     const tr = `translate(${t.x} ${t.y}) rotate(${t.rotation}) scale(${t.scale}${t.scaleY !== undefined && t.scaleY !== t.scale ? ` ${t.scaleY}` : ""})`;
     const common = `transform="${tr}" opacity="${n.opacity}"`;
     switch (n.type) {
-      case "VECTOR":
-        out.push(`<path ${common} d="${vectorToSvgD(n)}" fill="${n.fill ?? "none"}" fill-rule="${n.fillRule}" stroke="${n.stroke ?? "none"}" stroke-width="${n.strokeWidth}" stroke-linejoin="${n.strokeJoin ?? "round"}" stroke-linecap="${n.strokeCap ?? "round"}"${n.strokeDash?.length ? ` stroke-dasharray="${n.strokeDash.join(" ")}"` : ""}/>`);
+      case "VECTOR": {
+        // a gradient fill (fills[0]) as an SVG gradient in the path's own space (render/draw vectorGradient)
+        const g = (n as VectorNode & { fills?: Paint[] }).fills?.[0];
+        let fill = n.fill ?? "none";
+        if (n.fill && g?.type === "gradient" && (g.kind === "linear" || g.kind === "radial")) {
+          const b = paintBox(n), id = `g_${n.id.replace(/[^\w-]/g, "")}`;
+          const at = (u: Vec2) => [b.x + u[0] * b.w, b.y + u[1] * b.h].map((v) => +v.toFixed(3));
+          const [x0, y0] = at(g.from), [x1, y1] = at(g.to);
+          const stops = g.stops.map((s) => `<stop offset="${s.at}" stop-color="${s.color.hex}"${s.color.a !== undefined && s.color.a < 1 ? ` stop-opacity="${s.color.a}"` : ""}/>`).join("");
+          out.push(
+            g.kind === "linear"
+              ? `<defs><linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}">${stops}</linearGradient></defs>`
+              : `<defs><radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${x0}" cy="${y0}" r="${+Math.hypot(x1 - x0, y1 - y0).toFixed(3)}">${stops}</radialGradient></defs>`,
+          );
+          fill = `url(#${id})`;
+        }
+        out.push(`<path ${common} d="${vectorToSvgD(n)}" fill="${fill}" fill-rule="${n.fillRule}" stroke="${n.stroke ?? "none"}" stroke-width="${n.strokeWidth}" stroke-linejoin="${n.strokeJoin ?? "round"}" stroke-linecap="${n.strokeCap ?? "round"}"${n.strokeDash?.length ? ` stroke-dasharray="${n.strokeDash.join(" ")}"` : ""}/>`);
         break;
+      }
       case "TEXT": {
         const lay = layoutText(n);
         out.push(`<g ${common}>`);

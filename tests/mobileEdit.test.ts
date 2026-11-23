@@ -188,7 +188,17 @@ describe("open → edit → save (phone path) → read again (desktop)", () => {
         (pg.nodes.find((x) => x.id === pdfNode.id) as any).covers = covers;
         pg.nodes.push(...(nodes as any));
       });
-      markFirstText();
+      // the AI sample's only text lies under a picture band painted after it (not seen on the page): it stays in the
+      // background; its four gradient shapes come up as objects instead — one is deleted
+      const isGrad = (n: any) => n.type === "VECTOR" && n.fills?.[0]?.type === "gradient";
+      const ai = name.endsWith(".ai");
+      if (ai) {
+        expect(nodes.filter(isGrad).length).toBe(4);
+        const gone = nodes.find(isGrad)!.id;
+        S().commit("delete", (d) => {
+          d.pages[0].nodes = d.pages[0].nodes.filter((x) => x.id !== gone);
+        });
+      } else markFirstText();
       const out = await produce("same", ses, () => true);
       expect(out.name.endsWith(name.slice(-3))).toBe(true);
       const again = await openForEdit(out.name, out.bytes);
@@ -196,7 +206,8 @@ describe("open → edit → save (phone path) → read again (desktop)", () => {
       const pn = pg.nodes.find((n) => n.type === "PDF")!;
       if (pn.type !== "PDF") throw new Error("no PDF node");
       const el = await elevatePdfText(S().doc.assets[pn.assetId].hash, pn.pageIndex, pg.width);
-      expect(textOf([{ ...pg, nodes: el.nodes }])).toContain(MARK);
+      if (ai) expect(el.nodes.filter(isGrad).length).toBe(3);
+      else expect(textOf([{ ...pg, nodes: el.nodes }])).toContain(MARK);
       expect(again.name).toBe(out.name);
     }
   });

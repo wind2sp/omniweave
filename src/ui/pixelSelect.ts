@@ -13,7 +13,7 @@
 import { create } from "zustand";
 import { applyTransform, invertTransform } from "../core/geom";
 import { localBounds } from "../core/loom";
-import { combine, ellipseMask, invertMask, maskBounds, maskOutline, polygonMask, rectMask, wandMask, type SelMask, type SelOp } from "../core/image/pixelSelection";
+import { borderMask, colorRangeMask, contractMask, expandMask, featherMask, combine, ellipseMask, invertMask, maskBounds, maskOutline, polygonMask, rectMask, wandMask, type SelMask, type SelOp } from "../core/image/pixelSelection";
 import { renderMasterOf } from "../core/headerFooter";
 import { currentPage, draftPage, useStore } from "../core/store";
 import { IDENTITY, newRaster, type Page, type RasterNode, type SceneNode, type Transform } from "../core/types";
@@ -107,6 +107,24 @@ export function invertSelection() {
   if (!page) return;
   const m = activeMask();
   setSelection(m ? invertMask(m) : rectMask(page.width, page.height, 0, 0, page.width, page.height));
+}
+
+/** 선택 › 수정 (확대 · 축소 · 페더 · 테두리) of the current selection by `r` px; false when there is none. */
+export function modifySelection(kind: "expand" | "contract" | "feather" | "border", r: number): boolean {
+  const m = activeMask();
+  if (!m || !(r > 0)) return false;
+  const f = kind === "expand" ? expandMask : kind === "contract" ? contractMask : kind === "feather" ? featherMask : borderMask;
+  setSelection(f(m, Math.min(500, r)));
+  return true;
+}
+
+/** 선택 › 색상 범위: pixels of the visible picture near `rgb` (Photoshop's fuzziness 0…200), combined by `op`. */
+export function selectColorRange(rgb: [number, number, number], fuzziness: number, op: SelOp = "replace"): boolean {
+  const page = currentPage();
+  const s = page && samplePixels(page, true);
+  if (!page || !s) return false;
+  setSelection(colorRangeMask(s.data, s.w, s.h, rgb, fuzziness), op);
+  return !!activeMask();
 }
 
 /** Shift = add, Alt = subtract, Shift+Alt = intersect (Photoshop). */

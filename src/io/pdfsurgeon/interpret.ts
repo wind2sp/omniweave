@@ -572,3 +572,91 @@ function drawForm(doc: SurgeonDoc, a: PageAnalysis, st: GState, ref: PDFObject |
   run(doc, a, unit, inner, [...marked, ...extra], hidden, active, depth + 1);
   active.delete(key);
 }
+
+// ───────── shadings (sh): axial / radial gradients ─────────
+
+/** A shading the editor can hold as a gradient fill: its axis (or centre and radius) in shading space and its stops. */
+export interface ShadeGradient {
+  kind: "linear" | "radial";
+  /** linear: start / end · radial: centre and a point on the circle (shading space) */
+  p0: [number, number];
+  p1: [number, number];
+  stops: { at: number; hex: string }[];
+}
+
+/**
+ * The shading `name` of the resources as a gradient: ShadingType 2 (axial) or 3 (radial, one centred circle) with a
+ * type-2 (exponential) or type-3 (stitching of type-2) function in a colour space read like fills. Null for other
+ * shadings (meshes, sampled functions, two-circle radial), which stay in the page background.
+ */
+export function shadingGradient(doc: SurgeonDoc, res: PDFDict | undefined, name: string): ShadeGradient | null {
+  const o = look(doc.ctx, resCategory(doc, res, "Shading", name));
+  const d = o instanceof PDFStream ? o.dict : dictOf(o);
+  if (!d) return null;
+  const type = numOf(dget(doc.ctx, d, "ShadingType"));
+  if (type !== 2 && type !== 3) return null;
+  const coords = numArray(doc.ctx, dget(doc.ctx, d, "Coords"));
+  if (!coords || coords.length < (type === 2 ? 4 : 6)) return null;
+  const csObj = dget(doc.ctx, d, "ColorSpace");
+  const csName = nameOf(csObj);
+  const cs = csName ? colorSpace(doc, res, csName) : colorSpaceObj(doc, csObj);
+  if (cs.pattern) return null;
+  const dom = numArray(doc.ctx, dget(doc.ctx, d, "Domain")) ?? [0, 1];
+  const fn = look(doc.ctx, dget(doc.ctx, d, "Function"));
+  const samples = fnSamples(doc, fn, dom[0], dom[1]);
+  if (!samples) return null;
+  const stops: ShadeGradient["stops"] = [];
+  for (const s of samples) {
+    const hex = cs.toHex(s.c);
+    if (!hex) return null;
+    stops.push({ at: (s.t - dom[0]) / (dom[1] - dom[0] || 1), hex });
+  }
+  if (type === 2) return { kind: "linear", p0: [coords[0], coords[1]], p1: [coords[2], coords[3]], stops };
+  // radial: only one circle grown from its centre (r0 = 0, same centres) is a plain radial gradient
+  const [x0, y0, r0, x1, y1, r1] = coords;
+  if (Math.abs(x0 - x1) > 1e-6 || Math.abs(y0 - y1) > 1e-6 || r0 > 1e-6) return null;
+  return { kind: "radial", p0: [x1, y1], p1: [x1 + r1, y1], stops };
+}
+
+/** Colour space from an object (array / name) that is not under a /ColorSpace resource name. */
+function colorSpaceObj(doc: SurgeonDoc, o: PDFObject | undefined): ReturnType<typeof colorSpace> {
+  const res = doc.ctx.obj({ ColorSpace: { __cs: o ?? PDFName.of("DeviceGray") } }) as PDFDict;
+  return colorSpace(doc, res, "__cs");
+}
+
+/** Colour stops of a function over [t0, t1]: exponential (type 2) or stitching (type 3) of those. */
+function fnSamples(doc: SurgeonDoc, fn: PDFObject | undefined, t0: number, t1: number, depth = 0): { t: number; c: number[] }[] | null {
+  const d = fn instanceof PDFStream ? fn.dict : dictOf(fn);
+  if (!d || depth > 4) return null;
+  const type = numOf(dget(doc.ctx, d, "FunctionType"));
+  if (type === 2) {
+    const c0 = numArray(doc.ctx, dget(doc.ctx, d, "C0")) ?? [0], c1 = numArray(doc.ctx, dget(doc.ctx, d, "C1")) ?? [1];
+    const n = numOf(dget(doc.ctx, d, "N")) ?? 1;
+    const fd = numArray(doc.ctx, dget(doc.ctx, d, "Domain")) ?? [0, 1];
+    const at = (x: number) => {
+      const u = Math.pow(Math.min(1, Math.max(0, (x - fd[0]) / (fd[1] - fd[0] || 1))), n);
+      return c0.map((v, i) => v + u * ((c1[i] ?? v) - v));
+    };
+    // N = 1 is linear: two stops; a curve is sampled
+    const k = Math.abs(n - 1) < 1e-6 ? 1 : 8;
+    return Array.from({ length: k + 1 }, (_, i) => ({ t: t0 + ((t1 - t0) * i) / k, c: at(t0 + ((t1 - t0) * i) / k) }));
+  }
+  if (type === 3) {
+    const fns = look(doc.ctx, dget(doc.ctx, d, "Functions"));
+    if (!(fns instanceof PDFArray)) return null;
+    const bounds = numArray(doc.ctx, dget(doc.ctx, d, "Bounds")) ?? [];
+    const enc = numArray(doc.ctx, dget(doc.ctx, d, "Encode")) ?? [];
+    const fd = numArray(doc.ctx, dget(doc.ctx, d, "Domain")) ?? [t0, t1];
+    const edges = [fd[0], ...bounds, fd[1]];
+    const out: { t: number; c: number[] }[] = [];
+    for (let i = 0; i < fns.size(); i++) {
+      const e0 = enc[2 * i] ?? 0, e1 = enc[2 * i + 1] ?? 1;
+      const sub = fnSamples(doc, look(doc.ctx, fns.get(i)), e0, e1, depth + 1);
+      if (!sub) return null;
+      const a = edges[i], b = edges[i + 1];
+      for (const s of sub) out.push({ t: a + ((s.t - e0) / (e1 - e0 || 1)) * (b - a), c: s.c });
+    }
+    return out;
+  }
+  return null;
+}

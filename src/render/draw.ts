@@ -11,9 +11,10 @@ import { localBounds } from "../core/loom";
 import { CELL_PAD_Y, TABLE_LINE, cellFont, hasMerges, layoutTable, lineX, tableCells } from "../core/table";
 import { SCRIPT_SCALE, graphemes, isLockedFont, layoutText, measure, shadeWidth, type Piece } from "../core/text";
 import { reviewLook } from "../core/review";
-import { contourToSvgD } from "../core/vector";
+import { contourToSvgD, paintBox } from "../core/vector";
+import type { Paint } from "../core/style/types";
 import { boxLines, paraBoxes } from "../core/paraBox";
-import { TILE, type ImageNode, type MediaNode, type OmwDocument, type PdfNode, type PixelTile, type SceneNode, type TableNode, type TextNode, type VectorNode } from "../core/types";
+import { TILE, type ImageNode, type MediaNode, type OmwDocument, type PdfNode, type PixelTile, type SceneNode, type TableNode, type TextNode, type Vec2, type VectorNode } from "../core/types";
 import { pdfBitmap, pdfBitmapIsExact, pdfBitmapScale, pdfViewHash } from "../io/pdf";
 import { CANVAS_BLEND, fillParts } from "../core/style/blend";
 import { pixelGrid } from "./crisp";
@@ -220,6 +221,25 @@ function halved(pic: ImageBitmap | OffscreenCanvas | HTMLCanvasElement, dw: numb
   }
   halves.set(pic, { key, c: c! });
   return c!;
+}
+
+/**
+ * The canvas gradient of a vector's first fill when it is a linear or radial gradient (node-local; `from` / `to` are
+ * units of the path's box — core/vector paintBox), or null (a plain fill, or kinds not drawn this way).
+ */
+export function vectorGradient(ctx: Ctx, n: VectorNode): CanvasGradient | null {
+  const f = (n as VectorNode & { fills?: Paint[] }).fills?.[0];
+  if (!f || f.type !== "gradient" || (f.kind !== "linear" && f.kind !== "radial") || f.stops.length < 1) return null;
+  const b = paintBox(n);
+  const at = (u: Vec2): [number, number] => [b.x + u[0] * b.w, b.y + u[1] * b.h];
+  const [x0, y0] = at(f.from), [x1, y1] = at(f.to);
+  const g = f.kind === "linear" ? ctx.createLinearGradient(x0, y0, x1, y1) : ctx.createRadialGradient(x0, y0, 0, x0, y0, Math.max(1e-6, Math.hypot(x1 - x0, y1 - y0)));
+  for (const s of [...f.stops].sort((p, q) => p.at - q.at)) {
+    const hex = s.color.hex;
+    const a = s.color.a ?? 1;
+    g.addColorStop(Math.min(1, Math.max(0, s.at)), a >= 1 ? hex : `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`);
+  }
+  return g;
 }
 
 /** Pixel size of a picture node's decoded image (null while it is still decoding — env.incomplete is then set). */
@@ -627,7 +647,8 @@ export function drawNode(ctx: Ctx, n: SceneNode, env: DrawEnv, o?: NodeOverride,
       // every stroke is at least one device pixel wide, so a 1 pt line reads crisp at any zoom (Illustrator)
       const crispPath = env.screen ? onDevicePixels(ctx, n) : null;
       if (n.fill) {
-        ctx.fillStyle = ink(n.fill);
+        // a gradient fill (`fills`, from an SVG / Illustrator gradient) over the path's box; `fill` is its plain fallback
+        ctx.fillStyle = vectorGradient(ctx, n) ?? ink(n.fill);
         ctx.fill(crispPath?.fill ?? p, n.fillRule);
       }
       if (n.stroke && n.strokeWidth > 0) {

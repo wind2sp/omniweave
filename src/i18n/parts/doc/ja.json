@@ -222,5 +222,5 @@
   "doc.print.cancel": "キャンセル",
   "doc.print.savePdf": "PDF として保存",
   "doc.toast.adjustBaked": "この形式は調整レイヤーを保持できないため、影響するレイヤーを画像にして入れました",
-  "doc.toast.elevatedKept": "グラデーションで塗られた図形など {n} 個はまだオブジェクトにできず、背景の画像に残りました。"
+  "doc.toast.elevatedKept": "透明度やマスクのかかった図形など {n} 個はまだオブジェクトにできず、背景の画像に残りました。"
 }

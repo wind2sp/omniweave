@@ -1371,7 +1371,10 @@ function* ARRAY(): Cmd {
   const segs = ids.flatMap(segsOf);
   const b = segs.length ? bbox(segs) : [0, 0, 1, 1];
   const L = arrayLast;
-  const dx0 = L.dx || Math.max(1e-6, (b[2] - b[0]) * 1.5), dy0 = L.dy || Math.max(1e-6, (b[3] - b[1]) * 1.5);
+  // (a selection with no width or height — a vertical or horizontal line — uses its other side: a spacing of 0 would
+  // stack every copy on the original; 2026-11-23 a vertical line offered 0)
+  const bw = b[2] - b[0], bh = b[3] - b[1], side = Math.max(bw, bh, 1);
+  const dx0 = L.dx || (bw > 1e-6 ? bw : side) * 1.5, dy0 = L.dy || (bh > 1e-6 ? bh : side) * 1.5;
   const ask = function* (prompt: string, def: number, whole: boolean): Generator<Req, number | null, Ans> {
     for (;;) {
       const r = yield* point({ prompt, number: true, def: fmt(def) });

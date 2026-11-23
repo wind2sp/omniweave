@@ -72,6 +72,12 @@ export function flatten(c: Contour, tolerance = 0.5): Vec2[] {
   return pts;
 }
 
+/** The box a gradient fill spans (units 0…1 of `from` / `to`): the path's own outline, without the stroke. */
+export function paintBox(n: Pick<VectorNode, "contours">): Rect {
+  const r = rectFromPoints(n.contours.flatMap((c) => flatten(c, 1)));
+  return { x: r.x, y: r.y, w: Math.max(1e-6, r.w), h: Math.max(1e-6, r.h) };
+}
+
 export function vectorLocalBounds(n: VectorNode): Rect {
   const pts: Vec2[] = [];
   for (const c of n.contours) pts.push(...flatten(c, 2));

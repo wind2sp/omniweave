@@ -48,10 +48,13 @@ describe.skipIf(!layers)("Illustrator reference: ai_layers.ai (2 artboards, 3 la
       expect(texts.length).toBeGreaterThan(0);
       expect(texts.map(lineText).join("").replace(/\s+/g, "")).toBe(joined(await pageText(js, p)));
       const vecs = el.nodes.filter((n): n is VectorNode => n.type === "VECTOR");
-      // artboard 2: its fill and outline lie under the gradient, which stays in the page background — elevating them
-      // would cover it (paint order, elevate.ts), so only artboard 1 has shapes clear of the gradient to elevate
+      // artboard 2: its fill and outline lie under the gradient; the gradient shape (clip path + shading) is elevated
+      // too since 2026-11-23, so all three come up in paint order
       if (p === 0) expect(vecs.length).toBeGreaterThan(0);
-      else expect(vecs.length).toBe(0);
+      else {
+        expect(vecs.length).toBe(3);
+        expect(vecs.filter((v) => (v as VectorNode & { fills?: { type: string }[] }).fills?.[0]?.type === "gradient").length).toBe(1);
+      }
       for (const v of vecs) expect(["Background Shapes", "Paths Gradient", "Text"].some((l) => v.name.startsWith(l))).toBe(true);
     }
   });

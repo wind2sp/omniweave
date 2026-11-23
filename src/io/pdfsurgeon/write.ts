@@ -755,6 +755,20 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
         }
       }
       for (const v of model.vectors) {
+        // a gradient-filled shape (clip path + shading): deleting it takes the shading out (the clip alone draws
+        // nothing); its other edits are not written into the PDF yet — the original stays, said in the report
+        if (v.shade) {
+          const cur = byId.get(v.id);
+          const su = model.analysis.units.get(v.shade.unit)!;
+          if (!cur || cur.type !== "VECTOR" || !cur.visible) {
+            se.splice(v.shade.unit, { s: su.ops[v.shade.op].s, e: su.ops[v.shade.op].e, text: " " });
+            se.report.deletedVectors++;
+            block("engine.ai.why.delete");
+          } else if (vectorChanged(v.node, cur) || JSON.stringify((cur as { fills?: unknown }).fills) !== JSON.stringify((v.node as { fills?: unknown }).fills)) {
+            se.report.skipped.push(t("engine.pdf.edit.gradientKept", { name: v.node.name }));
+          }
+          continue;
+        }
         const unit = model.analysis.units.get(v.path.unit)!;
         // A plain path object (construction operators, then the paint) is replaced as a whole. When the
         // producer put other operators in between (pdf-lib drawEllipse: `q m c… Q f`), only the paint

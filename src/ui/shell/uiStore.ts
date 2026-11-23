@@ -17,7 +17,7 @@ export const UI_SCALES: { id: UIScale; factor: number }[] = [
 export const uiScaleFactor = (s: UIScale) => UI_SCALES.find((x) => x.id === s)?.factor ?? 1;
 export type LeftTab = "pages" | "layers";
 export type RightTab = "props" | "anim" | "history" | "review";
-export type ShellDialog = "palette" | "settings" | "shortcuts" | "about" | "find" | "pdfFind" | "replace" | "wordCount" | "symbol" | "sizePdf" | "pageSetup" | "columns" | "canvasSize" | "paragraph" | "listFormat" | "pageNumber";
+export type ShellDialog = "palette" | "settings" | "shortcuts" | "about" | "find" | "pdfFind" | "replace" | "wordCount" | "symbol" | "sizePdf" | "pageSetup" | "columns" | "canvasSize" | "selectModify" | "paragraph" | "listFormat" | "pageNumber";
 
 interface UIState {
   theme: Theme;
