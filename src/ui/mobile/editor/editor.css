@@ -66,12 +66,12 @@
   right: 10px;
   top: 10px;
   min-width: 56px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 10px;
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.55) !important;
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
 }
 .m-ed-bar {
   overflow-x: auto;
@@ -84,7 +84,7 @@
 .m-ed-save {
   flex: 0 0 auto;
   white-space: nowrap;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   margin-left: 2px;
 }
@@ -194,7 +194,7 @@
 }
 .m-ed-h3 {
   margin: 12px 0 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-2);
 }
 .m-ed-colors {
@@ -217,7 +217,7 @@
 }
 .m-ed-swatch-s {
   width: 36px;
-  height: 36px;
+  height: 44px;
   flex: 0 0 36px;
 }
 .m-ed-none {
@@ -279,7 +279,7 @@
 .m-ed-lname small,
 .m-ed-why {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-3);
 }
 .m-ed-layer-color {
@@ -321,7 +321,7 @@
 .m-ed-fmt .m-chip {
   flex: 0 0 auto;
   min-width: 44px;
-  min-height: 40px;
+  min-height: 44px;
 }
 .m-ed-textrow {
   display: flex;

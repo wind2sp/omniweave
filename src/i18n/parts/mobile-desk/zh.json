@@ -23,5 +23,15 @@
   "mobile.desk.editPdf": "编辑 PDF 文字",
   "mobile.desk.comment": "添加批注",
   "mobile.desk.editorAll": "全部功能",
-  "cmd.image.ocr": "文字识别 (OCR)"
+  "cmd.image.ocr": "文字识别 (OCR)",
+  "mobile.desk.bar.label": "电脑功能界面按钮",
+  "mobile.desk.bar.phone": "手机",
+  "mobile.desk.bar.menu": "菜单",
+  "mobile.desk.bar.undo": "撤销",
+  "mobile.desk.bar.ribbon": "格式",
+  "mobile.desk.bar.panel": "属性",
+  "mobile.desk.bar.save": "保存",
+  "mobile.desk.menu.title": "全部菜单",
+  "mobile.desk.menu.search": "查找命令",
+  "mobile.desk.menu.none": "没有这样的命令"
 }

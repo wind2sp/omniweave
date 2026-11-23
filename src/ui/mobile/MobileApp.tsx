@@ -5,7 +5,7 @@
 // has no network permission.
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLang, useT, t, type Lang } from "../../i18n";
+import { LANGS, useLang, useT, t, type Lang } from "../../i18n";
 import { isTauri, openFiles, type OpenedFile } from "../../io/platform";
 import { switchLayout } from "../../web/phone";
 import { setPasswordAsker } from "../../io/crypto/session";
@@ -494,13 +494,19 @@ export function MobileApp() {
           <main className="m-main">
             {tab === "home" && (
               <>
-                <input className="m-search" type="search" placeholder={tr("mobile.search")} aria-label={tr("mobile.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
-                <div className="m-actions">
+                {/* the first screen without scrolling: open, the PC program's every feature, scan, new PDF (2 × 2) */}
+                <div className="m-actions m-actions-4">
                   <button className="m-action m-primary" onClick={() => void actions.open()}>
                     <span className="m-action-icon" aria-hidden>
                       ▤︎
                     </span>
                     {tr("mobile.open")}
+                  </button>
+                  <button className="m-action m-desk-entry" onClick={() => openDesk({ file: null })} aria-describedby="m-desk-note">
+                    <span className="m-action-icon" aria-hidden>
+                      ▦︎
+                    </span>
+                    {tr("mobile.desk.open")}
                   </button>
                   <button className="m-action" onClick={actions.scan}>
                     <span className="m-action-icon" aria-hidden>
@@ -515,18 +521,13 @@ export function MobileApp() {
                     {tr("mobile.newPdf")}
                   </button>
                 </div>
-                <button className="m-action m-wide m-desk-entry" onClick={() => openDesk({ file: null })}>
-                  <span className="m-action-icon" aria-hidden>
-                    ▦︎
-                  </span>
-                  <span>
-                    {tr("mobile.desk.open")}
-                    <small>{tr("mobile.desk.openNote")}</small>
-                  </span>
-                </button>
+                <p className="m-note m-desk-note" id="m-desk-note">
+                  {tr("mobile.desk.openNote")}
+                </p>
                 <h2>{tr("mobile.tools")}</h2>
                 {toolGrid}
                 <h2>{tr("mobile.recent")}</h2>
+                <input className="m-search" type="search" placeholder={tr("mobile.search")} aria-label={tr("mobile.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
                 {recentList}
                 <p className="m-note">{tr("mobile.noUpload")}</p>
               </>
@@ -578,10 +579,11 @@ export function MobileApp() {
                   <label className="m-set-row">
                     <span>{tr("mobile.language")}</span>
                     <select value={lang} onChange={(e) => useLang.getState().set(e.target.value as Lang)} className="m-select">
-                      <option value="ko">한국어</option>
-                      <option value="en">English</option>
-                      <option value="ja">日本語</option>
-                      <option value="zh">中文(简体)</option>
+                      {LANGS.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label className="m-set-row">

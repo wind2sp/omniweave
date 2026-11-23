@@ -143,9 +143,9 @@
   display: grid;
   place-items: center;
   width: 40px;
-  height: 40px;
+  height: 44px;
   border-radius: 9px;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: var(--fw-bold);
   background: var(--bg-3);
   color: var(--text-2);
@@ -183,7 +183,7 @@
   font-weight: var(--fw-medium);
 }
 .m-row-meta {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-3);
 }
 .m-empty {
@@ -193,7 +193,7 @@
 }
 .m-note {
   margin: 20px 4px 0;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-3);
   text-align: center;
 }
@@ -210,7 +210,7 @@
   align-items: center;
   gap: 2px;
   min-height: 52px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-3);
 }
 .m-nav button span {
@@ -252,7 +252,7 @@
 }
 .m-received {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: 14px;
   background: var(--bg-2);
   color: var(--text-2);
 }
@@ -294,7 +294,7 @@
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.65);
   color: #fff;
-  font-size: 12.5px;
+  font-size: 14px;
   pointer-events: none;
 }
 .m-unsupported {
@@ -367,7 +367,7 @@
   opacity: 0.45;
 }
 .m-btn-small {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   margin-left: auto;
 }
@@ -451,7 +451,7 @@
   margin-top: 10px;
 }
 .m-chip {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 20px;
   background: var(--bg-3) !important;
@@ -477,7 +477,7 @@
   min-width: 0;
 }
 .m-search-in {
-  height: 42px;
+  height: 44px;
 }
 .m-searchbar {
   display: flex;
@@ -504,9 +504,9 @@
 button.m-pageno {
   pointer-events: auto;
   border: 0;
-  min-height: 36px;
+  min-height: 44px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
 }
 /* ---- markup & scan: one page fitted between the bars ---- */
 .m-mk-stage {
@@ -557,7 +557,7 @@ button.m-pageno {
 }
 .m-swatch {
   width: 36px;
-  height: 36px;
+  height: 44px;
   border-radius: 50% !important;
   border: 3px solid transparent !important;
   box-shadow: 0 0 0 1px var(--line-3);
@@ -624,7 +624,7 @@ button.m-pageno {
 .m-scan-hint {
   margin: 0;
   padding: 8px 16px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text-2);
   background: var(--bg-2);
 }
@@ -651,7 +651,7 @@ button.m-pageno {
   border: 1px solid var(--line-2);
 }
 .m-seg button {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 12px;
   font-size: 14px;
   color: var(--text-2);
@@ -732,7 +732,7 @@ button.m-pageno {
   width: 3.6em;
   height: 3.6em;
   min-width: 40px;
-  min-height: 40px;
+  min-height: 44px;
   overflow: hidden;
 }
 .m-tool-icon {
@@ -741,26 +741,20 @@ button.m-pageno {
   min-width: 22px;
 }
 
-/* ── home: the desktop editor on the phone ── */
+/* ── home: open · the PC program's every feature · scan · new PDF, 2 × 2 on the first screen ── */
+.m-actions.m-actions-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.m-actions-4 .m-action {
+  min-height: 88px;
+}
 .m-desk-entry {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  text-align: left;
-  min-height: 64px;
+  border: 2px solid var(--accent, #2f6fdc) !important;
 }
-.m-desk-entry > span:last-child {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-weight: 600;
-}
-.m-desk-entry small {
-  font-weight: 400;
-  font-size: 0.8em;
-  opacity: 0.75;
+.m-desk-note {
+  margin: 6px 2px 0;
 }
 /* viewer: "더보기" — the PC program's commands for this file */
 .m-more {
@@ -793,18 +787,57 @@ button.m-pageno {
 }
 
 /* ── the desktop editor laid out for a phone (PhoneDesk.tsx, html.phone-desk) ──
-   The installed program's own screen: one column the width of the phone; the title / menu / ribbon rows scroll
-   sideways; the side panels open over the page; the desktop's UI-size token makes every control larger for fingers. */
+   The installed program's own screen in one column for fingers: every control at least 44 px and text at least 14 px
+   (the desktop's own size tokens, set to phone sizes), the frequent commands on a bottom bar of large buttons and every
+   menu as a sheet of large rows (DeskBar.tsx), the formatting ribbon only when asked for (서식), the side panels as
+   sheets from the bottom, no rulers / status bar / rails. */
 html.phone-desk {
-  --ui-scale: 1.2 !important;
+  --ui-scale: 1.1 !important;
+  --fs-caption: 14px;
+  --fs-ui: 15px;
+  --fs-body: 16px;
+  --fs-subtitle: 18px;
+  --fs-title: 20px;
+  --ctl-xs: 44px;
+  --ctl-sm: 44px;
+  --ctl: 44px;
+  --ctl-lg: 48px;
+  --h-title: 52px;
+  --h-cmd: 48px;
+  --h-status: 0px;
+  --pd-bar: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 html.phone-desk body {
   overflow: hidden;
   overscroll-behavior: none;
 }
 html.phone-desk .app {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   width: 100%;
+  height: calc(100% - var(--pd-bar));
+}
+html.phone-desk .app > .workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+html.phone-desk .app > .titlebar {
+  flex: none;
+  height: var(--h-title);
+}
+/* the ribbon (and its tab row: 파일 · 홈 · 삽입 …) only with 서식 on; then it scrolls sideways */
+html.phone-desk .app > .tabrow,
+html.phone-desk .app > .ribbon {
+  display: none;
+}
+html.phone-desk.pd-ribbon .app > .tabrow,
+html.phone-desk.pd-ribbon .app > .ribbon {
+  display: flex;
+  flex: none;
+  height: auto;
+  min-height: var(--h-cmd);
 }
 html.phone-desk .titlebar,
 html.phone-desk .tabrow,
@@ -813,7 +846,6 @@ html.phone-desk .ribbon {
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
 }
 html.phone-desk .titlebar::-webkit-scrollbar,
 html.phone-desk .tabrow::-webkit-scrollbar,
@@ -825,63 +857,68 @@ html.phone-desk .tabrow > *,
 html.phone-desk .ribbon > * {
   flex-shrink: 0;
 }
-html.phone-desk .title-drag {
-  display: none;
-}
-html.phone-desk .workspace {
-  position: relative;
-}
-html.phone-desk .workspace > .dock {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 60;
-  width: min(88vw, 360px) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-}
-html.phone-desk .workspace > .dock-left {
-  left: 0;
-}
-html.phone-desk .workspace > .dock-right {
-  right: 0;
-}
+html.phone-desk .title-drag,
+html.phone-desk .app > .statusbar,
+html.phone-desk .workspace > .rail,
 html.phone-desk .splitter {
   display: none;
 }
+/* the tool column: large tool buttons, scrolls when they do not fit */
+html.phone-desk .workspace > .toolbox {
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+/* the side panels: sheets from the bottom, above the bar */
+html.phone-desk .workspace > .dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: var(--pd-bar);
+  z-index: 70;
+  width: 100% !important;
+  height: min(62vh, 560px);
+  border: 0;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+}
+/* every control of the desktop chrome (not the page itself) at least 44 px for a finger, its text at least 14 px */
+html.phone-desk :is(.titlebar, .tabrow, .ribbon, .toolbox, .dock, .backstage, .modal, .menu-pop, .cad-cmdline) :is(button, select, [role="button"], [role="tab"], [role="menuitem"], input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"])) {
+  min-height: 44px;
+  font-size: max(14px, 1em);
+}
+html.phone-desk :is(.titlebar, .tabrow, .ribbon, .toolbox, .dock, .modal) :is(button, [role="button"]) {
+  min-width: 44px;
+}
+html.phone-desk :is(.titlebar, .tabrow, .ribbon, .toolbox, .dock, .backstage, .modal, .menu-pop) :is(label, span, p, small, li, td, th, kbd, h3, h4, legend) {
+  font-size: max(14px, 1em);
+}
+html.phone-desk :is(input[type="checkbox"], input[type="radio"]) {
+  width: 22px;
+  height: 22px;
+}
 html.phone-desk .modal-backdrop {
   padding: 8px;
+  padding-bottom: calc(8px + var(--pd-bar));
 }
 html.phone-desk .modal {
   max-width: calc(100vw - 16px);
-  max-height: calc(100dvh - 16px);
+  max-height: calc(100dvh - 16px - var(--pd-bar));
+}
+html.phone-desk .modal .modal-actions {
+  flex-wrap: wrap;
+  gap: 8px;
 }
 html.phone-desk .menu-pop {
   max-width: calc(100vw - 8px);
   max-height: calc(100dvh - 80px);
   overflow-y: auto;
 }
-html.phone-desk .pd-exit {
-  position: fixed;
-  z-index: 1400;
-  right: 10px;
-  bottom: calc(var(--h-status) + 10px + env(safe-area-inset-bottom, 0px));
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 44px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 22px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-}
 /* the 파일 (backstage) screen: its command column above its pane, the whole screen scrolls */
 html.phone-desk .backstage {
   flex-direction: column;
   overflow-y: auto;
+  bottom: var(--pd-bar);
 }
 html.phone-desk .bs-nav {
   width: 100%;
@@ -892,6 +929,153 @@ html.phone-desk .bs-nav {
 }
 html.phone-desk .bs-main {
   flex: none;
-  padding: 16px 12px 96px;
+  padding: 16px 12px 32px;
   overflow: visible;
+}
+/* the bottom bar (DeskBar.tsx): six large buttons, the thumb's reach */
+.pd-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1450;
+  display: flex;
+  height: var(--pd-bar);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--bg-1, #1d1f24);
+  border-top: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+}
+.pd-bar button {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  background: none;
+  color: var(--text, #e8e8ea);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.pd-bar button > span {
+  font-size: 20px;
+  line-height: 1;
+}
+.pd-bar button.on {
+  color: var(--accent, #2f6fdc);
+}
+.pd-bar button:disabled {
+  opacity: 0.4;
+}
+/* every menu as a sheet of large rows */
+.pd-scrim {
+  z-index: 1460;
+}
+.pd-menu {
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1, #1d1f24);
+  color: var(--text, #e8e8ea);
+}
+.pd-menu-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pd-menu-head .m-field {
+  flex: 1;
+  min-width: 0;
+}
+.pd-menu-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.pd-sec-head,
+.pd-row {
+  display: flex;
+  width: 100%;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  text-align: left;
+}
+.pd-row {
+  flex-wrap: wrap;
+}
+.pd-row small {
+  flex-basis: 100%;
+  font-size: 14px;
+  opacity: 0.7;
+}
+.pd-row:disabled {
+  opacity: 0.45;
+}
+.pd-row.checked {
+  color: var(--accent, #2f6fdc);
+}
+.pd-sec-head {
+  font-weight: 600;
+  font-size: 17px;
+}
+.pd-sec-head.on {
+  background: rgba(127, 127, 127, 0.12);
+}
+.pd-rows hr {
+  border: 0;
+  border-top: 1px solid rgba(127, 127, 127, 0.25);
+  margin: 4px 12px;
+}
+.pd-rows h3 {
+  margin: 10px 12px 2px;
+  font-size: 14px;
+  opacity: 0.7;
+}
+.pd-subrows {
+  padding-left: 16px;
+}
+/* a phone held sideways: the bar slimmer, the page taller */
+@media (orientation: landscape) and (max-height: 500px) {
+  html.phone-desk {
+    --pd-bar: calc(52px + env(safe-area-inset-bottom, 0px));
+    --h-title: 44px;
+  }
+  .pd-bar button {
+    flex-direction: row;
+    gap: 6px;
+  }
+}
+/* a phone held sideways: the phone screen's top and bottom bars slimmer (icon beside its word), the page taller */
+@media (orientation: landscape) and (max-height: 500px) {
+  .m-app .m-top {
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .m-app .m-nav button {
+    flex-direction: row;
+    gap: 6px;
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .m-app .m-nav {
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .m-app .m-received {
+    display: none;
+  }
 }

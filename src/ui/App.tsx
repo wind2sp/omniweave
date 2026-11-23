@@ -416,12 +416,6 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
       )}
       {!recovery && !phone && <WebMobileNotice />}
       {!recovery && !phone && <WebInstallHint />}
-      {phone && (
-        <button type="button" className="pd-exit" onClick={phone.onExit} aria-label={t("mobile.desk.exit")}>
-          <Icon name="close" size={16} />
-          <span>{t("mobile.desk.exitShort")}</span>
-        </button>
-      )}
       <PageOrganizer />
       <ToolsDialog />
       <SecurityDialogs />

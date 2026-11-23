@@ -23,5 +23,15 @@
   "mobile.desk.editPdf": "Edit PDF text",
   "mobile.desk.comment": "Add comment",
   "mobile.desk.editorAll": "All features",
-  "cmd.image.ocr": "Recognize text (OCR)"
+  "cmd.image.ocr": "Recognize text (OCR)",
+  "mobile.desk.bar.label": "PC feature screen buttons",
+  "mobile.desk.bar.phone": "Phone",
+  "mobile.desk.bar.menu": "Menu",
+  "mobile.desk.bar.undo": "Undo",
+  "mobile.desk.bar.ribbon": "Format",
+  "mobile.desk.bar.panel": "Properties",
+  "mobile.desk.bar.save": "Save",
+  "mobile.desk.menu.title": "All menus",
+  "mobile.desk.menu.search": "Find a command",
+  "mobile.desk.menu.none": "No such command"
 }

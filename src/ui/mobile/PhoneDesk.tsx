@@ -1,10 +1,11 @@
 // The desktop editor on a phone ("PC 기능 전체"): the same App as the installed program — every menu command, ribbon,
-// tool, panel and dialog — laid out for a phone (mobile.css `html.phone-desk`: one column, the ribbon and menus
-// scroll sideways, the side panels come over the page, larger touch targets). The phone shell (MobileApp) hands it a
+// tool, panel and dialog — laid out for a phone (mobile.css `html.phone-desk`: one column, every control at least 44 px,
+// text at least 14 px, the menus as a sheet of large rows and the frequent commands on a bottom bar (DeskBar.tsx), the
+// formatting ribbon on demand, the panels as sheets from the bottom). The phone shell (MobileApp) hands it a
 // file, or the document its own editor already holds; "휴대폰 화면" goes back. Nothing here re-implements an editor
 // command: what the desktop does, it does here with the desktop's own code.
 
-import { lazy, Suspense, useCallback, useEffect, useMemo } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { t, useT } from "../../i18n";
 import { setPasswordAsker } from "../../io/crypto/session";
 import type { OpenedFile } from "../../io/platform";
@@ -13,6 +14,8 @@ import { knownPassword } from "./openDoc";
 import { phonePasswordAsker } from "./prompt";
 
 const App = lazy(() => import("../App").then((m) => ({ default: m.App })));
+// large buttons for fingers: every menu, undo, ribbon, panel, save, back (DeskBar.tsx)
+const DeskBar = lazy(() => import("./DeskBar").then((m) => ({ default: m.DeskBar })));
 
 export interface PhoneDeskProps {
   /** a file to open in a tab of its own; none = the document already in the editor store (the phone editor's) */
@@ -45,7 +48,15 @@ export function PhoneDesk({ file, command, onExit }: PhoneDeskProps) {
     if (anyDirty() && !(await confirmAllSaved())) return;
     onExit();
   }, [onExit]);
-  useBackClose(true, () => void exit());
+  // back (Android gesture / button): the newest desktop layer closes first — a dialog, the 파일 screen, a menu — as Esc
+  // does on a PC; with none open, back to the phone screen
+  const [backTick, setBackTick] = useState(0);
+  const onBack = useCallback(() => {
+    if (document.querySelector(".modal-backdrop, .backstage, .menu-pop")) {
+      (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+      setBackTick((n) => n + 1);
+    } else void exit();
+  }, [exit]);
 
   const phone = useMemo(() => {
     let started = false;
@@ -91,7 +102,15 @@ export function PhoneDesk({ file, command, onExit }: PhoneDeskProps) {
 
   return (
     <Suspense fallback={<div className="m-spinner" role="progressbar" aria-label={tr("mobile.working")} />}>
+      <BackGuard key={backTick} onBack={onBack} />
       <App phone={phone} />
+      <DeskBar onExit={() => void exit()} />
     </Suspense>
   );
+}
+
+/** one history entry for the back gesture (a new one after each back that only closed a desktop layer) */
+function BackGuard({ onBack }: { onBack: () => void }) {
+  useBackClose(true, onBack);
+  return null;
 }

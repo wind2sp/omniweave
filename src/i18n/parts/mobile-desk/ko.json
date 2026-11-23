@@ -23,5 +23,15 @@
   "mobile.desk.editPdf": "PDF 글자 고치기",
   "mobile.desk.comment": "메모 달기",
   "mobile.desk.editorAll": "모든 기능",
-  "cmd.image.ocr": "글자 인식(OCR)"
+  "cmd.image.ocr": "글자 인식(OCR)",
+  "mobile.desk.bar.label": "PC 기능 화면 단추",
+  "mobile.desk.bar.phone": "휴대폰",
+  "mobile.desk.bar.menu": "메뉴",
+  "mobile.desk.bar.undo": "실행 취소",
+  "mobile.desk.bar.ribbon": "서식",
+  "mobile.desk.bar.panel": "속성",
+  "mobile.desk.bar.save": "저장",
+  "mobile.desk.menu.title": "모든 메뉴",
+  "mobile.desk.menu.search": "명령 찾기",
+  "mobile.desk.menu.none": "그런 명령이 없습니다"
 }

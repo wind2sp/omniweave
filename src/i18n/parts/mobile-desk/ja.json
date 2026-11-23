@@ -23,5 +23,15 @@
   "mobile.desk.editPdf": "PDFの文字を編集",
   "mobile.desk.comment": "コメントを追加",
   "mobile.desk.editorAll": "すべての機能",
-  "cmd.image.ocr": "文字認識（OCR）"
+  "cmd.image.ocr": "文字認識（OCR）",
+  "mobile.desk.bar.label": "PC機能画面のボタン",
+  "mobile.desk.bar.phone": "スマホ",
+  "mobile.desk.bar.menu": "メニュー",
+  "mobile.desk.bar.undo": "元に戻す",
+  "mobile.desk.bar.ribbon": "書式",
+  "mobile.desk.bar.panel": "プロパティ",
+  "mobile.desk.bar.save": "保存",
+  "mobile.desk.menu.title": "すべてのメニュー",
+  "mobile.desk.menu.search": "コマンドを検索",
+  "mobile.desk.menu.none": "該当するコマンドがありません"
 }
