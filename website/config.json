@@ -2,13 +2,13 @@
   "_help": "홈페이지 설정. 수정 후 이 파일만 다시 올리면 됩니다. 자세한 설명은 README.txt [config.json] 참고.",
   "siteUrl": "",
   "copyright": "© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · wind2sp@9rowpar.com",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "released": true,
-  "releaseDate": "2026-11-22",
+  "releaseDate": "2026-11-23",
   "notes": [
-    "JPG·WebP로 내보내기(품질 선택, 사진 위치 정보는 지움)",
-    "내보낼 때 파일 이름이 두 번 붙던 문제 수정",
-    "Windows '연결 프로그램'에서 오메로 열기"
+    "지우개·배경 지우기·캔버스 맞춤 등 실제로 써 보며 찾은 문제 수정",
+    "SVG·AI 그레이디언트 도형 편집, PSD 투명 바탕, 문서 단 나누기",
+    "DOCX·HWPX 머리말 보존, PDF 저장·찾기·OCR, PPTX 애니메이션 저장"
   ],
   "repoPublic": true,
   "repoUrl": "https://github.com/wind2sp/omniweave",
