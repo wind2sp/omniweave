@@ -5,7 +5,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { unzlibSync, zlibSync } from "fflate";
-import { interpretNative } from "../../src/io/pdfsurgeon/aiNative";
+import { MAX_WORK, interpretNative, lastNativeWork } from "../../src/io/pdfsurgeon/aiNative";
+import { lastTextFramesLaidOut } from "../../src/io/pdfsurgeon/aiNativeText";
 import { nativeToPdf } from "../../src/io/pdfsurgeon/aiNativePdf";
 import { a85encode, inflateCapped } from "../../src/io/pdfsurgeon/aiPrivate";
 import { inflate } from "../../src/io/pdfsurgeon/filters";
@@ -17,11 +18,13 @@ import { openJs } from "./helpers";
 
 const doc = (setup: string, art: string) => `%!PS-Adobe-3.0\n%AI3_Cropmarks: 0 0 100 100\n%%EndComments\n%%BeginSetup\n${setup}%%EndSetup\n${art}%%PageTrailer\n`;
 const inst = (n: string) => `/SymbolInstance :\n(${n}) /SymbolRef ,\n1 0 0 1 0 0 /RTransformMatrix\n;\n`;
+// (bounds are on the work done — tokens read, end-marker scans, frames laid out — not on the clock: wall-clock
+// limits failed whenever the machine was busy, e.g. 46 s for a 5 s case in a full parallel run, QA 2026-11-24)
 const run = async (s: string) => {
-  const t0 = Date.now();
   const d = interpretNative(s);
+  const work = lastNativeWork();
   const pdf = d ? (await nativeToPdf(d)).pdf : null;
-  return { ms: Date.now() - t0, d, pdf };
+  return { work, d, pdf };
 };
 /** the page content streams of a PDF, inflated, as text */
 const contents = (pdf: Uint8Array) => {
@@ -49,7 +52,7 @@ describe("AI native data: hostile input stays bounded", () => {
     const sym = `%AI14_BeginSymbol\n(S)\n/ArtDictionary :\n${"0 ".repeat(1_000_000)}\n;\n%AI10_EndSymbol\n`;
     // was 8.3 s for 100 instances (dictionary tokens were not counted as work): 2 million instances would never end
     const r = await run(doc(sym, inst("S").repeat(1000)));
-    expect(r.ms).toBeLessThan(20_000);
+    expect(r.work.tokens).toBeLessThanOrEqual(MAX_WORK + 16);
     expect(r.d).not.toBeNull();
   }, 60_000);
 
@@ -72,7 +75,6 @@ describe("AI native data: hostile input stays bounded", () => {
     const m0 = process.memoryUsage().rss;
     const r = await run(doc(`%AI14_BeginSymbol\n(S)\n${fo}%AI10_EndSymbol\n`, inst("S").repeat(50)));
     expect(r.d!.notes.get("foreign-missing")).toBe(50);
-    expect(r.ms).toBeLessThan(20_000);
     expect(process.memoryUsage().rss - m0).toBeLessThan(400 * 2 ** 20);
   }, 60_000);
 
@@ -90,13 +92,17 @@ describe("AI native data: hostile input stays bounded", () => {
     const enc = a85encode(Uint8Array.from(td, (c) => c.charCodeAt(0))).match(/.{1,200}/g)!.map((l) => "%" + l).join("\n");
     const t = "/AI11Text :\n0 /FrameIndex ,\n0 /StoryIndex ,\n;\n";
     const r = await run(doc(`/AI11TextDocument : /ASCII85Decode ,\n${enc}\n;\n`, t.repeat(300) + "0 /FrameIndex 7 /StoryIndex\n" + "/AI11Text :\n9 /FrameIndex ,\n0 /StoryIndex ,\n;\n".repeat(300)));
-    expect(r.ms).toBeLessThan(20_000);
+    // 600 text objects, two (story, frame) pairs: laid out twice, not 600 times
+    expect(lastTextFramesLaidOut()).toBeLessThanOrEqual(2);
+    expect(r.d).not.toBeNull();
   }, 60_000);
 
   it("end markers that are missing are looked for once (raster data, placed files, gradients)", async () => {
     const tail = "x".repeat(5_000_000) + "\n";
-    for (const art of ["[ 1 0 0 1 0 0 ] XI\n".repeat(100_000) + tail, "%AI5_BeginPlace\n%AI5_EndPlace\n".repeat(100_000) + tail]) expect((await run(doc("", art))).ms).toBeLessThan(10_000);
-    expect((await run(doc("%AI5_BeginGradient: (G)\n".repeat(30_000) + "%AI5_EndGradient\n", ""))).ms).toBeLessThan(10_000);
+    // 100 000 operators looking for the same missing end marker: the source is scanned about once, not once each
+    for (const art of ["[ 1 0 0 1 0 0 ] XI\n".repeat(100_000) + tail, "%AI5_BeginPlace\n%AI5_EndPlace\n".repeat(100_000) + tail]) { const src = doc("", art); expect((await run(src)).work.scans).toBeLessThanOrEqual(3 * src.length); }
+    const grad = doc("%AI5_BeginGradient: (G)\n".repeat(30_000) + "%AI5_EndGradient\n", "");
+    expect((await run(grad)).work.scans).toBeLessThanOrEqual(3 * grad.length);
   }, 120_000);
 
   it("one big group seen by hundreds of artboards stops at the output limit, with a notice", async () => {
@@ -105,7 +111,6 @@ describe("AI native data: hostile input stays bounded", () => {
     const r = await run(doc(abs, "u\n" + "0 0 m 100 0 l 100 100 l f\n".repeat(100_000) + "U\n"));
     expect(r.d!.artboards.length).toBe(300);
     expect(r.d!.notes.get("too-large")).toBe(1);
-    expect(r.ms).toBeLessThan(30_000);
   }, 60_000);
 
   it("numbers beyond a double and huge coordinates never reach the PDF as exponents or Infinity", async () => {
@@ -139,7 +144,6 @@ describe("AI native data: hostile input stays bounded", () => {
     let seed = 99;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
     const files = readdirSync(DIR).filter((f) => f.endsWith("-nopdf.ai"));
-    const t0 = Date.now();
     let n = 0;
     for (const f of files) {
       const r = await ai.open!({ name: f, bytes: new Uint8Array(readFileSync(join(DIR, f))) } as never, { confirm: () => true });
@@ -159,6 +163,7 @@ describe("AI native data: hostile input stays bounded", () => {
         else s = s.slice(0, at) + String.fromCharCode(Math.floor(rnd() * 256)).repeat(1 + Math.floor(rnd() * 64)) + s.slice(at);
         try {
           const d = interpretNative(s);
+          expect(lastNativeWork().tokens).toBeLessThanOrEqual(MAX_WORK + 16);
           if (d) await nativeToPdf(d);
         } catch (e) {
           // a throw is allowed (open falls back to Illustrator's preview); it must be an Error, not a hang
@@ -168,7 +173,6 @@ describe("AI native data: hostile input stays bounded", () => {
       }
     }
     expect(n).toBeGreaterThanOrEqual(19 * 24);
-    expect(Date.now() - t0).toBeLessThan(240_000);
   }, 300_000);
 });
 

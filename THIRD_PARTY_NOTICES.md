@@ -162,6 +162,10 @@ The Omniweave name and logo are trademarks; the GPL does not grant rights to use
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+#### Omni PDFA Serif (from Liberation Serif 2.1.5, SIL OFL 1.1)
+
+PDF/A saving embeds it in place of a left-out Times (`public/pdfjs/pdfa/OmniPDFASerif-*.ttf`, built by `scripts/pdfa-fonts.mjs`). It is a Modified Version of Liberation Serif 2.1.5 (https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.5): only the characters of the PDF base encodings are kept, and it is renamed because "Liberation" is a Reserved Font Name. Same copyright and licence as below (`LICENSE_LIBERATION_SERIF`).
+
 #### pdf.js standard fonts — Liberation (SIL OFL 1.1)
 
 ```text
@@ -1004,6 +1008,12 @@ Background removal bundles the weights of **U²-Netp**, the small variant of U²
    See the License for the specific language governing permissions and
    limitations under the License.
 ```
+
+### MODNet (Apache License 2.0)
+
+Background removal of person photos bundles the weights of **MODNet** (Zhanghan Ke, Jiayu Sun, Kaican Li, Qiong Yan, Rynson W.H. Lau, *MODNet: Real-Time Trimap-Free Portrait Matting via Objective Decomposition*, AAAI 2022), from https://github.com/ZHKKKe/MODNet, whose README states that the code, models and demos of the repository (except the GIF files under doc/gif) are released under the Apache License 2.0. The file used is the official ONNX export `modnet_photographic_portrait_matting.onnx` linked from the repository's onnx/README.md (25,888,640 bytes, SHA-256 `07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9`).
+
+**Changes (Apache-2.0 §4(b)):** converted once by `scripts/convert-modnet.mjs` into Omniweave's LWT graph format (`models/matte/modnet.lwt`): the ONNX file read as data only; shape sub-graphs folded, the Relu / Clip after a convolution fused into it, the squeeze-and-excitation matrix products turned into 1×1 convolutions; convolution weights stored as 8-bit integers with one single-precision scale per output channel. No retraining. The network is run by Omniweave's own code (Loom Infer); no ONNX Runtime or other inference library is shipped. The license text (the Apache License 2.0, as above for U²-Netp) ships next to the weights (`models/matte/LICENSE`).
 
 ### PP-OCRv5 text detection and Korean recognition (Apache License 2.0)
 

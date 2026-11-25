@@ -13,7 +13,10 @@ import { toggleGrid, toggleRulers } from "../aids";
 import { ocrTarget } from "../ocrActions";
 import { PdfAnnotBtns, usePdfAnnot } from "../pdf/PdfAnnotLayer";
 import { PdfFormBtn } from "../pdf/PdfFormLayer";
-import { BigBtn, CmdBig, CmdSmall, CtxPanel, Group, SmallBtn, can, docZoom } from "./DocRibbon";
+import { PdfToolsPanel } from "../pdf/PdfTools";
+import { exportComments, importComments } from "../pdf/PdfComments";
+import { openPdfDialog, setPdfTool } from "../pdf/pdfToolsStore";
+import { BigBtn, CmdBig, CmdSmall, CtxPanel, Group, SmallBtn, ViewModesGroup, can, docZoom } from "./DocRibbon";
 import { useImageUI } from "./imageMenu";
 import { zoomStep } from "./ops";
 import { ContextArea, ToolStrip } from "./Ribbon";
@@ -96,6 +99,13 @@ function PdfCommentPanel() {
       <PdfAnnotBtns />
       <PdfFormBtn />
       <span className="ribbon-div" />
+      {/* Acrobat: comments as a data file (XFDF / FDF), out and in */}
+      <div className="rcol">
+        <SmallBtn icon="export" label={t("pdftools.comments.exportXfdf")} onClick={() => void exportComments("xfdf")} />
+        <SmallBtn icon="export" label={t("pdftools.comments.exportFdf")} onClick={() => void exportComments("fdf")} />
+        <SmallBtn icon="upload" label={t("pdftools.comments.import")} onClick={() => void importComments()} />
+      </div>
+      <span className="ribbon-div" />
       <ToolStrip />
       <span className="ribbon-div" />
       <ContextArea />
@@ -146,6 +156,12 @@ function PdfProtectPanel() {
         <BigBtn icon="lock" label={t("cmd.file.saveProtected")} tip={t("topui.pdf.protectPdfTip")} onClick={() => { const s = useStore.getState(); const pg = findPage(s.doc, s.pageId); void exportAs(pg && sameTypeExport(pg, s.doc.pages) ? "same" : "pdf", true); }} />
         <BigBtn icon="export" label={t("size.menu")} tip={t("size.menuHint")} onClick={() => useUI.getState().set({ shellDialog: "sizePdf" })} />
       </Group>
+      {/* Acrobat ▸ 보호 ▸ 가리기: also on the 도구 tab (ui/pdf/PdfTools.tsx) */}
+      <Group label={t("pdftools.g.redact")}>
+        <BigBtn icon="shield" label={t("pdftools.redact.area")} tip={t("pdftools.redact.areaTip")} onClick={() => setPdfTool("redact")} />
+        <BigBtn icon="search" label={t("pdftools.redact.findBtn")} onClick={() => openPdfDialog("redact")} />
+        <BigBtn icon="save" label={t("pdftools.pdfa.title")} onClick={() => openPdfDialog("pdfa")} />
+      </Group>
       <span className="ctx-hint">{t("topui.pdf.protectHint")}</span>
     </div>
   );
@@ -156,6 +172,7 @@ function PdfViewPanel() {
   const ui = useUI();
   return (
     <div className="rpanel">
+      <ViewModesGroup />
       <Group label={t("docmode.group.zoom")}>
         <BigBtn icon="zoomPage" label={t("docmode.onePage")} onClick={() => docZoom("page")} />
         <BigBtn icon="zoomWidth" label={t("docmode.pageWidth")} onClick={() => docZoom("width")} />
@@ -197,6 +214,8 @@ export function PdfRibbon({ tab, ctx }: { tab: string; ctx: RibbonContext | null
           <PdfCommentPanel />
         ) : tab === "pages" ? (
           <PdfPagesPanel />
+        ) : tab === "tools" ? (
+          <PdfToolsPanel />
         ) : tab === "protect" ? (
           <PdfProtectPanel />
         ) : tab === "view" ? (

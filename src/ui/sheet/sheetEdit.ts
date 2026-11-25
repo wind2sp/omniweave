@@ -5,7 +5,7 @@
 
 import { create } from "zustand";
 import { draftPage, findPage, useStore } from "../../core/store";
-import type { SheetCell, SheetData, SheetValidation } from "../../core/sheetTypes";
+import type { SheetCell, SheetCustomFilter, SheetData, SheetFilter, SheetValidation } from "../../core/sheetTypes";
 import type { Page } from "../../core/types";
 import { t } from "../../i18n";
 import { applyChange, Book } from "../../io/sheet/calc";
@@ -13,8 +13,9 @@ import { fillEdits, type FillMode } from "../../io/sheet/fill";
 import { addr, MAX_COL, MAX_ROW, parseAddr, parseRange, tokenize, type Rect } from "../../io/sheet/formula";
 import { currentRegion, filterHiddenRows, filterRangeAt, findAll, findNext, guessHeader, replaceText, searchText, shownText, sortEdits, type FindOpts, type SortKey } from "../../io/sheet/sortFilter";
 import { usedRange } from "../../io/sheet/pages";
+import { sheetFilters } from "../../io/sheet/filters";
 import { applyStructToBook, insertWouldLoseData, type StructOp } from "../../io/sheet/structure";
-import { bookPages, lang, norm, parseInput, selOf, setCells, setSel, type Sel } from "./sheetActions";
+import { bookPages, lang, norm, parseInput, selOf, setCells, setRepeat, setSel, type Sel } from "./sheetActions";
 
 const S = () => useStore.getState();
 
@@ -25,10 +26,48 @@ export type SheetDlg =
   | { kind: "sort" }
   | { kind: "insert" | "delete" }
   | { kind: "note"; a: string }
-  | { kind: "filter"; col: number; x: number; y: number }
+  | { kind: "filter"; col: number; table?: string; x: number; y: number }
+  | { kind: "customFilter"; col: number; table?: string; op: string; text: boolean }
   | { kind: "list"; r: number; c: number; x: number; y: number }
   | { kind: "invalid"; v: SheetValidation; retry: () => void; accept: () => void; cancel: () => void }
-  | { kind: "menu"; x: number; y: number; head: "col" | "row" | null };
+  | { kind: "menu"; x: number; y: number; head: "col" | "row" | null }
+  // Excel's dialogs of the ribbon tabs (ui/sheet/SheetFeatureDialogs.tsx)
+  | { kind: "fmt"; tab?: "number" | "align" | "font" | "border" | "fill" | "protect" }
+  | { kind: "cond"; type: string; edit?: { b: number; r: number } }
+  | { kind: "condMgr" }
+  | { kind: "valid" }
+  | { kind: "dedupe" }
+  | { kind: "split" }
+  | { kind: "link" }
+  | { kind: "protect" }
+  | { kind: "unprotect" }
+  | { kind: "book" }
+  | { kind: "page"; tab?: "page" | "margins" | "hf" | "sheet" }
+  | { kind: "name"; edit?: string; from?: "names" }
+  | { kind: "names" }
+  | { kind: "chart"; i: number }
+  | { kind: "pivot" }
+  | { kind: "fn" }
+  | { kind: "pasteSpecial" }
+  | { kind: "table"; style?: string }
+  | { kind: "group"; ungroup?: boolean }
+  | { kind: "subtotal" }
+  | { kind: "goalSeek" }
+  | { kind: "goTo" }
+  | { kind: "goSpecial" }
+  | { kind: "moveCopy"; pageId: string }
+  | { kind: "series" }
+  | { kind: "evalFormula" }
+  | { kind: "consol" }
+  | { kind: "scenarios" }
+  | { kind: "scenarioEdit"; i?: number }
+  | { kind: "dataTable" }
+  | { kind: "customLists" }
+  | { kind: "thread"; a: string }
+  | { kind: "errCheck" }
+  | { kind: "slicer" }
+  | { kind: "spark"; type: "line" | "column" | "stacked" }
+  | { kind: "chartMenu"; i: number; x: number; y: number };
 
 export const useSheetDlg = create<{ dlg: SheetDlg | null }>(() => ({ dlg: null }));
 export const openDlg = (dlg: SheetDlg | null) => useSheetDlg.setState({ dlg });
@@ -72,6 +111,60 @@ export function changeLines(pageId: string, op: StructOp, label = op.n > 0 ? t("
   return true;
 }
 
+/**
+ * Several changes to a book in one undo step: `f` gets copies of the book's sheets (and the page's index among them),
+ * inserts / deletes lines with `lines` (every reference moved) and edits cells; formulas are recalculated after it.
+ * `f` returning false drops the change.
+ */
+export function bookEdit(pageId: string, label: string, f: (sheets: SheetData[], ti: number, lines: (op: StructOp) => void) => boolean | void): boolean {
+  const st = S();
+  const page = findPage(st.doc, pageId);
+  if (!page?.sheet) return false;
+  const pages = bookPages(st.doc, page);
+  const ti = pages.findIndex((p) => p.id === pageId);
+  const sheets = pages.map((p) => JSON.parse(JSON.stringify(p.sheet)) as SheetData);
+  const lines = (op: StructOp) => {
+    applyStructToBook(sheets, ti, op);
+    sheets[ti].struct = [...(sheets[ti].struct ?? []), op];
+  };
+  if (f(sheets, ti, lines) === false) return false;
+  recalcAll(sheets);
+  st.commit(label, (d) => {
+    pages.forEach((p, i) => {
+      const dp = draftPage(d, p.id);
+      if (dp) dp.sheet = sheets[i] as typeof dp.sheet;
+    });
+  });
+  return true;
+}
+
+/**
+ * 셀 삽입 / 셀 삭제 that shifts cells: down / right (insert) or up / left (delete) — only the cells in the selection's
+ * columns (rows) move, with the references into them; the rows and columns themselves stay (Excel). Refused, as in
+ * Excel, when it would cut a merged cell or a table in two, or push data off the sheet.
+ */
+export function shiftCells(pageId: string, g: Rect, dir: "down" | "right" | "up" | "left"): boolean {
+  const st = S();
+  const sh = findPage(st.doc, pageId)?.sheet;
+  if (!sh) return false;
+  const rows = g.r1 - g.r0 + 1, cols = g.c1 - g.c0 + 1;
+  const op: StructOp =
+    dir === "down" ? { axis: "row", at: g.r0, n: rows, band: [g.c0, g.c1] } :
+    dir === "up" ? { axis: "row", at: g.r0, n: -rows, band: [g.c0, g.c1] } :
+    dir === "right" ? { axis: "col", at: g.c0, n: cols, band: [g.r0, g.r1] } :
+    { axis: "col", at: g.c0, n: -cols, band: [g.r0, g.r1] };
+  // the block that moves: from the selection to the sheet's end, in the band
+  const moving: Rect = op.axis === "row" ? { r0: g.r0, r1: MAX_ROW, c0: g.c0, c1: g.c1 } : { r0: g.r0, r1: g.r1, c0: g.c0, c1: MAX_COL };
+  const cuts = (x: Rect) => !(x.r1 < moving.r0 || x.r0 > moving.r1 || x.c1 < moving.c0 || x.c0 > moving.c1) && !(op.axis === "row" ? x.c0 >= g.c0 && x.c1 <= g.c1 : x.r0 >= g.r0 && x.r1 <= g.r1);
+  if (sh.merges.some((m) => { const x = parseRange(m); return !!x && cuts(x); })) return void st.notify(t("sheetx.cells.merged")), false;
+  if ((sh.tables ?? []).some((tb) => { const x = parseRange(tb.ref); return !!x && cuts(x); })) return void st.notify(t("sheetx.cells.table")), false;
+  if (insertWouldLoseData(sh, op)) return void st.notify(t("sheet.insertLoses")), false;
+  // (not recorded in `struct`: the save writes the moved cells as cell changes)
+  return bookEdit(pageId, op.n > 0 ? t("sheet.h.insert") : t("sheet.h.delete"), (sheets, ti) => {
+    applyStructToBook(sheets, ti, op);
+  });
+}
+
 /** Insert / delete for the selection: whole rows or columns when they are selected, else `axis` (the dialog's choice). */
 export function insertOrDelete(pageId: string, del: boolean, axis?: "row" | "col"): boolean {
   const s = selOf(pageId);
@@ -86,6 +179,13 @@ export function insertOrDelete(pageId: string, del: boolean, axis?: "row" | "col
   const n = ax === "row" ? g.r1 - g.r0 + 1 : g.c1 - g.c0 + 1;
   if (n > (ax === "row" ? MAX_ROW : MAX_COL)) return false;
   const ok = changeLines(pageId, { axis: ax, at, n: del ? -n : n });
+  // F4: the same insertion / deletion at the selection then (as many lines as it spans)
+  if (ok)
+    setRepeat((p) => {
+      const q = norm(selOf(p));
+      const k = ax === "row" ? q.r1 - q.r0 + 1 : q.c1 - q.c0 + 1;
+      changeLines(p, { axis: ax, at: ax === "row" ? q.r0 : q.c0, n: del ? -k : k });
+    });
   if (ok && del) {
     // the selection stays where it was (the lines after it moved up)
     setSel(pageId, s);
@@ -158,13 +258,13 @@ export function quickSort(pageId: string, desc: boolean) {
   sortRange(pageId, g, [{ col: sel.ac, desc }], header);
 }
 
-/** Rows the filter hides, written into hiddenRows (rows of its range shown again first). */
+/** Rows the filters hide (the sheet's and the tables'), written into hiddenRows (rows of their ranges shown again first). */
 function applyFilterRows(sh: SheetData) {
-  const f = sh.filter;
-  if (!f) return;
-  const g = parseRange(f.ref)!;
-  const keep = (sh.hiddenRows ?? []).filter((r) => r <= g.r0 || r > g.r1);
-  const hide = filterHiddenRows(sh, f, lang());
+  const fs = sheetFilters(sh);
+  if (!fs.length) return;
+  const areas = fs.map((x) => parseRange(x.f.ref)!).filter(Boolean);
+  const keep = (sh.hiddenRows ?? []).filter((r) => !areas.some((g) => r > g.r0 && r <= g.r1));
+  const hide = fs.flatMap((x) => filterHiddenRows(sh, x.f, lang()));
   const all = [...new Set([...keep, ...hide])].sort((a, b) => a - b);
   if (all.length) sh.hiddenRows = all;
   else delete sh.hiddenRows;
@@ -194,15 +294,37 @@ export function toggleFilter(pageId: string) {
 }
 
 /** Set (vals) or clear (null) the value filter of one filter column. */
-export function setFilterColumn(pageId: string, col: number, vals: string[] | null, blank = false) {
+export function setFilterColumn(pageId: string, col: number, vals: string[] | null, blank = false, table?: string) {
   S().commit(t("sheet.h.filter"), (d) => {
     const sh = draftPage(d, pageId)?.sheet as SheetData | undefined;
-    if (!sh?.filter) return;
-    const cols = { ...(sh.filter.cols ?? {}) };
+    const tb = table ? sh?.tables?.find((x) => x.name === table) : undefined;
+    const cur = table ? tb?.filter : sh?.filter;
+    if (!sh || !cur) return;
+    const cols = { ...(cur.cols ?? {}) };
     if (vals) cols[col] = { vals, ...(blank ? { blank: true } : {}) };
     else delete cols[col];
-    sh.filter = { ...sh.filter, cols };
-    if (!Object.keys(cols).length) delete sh.filter.cols;
+    const next = { ...cur, cols };
+    if (!Object.keys(cols).length) delete (next as { cols?: unknown }).cols;
+    if (tb) tb.filter = next;
+    else sh.filter = next;
+    applyFilterRows(sh);
+  });
+}
+
+/** 숫자 필터 · 텍스트 필터: a column's conditions (null = none), the sheet's AutoFilter or a table's. */
+export function setFilterCustom(pageId: string, col: number, custom: SheetCustomFilter | null, table?: string) {
+  S().commit(t("sheet.h.filter"), (d) => {
+    const sh = draftPage(d, pageId)?.sheet as SheetData | undefined;
+    const tb = table ? sh?.tables?.find((x) => x.name === table) : undefined;
+    const cur = table ? tb?.filter : sh?.filter;
+    if (!sh || !cur) return;
+    const cols = { ...(cur.cols ?? {}) };
+    if (custom) cols[col] = { custom };
+    else delete cols[col];
+    const next: SheetFilter = { ...cur, cols };
+    if (!Object.keys(cols).length) delete next.cols;
+    if (tb) tb.filter = next;
+    else sh.filter = next;
     applyFilterRows(sh);
   });
 }
@@ -220,7 +342,7 @@ const findScope = (sel: Sel): Rect | undefined => {
 export function doFindNext(pageId: string, back = false): boolean {
   const sh = findPage(S().doc, pageId)?.sheet;
   const { q, opts } = useFind.getState();
-  if (!sh || !q) return false;
+  if (!sh || (!q && !opts.format)) return false;
   const sel = selOf(pageId);
   const scope = findScope(sel);
   const a = findNext(sh, q, opts, lang(), { r: sel.ar, c: sel.ac }, back, scope);
@@ -236,7 +358,7 @@ export function doFindNext(pageId: string, back = false): boolean {
 export function doFindAll(pageId: string) {
   const sh = findPage(S().doc, pageId)?.sheet;
   const { q, opts } = useFind.getState();
-  if (!sh || !q) return;
+  if (!sh || (!q && !opts.format)) return;
   const found = findAll(sh, q, opts, lang(), findScope(selOf(pageId)));
   useFind.setState({ found });
   if (!found.length) S().notify(t("sheet.find.none"));
@@ -292,7 +414,7 @@ export function setNote(pageId: string, a: string, text: string | null) {
   const sh = findPage(S().doc, pageId)?.sheet;
   if (!sh) return;
   const old = sh.notes?.[a];
-  if (old?.threaded) return S().notify(t("sheet.note.threaded"));
+  if (old?.threaded) return void openDlg({ kind: "thread", a }); // a thread: its own dialog (답글 · 해결)
   if ((old?.text ?? null) === text) return;
   S().commit(t("sheet.h.note"), (d) => {
     const s2 = draftPage(d, pageId)?.sheet;

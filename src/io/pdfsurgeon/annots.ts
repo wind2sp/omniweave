@@ -15,7 +15,15 @@ import { forkDoc } from "./index";
 import { num } from "./syntax";
 import { t } from "../../i18n";
 
-export type PdfAnnotKind = "highlight" | "underline" | "strike" | "note" | "sign";
+export type PdfAnnotKind = "highlight" | "underline" | "strike" | "note" | "sign" | "measure";
+export type PdfReviewState = "Accepted" | "Rejected" | "Cancelled" | "Completed";
+export interface PdfReply {
+  id: string;
+  contents: string;
+  author?: string;
+  /** ISO date */
+  date?: string;
+}
 
 export interface PdfAnnot {
   /** stable id (written as /NM) */
@@ -39,6 +47,15 @@ export interface PdfAnnot {
    * in user space, and they are written as they always were (unturned) rather than squeezed into the turned box.
    */
   upright?: boolean;
+  /** measure: the points (x, y pairs, user space) and what was measured — written as Line / PolyLine / Polygon */
+  points?: number[];
+  shape?: "line" | "polyline" | "polygon";
+  /** measure: the scale it was taken with — written as /Measure (Acrobat reads the ratio and the units back) */
+  scale?: MeasureRatio;
+  /** replies, written as Text annotations /IRT this one (Acrobat's 답글) */
+  replies?: PdfReply[];
+  /** review state, written as a Text annotation /IRT this one with /StateModel /Review (Acrobat's 상태) */
+  state?: PdfReviewState;
 }
 
 const NOTE = 20; // pt, Acrobat's note icon
@@ -50,6 +67,14 @@ export function annotRect(a: PdfAnnot): [number, number, number, number] {
     return [x, y - NOTE, x + NOTE, y];
   }
   if (a.kind === "sign") return a.rect ?? [0, 0, 0, 0];
+  if (a.kind === "measure") {
+    const p = a.points ?? [];
+    const xs2 = p.filter((_, i) => i % 2 === 0), ys2 = p.filter((_, i) => i % 2 === 1);
+    if (!xs2.length) return [0, 0, 0, 0];
+    // room for the line width and the label above it
+    const x0 = Math.min(...xs2);
+    return [x0 - 4, Math.min(...ys2) - 4, Math.max(Math.max(...xs2) + 4, x0 + LABEL_W * (a.contents?.length ?? 0) + 4), Math.max(...ys2) + 16];
+  }
   const xs: number[] = [], ys: number[] = [];
   for (const q of a.quads ?? []) for (let i = 0; i < 8; i += 2) xs.push(q[i]), ys.push(q[i + 1]);
   if (!xs.length) return [0, 0, 0, 0];
@@ -99,6 +124,22 @@ const pdfDate = (d: Date) => {
   return `D:${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
 };
 
+/** a measurement's label: Helvetica 9 pt above the shape (a character is at most this wide) */
+const LABEL_W = 5.6;
+/** a string in a content stream, WinAnsi (Helvetica): "²" / "³" kept, what it cannot show as "?" */
+const winAnsi = (s: string) =>
+  "(" +
+  [...s]
+    .map((ch) => {
+      const c = ch.charCodeAt(0);
+      if (ch === "(" || ch === ")" || ch === "\\") return "\\" + ch;
+      if (c >= 0x20 && c < 0x7f) return ch;
+      if (c >= 0xa0 && c <= 0xff) return "\\" + c.toString(8).padStart(3, "0");
+      return "?";
+    })
+    .join("") +
+  ")";
+
 /** content of the appearance stream, in the coordinates of `rect` moved to the origin */
 function appearance(a: PdfAnnot, rect: [number, number, number, number]): string {
   const [ox, oy] = rect;
@@ -110,6 +151,24 @@ function appearance(a: PdfAnnot, rect: [number, number, number, number]): string
     s += `${r} ${g} ${b} rg 0.25 0.25 0.25 RG 1 w\n`;
     s += `1.5 6 m 1.5 18.5 l 18.5 18.5 l 18.5 6 l 9 6 l 5 1.5 l 6 6 l h B\n`;
     s += `0.25 0.25 0.25 RG 1 w 4.5 15 m 15.5 15 l S 4.5 12 m 15.5 12 l S 4.5 9 m 12 9 l S\n`;
+    return s;
+  }
+  if (a.kind === "measure") {
+    // the measured line / outline (the label is the annotation's /Contents, which viewers show with it)
+    const p = a.points ?? [];
+    s += `${r} ${g} ${b} RG 1.2 w\n`;
+    for (let i = 0; i + 1 < p.length; i += 2) s += `${P(p[i], p[i + 1])} ${i ? "l" : "m"}\n`;
+    s += a.shape === "polygon" ? "h S\n" : "S\n";
+    // end ticks on a distance, as Acrobat draws them
+    if (a.shape === "line" && p.length >= 4) {
+      const dx = p[2] - p[0], dy = p[3] - p[1], L = Math.hypot(dx, dy) || 1, nx = (-dy / L) * 4, ny = (dx / L) * 4;
+      for (const [x, y] of [[p[0], p[1]], [p[2], p[3]]]) s += `${P(x - nx, y - ny)} m ${P(x + nx, y + ny)} l S\n`;
+    }
+    // the value, above the shape (as Acrobat's caption)
+    if (a.contents) {
+      const xs = p.filter((_, i) => i % 2 === 0), ys = p.filter((_, i) => i % 2 === 1);
+      s += `BT /Helv 9 Tf ${r} ${g} ${b} rg ${P(Math.min(...xs), Math.max(...ys) + 5)} Td ${winAnsi(a.contents)} Tj ET\n`;
+    }
     return s;
   }
   for (const q of a.quads ?? []) {
@@ -127,7 +186,37 @@ function appearance(a: PdfAnnot, rect: [number, number, number, number]): string
   return s;
 }
 
-const SUBTYPE: Record<PdfAnnotKind, string> = { highlight: "Highlight", underline: "Underline", strike: "StrikeOut", note: "Text", sign: "Stamp" };
+/** Acrobat's scale ratio: `page` units on the page are `real` units in reality (units: pt in mm cm m km ft) */
+export interface MeasureRatio {
+  page: number;
+  pageUnit: string;
+  real: number;
+  realUnit: string;
+}
+/** one unit in points (1 pt = 1/72 in) */
+const UNIT_PT: Record<string, number> = { pt: 1, in: 72, mm: 72 / 25.4, cm: 72 / 2.54, m: 7200 / 2.54, km: 7200000 / 2.54, ft: 864 };
+const fmtR = (n: number) => String(Math.round(n * 1e6) / 1e6);
+/** the ratio as Acrobat writes it in /R: "1 mm = 1 m" */
+export const ratioText = (s: MeasureRatio) => `${fmtR(s.page)} ${s.pageUnit} = ${fmtR(s.real)} ${s.realUnit}`;
+/** "1 mm = 1 m" (Acrobat's /R, XFDF rateValue) back to a ratio; null for what it does not understand */
+export function parseRatio(r: string | undefined): MeasureRatio | null {
+  const m = /^\s*([\d.]+)\s*([a-z]+)\s*=\s*([\d.]+)\s*([a-z]+)\s*$/i.exec(r ?? "");
+  if (!m || !UNIT_PT[m[2].toLowerCase()] || !UNIT_PT[m[4].toLowerCase()]) return null;
+  return { page: Number(m[1]) || 1, pageUnit: m[2].toLowerCase(), real: Number(m[3]) || 1, realUnit: m[4].toLowerCase() };
+}
+/** real units per point of the page, by the ratio (the /X conversion factor) */
+export const realPerPt = (s: MeasureRatio) => (1 / (UNIT_PT[s.pageUnit] ?? 1)) * (s.real / (s.page || 1));
+/**
+ * The /Measure dictionary of a measurement (ISO 32000-1 §12.9, as Acrobat's measuring tool writes it): a rectilinear
+ * measure with the ratio text, X converting points to the real unit, D distances and A areas in that unit.
+ */
+export function measureDict(s: MeasureRatio) {
+  const nf = (u: string, c: number) => ({ Type: "NumberFormat", U: PDFString.of(u), C: Number(c.toPrecision(8)), D: 100, F: "D", RD: PDFString.of("."), RT: PDFString.of(""), SS: PDFString.of(""), O: "S" });
+  return { Type: "Measure", Subtype: "RL", R: PDFString.of(ratioText(s)), X: [nf(s.realUnit, realPerPt(s))], D: [nf(s.realUnit, 1)], A: [nf("sq " + s.realUnit, 1)] };
+}
+
+const SUBTYPE: Record<PdfAnnotKind, string> = { highlight: "Highlight", underline: "Underline", strike: "StrikeOut", note: "Text", sign: "Stamp", measure: "Line" };
+const MEASURE_SUBTYPE = { line: "Line", polyline: "PolyLine", polygon: "Polygon" } as const;
 
 export interface AnnotReport {
   changed: boolean;
@@ -175,7 +264,7 @@ export async function addAnnots(
       /* a damaged page dictionary: as if unrotated */
     }
     for (const a of list) {
-      if (a.kind !== "note" && a.kind !== "sign" && !a.quads?.length) continue;
+      if (a.kind === "measure" ? (a.points?.length ?? 0) < 4 : a.kind !== "note" && a.kind !== "sign" && !a.quads?.length) continue;
       const rect = annotRect(a);
       if (rect[2] - rect[0] <= 0 || rect[3] - rect[1] <= 0) continue;
       const res: Record<string, PDFObject> = {};
@@ -192,6 +281,7 @@ export async function addAnnots(
         const { bbox } = uprightAppearance(rect, a.upright ? rotate : 0);
         body = `q ${num(bbox[2])} 0 0 ${num(bbox[3])} 0 0 cm /Im0 Do Q\n`;
       }
+      if (a.kind === "measure" && a.contents) res.Font = ctx.obj({ Helv: ctx.obj({ Type: "Font", Subtype: "Type1", BaseFont: "Helvetica", Encoding: "WinAnsiEncoding" }) });
       if (a.kind === "highlight") {
         gs ??= ctx.register(ctx.obj({ Type: "ExtGState", BM: "Multiply" }));
         res.ExtGState = ctx.obj({ GS0: gs });
@@ -220,10 +310,44 @@ export async function addAnnots(
       } else if (a.kind === "sign") {
         d.set(PDFName.of("Name"), PDFName.of("OmwSignature")); // a custom stamp: its appearance is the picture
         d.delete(PDFName.of("C"));
+      } else if (a.kind === "measure") {
+        // a measurement (Acrobat's 측정 도구): Line with /L, PolyLine / Polygon with /Vertices; /IT names the kind
+        const p = a.points!;
+        const shape = a.shape ?? "line";
+        d.set(PDFName.of("Subtype"), PDFName.of(MEASURE_SUBTYPE[shape]));
+        if (shape === "line") {
+          d.set(PDFName.of("L"), ctx.obj(p.slice(0, 4)));
+          d.set(PDFName.of("LE"), ctx.obj([PDFName.of("Butt"), PDFName.of("Butt")]));
+          d.set(PDFName.of("IT"), PDFName.of("LineDimension"));
+          d.set(PDFName.of("Cap"), ctx.obj(true));
+        } else {
+          d.set(PDFName.of("Vertices"), ctx.obj(p));
+          d.set(PDFName.of("IT"), PDFName.of(shape === "polygon" ? "PolygonDimension" : "PolyLineDimension"));
+        }
+        d.set(PDFName.of("BS"), ctx.obj({ W: 1.2 }));
+        if (a.scale) d.set(PDFName.of("Measure"), ctx.obj(measureDict(a.scale) as never));
       } else d.set(PDFName.of("QuadPoints"), ctx.obj(a.quads!.flat()));
       d.set(PDFName.of("AP"), ctx.obj({ N: ap }));
-      refs.push(ctx.register(d));
+      const ref = ctx.register(d);
+      refs.push(ref);
       report.added++;
+      // replies and the review state: Text annotations in reply to this one (/IRT), not shown on the page by
+      // themselves (NoView) — Acrobat lists them in the comment pane under their comment
+      const small = [rect[0], rect[3] - NOTE, rect[0] + NOTE, rect[3]];
+      for (const rp of a.replies ?? []) {
+        const r = ctx.obj({ Type: "Annot", Subtype: "Text", Rect: small, F: 4 | 32, P: pageRef, IRT: ref, RT: PDFName.of("R"), M: PDFString.of(rp.date ? pdfDate(new Date(rp.date)) : now), Open: false, Name: PDFName.of("Comment") }) as PDFDict;
+        r.set(PDFName.of("NM"), pdfText(rp.id));
+        r.set(PDFName.of("Contents"), pdfText(rp.contents));
+        if (rp.author) r.set(PDFName.of("T"), pdfText(rp.author));
+        refs.push(ctx.register(r));
+      }
+      if (a.state) {
+        const st = ctx.obj({ Type: "Annot", Subtype: "Text", Rect: small, F: 4 | 32, P: pageRef, IRT: ref, State: PDFString.of(a.state), StateModel: PDFString.of("Review"), M: PDFString.of(now), Open: false, Name: PDFName.of("Comment") }) as PDFDict;
+        st.set(PDFName.of("NM"), pdfText(`${a.id}-state`));
+        st.set(PDFName.of("Contents"), pdfText(`${a.state} set by ${a.author || "Omniweave"}`));
+        if (a.author) st.set(PDFName.of("T"), pdfText(a.author));
+        refs.push(ctx.register(st));
+      }
     }
     if (!refs.length) continue;
     // the page's /Annots: an array object of its own is changed in place, a direct one with the page

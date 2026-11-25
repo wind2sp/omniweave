@@ -56,7 +56,8 @@ function themeFonts(env: Env): string[] {
 
 function xfrmOf(sp: Element) {
   const pr = child(sp, "spPr") ?? child(sp, "grpSpPr");
-  const x = pr && child(pr, "xfrm");
+  // (a graphic frame — a chart — has its xfrm directly, not in spPr)
+  const x = pr ? child(pr, "xfrm") : child(sp, "xfrm");
   if (!x) return null;
   const off = child(x, "off"), ext = child(x, "ext"), cOff = child(x, "chOff"), cExt = child(x, "chExt");
   return {
@@ -116,7 +117,7 @@ function shapeText(sp: Element, theme: string[], styleFont: string | null): Pick
   };
 }
 
-function readItem(el: Element, at: SheetAnchor, env: Env, out: SheetDrawing[], box?: [number, number, number, number]) {
+function readItem(el: Element, at: SheetAnchor, env: Env, out: SheetDrawing[], box?: [number, number, number, number], path: number[] = []) {
   const nv = descendants(el, "cNvPr")[0];
   const name = (nv && attr(nv, "name")) ?? undefined;
   if (nv && /^(1|true)$/.test(attr(nv, "hidden") ?? "")) return;
@@ -128,7 +129,7 @@ function readItem(el: Element, at: SheetAnchor, env: Env, out: SheetDrawing[], b
     const rid = c && (attr(c, "r:id") ?? attr(c, "id"));
     const rel = rid ? env.rels.get(rid) : undefined;
     const xml = rel && env.read(rel.target);
-    if (xml) out.push({ ...base, kind: "chart", chart: xml, theme: env.theme, fonts: themeFonts(env) });
+    if (xml) out.push({ ...base, kind: "chart", chart: xml, part: rel!.target, theme: env.theme, fonts: themeFonts(env) });
     return;
   }
   if (el.localName === "pic") {
@@ -182,15 +183,20 @@ function readItem(el: Element, at: SheetAnchor, env: Env, out: SheetDrawing[], b
   }
   if (el.localName === "grpSp") {
     const g = xfrmOf(el);
+    let ci = -1;
     for (const k of children(el)) {
       if (!/^(sp|pic|graphicFrame|grpSp|cxnSp)$/.test(k.localName)) continue;
+      ci++;
       const kx = xfrmOf(k);
       let b: [number, number, number, number] | undefined = box;
       if (g && kx && g.cw && g.ch) {
         const fx = (kx.x - g.cx) / g.cw, fy = (kx.y - g.cy) / g.ch, fw = kx.w / g.cw, fh = kx.h / g.ch;
         b = box ? [box[0] + fx * box[2], box[1] + fy * box[3], fw * box[2], fh * box[3]] : [fx, fy, fw, fh];
       }
-      readItem(k, at, env, out, b);
+      const n0 = out.length;
+      readItem(k, at, env, out, b, [...path, ci]);
+      // where the member sits in its group (child index at each level): deleted here, that element goes
+      for (let j = n0; j < out.length; j++) out[j].grpPath ??= [...path, ci];
     }
   }
 }
@@ -205,10 +211,13 @@ export function readDrawings(sh: SheetData, root: Element, part: string, read: (
   if (!xml) return;
   const env: Env = { theme, rels: partRels(rel.target, read), read, bytes };
   const out: SheetDrawing[] = [];
+  let ai = -1;
   for (const a of children(parseXml(xml).documentElement)) {
     if (!/^(twoCellAnchor|oneCellAnchor|absoluteAnchor)$/.test(a.localName)) continue;
+    ai++;
     const at = anchorOf(a);
     if (!at) continue;
+    const n0 = out.length;
     const item = children(a).find((k) => /^(sp|pic|graphicFrame|grpSp|cxnSp)$/.test(k.localName));
     if (item) readItem(item, at, env, out);
     else {
@@ -217,11 +226,23 @@ export function readDrawings(sh: SheetData, root: Element, part: string, read: (
       // a chartex chart (waterfall, histogram, treemap, funnel, …) is in the Choice; its Fallback is only a box
       // saying the chart needs a newer Excel — the chart painter draws the chartex part itself
       const ch = alt && child(alt, "Choice");
+      // a slicer (its Fallback is only a box saying slicers need Excel 2010): its anchor kept by name for the slicer
+      // reader (io/sheet/slicers.ts)
+      const sl = ch && children(ch).find((k) => k.localName === "graphicFrame" && descendants(k, "graphicData").some((g) => /\/slicer$/.test(attr(g, "uri") ?? "")));
+      if (sl) {
+        const nm = descendants(sl, "slicer")[0];
+        const name = nm && attr(nm, "name");
+        if (name) ((sh as { slicerAt?: Record<string, SheetAnchor> }).slicerAt ??= {})[name] = at;
+        continue;
+      }
       const cx = ch && children(ch).find((k) => k.localName === "graphicFrame" && descendants(k, "graphicData").some((g) => /chartex/.test(attr(g, "uri") ?? "")));
       const fb = cx ? ch : alt && (child(alt, "Fallback") ?? child(alt, "Choice"));
       const it = fb && children(fb).find((k) => /^(sp|pic|graphicFrame|grpSp|cxnSp)$/.test(k.localName));
       if (it) readItem(it, at, env, out);
     }
+    // which anchor of the drawing part each drawing came from (moved / sized / deleted here, that anchor is rewritten —
+    // io/sheet/writeDrawings.ts; a group's members share theirs and move together)
+    for (let j = n0; j < out.length; j++) out[j].anchorIx = ai;
   }
   if (out.length) sh.drawings = out;
 }

@@ -2,7 +2,7 @@
 // model / layout tabs and AutoCAD's drawing aids, the Home ribbon (Draw · Modify · Annotation · Layers · Properties ·
 // Utilities · Omniweave · View) and the Properties palette. Loaded only when a drawing is shown.
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { draftPage, findPage, useStore } from "../../core/store";
 import type { LayerGroup, Page, SceneNode, VectorNode } from "../../core/types";
 import { t as tr, useT } from "../../i18n";
@@ -17,13 +17,18 @@ import { Icon, type IconName } from "../shell/Icons";
 import { useUI } from "../shell/uiStore";
 import { zoomStep } from "../shell/ops";
 import {
-  OPT_KEY, active, answer, cancel, complete, currentLayer, layerGroupOf, lwPx, mapNode, restoreLayerState, run, saveLayerState, sendToPage, setCurrentLayer, submit,
+  OPT_KEY, active, answer, cancel, complete, resolve, currentLayer, layerGroupOf, lwPx, mapNode, restoreLayerState, run, saveLayerState, sendToPage, setCurrentLayer, submit,
   textParts, useClayer, useCmd,
 } from "./engine";
 import { arcOf, dist, fmt, nodeSegs, pageToW, ap, angleOf, deg, polyArea, wToPage, mul, type W, SNAP_KINDS } from "./geom";
 import { ACI, cadLayers, moveToLayer, setLayerColor, setLayerFrozen, setLayerLocked, setLayerOn } from "./layers";
 import { F_KEYS, toggle, useCadUI, type Toggle } from "./state";
 import { cadKey, cmdInput, zoomExtents } from "./view";
+import { ACAD_PGP } from "./more";
+import { blockEdit } from "./engine";
+import { insertOf, attribsOf } from "./moreBlock";
+import { editHatch, hatchOf } from "./moreDraw";
+import { HATCH_NAMES, hatchArea } from "./hatch";
 
 const S = () => useStore.getState();
 const usePage = () => useStore((s) => findPage(s.doc, s.pageId));
@@ -44,9 +49,21 @@ export function CadCommandLine() {
   useEffect(() => {
     cmdInput.set = (v) => setText(v);
     cmdInput.focus = () => box.current?.focus();
+    // ↑ / ↓ pressed on the canvas: the recent commands, as in the box (AutoCAD)
+    cmdInput.recall = (up) => {
+      const rec = useCmd.getState().recent;
+      if (!rec.length) return;
+      setRecall((r) => {
+        const i = Math.max(-1, Math.min(rec.length - 1, r + (up ? 1 : -1)));
+        setText(i < 0 ? "" : rec[i]);
+        return i;
+      });
+      box.current?.focus();
+    };
     return () => {
       cmdInput.set = null;
       cmdInput.focus = null;
+      cmdInput.recall = null;
     };
   }, []);
   useEffect(() => {
@@ -55,7 +72,7 @@ export function CadCommandLine() {
   if (!u.cmdLine) return null;
   const req = st.req;
   const sugg = !st.name && text.trim() ? complete(text) : [];
-  const lines = st.hist.slice(u.histOpen ? -14 : -3);
+  const lines = u.histFold && !u.histOpen ? [] : st.hist.slice(u.histOpen ? -14 : -3);
   const send = (v: string) => {
     setText("");
     setRecall(-1);
@@ -78,7 +95,8 @@ export function CadCommandLine() {
     }
     if (e.key === "Enter" || (e.key === " " && req?.k !== "text")) {
       e.preventDefault();
-      send(sugg.length && text.trim() && !st.name && !resolveExact(text) ? sugg[0] : text);
+      // a name or alias that names a command exactly runs that command (E = ERASE); otherwise the first suggestion
+      send(sugg.length && text.trim() && !st.name && !resolve(text) ? sugg[0] : text);
       return;
     }
     if (e.key === "Tab" && sugg.length) {
@@ -122,6 +140,9 @@ export function CadCommandLine() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKey}
         />
+        <button type="button" className={cx("cad-cmd-fold", u.histFold && "folded")} data-tip={t(u.histFold ? "cadfeat.hist.expand" : "cadfeat.hist.collapse")} aria-pressed={u.histFold} aria-label={t(u.histFold ? "cadfeat.hist.expand" : "cadfeat.hist.collapse")} onClick={() => u.set({ histFold: !u.histFold, histOpen: false })}>
+          <Icon name="chevron" size={10} />
+        </button>
         <Menu
           className="cad-cmd-recent"
           tip={t("cadui.recent")}
@@ -142,7 +163,6 @@ export function CadCommandLine() {
     </div>
   );
 }
-const resolveExact = (s: string) => /^[a-z]+$/i.test(s.trim()) && complete(s).length === 0;
 
 /** The prompt with its options clickable (AutoCAD's command line options). */
 function Prompt() {
@@ -196,6 +216,9 @@ function LayoutTabs({ page }: { page: Page }) {
           {p.source?.cad?.layout ?? t("cadui.model")}
         </button>
       ))}
+      <button type="button" className="cad-tab cad-tab-add" data-tip={t("cadui.cmd.LAYOUT")} aria-label={t("cadui.cmd.LAYOUT")} onClick={() => run("LAYOUT")}>
+        +
+      </button>
     </span>
   );
 }
@@ -286,7 +309,41 @@ export function CadStatusBar() {
 
 // ───────── ribbon ─────────
 
-function Group({ label, children }: { label: string; children: React.ReactNode }) {
+/** How many of the main tab's last groups are folded into one button each (Office's narrow-window ribbon). */
+const FoldCtx = createContext<{ folded: number; total: number }>({ folded: 0, total: 0 });
+function Group({ label, children, i }: { label: string; children: React.ReactNode; i?: number }) {
+  const f = useContext(FoldCtx);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  // the panel under its button, kept inside the window
+  useLayoutEffect(() => {
+    const pop = popRef.current, btn = ref.current;
+    if (!open || !pop || !btn) return;
+    const r = btn.getBoundingClientRect();
+    pop.style.top = `${r.bottom + 4}px`;
+    pop.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 8 - pop.offsetWidth))}px`;
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener("mousedown", off);
+    return () => window.removeEventListener("mousedown", off);
+  }, [open]);
+  if (i !== undefined && i >= f.total - f.folded)
+    return (
+      <div className="rg rg-folded" role="group" aria-label={label} ref={ref}>
+        <button type="button" className={cx("rbig", open && "on")} aria-expanded={open} onClick={() => setOpen(!open)}>
+          <Icon name="chevron" size={16} />
+          <span>{label}</span>
+        </button>
+        {open && (
+          <div className="rg-pop" ref={popRef} onClick={(e) => (e.target as HTMLElement).closest("button") && !(e.target as HTMLElement).closest(".menu, .cad-layer-drop") && setOpen(false)}>
+            <div className="rg-body">{children}</div>
+          </div>
+        )}
+      </div>
+    );
   return (
     <div className="rg" role="group" aria-label={label}>
       <div className="rg-body">{children}</div>
@@ -298,13 +355,19 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 function CmdBtn({ cmd, icon, big, label }: { cmd: string; icon: IconName; big?: boolean; label?: string }) {
   const t = useT();
   const name = label ?? t(`cadui.cmd.${cmd}`);
-  const alias = ALIAS_OF[cmd];
+  const alias = aliasOf(cmd);
   return (
     <button type="button" className={big ? "rbig" : "rsmall"} data-tip={`${name} (${cmd})`} data-kbd={alias} onClick={() => run(cmd)}>
       <Icon name={icon} size={big ? 20 : 15} />
       <span>{name}</span>
     </button>
   );
+}
+/** The shortest acad.pgp alias of a command (the ribbon's key hint). */
+function aliasOf(cmd: string): string | undefined {
+  let best: string | undefined = ALIAS_OF[cmd];
+  for (const [a, c] of Object.entries(ACAD_PGP)) if (c === cmd && !a.startsWith("-") && (!best || a.length < best.length)) best = a;
+  return best;
 }
 const ALIAS_OF: Record<string, string> = { LINE: "L", PLINE: "PL", CIRCLE: "C", ARC: "A", RECTANG: "REC", MOVE: "M", COPY: "CO", ROTATE: "RO", SCALE: "SC", MIRROR: "MI", OFFSET: "O", TRIM: "TR", EXTEND: "EX", ERASE: "E", FILLET: "F", ARRAYRECT: "AR", EXPLODE: "X", JOIN: "J", TEXT: "DT", DIMLINEAR: "DLI", DIMALIGNED: "DAL", DIST: "DI", AREA: "AA", ZOOM: "Z" };
 
@@ -317,6 +380,15 @@ function LayerDrop({ page }: { page: Page }) {
   useClayer((s) => s.v);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  // the panel under its button, kept inside the window
+  useLayoutEffect(() => {
+    const pop = popRef.current, btn = ref.current;
+    if (!open || !pop || !btn) return;
+    const r = btn.getBoundingClientRect();
+    pop.style.top = `${r.bottom + 4}px`;
+    pop.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 8 - pop.offsetWidth))}px`;
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const off = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -402,6 +474,29 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
   const page = usePage();
   const u = useCadUI();
   const sel = useStore((s) => s.selection);
+  // narrow window: the last groups fold into one button each, one by one, and open again when there is room
+  const ribbonRef = useRef<HTMLDivElement>(null);
+  const [folded, setFolded] = useState(0);
+  const foldAt = useRef<number[]>([]);
+  useEffect(() => {
+    const el = ribbonRef.current?.querySelector(".rbody") as HTMLElement | null;
+    if (!el) return;
+    const check = () => {
+      const over = el.scrollWidth > el.clientWidth + 2;
+      setFolded((f) => {
+        if (over && f < 6) {
+          foldAt.current[f] = el.clientWidth;
+          return f + 1;
+        }
+        if (!over && f > 0 && el.clientWidth > (foldAt.current[f - 1] ?? Infinity) + 8) return f - 1;
+        return f;
+      });
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tab, folded]);
   if (!page?.source?.cad) return null;
   const states = Object.keys(page.source.cad.layerStates ?? {});
   const keep = (e: React.MouseEvent) => {
@@ -457,6 +552,13 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
                 <span>{t("cadui.toSlide.btn")}</span>
               </button>
             </Group>
+            <Group label={t("cadui.cmd.PLOT")}>
+              <CmdBtn cmd="PLOT" icon="paper" big />
+              <button type="button" className="rbig" data-tip={t("cadfeat.exportDxf")} onClick={() => void exportAs("dxf")}>
+                <Icon name="export" size={20} />
+                <span>DXF</span>
+              </button>
+            </Group>
             <Group label={t("menu.head.export")}>
               <button type="button" className="rbig" onClick={() => void exportAs("pdf" as any)}>
                 <Icon name="export" size={20} />
@@ -475,11 +577,78 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
         </div>
       </div>
     );
+  if (tab === "annot")
+    return (
+      <div className="ribbon doc-ribbon cad-ribbon">
+        <div className="rbody" role="tabpanel" aria-label={t("topui.tab.cad.annot")}>
+          <div className="rpanel" onMouseDown={keep}>
+            <Group label={t("cadui.ent.text")}>
+              <CmdBtn cmd="MTEXT" icon="text" big />
+              <div className="rcol">
+                <CmdBtn cmd="TEXT" icon="text" />
+                <CmdBtn cmd="TEXTEDIT" icon="text" />
+                <CmdBtn cmd="STYLE" icon="text" />
+              </div>
+            </Group>
+            <Group label={t("cadui.ent.dim")}>
+              <CmdBtn cmd="DIMLINEAR" icon="cadDim" big />
+              <div className="rcol">
+                <CmdBtn cmd="DIMALIGNED" icon="cadDim" />
+                <CmdBtn cmd="DIMANGULAR" icon="cadArc" />
+                <CmdBtn cmd="DIMRADIUS" icon="cadCircle" />
+              </div>
+              <div className="rcol">
+                <CmdBtn cmd="DIMDIAMETER" icon="cadCircle" />
+                <CmdBtn cmd="DIMCONTINUE" icon="cadDim" />
+                <CmdBtn cmd="DIMBASELINE" icon="cadDim" />
+              </div>
+              <div className="rcol">
+                <CmdBtn cmd="DIMSTYLE" icon="cadDim" />
+              </div>
+            </Group>
+            <Group label={t("cadui.cmd.MLEADER")}>
+              <CmdBtn cmd="MLEADER" icon="cadPline" big />
+            </Group>
+            <Group label={t("cadui.cmd.HATCH")}>
+              <CmdBtn cmd="HATCH" icon="grid" big />
+              <div className="rcol">
+                <CmdBtn cmd="GRADIENT" icon="grid" />
+                <CmdBtn cmd="HATCHEDIT" icon="grid" />
+              </div>
+            </Group>
+          </div>
+        </div>
+      </div>
+    );
+  if (tab === "insert")
+    return (
+      <div className="ribbon doc-ribbon cad-ribbon">
+        <div className="rbody" role="tabpanel" aria-label={t("topui.tab.cad.insert")}>
+          <div className="rpanel" onMouseDown={keep}>
+            <Group label={t("cadfeat.rb.block")}>
+              <CmdBtn cmd="INSERT" icon="cadMove" big />
+              <CmdBtn cmd="BLOCK" icon="cadRect" big />
+              <div className="rcol">
+                <CmdBtn cmd="BEDIT" icon="cadRect" />
+                {blockEdit.gid ? <CmdBtn cmd="BCLOSE" icon="check" /> : null}
+                <CmdBtn cmd="EXPLODE" icon="cadExplode" />
+              </div>
+              <div className="rcol">
+                <CmdBtn cmd="ATTDEF" icon="text" />
+                <CmdBtn cmd="ATTEDIT" icon="text" />
+              </div>
+            </Group>
+          </div>
+        </div>
+      </div>
+    );
   return (
-    <div className="ribbon doc-ribbon cad-ribbon">
+    <FoldCtx.Provider value={{ folded, total: 6 }}>
+    <div className="ribbon doc-ribbon cad-ribbon" ref={ribbonRef}>
+      <RibbonMore />
       <div className="rbody" role="tabpanel" aria-label={t("topui.tab.cad.cad")}>
       <div className="rpanel" onMouseDown={keep}>
-        <Group label={t("cadui.g.draw")}>
+        <Group label={t("cadui.g.draw")} i={0}>
           <CmdBtn cmd="LINE" icon="cadLine" big />
           <CmdBtn cmd="PLINE" icon="cadPline" big />
           <div className="rcol">
@@ -487,8 +656,18 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
             <CmdBtn cmd="ARC" icon="cadArc" />
             <CmdBtn cmd="RECTANG" icon="cadRect" />
           </div>
+          <div className="rcol">
+            <CmdBtn cmd="ELLIPSE" icon="cadCircle" />
+            <CmdBtn cmd="POLYGON" icon="cadRect" />
+            <CmdBtn cmd="SPLINE" icon="cadPline" />
+          </div>
+          <div className="rcol">
+            <CmdBtn cmd="HATCH" icon="grid" />
+            <CmdBtn cmd="XLINE" icon="cadLine" />
+            <CmdBtn cmd="POINT" icon="cadOsnap" />
+          </div>
         </Group>
-        <Group label={t("cadui.g.modify")}>
+        <Group label={t("cadui.g.modify")} i={1}>
           <div className="rcol">
             <CmdBtn cmd="MOVE" icon="cadMove" />
             <CmdBtn cmd="COPY" icon="copy" />
@@ -506,21 +685,32 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
           </div>
           <div className="rcol">
             <CmdBtn cmd="FILLET" icon="cadFillet" />
-            <CmdBtn cmd="ARRAYRECT" icon="cadArray" />
+            <CmdBtn cmd="CHAMFER" icon="cadFillet" />
+            <CmdBtn cmd="ARRAY" icon="cadArray" label={t("cadfeat.rb.array")} />
+          </div>
+          <div className="rcol">
+            <CmdBtn cmd="STRETCH" icon="cadScale" />
+            <CmdBtn cmd="BREAK" icon="cadTrim" />
+            <CmdBtn cmd="LENGTHEN" icon="cadExtend" />
           </div>
           <div className="rcol">
             <CmdBtn cmd="EXPLODE" icon="cadExplode" />
             <CmdBtn cmd="JOIN" icon="cadJoin" />
+            <CmdBtn cmd="PEDIT" icon="cadPline" />
           </div>
-        </Group>
-        <Group label={t("cadui.g.annot")}>
-          <CmdBtn cmd="TEXT" icon="text" big />
           <div className="rcol">
+            <CmdBtn cmd="ALIGN" icon="cadMove" />
+          </div>
+
+        </Group>
+        <Group label={t("cadui.g.annot")} i={2}>
+          <div className="rcol">
+            <CmdBtn cmd="MTEXT" icon="text" />
             <CmdBtn cmd="DIMLINEAR" icon="cadDim" />
-            <CmdBtn cmd="DIMALIGNED" icon="cadDim" />
+            <CmdBtn cmd="MLEADER" icon="cadPline" />
           </div>
         </Group>
-        <Group label={t("cadui.g.layers")}>
+        <Group label={t("cadui.g.layers")} i={3}>
           <div className="rcol cad-layer-col">
             <LayerDrop page={page} />
             <div className="rrow">
@@ -554,7 +744,7 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
             </div>
           </div>
         </Group>
-        <Group label={t("cadui.g.props")}>
+        <Group label={t("cadui.g.props")} i={4}>
           <div className="rcol">
             <Select
               tip={t("cadui.props.color")}
@@ -570,12 +760,18 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
               options={[{ value: "bylayer", label: "ByLayer" }, ...LWS.map((v) => ({ value: String(v), label: `${v.toFixed(2)} mm` }))]}
               onChange={(v) => sel.length && setLw(sel, v === "bylayer" ? null : Number(v), page)}
             />
+            <CmdBtn cmd="MATCHPROP" icon="copy" />
           </div>
         </Group>
-        <Group label={t("cadui.g.utils")}>
+        <Group label={t("cadui.g.utils")} i={5}>
           <div className="rcol">
             <CmdBtn cmd="DIST" icon="cadDist" />
             <CmdBtn cmd="AREA" icon="cadArea" />
+            <CmdBtn cmd="LIST" icon="cadArea" />
+          </div>
+          <div className="rcol">
+            <CmdBtn cmd="QSELECT" icon="check" />
+            <CmdBtn cmd="LAYISO" icon="layers" />
             <button type="button" className="rsmall" data-tip={t("cadui.cmd.ZOOMEXT")} data-kbd="Z E" onClick={zoomExtents}>
               <Icon name="fit" size={15} />
               <span>{t("cadui.zoomExt")}</span>
@@ -585,6 +781,38 @@ export function CadRibbon({ tab = "cad" }: { tab?: string }) {
       </div>
       </div>
     </div>
+    </FoldCtx.Provider>
+  );
+}
+/** A narrow window: » at the right edge shows the ribbon groups cut off (the ribbon body scrolls to them; « back). */
+function RibbonMore() {
+  const t = useT();
+  const ref = useRef<HTMLButtonElement>(null);
+  const [state, setState] = useState<"none" | "more" | "back">("none");
+  useEffect(() => {
+    const body = ref.current?.parentElement?.querySelector(".rbody") as HTMLElement | null;
+    if (!body) return;
+    const check = () => setState(body.scrollWidth <= body.clientWidth + 2 ? "none" : body.scrollLeft + body.clientWidth >= body.scrollWidth - 2 ? "back" : "more");
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(body);
+    body.addEventListener("scroll", check);
+    return () => (ro.disconnect(), body.removeEventListener("scroll", check));
+  }, []);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={cx("cad-ribbon-more", state === "none" && "hidden")}
+      data-tip={t(state === "back" ? "cadfeat.rb.back" : "cadfeat.rb.more")}
+      aria-label={t(state === "back" ? "cadfeat.rb.back" : "cadfeat.rb.more")}
+      onClick={() => {
+        const body = ref.current?.parentElement?.querySelector(".rbody") as HTMLElement | null;
+        body?.scrollBy({ left: state === "back" ? -body.scrollWidth : body.clientWidth * 0.8, behavior: "smooth" });
+      }}
+    >
+      {state === "back" ? "«" : "»"}
+    </button>
   );
 }
 const rootOf = (page: Page, g: LayerGroup): LayerGroup => {
@@ -723,10 +951,15 @@ export function CadProps() {
   const lwOf = (n: SceneNode) => (n.type === "VECTOR" && n.stroke ? `${(n.strokeWidth / (96 / 25.4)).toFixed(2)} mm` : "—");
   const lws = [...new Set(nodes.map(lwOf))];
   const ltypes = [...new Set(nodes.map((n) => (n.type === "VECTOR" && n.strokeDash?.length ? t("cadui.props.dashed") : t("cadui.props.continuous"))))];
-  const shape = one?.type === "VECTOR" ? shapeOf(one, page) : null;
+  // a hatch (one, or a gradient's bands) and a block insert show as such (AutoCAD's Properties palette)
+  const hx = nodes[0]?.type === "VECTOR" && nodes[0].cadHatch ? hatchOf(page, nodes[0].id) : null;
+  const isHatch = !!hx && nodes.every((n) => hx.ids.includes(n.id));
+  const blk = insertOf(page, nodes[0].id);
+  const isBlock = !!blk && nodes.every((n) => insertOf(page, n.id)?.id === blk.id);
+  const shape = one?.type === "VECTOR" && !isHatch ? shapeOf(one, page) : null;
   return (
     <div className="cad-props">
-      <div className="cad-props-head">{one ? kind(one) : t("cadui.props.all", { n: nodes.length })}</div>
+      <div className="cad-props-head">{isHatch ? t("cadfeat.ent.hatch") : isBlock ? `${t("cadfeat.props.block")} ${blk!.cad!.block}` : one ? kind(one) : t("cadui.props.all", { n: nodes.length })}</div>
       <div className="cad-sec">{t("cadui.props.general")}</div>
       <Row label={t("cadui.props.color")}>
         {colors.length === 1 && colors[0].startsWith("#") && <span className="cad-swatch" style={{ background: colors[0] }} />}
@@ -737,6 +970,34 @@ export function CadProps() {
       </Row>
       <Row label={t("cadui.props.ltype")}>{ltypes.length === 1 ? ltypes[0] : t("cadui.props.varies")}</Row>
       <Row label={t("cadui.props.lw")}>{lws.length === 1 ? lws[0] : t("cadui.props.varies")}</Row>
+      {isHatch && hx && (
+        <>
+          <div className="cad-sec">{t("cadfeat.props.hatch")}</div>
+          <Row label={t("cadfeat.props.hpattern")}>
+            <Select value={hx.h.pattern} options={[...new Set([...HATCH_NAMES, hx.h.pattern])].map((v) => ({ value: v, label: v }))} onChange={(v) => S().set({ selection: editHatch(hx.ids[0], { pattern: v }) })} />
+          </Row>
+          <Row label={t("cadfeat.props.hscale")}><NumIn value={hx.h.scale} onCommit={(v) => v > 0 && S().set({ selection: editHatch(hx.ids[0], { scale: v }) })} /></Row>
+          <Row label={t("cadfeat.props.hangle")}><NumIn value={hx.h.angle} onCommit={(v) => S().set({ selection: editHatch(hx.ids[0], { angle: v }) })} /></Row>
+          <Row label={t("cadui.props.area")}>{fmt(hatchArea(hx.h))}</Row>
+        </>
+      )}
+      {isBlock && blk && (
+        <>
+          <div className="cad-sec">{t("cadfeat.props.block")}</div>
+          <Row label={t("cadfeat.props.bname")}>{blk.cad!.block}</Row>
+          {blk.cad?.ins && (
+            <>
+              <Row label={t("cadui.props.centerX")}>{fmt(blk.cad.ins.p[0])}</Row>
+              <Row label={t("cadui.props.centerY")}>{fmt(blk.cad.ins.p[1])}</Row>
+              <Row label={t("cadui.props.rotation")}>{fmt(deg(blk.cad.ins.rot), 2)}°</Row>
+              <Row label={t("cadfeat.props.hscale")}>{fmt(blk.cad.ins.sx)}</Row>
+            </>
+          )}
+          {attribsOf(page, blk.id).map((a) => (
+            <Row key={a.id} label={a.cadAttr!.tag}>{a.paragraphs.map((p) => p.runs.map((r) => r.text).join("")).join(" ")}</Row>
+          ))}
+        </>
+      )}
       {shape && one && (
         <>
           <div className="cad-sec">{t("cadui.props.geometry")}</div>

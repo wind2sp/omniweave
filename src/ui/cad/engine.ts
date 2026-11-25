@@ -47,7 +47,7 @@ export interface Req {
   number?: boolean;
   preview?: (cursor: W) => Shape[];
 }
-type Cmd = Generator<Req, void, Ans>;
+export type Cmd = Generator<Req, void, Ans>;
 
 /** Option letters as AutoCAD shows them: 닫기(C), 명령 취소(U)… */
 export const OPT_KEY: Record<string, string> = {
@@ -85,7 +85,18 @@ export const bridge: {
   ortho: () => boolean;
   polar: () => number | null;
   openLayers: () => void;
-} = { cursor: () => null, zoomExtents() {}, zoomWindow() {}, zoomBy() {}, zoomPrevious() {}, zoomAll() {}, ortho: () => false, polar: () => null, openLayers() {} };
+  /** move the view by a drawing displacement (PAN) */
+  panBy: (d: W) => void;
+  /** edit a text in place (MTEXT, TEXTEDIT, double click); false when there is no canvas editor */
+  editText: (id: string) => boolean;
+  /** the last window / crossing the canvas drew at "객체 선택" (STRETCH takes its corners) */
+  lastWin: { a: W; b: W; crossing: boolean } | null;
+  /** repaint (REGEN) */
+  redraw: () => void;
+} = { cursor: () => null, zoomExtents() {}, zoomWindow() {}, zoomBy() {}, zoomPrevious() {}, zoomAll() {}, ortho: () => false, polar: () => null, openLayers() {}, panBy() {}, editText: () => false, lastWin: null, redraw() {} };
+
+/** The current text style (AutoCAD STYLE): font (empty = the default), fixed height (0 = asked), width factor. */
+export const textStyle = { font: "", height: 0, wf: 1 };
 
 export function say(line: string) {
   useCmd.setState((s) => ({ hist: [...s.hist.slice(-199), line] }));
@@ -145,6 +156,24 @@ export function insertNodes(label: string, pageId: string, layer: string, nodes:
     const pg = draftPage(d, pageId);
     if (!pg) return;
     pg.groups ??= [];
+    // the block editor (BEDIT) is open: what is drawn goes into the block (its layer kept on the node), so BCLOSE
+    // gives it to every insert and the DXF block definition has it (it went to the layer, outside the block)
+    const be = blockEdit.gid ? pg.groups.find((x) => x.id === blockEdit.gid) : undefined;
+    if (be) {
+      const under = groupDescendants(pg.groups, be.id);
+      let last = -1;
+      pg.nodes.forEach((x, i) => {
+        if (x.groupId && under.has(x.groupId)) last = i;
+      });
+      for (const n of nodes) {
+        n.groupId = be.id;
+        n.cadLayer = layer;
+      }
+      lastMade = nodes.map((n) => n.id);
+      if (last < 0) pg.nodes.push(...(nodes as any));
+      else pg.nodes.splice(last + 1, 0, ...(nodes as any));
+      return;
+    }
     let g = pg.groups.find((x) => !x.parentId && x.cad?.layer?.toUpperCase() === layer.toUpperCase());
     if (!g) {
       g = { id: uid("g"), name: layer, parentId: null, visible: true, locked: false, opacity: 1, blendMode: "PASS_THROUGH", collapsed: true, cad: { layer, color: "#000000" } };
@@ -156,6 +185,7 @@ export function insertNodes(label: string, pageId: string, layer: string, nodes:
       if (x.groupId && ids.has(x.groupId)) at = i;
     });
     for (const n of nodes) n.groupId = g.id;
+    lastMade = nodes.map((n) => n.id);
     if (at < 0) pg.nodes.push(...(nodes as any));
     else pg.nodes.splice(at + 1, 0, ...(nodes as any));
   });
@@ -166,28 +196,101 @@ export function insertNodes(label: string, pageId: string, layer: string, nodes:
  * upper parts of MTEXT stacks), so a text is picked, moved, copied, erased and re-layered as one object.
  */
 export function textParts(page: Page, ids: string[]): string[] {
-  const tg = new Set((page.groups ?? []).filter((g) => g.cad?.text).map((g) => g.id));
-  if (!tg.size || !ids.length) return ids;
+  const groups = page.groups ?? [];
+  if (!groups.length || !ids.length) return ids;
+  const byId = new Map(groups.map((g) => [g.id, g]));
   const set = new Set(ids);
+  // a block insert or a dimension is one object too (AutoCAD picks the INSERT, not its lines): everything under its
+  // outermost block group below the layer — except the block open in the block editor (BEDIT), whose parts are picked
   const hit = new Set<string>();
-  for (const n of page.nodes) if (set.has(n.id) && n.groupId && tg.has(n.groupId)) hit.add(n.groupId);
+  for (const n of page.nodes) {
+    if (!set.has(n.id) || !n.groupId) continue;
+    let g = byId.get(n.groupId);
+    let top: LayerGroup | undefined = g?.cad?.text ? g : undefined;
+    for (let i = 0; g && i < 64; i++) {
+      if (g.cad?.layer && !g.parentId) break;
+      if (g.id === blockEdit.gid) break;
+      if (g.cad?.block && !g.cad.block.startsWith("*VIEWPORT")) top = g;
+      g = g.parentId ? byId.get(g.parentId) : undefined;
+    }
+    if (top) hit.add(top.id);
+  }
   if (!hit.size) return ids;
-  for (const n of page.nodes) if (n.groupId && hit.has(n.groupId)) set.add(n.id);
+  const under = new Set<string>();
+  for (const id of hit) for (const x of groupDescendants(groups, id)) under.add(x);
+  for (const n of page.nodes) if (n.groupId && under.has(n.groupId)) set.add(n.id);
   return [...set];
 }
+/** Hooks the other command files lend the engine (an array made associative after ARRAYRECT). */
+export const hooksCad: { onArray: ((src: string[], made: string[], arr: Record<string, unknown>) => void) | null } = { onArray: null };
+/** The block open in the block editor (BEDIT): its group, so its parts are picked one by one. */
+export const blockEdit: { gid: string | null; name: string | null } = { gid: null, name: null };
 
-/** A copy of a text group's member goes into a text group of its own (one per source group and `key`), not the original's. */
-function regroupCopy(pg: Draft<Page>, n: Draft<SceneNode>, key: string, fresh: Map<string, string>) {
-  const g = n.groupId ? pg.groups?.find((x) => x.id === n.groupId) : undefined;
-  if (!g?.cad?.text) return;
-  const k = `${g.id}|${key}`;
-  let id = fresh.get(k);
-  if (!id) {
-    id = uid("g");
-    fresh.set(k, id);
-    pg.groups!.push({ ...(JSON.parse(JSON.stringify(g)) as LayerGroup), id } as any);
+/** A block placement moved by drawing matrix m (insertion point, rotation, scales). */
+export function mapIns(ins: NonNullable<NonNullable<LayerGroup["cad"]>["ins"]>, m: Mat): typeof ins {
+  const c = Math.cos(ins.rot), s = Math.sin(ins.rot);
+  const X: W = [(m[0] * c + m[2] * s) * ins.sx, (m[1] * c + m[3] * s) * ins.sx];
+  const Y: W = [(-m[0] * s + m[2] * c) * ins.sy, (-m[1] * s + m[3] * c) * ins.sy];
+  const sx = Math.hypot(X[0], X[1]), det = X[0] * Y[1] - X[1] * Y[0];
+  const p = ap(m, ins.p);
+  return { p: [p[0], p[1]], rot: Math.atan2(X[1], X[0]), sx, sy: Math.hypot(Y[0], Y[1]) * (det < 0 ? -1 : 1) * (ins.sx < 0 ? -1 : 1) };
+}
+/** A dimension's definition points moved by drawing matrix m (its angle turns with it; the measure scales). */
+export function mapDim(d: NonNullable<NonNullable<LayerGroup["cad"]>["dim"]>, m: Mat): typeof d {
+  const p: Record<string, [number, number]> = {};
+  for (const [k, v] of Object.entries(d.p)) {
+    const q = ap(m, v);
+    p[k] = [q[0], q[1]];
   }
-  n.groupId = id;
+  const s = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
+  const turn = (Math.atan2(m[1], m[0]) * 180) / Math.PI;
+  const u = d.u ? ((v: W) => ((l) => [v[0] / l, v[1] / l] as [number, number])(Math.hypot(v[0], v[1]) || 1))([m[0] * d.u[0] + m[2] * d.u[1], m[1] * d.u[0] + m[3] * d.u[1]]) : undefined;
+  return { ...d, p, measure: d.type === 5 ? d.measure : d.measure * s, ...(d.angle !== undefined ? { angle: d.angle + turn } : {}), ...(u ? { u } : {}), ...(d.off !== undefined ? { off: d.off * s } : {}) };
+}
+const isBlockGroup = (g: LayerGroup | undefined) => !!g && (!!g.cad?.text || (!!g.cad?.block && !g.cad.block.startsWith("*VIEWPORT")));
+/**
+ * A copy of a member of a text drawn in parts or of a block insert goes into groups of its own (one per source group
+ * and `key`, the whole chain up to the layer), not the original's; a block's placement goes along by `mw`.
+ */
+function regroupCopy(pg: Draft<Page>, n: Draft<SceneNode>, key: string, fresh: Map<string, string>, mw?: Mat) {
+  const chain: LayerGroup[] = [];
+  let g = n.groupId ? (pg.groups?.find((x) => x.id === n.groupId) as LayerGroup | undefined) : undefined;
+  for (let i = 0; isBlockGroup(g) && i < 64; i++) {
+    chain.push(g!);
+    g = pg.groups?.find((x) => x.id === g!.parentId) as LayerGroup | undefined;
+  }
+  if (!chain.length) return;
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const src = chain[i];
+    const k = `${src.id}|${key}`;
+    if (fresh.has(k)) continue;
+    const id = uid("g");
+    fresh.set(k, id);
+    const c = JSON.parse(JSON.stringify(src)) as LayerGroup;
+    c.id = id;
+    if (i < chain.length - 1) c.parentId = fresh.get(`${chain[i + 1].id}|${key}`) ?? c.parentId;
+    if (c.cad?.ins && mw) c.cad.ins = mapIns(c.cad.ins, mw);
+    if (c.cad?.dim && mw) c.cad.dim = mapDim(c.cad.dim, mw);
+    pg.groups!.push(c as any);
+  }
+  n.groupId = fresh.get(`${chain[0].id}|${key}`)!;
+}
+/** Moved block inserts keep their placement (the groups above the moved nodes). */
+function moveIns(pg: Draft<Page>, ids: Set<string>, mw: Mat) {
+  const done = new Set<string>();
+  for (const n of pg.nodes) {
+    if (!ids.has(n.id)) continue;
+    let g = pg.groups?.find((x) => x.id === n.groupId);
+    for (let i = 0; g && !(g.cad?.layer && !g.parentId) && i < 64; i++) {
+      if ((g.cad?.ins || g.cad?.dim || g.cad?.arr) && !done.has(g.id)) {
+        done.add(g.id);
+        if (g.cad.ins) g.cad.ins = mapIns(g.cad.ins, mw) as any;
+        if (g.cad.dim) g.cad.dim = mapDim(g.cad.dim as any, mw) as any;
+        if (g.cad.arr?.c) g.cad.arr.c = ap(mw, g.cad.arr.c) as any;
+      }
+      g = pg.groups?.find((x) => x.id === g!.parentId);
+    }
+  }
 }
 
 /** Apply a drawing-space matrix to nodes (move, rotate, scale, mirror); copy = leave the originals. */
@@ -210,11 +313,12 @@ export function transformNodes(label: string, ids: string[], mw: Mat, copy = fal
       if (copy) {
         n.id = uid();
         made.push(n.id);
-        regroupCopy(pg as Draft<Page>, n, "", fresh);
+        regroupCopy(pg as Draft<Page>, n, "", fresh, mw);
         pg.nodes.splice(i + 1, 0, n as any);
       }
       mapNode(n as SceneNode, P);
     }
+    if (!copy) moveIns(pg as Draft<Page>, set, mw);
   });
   return made;
 }
@@ -349,6 +453,23 @@ function* selectObjects(): Generator<Req, string[], Ans> {
     const a = yield { k: "select", prompt: "select" };
     if (a.k === "sel") return a.ids;
     if (a.k === "enter") return [...S().selection];
+    if (a.k === "opt" && a.key === "fence") {
+      // Fence (F): a line of points; what it crosses is selected
+      const pts: W[] = [];
+      for (;;) {
+        const last = pts[pts.length - 1];
+        const r = yield* point({ prompt: pts.length ? "fenceNext" : "fenceFirst", base: last, preview: (q) => (pts.length ? [{ k: "poly", pts: [...pts, q] }] : []) });
+        if (r.k !== "point") break;
+        pts.push(r.p);
+      }
+      const page = currentPage(), cad = cadOfPage(page);
+      if (page && cad && pts.length > 1) {
+        const fence: Seg[] = pts.slice(1).map((b, i) => ({ a: pts[i], b, id: "", ci: 0, si: 0 }));
+        const hit = page.nodes.filter((n) => n.type === "VECTOR" && n.visible && !n.locked && nodeSegs(n, cad).some((s) => fence.some((f) => intersect(s, f).length))).map((n) => n.id);
+        S().set({ selection: [...new Set([...S().selection, ...textParts(page, hit)])] });
+        say(t("cadfeat.msg.found", { n: hit.length }));
+      }
+    }
   }
 }
 
@@ -569,7 +690,13 @@ function* moveCopy(copy: boolean): Cmd {
   }
   finishSel();
 }
-const finishSel = () => S().set({ selection: [] });
+const finishSel = () => {
+  if (S().selection.length) prevSel = [...S().selection];
+  S().set({ selection: [] });
+};
+/** AutoCAD's Previous (P) and Last (L) at "객체 선택": the last command's selection, the newest object drawn. */
+let prevSel: string[] = [];
+let lastMade: string[] = [];
 
 function* ROTATE(): Cmd {
   const ids = yield* selectObjects();
@@ -899,7 +1026,8 @@ let textHeight = 2.5;
 function* TEXT(): Cmd {
   const a = yield* point({ prompt: "textStart" });
   if (a.k !== "point") return;
-  const h = yield* point({ prompt: "textHeight", def: fmt(textHeight), number: true, base: a.p });
+  // a style with a fixed height does not ask it (AutoCAD STYLE)
+  const h: Ans = textStyle.height > 0 ? { k: "number", v: textStyle.height } : yield* point({ prompt: "textHeight", def: fmt(textHeight), number: true, base: a.p });
   if (h.k === "number" && h.v > 0) textHeight = h.v;
   else if (h.k === "point") textHeight = dist(a.p, h.p) || textHeight;
   const r = yield* point({ prompt: "textRot", def: "0", number: true, base: a.p });
@@ -912,7 +1040,7 @@ function* TEXT(): Cmd {
   const hpx = textHeight * cad.k;
   const n = newText(s.s);
   const run = n.paragraphs[0].runs[0];
-  Object.assign(run, { ...DEFAULT_RUN, text: s.s, fontSize: hpx / 0.72, color: g?.cad?.color ?? "#000000" });
+  Object.assign(run, { ...DEFAULT_RUN, text: s.s, fontSize: hpx / 0.72, color: g?.cad?.color ?? "#000000", ...(textStyle.font ? { fontFamily: textStyle.font } : {}), ...(textStyle.wf !== 1 ? { hscale: textStyle.wf * 100 } : {}) });
   const at = ap(wToPage(cad), a.p);
   // baseline-left at the insertion point: the box top sits one line above it
   n.transform = { x: at[0], y: at[1] - hpx / 0.72, rotation: -rot, scale: 1 };
@@ -1077,6 +1205,12 @@ export function explodeNodes(ids: string[]): number {
     let g = groups.find((x) => x.id === n.groupId);
     // a text drawn as several nodes stays whole: the block around it is what explodes
     if (g?.cad?.text) g = groups.find((x) => x.id === g!.parentId);
+    // one level: the outermost block below the layer (AutoCAD explodes the insert, not the blocks nested in it)
+    for (let i = 0; g?.parentId && !g.cad?.layer && i < 64; i++) {
+      const up = groups.find((x) => x.id === g!.parentId);
+      if (!up || (up.cad?.layer && !up.parentId) || !up.cad?.block) break;
+      g = up;
+    }
     if (g && g.parentId && !g.cad?.layer) blockGroups.add(g.id);
     else if (n.type === "VECTOR") vectors.push(id);
   }
@@ -1304,6 +1438,8 @@ export function filletAt(idA: string, pA: W, idB: string, pB: W, r: number): boo
       const i = pg.nodes.findIndex((q) => q.id === ea.id);
       const src = pg.nodes[i] as Draft<VectorNode>;
       const n = newVector([{ closed: false, nodes: mapAnchors(arcAnchors(arc.c, r, arc.a0, arc.a1), m) }], t("cadui.ent.arc"));
+      // (an arc is a curve: newVector's default fill would draw it, and export it, as a filled region)
+      n.fill = null;
       n.stroke = src.stroke;
       n.strokeWidth = src.strokeWidth;
       n.groupId = src.groupId;
@@ -1349,7 +1485,7 @@ export function arrayRect(ids: string[], cols: number, rows: number, dx: number,
           if (!r && !c) continue;
           const n = JSON.parse(JSON.stringify(src)) as SceneNode;
           n.id = uid();
-          regroupCopy(pg as Draft<Page>, n as Draft<SceneNode>, `${r},${c}`, fresh);
+          regroupCopy(pg as Draft<Page>, n as Draft<SceneNode>, `${r},${c}`, fresh, translate(c * dx, r * dy));
           mapNode(n, mul(wToPage(cad), mul(translate(c * dx, r * dy), pageToW(cad))));
           copies.push(n);
           made.push(n.id);
@@ -1393,6 +1529,7 @@ function* ARRAY(): Cmd {
   if (dy === null) return;
   arrayLast = { cols, rows, dx, dy };
   const made = arrayRect(ids, cols, rows, dx, dy);
+  hooksCad.onArray?.(ids, made, { kind: "rect", cols, rows, dx, dy });
   finishSel();
   say(t("cadui.msg.arrayed", { n: made.length }));
 }
@@ -1405,18 +1542,35 @@ export const COMMANDS: Record<string, () => Cmd> = {
 export const ALIASES: Record<string, string> = {
   L: "LINE", PL: "PLINE", C: "CIRCLE", A: "ARC", REC: "RECTANG", RECTANGLE: "RECTANG", M: "MOVE", CO: "COPY", CP: "COPY", RO: "ROTATE", SC: "SCALE", MI: "MIRROR",
   O: "OFFSET", TR: "TRIM", EX: "EXTEND", E: "ERASE", DEL: "ERASE", Z: "ZOOM", DI: "DIST", AA: "AREA", DT: "TEXT", DTEXT: "TEXT", DLI: "DIMLINEAR", DAL: "DIMALIGNED",
-  LA: "LAYER", UNDO: "U", MEASUREGEOM: "DIST", ME: "DIST", X: "EXPLODE", J: "JOIN", F: "FILLET", AR: "ARRAYRECT", ARRAY: "ARRAYRECT",
+  LA: "LAYER", UNDO: "U", MEASUREGEOM: "DIST", MEA: "DIST", X: "EXPLODE", J: "JOIN", F: "FILLET", AR: "ARRAYRECT", ARRAY: "ARRAYRECT",
 };
+/** AutoCAD commands (and acad.pgp aliases of them) the drawing screen does not have: named as such, never run as another. */
+export const NOT_HERE: Record<string, string> = {};
+/** More commands and aliases (ui/cad/more.ts registers the rest of the drawing screen's commands). */
+export function registerCommands(cmds: Record<string, () => Cmd>, aliases: Record<string, string>, missing: Record<string, string> = {}) {
+  Object.assign(COMMANDS, cmds);
+  Object.assign(ALIASES, aliases);
+  Object.assign(NOT_HERE, missing);
+}
 export const resolve = (s: string): string | null => {
-  const u = s.trim().toUpperCase().replace(/^[_.-]+/, "");
+  // an alias written with its dash (-CH = CHANGE, not CH) is its own; else the _ . - prefixes go, as in AutoCAD
+  const raw = s.trim().toUpperCase().replace(/^[_.]+/, "");
+  if (ALIASES[raw]) return ALIASES[raw];
+  if (NOT_HERE[raw]) return null;
+  const u = raw.replace(/^-+/, "");
   if (COMMANDS[u]) return u;
   return ALIASES[u] ?? null;
 };
-/** Command names and aliases starting with `prefix` (AutoComplete list). */
+/**
+ * Command names and aliases starting with `prefix` (AutoComplete list): the command the text names exactly (a name
+ * or an acad.pgp alias) first, then the others — so E + Enter is ERASE, not EXTEND (QA bux2 2026-11-24).
+ */
 export function complete(prefix: string): string[] {
-  const p = prefix.trim().toUpperCase();
+  const p = prefix.trim().toUpperCase().replace(/^[_.-]+/, "");
   if (!p) return [];
   const out = new Set<string>();
+  const exact = resolve(p);
+  if (exact) out.add(exact);
   for (const [k, v] of Object.entries(ALIASES)) if (k.startsWith(p)) out.add(v);
   for (const k of Object.keys(COMMANDS)) if (k.startsWith(p)) out.add(k);
   return [...out].slice(0, 8);
@@ -1455,7 +1609,10 @@ function step(a: Ans | undefined) {
 export function run(input: string): boolean {
   const name = resolve(input);
   if (!name) {
-    say(t("cadui.msg.unknown", { cmd: input.trim().toUpperCase() }));
+    const raw = input.trim().toUpperCase().replace(/^[_.]+/, "");
+    const u = NOT_HERE[raw] ? raw : raw.replace(/^-+/, "");
+    if (NOT_HERE[u]) say(t("cadfeat.msg.notHere", { cmd: u, name: NOT_HERE[u] }));
+    else say(t("cadui.msg.unknown", { cmd: input.trim().toUpperCase() }));
     return false;
   }
   if (gen) cancel(true);
@@ -1516,10 +1673,17 @@ export function submit(text: string) {
   const up = s.toUpperCase();
   const opt = r.opts?.find((o) => (OPT_KEY[o] ?? "") === up || o.toUpperCase() === up || t(`cadui.o.${o}`).toUpperCase() === up);
   if (opt) return answer({ k: "opt", key: opt });
-  if (r.k === "select" && (up === "ALL" || up === "A")) return void (bridge as any).selectAll?.();
+  if (r.k === "select" && (up === "ALL" || up === "A")) return void (bridge as any).selectAll?.(true);
+  if (r.k === "select" && (up === "F" || up === "FENCE")) return answer({ k: "opt", key: "fence" });
+  if (r.k === "select" && (up === "L" || up === "LAST" || up === "P" || up === "PREVIOUS")) {
+    const page = currentPage();
+    const ids = (up[0] === "L" ? lastMade : prevSel).filter((id) => page?.nodes.some((n) => n.id === id));
+    if (ids.length) S().set({ selection: [...new Set([...S().selection, ...ids])] });
+    return say(t("cadfeat.msg.found", { n: ids.length }));
+  }
   const e = parseEntry(s, st.lastPt);
   if (e && (r.k === "point" || r.k === "key")) return answer(e.k === "point" ? { k: "point", p: e.p } : { k: "number", v: e.v });
-  if (r.k === "point" && r.prompt === "zoom") return answer({ k: "text", s });
+  if (r.k === "point" && (r.prompt === "zoom" || r.prompt === "plScale")) return answer({ k: "text", s });
   say(t("cadui.msg.invalid"));
 }
 
@@ -1527,4 +1691,6 @@ export function submit(text: string) {
 export const lastPoint = () => useCmd.getState().lastPt;
 export const pageCad = () => cadOfPage(currentPage());
 export const _test = { findPage };
+/** The pieces more.ts builds its commands from. */
+export const parts = { point, selectObjects, finishSel: () => finishSel(), segsOf, nodeOf, invert, bbox, cutsOn, done, toWorld, toLocal, regroupCopy, shift };
 void constrain;

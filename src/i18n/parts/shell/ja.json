@@ -165,5 +165,6 @@
   "shell.hist.bullets": "箇条書き",
   "shell.hist.numbering": "段落番号",
   "shell.hist.heading": "見出し {level}",
-  "shell.hist.body": "本文"
+  "shell.hist.body": "本文",
+  "shell.saveAsType": "保存 ({ext})"
 }

@@ -13,6 +13,7 @@ import { packOmw } from "../../src/io/omw";
 import { newDocument } from "../../src/core/types";
 import { strToU8, zipSync } from "fflate";
 import { freshStore, installDom, installPdfWorker } from "../coverage/helpers";
+import { cpuNow, cpuBudget, wallBudget, wallTimeout } from "../budget";
 
 beforeAll(async () => {
   installDom();
@@ -25,9 +26,9 @@ const within = <T>(p: Promise<T>, ms: number) =>
 
 describe("security dialogs without a mounted UI", () => {
   it("resolve null immediately (the app's asker is installed by importing the module)", async () => {
-    await expect(within(askPasswordDialog({ title: "t", message: "m" }), 500)).resolves.toBeNull();
-    await expect(within(askPassword({ title: "t", message: "m" }), 500)).resolves.toBeNull();
-    await expect(within(askProtection({ ext: "omw", wasProtected: true, canReuse: true, supported: true }), 500)).resolves.toBeNull();
+    await expect(within(askPasswordDialog({ title: "t", message: "m" }), wallBudget(500))).resolves.toBeNull();
+    await expect(within(askPassword({ title: "t", message: "m" }), wallBudget(500))).resolves.toBeNull();
+    await expect(within(askProtection({ ext: "omw", wasProtected: true, canReuse: true, supported: true }), wallBudget(500))).resolves.toBeNull();
   });
 
   it("an encrypted PDF / Office / .omw opened headless ends quickly as cancelled or '암호 필요'", async () => {
@@ -40,10 +41,10 @@ describe("security dialogs without a mounted UI", () => {
     ];
     for (const f of files) {
       freshStore();
-      const t0 = performance.now();
-      await within(importFile({ ...f, path: null }), 10_000);
-      expect(performance.now() - t0).toBeLessThan(10_000);
+      const t0 = cpuNow();
+      await within(importFile({ ...f, path: null }), wallBudget(10_000));
+      expect(cpuNow() - t0).toBeLessThan(cpuBudget(10_000));
     }
     expect(lastImport?.error ?? "").not.toMatch(/still pending/);
-  }, 60_000);
+  }, wallTimeout(60_000));
 });

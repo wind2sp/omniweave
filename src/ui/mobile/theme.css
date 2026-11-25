@@ -1,0 +1,1588 @@
+/* Phone shell look (web phone layout + Android app). Every colour, size, radius, shadow and timing of the phone screens
+   is a token here; mobile.css / editor/editor.css keep the layout and pick the tokens up through the desktop names they
+   use (--bg-1, --text …), which are remapped inside .m-app only — the PC screens (desktop editor, phone-desk) keep theirs.
+   Rules: one accent (the logo's violet thread), neutrals for everything else, the eight file-kind colours only as small
+   marks (an icon's inside, a dot, a tag); 4 px grid; four type sizes; 150–240 ms motion with a purpose. */
+
+.m-app {
+  /* type: four sizes (Korean UI: line-height ≥ 1.4, letter-spacing near 0 for body, a touch tighter for titles) */
+  --m-font: "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --m-t1: 22px; /* sheet titles */
+  --m-t2: 18px; /* screen titles, the file being continued */
+  --m-t3: 16px; /* labels, file names, body, buttons */
+  --m-t4: 14px; /* meta, captions, tab labels (never smaller: read at arm's length) */
+  --m-lh1: 30px;
+  --m-lh2: 26px;
+  --m-lh3: 22px;
+  --m-lh4: 20px;
+  --m-track-title: -0.02em;
+  --m-w-bold: 700;
+  --m-w-strong: 600;
+  --m-w-body: 400;
+  /* space (4 px grid) and shape */
+  --m-s1: 4px;
+  --m-s2: 8px;
+  --m-s3: 12px;
+  --m-s4: 16px;
+  --m-s5: 24px;
+  --m-s6: 32px;
+  --m-r-s: 8px; /* tags, small buttons */
+  --m-r: 12px; /* buttons, lists, cards */
+  --m-r-l: 20px; /* sheets */
+  --m-touch: 48px;
+  /* motion */
+  --m-fast: 150ms;
+  --m-mid: 200ms;
+  --m-slow: 240ms;
+  --m-ease: cubic-bezier(0.2, 0, 0, 1);
+  /* colour — light */
+  --m-bg: #f5f5f7;
+  --m-surface: #ffffff;
+  --m-raised: #ffffff;
+  --m-sunk: #e9e9ed; /* behind pages: paper reads as paper */
+  --m-fill: #eeeef2; /* quiet button / tag fill */
+  --m-line: #e2e2e7;
+  --m-line-2: #cfcfd6;
+  --m-ink: #18181c;
+  --m-ink-2: #4f5059;
+  --m-ink-3: #74757f; /* 4.6:1 on --m-bg */
+  --m-accent: #5a48d6; /* the logo's violet thread, deepened for white text (6.4:1) */
+  --m-accent-press: #4b3bc2;
+  --m-on-accent: #ffffff;
+  --m-accent-soft: rgba(90, 72, 214, 0.1);
+  --m-accent-text: #4c3bc9;
+  --m-ok: #17804f;
+  --m-danger: #c43345;
+  --m-shadow-sheet: 0 -6px 24px rgba(20, 20, 30, 0.12);
+  --m-shadow-float: 0 4px 14px rgba(20, 20, 30, 0.14);
+  --m-shadow-page: 0 1px 2px rgba(20, 20, 30, 0.12), 0 0 0 1px rgba(20, 20, 30, 0.06);
+  --m-scrim: rgba(16, 16, 22, 0.42);
+  /* file kinds (small marks only) */
+  --m-k-doc: #3666d6;
+  --m-k-sheet: #16855a;
+  --m-k-slide: #c9622a;
+  --m-k-pdf: #c93448;
+  --m-k-photo: #a87410;
+  --m-k-design: #7149d6;
+  --m-k-cad: #17809b;
+  --m-k-omw: var(--m-accent);
+  --m-k-media: #6b6d78;
+  --m-k-other: #74757f;
+
+  /* the desktop names mobile.css / editor.css use, mapped onto these */
+  --bg-0: var(--m-bg);
+  --bg-1: var(--m-surface);
+  --bg-2: var(--m-fill);
+  --bg-3: var(--m-line);
+  --bg-4: var(--m-line-2);
+  --line: var(--m-line);
+  --line-2: var(--m-line-2);
+  --line-3: var(--m-line-2);
+  --text: var(--m-ink);
+  --text-2: var(--m-ink-2);
+  --text-3: var(--m-ink-3);
+  --accent: var(--m-accent);
+  --text-on-accent: var(--m-on-accent);
+  --workspace: var(--m-sunk);
+  --scrim: var(--m-scrim);
+  --focus-ring: var(--m-accent);
+  --m-ed-desk: var(--m-sunk);
+  --fw-medium: 500;
+  --fw-strong: var(--m-w-strong);
+  --fw-bold: var(--m-w-bold);
+
+  font-family: var(--m-font);
+  font-size: var(--m-t3);
+  line-height: var(--m-lh3);
+  font-feature-settings: "tnum" 1; /* numbers line up (sizes, pages, times) */
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+:root[data-theme="dark"] .m-app {
+  --m-bg: #121215;
+  --m-surface: #1b1b20;
+  --m-raised: #24242a;
+  --m-sunk: #0c0c0e;
+  --m-fill: #26262c;
+  --m-line: #2b2b32;
+  --m-line-2: #3c3c45;
+  --m-ink: #ededf1;
+  --m-ink-2: #b4b5bd;
+  --m-ink-3: #8f909a;
+  --m-accent: #9184ff;
+  --m-accent-press: #a397ff;
+  --m-on-accent: #120f24;
+  --m-accent-soft: rgba(145, 132, 255, 0.16);
+  --m-accent-text: #aaa0ff;
+  --m-ok: #45c088;
+  --m-danger: #f06a7a;
+  --m-shadow-sheet: 0 -6px 24px rgba(0, 0, 0, 0.5);
+  --m-shadow-float: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --m-shadow-page: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --m-scrim: rgba(0, 0, 0, 0.55);
+  --m-k-doc: #6f96ff;
+  --m-k-sheet: #3cc489;
+  --m-k-slide: #f2904f;
+  --m-k-pdf: #f26b7e;
+  --m-k-photo: #e2ae3d;
+  --m-k-design: #a68bff;
+  --m-k-cad: #43b9d6;
+  --m-k-media: #9a9ca7;
+  --m-k-other: #8f909a;
+}
+
+/* ───────── icons ───────── */
+.m-app .m-ic {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.m-app .m-ic-dot {
+  fill: currentColor;
+  stroke: none;
+}
+.m-k-doc { --k: var(--m-k-doc); }
+.m-k-sheet { --k: var(--m-k-sheet); }
+.m-k-slide { --k: var(--m-k-slide); }
+.m-k-pdf { --k: var(--m-k-pdf); }
+.m-k-photo { --k: var(--m-k-photo); }
+.m-k-design { --k: var(--m-k-design); }
+.m-k-cad { --k: var(--m-k-cad); }
+.m-k-omw { --k: var(--m-k-omw); }
+.m-k-media { --k: var(--m-k-media); }
+.m-k-other { --k: var(--m-k-other); }
+.m-app .m-kic .m-kic-in {
+  stroke: var(--k, currentColor);
+  color: var(--k, currentColor);
+}
+
+/* ───────── motion: press, sheets ───────── */
+.m-app button {
+  transition: transform var(--m-fast) var(--m-ease), background-color var(--m-fast) var(--m-ease), color var(--m-fast) var(--m-ease);
+}
+.m-app button:not(:disabled):active {
+  transform: scale(0.97);
+}
+.m-app .m-sheet-scrim {
+  animation: m-fade var(--m-mid) var(--m-ease);
+}
+.m-app .m-sheet {
+  animation: m-rise var(--m-slow) var(--m-ease);
+}
+@keyframes m-fade {
+  from { opacity: 0; }
+}
+@keyframes m-rise {
+  from { transform: translateY(24px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-app *, .m-app *::before, .m-app *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ───────── bars ───────── */
+.m-app .m-top {
+  min-height: 56px;
+  gap: var(--m-s1);
+  padding: calc(env(safe-area-inset-top, 0px) + var(--m-s1)) var(--m-s2) var(--m-s1);
+  background: var(--m-surface);
+  border-bottom: 1px solid var(--m-line);
+}
+.m-app .m-top h1 {
+  font-size: var(--m-t2);
+  line-height: var(--m-lh2);
+  letter-spacing: var(--m-track-title);
+}
+.m-app .m-home-top {
+  padding-left: var(--m-s4);
+  padding-right: var(--m-s4);
+  gap: var(--m-s2);
+  border-bottom: 0;
+  background: var(--m-bg);
+}
+.m-app .m-home-top h1 {
+  flex: 1;
+}
+.m-app .m-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+.m-app .m-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--m-s3) 0 10px;
+  border-radius: 16px;
+  background: var(--m-fill);
+  color: var(--m-ink-2);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.m-app .m-status .m-ic {
+  width: 18px;
+  height: 18px;
+  color: var(--m-ok);
+}
+.m-app .m-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--m-touch);
+  min-height: var(--m-touch);
+  border-radius: var(--m-r);
+  color: var(--m-ink);
+}
+.m-app .m-icon-btn:disabled {
+  color: var(--m-ink-3);
+  opacity: 0.45;
+}
+.m-app .m-icon-btn:not(:disabled):active,
+.m-app .m-icon-btn.on {
+  background: var(--m-fill);
+}
+.m-app .m-nav {
+  padding: var(--m-s1) var(--m-s2) calc(env(safe-area-inset-bottom, 0px) + var(--m-s1));
+  background: var(--m-surface);
+  border-top: 1px solid var(--m-line);
+}
+.m-app .m-nav button {
+  gap: 2px;
+  min-height: 56px;
+  justify-content: center;
+  border-radius: var(--m-r);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: 500;
+  color: var(--m-ink-3);
+}
+.m-app .m-nav button.on {
+  color: var(--m-accent-text);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-nav button.on .m-ic {
+  stroke-width: 2.1;
+}
+
+/* ───────── home ───────── */
+.m-app .m-main {
+  padding: var(--m-s2) var(--m-s4) var(--m-s6);
+  background: var(--m-bg);
+}
+.m-app .m-label {
+  margin: var(--m-s5) 0 var(--m-s2);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink-2);
+  letter-spacing: 0;
+}
+.m-app .m-count {
+  margin-left: 2px;
+  color: var(--m-ink-3);
+  font-weight: 500;
+}
+.m-app .m-continue .m-label {
+  margin-top: var(--m-s2);
+}
+.m-app .m-continue-card {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  width: 100%;
+  min-height: 104px;
+  padding: var(--m-s3);
+  border-radius: var(--m-r);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  text-align: left;
+  color: var(--m-ink);
+}
+.m-app .m-thumb {
+  flex: none;
+  width: 60px;
+  height: 80px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--m-fill);
+  box-shadow: var(--m-shadow-page);
+}
+.m-app .m-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  background: #fff;
+}
+.m-app .m-thumb .m-ic {
+  width: 32px;
+  height: 32px;
+  color: var(--m-ink-3);
+}
+.m-app .m-continue-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.m-app .m-continue-body b {
+  font-size: var(--m-t2);
+  line-height: var(--m-lh2);
+  font-weight: var(--m-w-bold);
+  letter-spacing: var(--m-track-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-app .m-continue-body small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+}
+.m-app .m-continue-body small.m-saved {
+  color: var(--m-ok);
+  font-weight: 500;
+}
+.m-app .m-continue-body small .m-ic {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
+}
+.m-app .m-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink-2);
+}
+.m-app .m-tag i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--k, var(--m-ink-3));
+}
+.m-app .m-chev {
+  color: var(--m-ink-3);
+}
+.m-app .m-start {
+  margin-top: var(--m-s4);
+  display: grid;
+  gap: var(--m-s2);
+}
+.m-app .m-open {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  width: 100%;
+  min-height: 72px;
+  padding: 0 var(--m-s4);
+  border-radius: var(--m-r);
+  background: var(--m-accent);
+  color: var(--m-on-accent);
+  text-align: left;
+}
+.m-app .m-open:not(:disabled):active {
+  background: var(--m-accent-press);
+}
+.m-app .m-open .m-ic {
+  width: 28px;
+  height: 28px;
+}
+.m-app .m-open b {
+  display: block;
+  font-size: var(--m-t2);
+  line-height: var(--m-lh2);
+  font-weight: var(--m-w-bold);
+}
+.m-app .m-open small {
+  display: block;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  opacity: 0.86;
+}
+.m-app .m-start-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--m-s2);
+}
+.m-app .m-start-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 76px;
+  padding: var(--m-s2) var(--m-s1);
+  border-radius: var(--m-r);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  color: var(--m-ink);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: var(--m-w-strong);
+  text-align: center;
+}
+.m-app .m-start-btn .m-ic {
+  color: var(--m-accent-text);
+}
+/* first run: the kinds of file, in place of an empty list */
+.m-app .m-kinds {
+  list-style: none;
+  margin: 0;
+  padding: var(--m-s1) 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-radius: var(--m-r);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+}
+.m-app .m-kinds li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  column-gap: 10px;
+  align-items: center;
+  padding: var(--m-s2) var(--m-s3);
+}
+.m-app .m-kinds li .m-ic {
+  grid-row: span 2;
+  color: var(--m-ink-2);
+}
+.m-app .m-kinds b {
+  font-size: var(--m-t3);
+  line-height: var(--m-lh3);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-kinds small {
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+  white-space: nowrap;
+}
+.m-app .m-note {
+  margin: var(--m-s3) 2px 0;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+  text-align: left;
+}
+/* lists: quick jobs, desktop tools, recent files — one card, rows split by hairlines */
+.m-app .m-tools.m-tools-list {
+  display: block;
+  border-radius: var(--m-r);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  overflow: hidden;
+}
+.m-app .m-tools-list .m-tool {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  width: 100%;
+  min-height: 60px;
+  padding: var(--m-s2) var(--m-s3);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  color: var(--m-ink);
+}
+.m-app .m-tools-list .m-tool + .m-tool {
+  border-top: 1px solid var(--m-line);
+}
+.m-app .m-tools-list .m-tool:not(:disabled):active {
+  transform: none;
+  background: var(--m-fill);
+}
+.m-app .m-tool-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--m-fill);
+  color: var(--m-ink-2);
+  font-size: inherit;
+}
+.m-app .m-tool-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.m-app .m-tool-text b {
+  font-size: var(--m-t3);
+  line-height: var(--m-lh3);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-tool-text small {
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+}
+.m-app .m-recent {
+  margin: 0;
+  padding: 0;
+  border-radius: var(--m-r);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  overflow: hidden;
+}
+.m-app .m-recent li + li {
+  border-top: 1px solid var(--m-line);
+}
+.m-app .m-recent .m-row {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: var(--m-s3);
+  align-items: center;
+  min-height: 64px;
+  padding: var(--m-s2) var(--m-s3);
+  background: none;
+  text-align: left;
+}
+.m-app .m-recent .m-row:not(:disabled):active {
+  transform: none;
+  background: var(--m-fill);
+}
+.m-app .m-kind-mark {
+  grid-row: span 2;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--m-fill);
+  color: var(--m-ink-2);
+}
+.m-app .m-row-name {
+  font-size: var(--m-t3);
+  line-height: var(--m-lh3);
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-app .m-row-meta {
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+}
+.m-app .m-ext {
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink-2);
+}
+.m-app .m-row-x {
+  color: var(--m-ink-3);
+}
+.m-app .m-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  min-height: 64px;
+  padding: var(--m-s3) var(--m-s4);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+}
+.m-app .m-search {
+  height: var(--m-touch);
+  margin-bottom: var(--m-s2);
+  border-radius: var(--m-r);
+  border: 1px solid var(--m-line);
+  background: var(--m-surface);
+  font-size: var(--m-t3);
+}
+.m-app .m-about {
+  padding: var(--m-s5) 0;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+}
+.m-app .m-settings {
+  border-radius: var(--m-r);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+}
+
+/* ───────── viewer ───────── */
+.m-app .m-viewer-top {
+  gap: 2px;
+}
+.m-app .m-doc-head {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--m-s1);
+}
+.m-app .m-doc-head .m-doc-name {
+  margin: 0;
+  font-size: var(--m-t3) !important;
+  line-height: var(--m-lh3);
+  font-weight: var(--m-w-strong);
+  letter-spacing: 0;
+}
+.m-app .m-doc-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.m-app .m-doc-meta i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--k, var(--m-ink-3));
+}
+.m-app .m-mode {
+  flex: none;
+  display: flex;
+  height: 44px;
+  padding: 3px;
+  border-radius: var(--m-r);
+  background: var(--m-fill);
+}
+.m-app .m-mode > * {
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: var(--m-t4);
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink-3);
+  cursor: pointer;
+}
+.m-app .m-mode > .on {
+  background: var(--m-surface);
+  color: var(--m-ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.m-app .m-pages {
+  background: var(--m-sunk);
+}
+.m-app .m-page-col {
+  padding: var(--m-s3);
+}
+.m-app .m-page {
+  margin-bottom: var(--m-s3);
+  box-shadow: var(--m-shadow-page);
+}
+.m-app .m-pageno {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: rgba(24, 24, 28, 0.78);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: 500;
+}
+.m-app .m-received {
+  padding: var(--m-s2) var(--m-s4);
+  font-size: var(--m-t4);
+  background: var(--m-accent-soft);
+  color: var(--m-accent-text);
+}
+.m-app .m-viewer-bar button {
+  min-width: 0;
+}
+.m-app .m-viewer-bar.has-edit {
+  align-items: center;
+  gap: 2px;
+}
+.m-app .m-viewer-bar .m-edit-go {
+  flex: 1.6;
+  flex-direction: row;
+  gap: var(--m-s2);
+  min-height: 52px;
+  margin: 0 var(--m-s1);
+  border-radius: var(--m-r);
+  background: var(--m-accent);
+  color: var(--m-on-accent);
+  font-size: var(--m-t3);
+  font-weight: var(--m-w-bold);
+}
+.m-app .m-viewer-bar .m-edit-go:not(:disabled):active {
+  background: var(--m-accent-press);
+}
+.m-app .m-photo-bar {
+  gap: var(--m-s1);
+  padding: var(--m-s2);
+  background: var(--m-surface);
+  border-top: 1px solid var(--m-line);
+}
+.m-app .m-photo-bar button {
+  gap: 4px;
+  border-radius: var(--m-r);
+  background: var(--m-fill);
+  color: var(--m-ink);
+  font-size: var(--m-t4);
+  font-weight: 500;
+}
+.m-app .m-viewer > .m-show-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-s2);
+}
+/* empty, loading, error: one centred block, an icon, a title, a line, maybe one way on */
+.m-app .m-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--m-s2);
+  margin: 15vh auto 0;
+  max-width: 300px;
+  padding: var(--m-s5) var(--m-s4);
+  border-radius: var(--m-r);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  text-align: center;
+  color: var(--m-ink-2);
+}
+.m-app .m-state > .m-ic {
+  width: 32px;
+  height: 32px;
+  color: var(--m-ink-3);
+}
+.m-app .m-state b {
+  font-size: var(--m-t3);
+  line-height: var(--m-lh3);
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink);
+  overflow-wrap: anywhere;
+}
+.m-app .m-state p {
+  margin: 0;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+}
+.m-app .m-state .m-btn {
+  margin-top: var(--m-s2);
+}
+.m-app .m-state-error > .m-ic {
+  color: var(--m-danger);
+}
+.m-app .m-state-loading {
+  background: none;
+  border: 0;
+}
+.m-app .m-spinner {
+  width: 28px;
+  height: 28px;
+  border-width: 2.5px;
+  border-color: var(--m-line-2);
+  border-top-color: var(--m-accent);
+}
+
+/* ───────── sheets, buttons, toasts ───────── */
+.m-app .m-sheet-scrim {
+  background: var(--m-scrim);
+}
+.m-app .m-sheet {
+  padding: var(--m-s2) var(--m-s4) calc(env(safe-area-inset-bottom, 0px) + var(--m-s4));
+  border-radius: var(--m-r-l) var(--m-r-l) 0 0;
+  background: var(--m-surface);
+  box-shadow: var(--m-shadow-sheet);
+}
+.m-app .m-sheet::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto var(--m-s3);
+  border-radius: 2px;
+  background: var(--m-line-2);
+}
+.m-app .m-sheet h2 {
+  font-size: var(--m-t1);
+  line-height: var(--m-lh1);
+  font-weight: var(--m-w-bold);
+  letter-spacing: var(--m-track-title);
+}
+.m-app .m-sheet-msg {
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-2);
+}
+.m-app .m-btn {
+  min-height: var(--m-touch);
+  border-radius: var(--m-r);
+  border: 1px solid var(--m-line-2);
+  background: var(--m-surface);
+  font-size: var(--m-t3);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-btn-primary {
+  border-color: transparent;
+  background: var(--m-accent);
+  color: var(--m-on-accent);
+}
+.m-app .m-more-list {
+  border-radius: var(--m-r);
+  border: 1px solid var(--m-line);
+  overflow: hidden;
+}
+.m-app .m-more-row {
+  min-height: 52px;
+  padding: 0 var(--m-s3);
+  border-radius: 0;
+}
+.m-app .m-more-row + .m-more-row {
+  border-top: 1px solid var(--m-line);
+}
+.m-app .m-more-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  color: var(--m-ink-2);
+}
+.m-app .m-toast {
+  border-radius: var(--m-r);
+  background: #232328;
+  color: #f3f3f6;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  box-shadow: var(--m-shadow-float);
+  animation: m-rise var(--m-mid) var(--m-ease);
+}
+.m-app .m-busy {
+  border-radius: var(--m-r);
+  font-size: var(--m-t4);
+}
+
+/* ───────── editor ───────── */
+.m-app .m-editor .m-ed-stage {
+  background: var(--m-sunk);
+}
+.m-app .m-ed-save {
+  min-height: 40px;
+  padding: 0 var(--m-s4);
+  margin: 0 var(--m-s1) 0 var(--m-s1);
+  border-radius: 10px;
+}
+.m-app .m-ed-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--m-accent);
+}
+.m-app .m-ed-orig.on {
+  background: var(--m-accent-soft);
+  color: var(--m-accent-text);
+}
+.m-app .m-ed-origtag {
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 68px);
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: var(--m-ink);
+  color: var(--m-surface);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: var(--m-w-strong);
+  pointer-events: none;
+}
+.m-app .m-ed-fit {
+  border-radius: 14px;
+  background: rgba(24, 24, 28, 0.72) !important;
+  font-size: var(--m-t4);
+}
+.m-app .m-ed-pagebar {
+  min-height: 48px;
+  background: var(--m-surface);
+  border-top: 1px solid var(--m-line);
+}
+.m-app .m-ed-pageno {
+  font-size: var(--m-t4);
+  font-weight: 500;
+}
+.m-app .m-ed-bar {
+  gap: 2px;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+}
+.m-app .m-ed-bar:has(button:nth-child(6)) {
+  padding-right: var(--m-s5);
+}
+.m-app .m-ed-bar:not(:has(button:nth-child(6))) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.m-app .m-ed-bar button {
+  flex: 1 0 64px;
+  min-width: 64px;
+  gap: 2px;
+}
+.m-app .m-ed-bar button .m-ic {
+  width: 40px;
+  height: 28px;
+  padding: 2px 8px;
+  border-radius: 14px;
+  box-sizing: border-box;
+}
+.m-app .m-ed-bar button.on .m-ic {
+  background: var(--m-accent-soft);
+}
+/* save: 형식 → 확인 → 저장 */
+.m-app .m-steps {
+  display: flex;
+  gap: var(--m-s2);
+  margin: 0 0 var(--m-s3);
+  padding: 0;
+  list-style: none;
+  counter-reset: m-step;
+}
+.m-app .m-steps li {
+  flex: 1;
+  padding-top: var(--m-s2);
+  border-top: 3px solid var(--m-line);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink-3);
+  counter-increment: m-step;
+}
+.m-app .m-steps li::before {
+  content: counter(m-step) " ";
+}
+.m-app .m-steps li.on {
+  border-color: var(--m-accent);
+  color: var(--m-accent-text);
+}
+.m-app .m-steps li.done {
+  border-color: var(--m-accent);
+  color: var(--m-ink-2);
+}
+.m-app .m-ed-targets {
+  display: grid;
+  gap: var(--m-s2);
+}
+.m-app .m-ed-targets .m-tool {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  min-height: 56px;
+  padding: var(--m-s2) var(--m-s3);
+  border-radius: var(--m-r);
+  border: 1px solid var(--m-line);
+  background: var(--m-surface);
+  text-align: left;
+}
+.m-app .m-ed-targets .m-tool.m-ed-keep {
+  border: 1.5px solid var(--m-accent);
+  background: var(--m-accent-soft);
+}
+.m-app .m-ed-keep .m-tool-icon {
+  background: var(--m-accent);
+  color: var(--m-on-accent);
+}
+.m-app .m-sheet .m-label {
+  margin: var(--m-s4) 0 var(--m-s2);
+}
+.m-app .m-ed-made {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  padding: var(--m-s3);
+  border-radius: var(--m-r);
+  background: var(--m-fill);
+}
+.m-app .m-ed-made > .m-ic {
+  width: 32px;
+  height: 32px;
+  color: var(--m-ink-2);
+}
+.m-app .m-ed-made span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.m-app .m-ed-made b {
+  font-size: var(--m-t3);
+  line-height: var(--m-lh3);
+  font-weight: var(--m-w-strong);
+  overflow-wrap: anywhere;
+}
+.m-app .m-ed-made small {
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-3);
+}
+.m-app .m-ed-dest {
+  display: flex;
+  gap: var(--m-s2);
+  align-items: flex-start;
+  margin: var(--m-s3) 2px var(--m-s1);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-2);
+}
+.m-app .m-ed-dest .m-ic {
+  width: 20px;
+  height: 20px;
+  color: var(--m-ink-3);
+}
+
+/* the phone's own bar on the PC feature screen: the same icons */
+.pd-bar .m-ic {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pd-bar .m-ic-dot {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ───────── v2 fixes after the first look ───────── */
+.m-app .m-editor {
+  --m-ed-desk: var(--m-sunk);
+}
+.m-app .m-start-btn.m-desk-entry {
+  border: 1px solid var(--m-line);
+}
+.m-app .m-more-row {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+}
+.m-app .m-ed-orig {
+  position: absolute;
+  left: var(--m-s3);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 140px);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--m-touch);
+  padding: 0 var(--m-s4) 0 var(--m-s3);
+  border-radius: 24px;
+  background: var(--m-surface);
+  color: var(--m-ink);
+  font-size: var(--m-t4);
+  font-weight: var(--m-w-strong);
+  box-shadow: var(--m-shadow-float);
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+.m-app .m-ed-orig.on {
+  background: var(--m-ink);
+  color: var(--m-surface);
+}
+.m-app .m-viewer-top .m-icon-btn,
+.m-app .m-editor .m-top .m-icon-btn {
+  min-width: 44px;
+}
+
+/* ───────── v2 round 2: the thread, the kinds, three jobs, the PC screen as a way on ───────── */
+.m-app {
+  /* the logo's three threads: what the file has been through (열기 · 고치기 · 원래 형식으로) */
+  --m-th-1: #1a9c94;
+  --m-th-2: var(--m-accent);
+  --m-th-3: #d9485f;
+}
+:root[data-theme="dark"] .m-app {
+  --m-th-1: #3fd0c3;
+  --m-th-3: #ff7b8f;
+}
+.m-app .m-home-top h1 {
+  font-size: var(--m-t2);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.m-app .m-continue-body b {
+  font-size: var(--m-t3);
+  line-height: var(--m-lh3);
+  font-weight: var(--m-w-strong);
+  letter-spacing: 0;
+}
+.m-app .m-continue {
+  position: relative;
+}
+.m-app .m-continue .m-continue-card {
+  border-radius: var(--m-r) var(--m-r) 0 0;
+  border-bottom: 0;
+  min-height: 96px;
+}
+.m-app .m-thread {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: var(--m-s2) var(--m-s3) var(--m-s3);
+  list-style: none;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-top: 0;
+  border-radius: 0 0 var(--m-r) var(--m-r);
+}
+.m-app .m-thread .m-th {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: 500;
+  color: var(--m-ink-3);
+}
+/* the thread between two steps: a 2 px line from this step's mark to the next */
+.m-app .m-thread .m-th:not(:last-child)::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  margin-right: 6px;
+  border-radius: 1px;
+  background: var(--m-line-2);
+}
+.m-app .m-thread i {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--m-fill);
+  color: var(--m-ink-3);
+}
+.m-app .m-thread i .m-ic {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+.m-app .m-thread .m-th span {
+  white-space: nowrap;
+}
+.m-app .m-thread .m-th.on {
+  color: var(--m-ink);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-thread .m-th.on i {
+  color: #fff;
+}
+:root[data-theme="dark"] .m-app .m-thread .m-th.on i {
+  color: #121215;
+}
+.m-app .m-thread .m-th-1.on i { background: var(--m-th-1); }
+.m-app .m-thread .m-th-2.on i { background: var(--m-th-2); }
+.m-app .m-thread .m-th-3.on i { background: var(--m-th-3); }
+.m-app .m-thread .m-th-1.on::after { background: linear-gradient(90deg, var(--m-th-1), var(--m-th-2)); }
+.m-app .m-thread .m-th-2.on::after { background: linear-gradient(90deg, var(--m-th-2), var(--m-th-3)); }
+.m-app .m-thread .m-th-1.on:has(+ .m-th-2:not(.on))::after { background: var(--m-line-2); }
+.m-app .m-thread .m-th-2.on:has(+ .m-th-3:not(.on))::after { background: var(--m-line-2); }
+/* first run: the same thread, standing alone, as how this app works */
+.m-app .m-thread-intro {
+  margin-top: var(--m-s2);
+  padding: var(--m-s3);
+  border-top: 1px solid var(--m-line);
+  border-radius: var(--m-r);
+}
+.m-app .m-firstrun .m-note {
+  margin-top: var(--m-s2);
+}
+/* the formats it opens and edits: one row under 열기, each kind's own small mark */
+.m-app .m-formats {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  margin: 0;
+  padding: var(--m-s2) 0 0;
+  list-style: none;
+}
+.m-app .m-formats li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--m-ink-3);
+}
+.m-app .m-formats .m-ic {
+  color: var(--m-ink-2);
+}
+/* the three jobs: the icon in its kind's colour (photo · document · PDF) */
+.m-app .m-tool-icon[class*="m-k-"] {
+  color: var(--k);
+}
+/* the PC screen: a way on at the end of the home screen */
+.m-app .m-desk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  width: 100%;
+  min-height: 64px;
+  margin-top: var(--m-s5);
+  padding: var(--m-s2) var(--m-s3);
+  border-radius: var(--m-r);
+  border: 1px dashed var(--m-line-2);
+  background: none;
+  text-align: left;
+  color: var(--m-ink);
+}
+.m-app .m-desk-row > .m-ic:first-child {
+  color: var(--m-ink-2);
+}
+.m-app .m-desk-row .m-tool-text {
+  flex: 1;
+}
+/* editor: the tap-to-edit hint above the tools (until the first edit) */
+.m-app .m-ed-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s2);
+  min-height: 48px;
+  padding: 0 var(--m-s1) 0 var(--m-s4);
+  background: var(--m-accent-soft);
+  color: var(--m-accent-text);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: 500;
+}
+.m-app .m-ed-hint > span {
+  flex: 1;
+}
+.m-app .m-ed-hint .m-icon-btn {
+  color: var(--m-accent-text);
+}
+/* zoom: a small quiet label, not a grey lump */
+.m-app .m-ed-fit {
+  top: var(--m-s2);
+  right: var(--m-s2);
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--m-surface) 88%, transparent) !important;
+  color: var(--m-ink-2);
+  font-size: var(--m-t4);
+  font-weight: 500;
+  box-shadow: 0 0 0 1px var(--m-line);
+}
+.m-app .m-ed-save {
+  min-height: var(--m-touch);
+}
+.m-app .m-ed-pagebar {
+  position: relative;
+}
+.m-app .m-ed-pagebar .m-ed-orig {
+  position: absolute;
+  left: var(--m-s2);
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  min-height: 40px;
+  padding: 0 var(--m-s3) 0 10px;
+  border-radius: 20px;
+  background: var(--m-fill);
+  box-shadow: none;
+}
+.m-app .m-ed-pagebar .m-ed-orig:not(:disabled):active {
+  transform: translateY(-50%) scale(0.97);
+}
+.m-app .m-ed-pagebar .m-ed-orig.on {
+  background: var(--m-ink);
+  color: var(--m-surface);
+}
+.m-app .m-open {
+  min-height: 64px;
+}
+
+/* ───────── v2 round 3 ───────── */
+/* the thread: every step in its own thread's colour — the ones the file came through filled, the rest faint */
+.m-app .m-thread .m-th-1 { --th: var(--m-th-1); }
+.m-app .m-thread .m-th-2 { --th: var(--m-th-2); }
+.m-app .m-thread .m-th-3 { --th: var(--m-th-3); }
+.m-app .m-thread .m-th i {
+  background: color-mix(in srgb, var(--th) 14%, transparent);
+  color: color-mix(in srgb, var(--th) 70%, var(--m-ink-3));
+}
+.m-app .m-thread .m-th:not(:last-child)::after {
+  background: color-mix(in srgb, var(--th) 22%, transparent);
+}
+.m-app .m-thread .m-th.on i {
+  background: var(--th);
+}
+.m-app .m-thread .m-th span {
+  color: color-mix(in srgb, var(--th) 55%, var(--m-ink-3));
+}
+.m-app .m-thread .m-th.on span {
+  color: var(--m-ink);
+}
+/* the formats row: eight small open-buttons (a finger's width each), four by two */
+.m-app .m-formats {
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--m-s1);
+  padding-top: var(--m-s2);
+}
+.m-app .m-formats button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border-radius: var(--m-r-s);
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: 500;
+  color: var(--m-ink-2);
+}
+.m-app .m-formats button .m-ic {
+  width: 20px;
+  height: 20px;
+}
+/* save: the pictures and the work file, folded under the formats */
+.m-app .m-ed-fold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--m-s2);
+  padding: 0 var(--m-s3);
+  border-radius: var(--m-r);
+  background: none;
+  color: var(--m-ink-2);
+  font-size: var(--m-t4);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-ed-fold .m-ed-fold-chev {
+  transform: rotate(90deg); /* folded: points down */
+  transition: transform var(--m-mid) var(--m-ease);
+}
+.m-app .m-ed-fold[aria-expanded="true"] .m-ed-fold-chev {
+  transform: rotate(-90deg);
+}
+/* 3 저장: done, and where it went */
+.m-app .m-ed-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--m-s2);
+  padding: var(--m-s3) 0 0;
+  text-align: center;
+}
+.m-app .m-ed-done-mark {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  background: var(--m-th-3);
+  color: #fff;
+}
+.m-app .m-ed-done > b {
+  font-size: var(--m-t2);
+  line-height: var(--m-lh2);
+}
+.m-app .m-ed-path {
+  margin: 0;
+  max-width: 100%;
+  padding: var(--m-s2) var(--m-s3);
+  border-radius: var(--m-r-s);
+  background: var(--m-fill);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  color: var(--m-ink-2);
+  overflow-wrap: anywhere;
+}
+.m-app .m-ed-path b {
+  color: var(--m-ink);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-ed-done .m-sheet-btns {
+  width: 100%;
+}
+
+/* typing a paragraph: where it is (1쪽 · 문단 5/21) over the format row; the row scrolls sideways (a fade says so) */
+.m-app .m-ed-textsheet {
+  padding-top: var(--m-s2);
+  background: var(--m-surface);
+  border-top: 1px solid var(--m-line);
+}
+.m-app .m-ed-textpos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 2px var(--m-s2);
+  font-size: var(--m-t4);
+  line-height: var(--m-lh4);
+  font-weight: var(--m-w-strong);
+  color: var(--m-ink-2);
+}
+.m-app .m-ed-textpos .m-ic {
+  width: 18px;
+  height: 18px;
+  color: var(--m-ink-3);
+}
+.m-app .m-ed-fmt {
+  scrollbar-width: none;
+  padding-right: var(--m-s5);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.m-app .m-ed-fmt .m-chip {
+  border-radius: var(--m-r);
+  background: var(--m-fill);
+  border: 0;
+  font-size: var(--m-t3);
+}
+.m-app .m-ed-swatch.m-ed-swatch-s {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  border: 3px solid var(--m-surface);
+  box-shadow: 0 0 0 1px var(--m-line-2);
+}
+.m-app .m-ed-textpos.m-ed-where {
+  flex: none;
+  padding: 0;
+  font-size: var(--m-t4);
+  color: var(--m-ink-2);
+  white-space: normal;
+}
+/* the thread between two steps both reached: drawn in full, from one thread's colour into the next */
+.m-app .m-thread .m-th-1.on:has(+ .m-th-2.on)::after { background: linear-gradient(90deg, var(--m-th-1), var(--m-th-2)); }
+.m-app .m-thread .m-th-2.on:has(+ .m-th-3.on)::after { background: linear-gradient(90deg, var(--m-th-2), var(--m-th-3)); }
+
+/* typing on the page: the paragraph's own box becomes the field (its font, size and colour at this zoom) */
+.m-app .m-ed-inplace {
+  position: fixed;
+  z-index: 25;
+  box-sizing: border-box;
+  height: auto;
+  margin: 0;
+  padding: 2px 4px;
+  border: 2px solid var(--m-accent);
+  border-radius: 4px;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  box-shadow: 0 0 0 4px var(--m-accent-soft), var(--m-shadow-float);
+  letter-spacing: 0;
+  word-break: keep-all;
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* the bar above the keyboard: where (1쪽 · 문단 n/m) over the format buttons, 완료 at the thumb */
+.m-app .m-ed-textsheet-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "pos pos" "fmt done";
+  column-gap: var(--m-s2);
+  align-items: center;
+}
+.m-app .m-ed-textsheet-bar .m-ed-textpos { grid-area: pos; }
+.m-app .m-ed-textsheet-bar .m-ed-fmt { grid-area: fmt; padding-bottom: 0; }
+.m-app .m-ed-textsheet-bar .m-ed-textrow-done { grid-area: done; }
+.m-app .m-ed-textrow-done .m-btn {
+  min-height: 44px;
+}
+/* a workbook's sheets as tabs under the title (the one on screen marked) */
+.m-app .m-sheet-tabs {
+  display: flex;
+  gap: var(--m-s1);
+  padding: var(--m-s1) var(--m-s2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--m-surface);
+  border-bottom: 1px solid var(--m-line);
+}
+.m-app .m-sheet-tabs button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--m-s3);
+  border-radius: var(--m-r-s);
+  font-size: var(--m-t4);
+  font-weight: 500;
+  color: var(--m-ink-2);
+  white-space: nowrap;
+}
+.m-app .m-sheet-tabs button.on {
+  background: var(--m-accent-soft);
+  color: var(--m-accent-text);
+  font-weight: var(--m-w-strong);
+}
+/* the first section of a tab starts close under the top bar */
+.m-app .m-main > .m-label:first-child {
+  margin-top: var(--m-s2);
+}
+/* 발표 시작: the second action of a deck (편집 stays the one accent) */
+.m-app .m-viewer > .m-show-btn {
+  min-height: 48px;
+  margin: var(--m-s2) var(--m-s3);
+  justify-content: center;
+  border: 1px solid var(--m-line-2);
+  background: var(--m-surface);
+  color: var(--m-ink);
+  font-size: var(--m-t3);
+  font-weight: var(--m-w-strong);
+}
+.m-app .m-viewer > .m-show-btn .m-ic {
+  color: var(--m-accent-text);
+}
+/* 정보: the notes read left to right like the rest */
+.m-app .m-about > p {
+  text-align: left;
+  margin: var(--m-s3) 2px 0;
+  color: var(--m-ink-2);
+}
+.m-app .m-about > h2 {
+  font-size: var(--m-t2);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: var(--m-s2) 0 var(--m-s4);
+}
+/* layer sheets: a hidden layer's eye is struck through and dimmed */
+.m-app .m-ic.m-ed-eye-off {
+  opacity: 0.5;
+}
+/* the on-page field: the paragraph's own runs, as tall as the paragraph is on the page (nothing spills over) */
+.m-app .m-ed-inplace {
+  min-height: 0;
+  padding: 1px 3px;
+  overflow: hidden;
+  white-space: normal;
+  text-align: left;
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* while typing: the page arrows, the tip and the tools step aside (the format bar sits above the keyboard) */
+.m-app .m-editor:has(.m-ed-textsheet-bar) :is(.m-ed-pagebar, .m-ed-hint, .m-ed-bar) {
+  visibility: hidden;
+}

@@ -163,5 +163,10 @@
   "sheet.valid.yes": "Yes",
   "sheet.valid.no": "No",
   "sheet.valid.list": "List",
-  "sheet.menu.clear": "Clear Contents"
+  "sheet.menu.clear": "Clear Contents",
+  "sheet.menu.cut": "Cut",
+  "sheet.menu.copy": "Copy",
+  "sheet.menu.paste": "Paste",
+  "sheet.menu.pasteValues": "Paste Values",
+  "sheet.paste.nothingCopied": "Copy cells on a sheet first (Ctrl+C) to paste their values"
 }

@@ -4,6 +4,9 @@ import { isEmptyPh } from "../core/slides";
 import { getBlob } from "../core/assets";
 import { layoutText, pageFontsSettled } from "../core/text";
 import { paintBox, vectorToSvgD } from "../core/vector";
+import { arrowNode } from "../core/arrowheads";
+import { liveParts } from "../core/liveVector";
+import { pathTextGlyphs } from "../core/pathText";
 import type { Paint } from "../core/style/types";
 import { renderMasterOf } from "../core/headerFooter";
 import { nodeBounds, paintBounds } from "../core/loom";
@@ -17,6 +20,8 @@ import { makeCanvas } from "../render/draw";
 import { PDF_PRODUCER, exportPdfVector } from "./pdfVector";
 import { bakeAdjustDoc } from "./bakeAdjust";
 import { t } from "../i18n";
+import { meshRaster } from "../core/mesh";
+import { encodePng } from "../core/image/png";
 
 export async function canvasToPng(c: OffscreenCanvas | HTMLCanvasElement): Promise<Uint8Array> {
   const blob = "convertToBlob" in c ? await c.convertToBlob({ type: "image/png" }) : await new Promise<Blob>((res) => (c as HTMLCanvasElement).toBlob((b) => res(b!), "image/png"));
@@ -179,9 +184,9 @@ export async function exportSvg(doc: OmwDocument, page: Page): Promise<string> {
       for (const it of list) {
         if (it.kind === "node" ? !it.node.visible : !it.group.visible) continue;
         const clips = it.clips.filter((c) => c.visible);
-        const body = it.kind === "node" ? await nodeSvg(doc, page, clips.length ? ({ ...it.node, opacity: 1 } as SceneNode) : it.node) : await items(it.children);
+        const body = it.kind === "node" ? await nodeSvg(doc, page, clips.length ? ({ ...it.node, opacity: 1, blendMode: "NORMAL" } as SceneNode) : it.node) : await items(it.children);
         if (!clips.length) {
-          if (it.kind === "node") parts.push(body);
+          if (it.kind === "node") { if (!it.node.lumMask) parts.push(body); }
           // a group in any mode but Pass Through is composited on its own first (its members do not blend with what is below)
           else {
             const g = `<g${look(it.group.opacity, it.group.blendMode)}${it.group.blendMode === "NORMAL" ? ` style="isolation:isolate"` : ""}>${body}</g>`;
@@ -191,7 +196,15 @@ export async function exportSvg(doc: OmwDocument, page: Page): Promise<string> {
         }
         const id = `clip-${page.id}-${k++}`;
         const base = it.kind === "node" ? it.node : null;
-        const plain = base && base.type === "VECTOR" && base.fill && !(base.stroke && base.strokeWidth > 0);
+        // an opacity mask (Illustrator): the mask art as an SVG luminance mask; it draws nothing itself
+        if (base?.lumMask) {
+          const inner = (await Promise.all(clips.map((c) => nodeSvg(doc, page, c)))).join("");
+          parts.push(`<g><defs><mask id="${id}" mask-type="luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="${page.width}" height="${page.height}">${body}</mask></defs><g mask="url(#${id})">${inner}</g></g>`);
+          continue;
+        }
+        // a path base (Illustrator's clipping path, Ctrl+7): an SVG clipPath of its geometry, whatever its paint —
+        // as Illustrator writes it (design 2 real-use check 2026-11-25); other bases: an alpha mask of what they draw
+        const plain = base && base.type === "VECTOR" && base.contours.some((c) => c.nodes.length > 1);
         const def = plain
           ? `<clipPath id="${id}"><path transform="${svgTransform(base)}" d="${vectorToSvgD(base)}" clip-rule="${base.fillRule}"/></clipPath>`
           : `<mask id="${id}" mask-type="alpha" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="${page.width}" height="${page.height}">${body}</mask>`;
@@ -233,16 +246,23 @@ function withSvgEffects(id: string, effects: SceneNode["effects"], box: { x: num
 /** One node as SVG markup (vectors and text live, images embedded, everything else as a picture), with its effects. */
 async function nodeSvg(doc: OmwDocument, page: Page, n: SceneNode): Promise<string> {
   if (isEmptyPh(n)) return "";
+  // an empty pixel layer (the one a new artboard starts with) draws nothing: no full-page transparent picture, which
+  // also made the SVG reopen as one picture instead of its shapes (design 2 real-use check 2026-11-25)
+  if (n.type === "RASTER" && !n.adjust && !Object.keys(n.tiles).length && !n.effects?.length) return "";
   const body = await nodeSvgBare(doc, page, n);
   return n.effects?.length ? withSvgEffects(`fx-${n.id}`, n.effects, nodeBounds(n), body) : body;
 }
 
 async function nodeSvgBare(doc: OmwDocument, page: Page, n: SceneNode): Promise<string> {
+  // a live appearance: its plain parts (core/liveVector.ts), each a path of its own
+  const parts = n.type === "VECTOR" ? liveParts(n) : null;
+  if (parts) return (await Promise.all(parts.map((q, i) => nodeSvgBare(doc, page, { ...q, id: `${q.id}-${i}` })))).join("");
   const out: string[] = [];
   {
     const t = n.transform;
     const tr = `translate(${t.x} ${t.y}) rotate(${t.rotation}) scale(${t.scale}${t.scaleY !== undefined && t.scaleY !== t.scale ? ` ${t.scaleY}` : ""})`;
-    const common = `transform="${tr}" opacity="${n.opacity}"`;
+    // its blend mode as CSS mix-blend-mode, as Illustrator writes it in SVG (design 2 real-use check 2026-11-25)
+    const common = `transform="${tr}" opacity="${n.opacity}"${CSS_BLEND[n.blendMode] ? ` style="mix-blend-mode:${CSS_BLEND[n.blendMode]}"` : ""}`;
     switch (n.type) {
       case "VECTOR": {
         // a gradient fill (fills[0]) / stroke (strokes[0]) as an SVG gradient in the path's own space (render/draw
@@ -262,12 +282,30 @@ async function nodeSvgBare(doc: OmwDocument, page: Page, n: SceneNode): Promise<
           );
           return `url(#${id})`;
         };
-        const fill = (n.fill && grad((n as VectorNode & { fills?: Paint[] }).fills?.[0], "g")) || (n.fill ?? "none");
+        // a gradient mesh: SVG has none — its pixels (2 px per unit) cut to the path, under the path's stroke
+        if (n.meshFill?.pts.length) {
+          const r = meshRaster(n.meshFill, 2);
+          const cid = `mesh-${n.id}`;
+          out.push(`<g ${common}><defs><clipPath id="${cid}"><path d="${vectorToSvgD(n)}" clip-rule="${n.fillRule}"/></clipPath></defs><image clip-path="url(#${cid})" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="none" href="data:image/png;base64,${b64(encodePng(r.data, r.pw, r.ph, 4))}"/></g>`);
+        }
+        const fill = n.meshFill?.pts.length ? "none" : (n.fill && grad((n as VectorNode & { fills?: Paint[] }).fills?.[0], "g")) || (n.fill ?? "none");
         const stroke = (n.stroke && grad((n as VectorNode & { strokes?: { paint: Paint }[] }).strokes?.[0]?.paint, "gs")) || (n.stroke ?? "none");
         out.push(`<path ${common} d="${vectorToSvgD(n)}" fill="${fill}" fill-rule="${n.fillRule}" stroke="${stroke}" stroke-width="${n.strokeWidth}" stroke-linejoin="${n.strokeJoin ?? "round"}" stroke-linecap="${n.strokeCap ?? "round"}"${n.strokeDash?.length ? ` stroke-dasharray="${n.strokeDash.join(" ")}"` : ""}/>`);
+        const heads = arrowNode(n);
+        if (heads) out.push(`<path ${common} d="${vectorToSvgD(heads)}" fill="${heads.fill}"/>`);
         break;
       }
       case "TEXT": {
+        // type on a path: each character placed and turned on the path (core/pathText.ts)
+        if (n.onPath) {
+          out.push(`<g ${common}>`);
+          for (const g of pathTextGlyphs(n))
+            out.push(
+              `<text transform="translate(${g.x.toFixed(2)} ${g.y.toFixed(2)}) rotate(${((g.angle * 180) / Math.PI).toFixed(2)})" font-family="${esc(g.run.fontFamily)}, 'Noto Sans KR', sans-serif" font-size="${g.run.fontSize}" font-weight="${g.run.bold ? 700 : 400}" font-style="${g.run.italic ? "italic" : "normal"}" fill="${g.run.color}" xml:space="preserve">${esc(g.ch)}</text>`,
+            );
+          out.push(`</g>`);
+          break;
+        }
         const lay = layoutText(n);
         out.push(`<g ${common}>`);
         if (n.background) out.push(`<rect width="${n.width}" height="${lay.height}" fill="${n.background}"/>`);

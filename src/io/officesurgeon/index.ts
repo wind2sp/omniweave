@@ -52,6 +52,8 @@ export function saveOffice(pages: Page[], fmt: Fmt, confirm: (msg: string) => bo
     return r.bytes;
   } catch (e) {
     if (!(e instanceof SurgeryUnavailable)) throw e;
+    // (why, for QA: the console of the page — the person sees the notice)
+    console.warn(`Office Surgeon: written anew (${e.message})`);
     ask([t("engine.officeSurgeon.fallback"), ...e.notes]);
     return fresh();
   }

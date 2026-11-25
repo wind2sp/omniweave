@@ -7,7 +7,7 @@
 // With no options the result equals layoutText() line for line (tests/layoutcheck asserts it on every
 // fixture paragraph); line starts are character offsets into the paragraph text.
 
-import { advance, glued, graphemes, lineHeightOf, listMarkerChars, runFont, runScale, spaceExtra, tokenize, type LaidLine, type TextLayout } from "../text";
+import { advance, glued, graphemes, lineHeightOf, listMarkerChars, rubyLine, rubyMetrics, rubyPad, runFont, runScale, spaceExtra, tokenize, type LaidLine, type TextLayout } from "../text";
 import type { TextParagraph, TextRun } from "../types";
 
 /** Advance of `text` (a token or part of one) of `run` starting at paragraph character `at`. */
@@ -61,9 +61,15 @@ export function simulateParagraph(para: TextParagraph, boxWidth: number, opts: S
   // a word split over runs (layoutText glueFrom): where it began on the line, to move it down whole
   let lastTok = "";
   let g = { ci: 0, x: 0, count: 0, lastEnd: 0, max: 0, wordMax: 0 };
+  // room the 덧말 of the line need above / below the baseline (layoutText, text.ts rubyLine)
+  let up = 0;
+  let down = 0;
   const flush = (next: number) => {
     const size = maxSize || para.runs[0]?.fontSize || 16;
-    lines.push({ start: lineStart, height: lineHeightOf(para, size), width: count ? lastEnd : 0 });
+    let height = lineHeightOf(para, size);
+    if (up || down) height = rubyLine(para, height, para.lineTop ? Math.min(height, size) * 0.85 : (height - size) / 2 + size * 0.8, up, down)[0];
+    up = down = 0;
+    lines.push({ start: lineStart, height, width: count ? lastEnd : 0 });
     lineStart = next;
     count = 0;
     x = left;
@@ -73,6 +79,24 @@ export function simulateParagraph(para: TextParagraph, boxWidth: number, opts: S
   };
   for (const run of para.runs) {
     const font = runFont(run);
+    if (run.ruby) {
+      // 덧말: one unbreakable piece, with room on both sides in Word (layoutText)
+      const hwp = !!para.lineTop;
+      const baseW = width(run.text, run, font, ci);
+      const pad = rubyPad(run, baseW, hwp);
+      if (x + baseW + pad * 2 > maxW && count) flush(ci);
+      x += pad;
+      count++;
+      maxSize = Math.max(maxSize, run.fontSize);
+      lastEnd = x + baseW;
+      x += baseW + pad;
+      ci += run.text.length;
+      const m = rubyMetrics(run, hwp);
+      up = Math.max(up, m.up);
+      down = Math.max(down, m.down);
+      lastTok = "";
+      continue;
+    }
     const segs = run.text.split("\n");
     segs.forEach((seg, si) => {
       if (si) {

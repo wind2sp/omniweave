@@ -34,6 +34,7 @@ import type { ListDef } from "../../core/style/types";
 import { A4_MARGIN, paginate, type OfficeItem, type OfficeLayout } from "../office";
 import { imageFields, picArea, type OfficePic, type PicFloat, type PicGeom } from "../officeDrawing";
 import type { ObjectPlace } from "../../core/types";
+import { shapeNodeOf } from "../officeShapes";
 
 export type Block =
   | { kind: "para"; para: TextParagraph }
@@ -54,6 +55,8 @@ export interface FlowPic {
   float?: PicFloat;
   /** anchored in the paragraph before it (its top is that paragraph's), not at the flow position */
   after: boolean;
+  /** a shape or text box (io/officeShapes.ts): made a VECTOR / TEXT node instead of a picture */
+  shape?: OfficePic["shape"];
 }
 
 export interface FlowOptions {
@@ -166,7 +169,7 @@ export function flowBlocks(blocks: Block[], title: string, assets: Record<string
   const placePic = (b: Extract<Block, { kind: "image" }>, P: FlowPic) => {
     const g = P.g;
     const node = (x: number, yy: number, behind = false) => {
-      const n = { ...newImage(b.assetId, g.w, g.h, b.name), ...imageFields({ ...g, x, y: yy }), id: P.id, place: P.place };
+      const n: SceneNode = P.shape ? shapeNodeOf(P.shape, { ...g, x, y: yy }, P.id, b.name) : { ...newImage(b.assetId, g.w, g.h, b.name), ...imageFields({ ...g, x, y: yy }), id: P.id, place: P.place };
       if (behind) page!.nodes.unshift(n);
       else page!.nodes.push(n);
     };
@@ -308,6 +311,8 @@ export function officePages(items: OfficeItem[], title: string, layout?: OfficeL
   if (layout?.notePr && pages[0]) pages[0].notePr = layout.notePr;
   // comments of the file (core/review.ts)
   if (layout?.comments?.length && pages[0]) pages[0].comments = layout.comments;
+  // named paragraph styles of the file (core/docStyles.ts)
+  if (layout?.docStyles?.length && pages[0]) pages[0].docStyles = layout.docStyles;
   if (layout?.trackChanges && pages[0]) pages[0].trackChanges = true;
   // Word cuts paragraphs at page ends (widow / orphan control, keep with next) and 한글 where its saved lines begin a
   // page: the body flow lays the pages out by those rules (core/flow.ts), with the notes at the foot of their pages;
@@ -350,6 +355,7 @@ function officePagesWhole(items: OfficeItem[], title: string, layout?: OfficeLay
           inline: pic.inline,
           float: pic.float,
           after: pic.tail && !!pic.float && pic.float.yFrom === "para",
+          ...(pic.shape ? { shape: pic.shape } : {}),
           place: { mode: pic.inline ? "inline" : "float", ...(pic.float ? { wrap: pic.float.wrap } : {}), ...(pic.para ? { para: pic.para } : {}), offset: pic.offset, ...(pic.own ? { own: true } : {}), ...(pic.inline ? { space: { before: pic.inline.before, after: pic.inline.after } } : {}) },
         },
       }));
@@ -369,6 +375,8 @@ function officePagesWhole(items: OfficeItem[], title: string, layout?: OfficeLay
     }
     // 단 of the section: on each of its pages (the body flow lays them out column by column)
     if (setup?.columns && setup.columns.n > 1) for (const pg of ps) pg.columns = { ...setup.columns };
+    // 쪽 테두리 of the section (Word w:pgBorders, 한글 hp:pageBorderFill)
+    if (setup?.border) for (const pg of ps) pg.border = { ...setup.border };
     if (a > 0) {
       if (starts.has(a)) ps[0].breakBefore = "section";
       else delete ps[0].breakBefore;
@@ -382,6 +390,9 @@ function officePagesWhole(items: OfficeItem[], title: string, layout?: OfficeLay
   // the body text and tables are the document's body flow (core/flow.ts): typing goes on from page to page. The
   // pages stay as paginated here until a page run is edited.
   markFlowInPlace(pages);
+  // shapes and text boxes read from the file float on the page: a text box at the left margin is still no body text
+  const shapeIds = new Set(pics.filter(({ pic }) => pic.shape).map(({ pic }) => pic.id));
+  if (shapeIds.size) for (const pg of pages) for (const n of pg.nodes) if (shapeIds.has(n.id)) delete n.flow;
   pages.forEach((p, i) => (p.name = t("engine.default.pageOfFile", { title, page: i + 1 })));
   // imported list definitions travel with the text nodes whose paragraphs use them
   if (lists?.length)

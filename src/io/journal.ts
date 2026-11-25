@@ -115,7 +115,7 @@ export async function journalRestore(key = "latest"): Promise<OmwDocument | null
   if (!root) return null;
   const tileHashes = new Set<string>();
   for (const p of [...root.graph.pages, ...root.graph.masters])
-    for (const n of p.nodes) if (n.type === "RASTER") for (const h of Object.values(n.tiles as Record<string, string>)) tileHashes.add(h);
+    for (const n of p.nodes) if (n.type === "RASTER") for (const h of [...Object.values(n.tiles as Record<string, string>), ...Object.values((n.mask?.tiles ?? {}) as Record<string, string>)]) tileHashes.add(h);
   const tiles = new Map<string, Uint8ClampedArray>();
   await Promise.all(
     [...tileHashes].map(async (h) => {

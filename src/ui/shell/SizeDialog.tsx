@@ -66,6 +66,15 @@ export function SizeDialog() {
       {lossy && (
         <>
           <p className="modal-sub">{t("size.lossyHint")}</p>
+          {/* Acrobat's quality steps (파일 크기 줄이기 / PDF 최적화): picture quality and the longest side together */}
+          <div className="tools-opt" role="group" aria-label={t("pdftools.size.preset")}>
+            <span>{t("pdftools.size.preset")}</span>
+            {([["high", 0.85, "2400"], ["medium", 0.7, "1600"], ["low", 0.5, "1200"]] as const).map(([k, q, d]) => (
+              <button key={k} type="button" className={"btn btn-ghost" + (quality === q && maxDim === d ? " on" : "")} aria-pressed={quality === q && maxDim === d} disabled={busy} onClick={() => (setQuality(q), setMaxDim(d))}>
+                {t("pdftools.size." + k)}
+              </button>
+            ))}
+          </div>
           <label className="tools-opt">
             <span>{t("size.quality")}</span>
             <input type="range" min={0.3} max={1} step={0.01} value={quality} disabled={busy} onChange={(e) => setQuality(Number(e.target.value))} />
@@ -78,6 +87,7 @@ export function SizeDialog() {
               onChange={setMaxDim}
               options={[
                 { value: "1600", label: "1600px" },
+                { value: "1200", label: "1200px" },
                 { value: "2400", label: "2400px" },
                 { value: "0", label: t("size.maxDimKeep") },
               ]}

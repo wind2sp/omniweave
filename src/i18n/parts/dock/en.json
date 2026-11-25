@@ -233,5 +233,14 @@
   "dock.history.settings": "Settings",
   "dock.history.record": "Record History",
   "dock.history.includeInFile": "Include History When Saving .omw",
-  "dock.history.fileNote": "For files you send to others, turn this off before saving to include only the result without the editing steps. History is kept in a separate section of the file (history/) and does not affect the document content."
+  "dock.history.fileNote": "For files you send to others, turn this off before saving to include only the result without the editing steps. History is kept in a separate section of the file (history/) and does not affect the document content.",
+  "dock.pages.menu.new": "New Slide",
+  "dock.pages.menu.duplicate": "Duplicate",
+  "dock.pages.menu.cut": "Cut",
+  "dock.pages.menu.copy": "Copy",
+  "dock.pages.menu.paste": "Paste",
+  "dock.pages.menu.hide": "Hide Slide",
+  "dock.pages.menu.show": "Unhide Slide",
+  "dock.pages.menu.delete": "Delete",
+  "dock.pages.nothingToPaste": "Nothing to paste (the copied pages are not in this document)"
 }

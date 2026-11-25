@@ -35,6 +35,7 @@ import { packOmw } from "../../src/io/omw";
 import { newDocument, newText } from "../../src/core/types";
 import { exportAs, importFile, openDemoIfRequested, saveDoc } from "../../src/ui/actions";
 import { S, freshStore, installDom, installPdfWorker } from "../coverage/helpers";
+import { cpuNow, cpuBudget, wallBudget, wallTimeout } from "../budget";
 
 beforeAll(async () => {
   installDom();
@@ -62,43 +63,43 @@ describe("password-protected PDF open (pdf.ts openPdf)", () => {
   it("fails fast with '암호 필요' when there is no one to ask (asker returns null)", async () => {
     setPasswordAsker(async () => null);
     const enc = await encryptPdf(await samplePdf("unique-a"), "qa-pw-1");
-    const t0 = performance.now();
-    await expect(withTimeout(importPdf(enc, "a.pdf"), 10_000)).rejects.toThrow(/암호/);
-    expect(performance.now() - t0).toBeLessThan(10_000);
-  }, 20_000);
+    const t0 = cpuNow();
+    await expect(withTimeout(importPdf(enc, "a.pdf"), wallBudget(10_000))).rejects.toThrow(/암호/);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(10_000));
+  }, wallTimeout(20_000));
 
   it("fails fast when the asker itself throws (no hang, no unhandled rejection)", async () => {
     setPasswordAsker(async () => {
       throw new Error("dialog unavailable");
     });
     const enc = await encryptPdf(await samplePdf("unique-b"), "qa-pw-2");
-    await expect(withTimeout(importPdf(enc, "b.pdf"), 10_000)).rejects.toThrow(/암호/);
-  }, 20_000);
+    await expect(withTimeout(importPdf(enc, "b.pdf"), wallBudget(10_000))).rejects.toThrow(/암호/);
+  }, wallTimeout(20_000));
 
   it("gives up after repeated wrong passwords instead of looping", async () => {
     let n = 0;
     setPasswordAsker(async () => `wrong-${n++}`);
     const enc = await encryptPdf(await samplePdf("unique-c"), "qa-pw-3");
-    await expect(withTimeout(importPdf(enc, "c.pdf"), 15_000)).rejects.toThrow(/암호/);
+    await expect(withTimeout(importPdf(enc, "c.pdf"), wallBudget(15_000))).rejects.toThrow(/암호/);
     expect(n).toBeLessThanOrEqual(5);
-  }, 30_000);
+  }, wallTimeout(30_000));
 
   it("opens with the right password and marks the pages as protected (secret id only)", async () => {
     setPasswordAsker(async () => "qa-pw-4");
     const enc = await encryptPdf(await samplePdf("unique-d"), "qa-pw-4");
-    const { pages } = await withTimeout(importPdf(enc, "d.pdf"), 15_000);
+    const { pages } = await withTimeout(importPdf(enc, "d.pdf"), wallBudget(15_000));
     expect(pages[0].source?.protection?.scheme).toBe("pdf");
     expect(JSON.stringify(pages)).not.toContain("qa-pw-4");
-  }, 30_000);
+  }, wallTimeout(30_000));
 
   it("importFile reports the refusal through lastImport instead of hanging", async () => {
     setPasswordAsker(async () => null);
     freshStore();
     const enc = await encryptPdf(await samplePdf("unique-e"), "qa-pw-5");
-    await withTimeout(importFile({ name: "e.pdf", path: null, bytes: enc }), 10_000);
+    await withTimeout(importFile({ name: "e.pdf", path: null, bytes: enc }), wallBudget(10_000));
     const { lastImport } = await import("../../src/ui/actions");
     expect(lastImport?.error).toMatch(/암호/);
-  }, 20_000);
+  }, wallTimeout(20_000));
 });
 
 // ------------------------------------------------------------------------------------------------
@@ -123,7 +124,7 @@ describe("save / export never silently drop protection (ui/actions.ts)", () => {
     expect(protectAsked[1]).toMatchObject({ wasProtected: true, canReuse: true });
     expect(isEncryptedOmw(lastBytes())).toBe(true);
     await expect(decryptOmw(lastBytes(), "qa-new-pw")).resolves.toBeInstanceOf(Uint8Array);
-  }, 60_000);
+  }, wallTimeout(60_000));
 
   it("changing the password: 'same' afterwards reuses the new password, not the old one", async () => {
     setPasswordAsker(async () => "qa-old-pw");
@@ -135,7 +136,7 @@ describe("save / export never silently drop protection (ui/actions.ts)", () => {
     protectAnswers.push({ mode: "same" });
     await saveDoc();
     await expect(decryptOmw(lastBytes(), "qa-changed-pw")).resolves.toBeInstanceOf(Uint8Array);
-  }, 60_000);
+  }, wallTimeout(60_000));
 
   it("a cancelled open of another encrypted .omw keeps the current document protected", async () => {
     setPasswordAsker(async () => "qa-a-pw");
@@ -151,7 +152,7 @@ describe("save / export never silently drop protection (ui/actions.ts)", () => {
     await saveDoc();
     expect(protectAsked.length).toBe(1);
     expect(isEncryptedOmw(lastBytes())).toBe(true);
-  }, 60_000);
+  }, wallTimeout(60_000));
 
   it("'암호 걸어 내보내기' on a text format still asks (and does not silently write plain text)", async () => {
     freshStore(plainDoc());
@@ -160,7 +161,7 @@ describe("save / export never silently drop protection (ui/actions.ts)", () => {
     expect(protectAsked.length).toBe(1);
     expect(protectAsked[0]).toMatchObject({ ext: "txt", supported: false });
     expect(saved.length).toBe(0);
-  }, 30_000);
+  }, wallTimeout(30_000));
 
   it("a new document does not inherit the previous file's .omw protection", async () => {
     setPasswordAsker(async () => "qa-c-pw");
@@ -172,7 +173,7 @@ describe("save / export never silently drop protection (ui/actions.ts)", () => {
     newFile();
     await saveDoc();
     expect(protectAsked.length).toBe(0);
-  }, 60_000);
+  }, wallTimeout(60_000));
 });
 
 // ------------------------------------------------------------------------------------------------
@@ -184,9 +185,9 @@ describe(".omw header is untrusted until the tag verifies", () => {
     const h = JSON.parse(strFromU8(files["encryption.json"]));
     for (const it of [1e12, 0, -5, 1.5, "600000"]) {
       files["encryption.json"] = strToU8(JSON.stringify({ ...h, iterations: it }));
-      const t0 = performance.now();
+      const t0 = cpuNow();
       await expect(decryptOmw(zipSync(files), "qa-iter-pw")).rejects.toThrow(/반복 횟수/);
-      expect(performance.now() - t0).toBeLessThan(2000);
+      expect(cpuNow() - t0).toBeLessThan(cpuBudget(2000));
     }
   });
 });

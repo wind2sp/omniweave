@@ -215,10 +215,12 @@ describe("list format QA: outline (개요) numbering", () => {
     expect(mk(again, "실적")).toBe("2. ");
   });
 
-  it.each([[HWPX], [HANCOM]])("%s: the outline numbering changed is written anew with a notice — and kept", async (path) => {
+  // (in place since QA 11-25 — a numbering of the new 개요 번호 모양 named by the sections; a file with outline items that
+  // are no headings, 개요 7–9, is still written anew with the notice)
+  it.each([[HWPX, false], [HANCOM, true]])("%s: the outline numbering changed is kept (written anew with a notice: %s)", async (path, notice) => {
     const def = "hwpx-n1";
     const probe = path === HANCOM ? "개요 2 수준" : "주요 성과";
-    const { again } = await round(path, (d) => redefineLevel(d, def, 1, { format: "upperLetter", text: "%2." }), true);
+    const { again } = await round(path, (d) => redefineLevel(d, def, 1, { format: "upperLetter", text: "%2." }), notice);
     expect(mk(again, probe)).toBe("A. ");
   });
 });

@@ -50,5 +50,19 @@
   "legacysave.pptWhy.reader": "打开后读取方式发生变化，或文件经快速保存仍留有旧的幻灯片记录，无法与打开时的文字对照",
   "legacysave.pptWhy.chars": "包含 PPT 无法作为文字保存的控制字符",
   "legacysave.pptWhy.master": "幻灯片母版的文字（显示在所有沿用母版的幻灯片上）不能在幻灯片上修改后写入 PPT",
-  "legacysave.pptWhy.verify": "重新读取写入的文件后，文字与编辑的文字不同"
+  "legacysave.pptWhy.verify": "重新读取写入的文件后，文字与编辑的文字不同",
+  "legacysave.fresh.notesTitle": "将以 XLS (Excel 97-2003) 格式重新写入。此格式无法保存:",
+  "legacysave.fresh.lose.drawings": "图表和图片",
+  "legacysave.fresh.lose.cond": "条件格式",
+  "legacysave.fresh.lose.valid": "数据验证",
+  "legacysave.fresh.lose.notes": "批注",
+  "legacysave.fresh.lose.links": "超链接",
+  "legacysave.fresh.lose.tables": "筛选和表格",
+  "legacysave.fresh.lose.sparks": "迷你图和数据透视表",
+  "legacysave.fresh.lose.protect": "工作表和工作簿保护",
+  "legacysave.fresh.lose.print": "页面设置",
+  "legacysave.fresh.lose.names": "定义的名称",
+  "legacysave.fresh.lose.size": "IV65536 以外的单元格",
+  "legacysave.fresh.lose.formulas": "{n} 个此格式无法保存的公式（保存为值）",
+  "legacysave.savedFresh.xls": "已保存为 XLS（以 Excel 97-2003 格式重新写入）"
 }

@@ -59,7 +59,7 @@ const fx = (type: EffectType, row: string, byNode?: Partial<Record<NodeType, str
 export const CAP_PROPS: readonly CapProp[] = [
   // node kinds: whether the object itself survives (a dropped kind makes its other properties moot)
   kind("RASTER", /*                   */ "NNNRDDDNN"),
-  kind("VECTOR", /*                   */ "RNNNDDDNN"),
+  kind("VECTOR", /*                   */ "RNNNNNDNN"),
   kind("TEXT", /*                     */ "RNNNNNDNN"),
   kind("IMAGE", /*                    */ "RNNNDDDNN"),
   kind("PDF", /*                      */ "RNNRDDDRN"),
@@ -69,11 +69,11 @@ export const CAP_PROPS: readonly CapProp[] = [
   // appearance
   {
     id: "fill.solid", bundle: "fills", nodes: ["VECTOR", "TEXT", "TABLE"], row: "RNNNNNDNN",
-    // vectors and text-frame backgrounds are not written by the flow exporters (DOCX / HWPX); XLSX keeps no cell fill
-    byNode: { VECTOR: "RNNNDDDNN", TEXT: "RNNNDDDNN" },
+    // DOCX / HWPX write shapes and text boxes with their fill (io/officeShapes.ts); XLSX keeps no cell fill
+    byNode: { VECTOR: "RNNNNNDNN", TEXT: "RNNNNNDNN" },
     detect: (n) => (n.type === "VECTOR" ? n.fill != null : n.type === "TEXT" ? n.background != null : n.type === "TABLE" ? cells(n).some((c) => c.fill != null) : false),
   },
-  { id: "stroke.solid", bundle: "strokes", nodes: ["VECTOR"], row: "RNNNDDDNN", detect: (n) => n.type === "VECTOR" && n.stroke != null && n.strokeWidth > 0 },
+  { id: "stroke.solid", bundle: "strokes", nodes: ["VECTOR"], row: "RNNNNNDNN", detect: (n) => n.type === "VECTOR" && n.stroke != null && n.strokeWidth > 0 },
   { id: "opacity", bundle: "blend", nodes: ALL, row: "NNNDDDDNN", detect: (n) => n.opacity < 1 },
   // SVG writes mix-blend-mode only on pages with groups / clipping (export.ts), hence approx
   { id: "blend", bundle: "blend", nodes: ALL, row: "NNNDDDDAN", detect: (n) => n.blendMode !== "NORMAL" && blendDef(n.blendMode)?.pdf != null },
@@ -85,7 +85,7 @@ export const CAP_PROPS: readonly CapProp[] = [
   // PPTX: neutral groups are flattened (same look, no folder), others become pictures
   { id: "group", bundle: "blend", nodes: ALL, row: "NNNADDDNN", detect: (n) => !!n.groupId },
   { id: "crop", bundle: "geom", nodes: ["RASTER", "IMAGE", "PDF"], row: "RNNNDDDNN", byNode: { RASTER: "RNNRDDDRN", PDF: "RNNRDDDRN" }, detect: (n) => (n.type === "RASTER" || n.type === "IMAGE" || n.type === "PDF") && !!n.crop },
-  { id: "transform.rotate", bundle: "geom", nodes: ALL, row: "RNNNDDDNN", detect: (n) => n.transform.rotation % 360 !== 0 },
+  { id: "transform.rotate", bundle: "geom", nodes: ALL, row: "RNNNDDDNN", byNode: { VECTOR: "RNNNNNDNN" }, detect: (n) => n.transform.rotation % 360 !== 0 },
   // PPTX writes flipH / flipV, but the PPTX reader does not read them back on shapes yet
   { id: "transform.flip", bundle: "geom", nodes: ALL, row: "RNNNDDDNN", readGap: ["pptx"], detect: (n) => n.transform.scale < 0 || (n.transform.scaleY ?? n.transform.scale) < 0 },
 
@@ -139,7 +139,7 @@ export const CAP_PROPS: readonly CapProp[] = [
   { id: "para.listLevel", bundle: "text", nodes: ["TEXT"], row: "RAANNNDAN", detect: (n) => paras(n).some((p) => !!p.list) },
 
   // tables
-  { id: "table.merge", bundle: "geom", nodes: ["TABLE"], row: "RNNDNNDRN", detect: (n) => cells(n).some((c) => (c.colSpan ?? 1) > 1 || (c.rowSpan ?? 1) > 1) },
+  { id: "table.merge", bundle: "geom", nodes: ["TABLE"], row: "RNNNNNDRN", detect: (n) => cells(n).some((c) => (c.colSpan ?? 1) > 1 || (c.rowSpan ?? 1) > 1) },
   { id: "table.cellFormat", bundle: "text", nodes: ["TABLE"], row: "RNNNNNARN", detect: (n) => cells(n).some((c) => c.bold || c.italic || !!c.color || (!!c.align && c.align !== "LEFT")) },
   { id: "table.formula", bundle: "text", nodes: ["TABLE"], row: "RDDDDDNDD", detect: (n) => cells(n).some((c) => !!c.formula) },
   { id: "table.numFmt", bundle: "text", nodes: ["TABLE"], row: "RDDDDDNDD", detect: (n) => cells(n).some((c) => !!c.numFmt) },

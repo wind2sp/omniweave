@@ -72,6 +72,10 @@ export function FlowEditor() {
   const at = tc ?? cb;
   const cv = at ? shown.find((s) => s.i === at.page)?.v : undefined;
   const caret = at && cv ? { x: at.x * cv.zoom + cv.panX, y: at.y * cv.zoom + cv.panY, h: Math.max(8, at.h * cv.zoom) } : null;
+  // where dragged text would go (docFlow moveSelectionTo): a dotted caret
+  const db = f.drop ? caretBox(lines, f.drop.p, f.drop.o) : null;
+  const dv = db ? shown.find((s) => s.i === db.page)?.v : undefined;
+  const drop = db && dv ? { x: db.x * dv.zoom + dv.panX, y: db.y * dv.zoom + dv.panY, h: Math.max(8, db.h * dv.zoom) } : null;
   return (
     <div className="flow-editor" aria-hidden={false}>
       {rects.map((q, i) => (
@@ -81,6 +85,7 @@ export function FlowEditor() {
         <div key={`c${i}`} className="flow-comp" style={{ left: q.x, top: q.y + q.h - 2, width: q.w }} />
       ))}
       {caret && RT.collapsed(r) && <div key={f.tick} className="flow-caret" style={{ left: Math.round(caret.x), top: caret.y, height: caret.h }} />}
+      {drop && <div className="flow-drop" style={{ left: Math.round(drop.x), top: drop.y, height: drop.h }} />}
       <textarea
         ref={ta}
         className="flow-input"

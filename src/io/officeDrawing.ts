@@ -214,7 +214,7 @@ export function itemTops(pages: Page[]): Map<string, { page: number; y: number; 
  * its page that starts at or below its top (inline: a paragraph of its own; floating: anchored in that paragraph), else
  * after the last item of its page; `item` -1 = its page has no item (an anchor paragraph of its own at the page).
  */
-export function picTargets(pics: PicOut[], ids: string[], tops: Map<string, { page: number; y: number; bottom: number }>): { pic: PicOut; item: number; after: boolean; before: number; below: number }[] {
+export function picTargets<T extends Pick<PicOut, "page" | "pageObj" | "g">>(pics: T[], ids: string[], tops: Map<string, { page: number; y: number; bottom: number }>): { pic: T; item: number; after: boolean; before: number; below: number }[] {
   return pics.map((pic) => {
     let last = -1;
     let found = -1;
@@ -328,6 +328,8 @@ export interface OfficePic {
   g: PicGeom;
   inline?: { align: Align; indent: number; before: number; after: number };
   float?: PicFloat;
+  /** a shape or text box read from the file (io/officeShapes.ts): no bytes; made a VECTOR / TEXT node */
+  shape?: import("./officeShapes").ShapeSpec;
   /** where it sits in the text (ObjectPlace para / offset / own) */
   para?: string;
   offset: number;

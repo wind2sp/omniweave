@@ -50,5 +50,19 @@
   "legacysave.pptWhy.reader": "파일을 연 뒤 읽는 방식이 바뀌었거나, 빠른 저장으로 옛 슬라이드 기록이 남은 파일이라 열 때의 글과 맞춰 볼 수 없습니다",
   "legacysave.pptWhy.chars": "PPT 글자로 담을 수 없는 제어 문자가 들어 있습니다",
   "legacysave.pptWhy.master": "슬라이드 마스터의 글(마스터를 따르는 모든 슬라이드에 보이는 글)은 슬라이드에서 고쳐 PPT에 써 넣을 수 없습니다",
-  "legacysave.pptWhy.verify": "써 넣은 파일을 다시 읽은 글이 고친 글과 다릅니다"
+  "legacysave.pptWhy.verify": "써 넣은 파일을 다시 읽은 글이 고친 글과 다릅니다",
+  "legacysave.fresh.notesTitle": "XLS(Excel 97-2003)로 새로 써서 저장합니다. 이 형식에 담지 못하는 것:",
+  "legacysave.fresh.lose.drawings": "차트·그림",
+  "legacysave.fresh.lose.cond": "조건부 서식",
+  "legacysave.fresh.lose.valid": "데이터 유효성 검사",
+  "legacysave.fresh.lose.notes": "메모",
+  "legacysave.fresh.lose.links": "하이퍼링크",
+  "legacysave.fresh.lose.tables": "필터·표",
+  "legacysave.fresh.lose.sparks": "스파크라인·피벗 테이블",
+  "legacysave.fresh.lose.protect": "시트·통합 문서 보호",
+  "legacysave.fresh.lose.print": "페이지 설정",
+  "legacysave.fresh.lose.names": "정의된 이름",
+  "legacysave.fresh.lose.size": "IV65536 밖의 칸",
+  "legacysave.fresh.lose.formulas": "이 형식에 쓸 수 없는 수식 {n}개(값으로 저장)",
+  "legacysave.savedFresh.xls": "XLS로 저장했습니다(통합 문서를 Excel 97-2003 형식으로 새로 썼습니다)"
 }

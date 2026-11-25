@@ -66,5 +66,6 @@
   "image.matte.inner": "안쪽 흰 면",
   "image.matte.inner.keep": "유지",
   "image.matte.inner.remove": "지우기",
-  "image.matte.inner.note": "배경색과 같은 닫힌 면입니다. 자동은 글자 속 구멍(O)은 지우고 문서 아이콘의 흰 종이·흰 글자 같은 면은 남깁니다."
+  "image.matte.inner.note": "배경색과 같은 닫힌 면입니다. 자동은 글자 속 구멍(O)은 지우고 문서 아이콘의 흰 종이·흰 글자 같은 면은 남깁니다.",
+  "image.matte.personChecking": "사람인지 확인하는 중… (미리보기는 먼저 나온 결과)"
 }

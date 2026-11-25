@@ -1,6 +1,7 @@
 // Free transform glue: the selection box on the current page and live resize / rotate inside a
 // store gesture (one undo step per drag). The maths is in core/transform.ts.
 
+import { currentEditMode } from "./editModes";
 import { localBounds, nodeBounds, rasterContentBounds } from "../core/loom";
 import { currentPage, draftPage, findPage, useStore } from "../core/store";
 import { boxCenter, boxSize, flipNodeScreen, keepRatio, resizeFactors, resizeNode, rotatedAbout, scaleNodeAbout, type Box, type Handle } from "../core/transform";
@@ -25,7 +26,10 @@ export function selectionBox(page: Page | undefined, ids: string[]): SelBox | nu
   const nodes = page.nodes.filter((n) => ids.includes(n.id) && !n.locked && n.visible);
   if (!nodes.length) return null;
   if (nodes.length === 1) {
-    const lb = localBounds(nodes[0]);
+    // a pixel layer: the box of its painted pixels, not of its 256 px tiles (Photoshop; before 2026-11-24 a merged
+    // 800 × 600 photo showed 1024 × 768 and its handles sat off the picture)
+    const n0 = nodes[0];
+    const lb = n0.type === "RASTER" && !n0.crop && !n0.adjust ? rasterContentBounds(n0) : localBounds(n0);
     if (lb.w <= 0 && lb.h <= 0) return null;
     return { box: { t: nodes[0].transform, lb }, nodes, multi: false };
   }
@@ -83,8 +87,10 @@ export function liveRotate(sb: SelBox, startAngle: number, p: Vec2, m: Mods, sna
   const c = boxCenter(sb.box);
   let delta = ((Math.atan2(p[1] - c[1], p[0] - c[0]) - startAngle) * 180) / Math.PI;
   const start = sb.multi ? 0 : sb.box.t.rotation;
-  // Shift: 15° steps · snapping on: pulled to 15° steps when within 4°
-  const target = m.shift ? snapAngle(start + delta, 15, 0, true) : snap ? snapAngle(start + delta, 15, 4) : start + delta;
+  // Shift: 45° steps in the design mode (Illustrator), 15° elsewhere (Photoshop) · snapping on: pulled to 15° steps
+  // when within 4°
+  const shiftStep = currentEditMode() === "DESIGN" ? 45 : 15;
+  const target = m.shift ? snapAngle(start + delta, shiftStep, 0, true) : snap ? snapAngle(start + delta, 15, 4) : start + delta;
   delta = target - start;
   if (!base) return target;
   const orig = baseNodes(base, sb.nodes.map((n) => n.id));

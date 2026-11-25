@@ -255,7 +255,7 @@ export function paintRegion(c: Ctx, page: Page, region: Rect, q: number, nodes: 
     c.rect(x0, y0, Math.min(area.x + area.w, region.x + region.w) - x0, Math.min(area.y + area.h, region.y + region.h) - y0);
   } else c.rect(0, 0, page.width, page.height);
   c.clip();
-  c.fillStyle = page.background;
+  c.fillStyle = pageFill(c, page);
   c.fillRect(region.x, region.y, region.w, region.h);
   waitForDissolve(page, env);
   if (cmyk && !master && paintCmykRegion(c, env.doc, page, region, q, env)) {
@@ -267,6 +267,20 @@ export function paintRegion(c: Ctx, page: Page, region: Rect, q: number, nodes: 
   if (master) paintNodes(c, master.nodes, master.groups, env, include);
   paintNodes(c, page.nodes, page.groups, env, include);
   c.restore();
+}
+
+/** The page's background as a fill style in page coordinates: its colour, or its gradient (Page.bgGrad). */
+export function pageFill(c: Ctx, page: Pick<Page, "background" | "bgGrad" | "width" | "height">): string | CanvasGradient {
+  const g = page.bgGrad;
+  if (!g || g.stops.length < 2) return page.background;
+  // DrawingML a:lin: the gradient runs along `angle` (clockwise from →) through the page's box, corner to corner
+  const a = (g.angle * Math.PI) / 180, dx = Math.cos(a), dy = Math.sin(a);
+  const W = page.width, H = page.height;
+  const half = (Math.abs(dx) * W + Math.abs(dy) * H) / 2;
+  const cx = W / 2, cy = H / 2;
+  const lg = (c as CanvasRenderingContext2D).createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
+  for (const s of g.stops) lg.addColorStop(Math.max(0, Math.min(1, s.at)), s.color);
+  return lg;
 }
 
 /** Uncached full-page paint (thumbnails, export, presentation). */
@@ -290,7 +304,7 @@ export function paintPage(
   c.beginPath();
   c.rect(0, 0, page.width, page.height);
   c.clip();
-  c.fillStyle = page.background;
+  c.fillStyle = pageFill(c, page);
   c.fillRect(0, 0, page.width, page.height);
   if (master) paintNodes(c, master.nodes, master.groups, env, null);
   // a sheet page (표 계산): the top-left of the sheet as it prints (thumbnails, page pictures)

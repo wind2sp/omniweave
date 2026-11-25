@@ -13,6 +13,8 @@ import { applyChange, Book, textNumber } from "../sheet/calc";
 import { dateTextFormat, parseDateText } from "../sheet/dateText";
 import { addr, formulaRefs, parseFormula, type Rect } from "../sheet/formula";
 import { formatValue } from "../sheet/numfmt";
+import { sheetCells, tableToSheet } from "../sheet/pages";
+import { sheetPages } from "../sheet/book";
 
 export function detectDelimiter(text: string): string {
   const sample = text.split("\n").slice(0, 20).join("\n");
@@ -306,9 +308,33 @@ export function collectTables(pages: Page[]): { name: string; rows: TableCell[][
   return out.map(({ last: _l, ...t }) => t);
 }
 
+/**
+ * A CSV opened as a sheet page (Excel opens CSV on a worksheet): the table's cells become sheet cells — a number only
+ * where it reads back as the same text (1.50 stays "1.50", 007 stays "007"), what Excel shows for dates and the like
+ * kept as that text — and the page keeps the file's source (encoding, delimiter, quoting, the file text) for saving.
+ */
+export function csvAsSheet(pages: Page[]): Page[] {
+  const tb = collectTables(pages)[0];
+  const src = pages[0]?.source;
+  if (!tb || !src) return pages;
+  const name = baseName(src.name ?? "Sheet1").slice(0, 31) || "Sheet1";
+  const sh = tableToSheet(name.replace(/[[\]:*?/\\]/g, "_"), tb.rows, tb.colWidths);
+  tb.rows.forEach((row, r) =>
+    row.forEach((c, k) => {
+      const cell = sh.cells[addr(r, k)];
+      if (cell && typeof cell.v === "number" && String(cell.v) !== c.text.trim()) cell.v = c.text;
+    }),
+  );
+  const [pg] = sheetPages([sh], src.name ?? name, "csv");
+  pg.source = { ...src, format: "csv" };
+  return [pg];
+}
+
 export function exportCsv(allPages: Page[]): Uint8Array {
   const pages = pagesFor(allPages, ["csv", "xlsx", "xls"]);
-  const t = collectTables(pages)[0];
+  // a sheet page (a CSV opened as a sheet, or a workbook's sheet): its cells as shown
+  const sheetPage = pages.find((p) => p.sheet) ?? allPages.find((p) => p.sheet && p.source?.format === "csv");
+  const t = sheetPage ? { rows: sheetCells(sheetPage.sheet!).rows } : collectTables(pages)[0];
   if (!t) throw new Error(tr("engine.csv.noTable"));
   const src = sourceOf(allPages, ["csv"]);
   const rows = t.rows.map((r) => r.map((c) => c.text));

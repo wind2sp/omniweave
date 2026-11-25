@@ -29,6 +29,7 @@ import { hashString } from "../../core/hash";
 import type { AssetRef, Page, TableNode, TextParagraph } from "../../core/types";
 import { markerLength } from "../../core/richtext";
 import { t } from "../../i18n";
+import { SAVE_CANCELLED } from "../errors";
 import { collectFlow, flowNotes } from "../office";
 import { flowBlocks, para, type Block } from "./flow";
 import { baseName } from "./text";
@@ -462,7 +463,7 @@ export function pptTextOnly(pages: readonly Page[]): boolean {
  * What the last save of each kind wrote — the original file, (XLS) the cell values or (DOC, PPT) the text written into it —
  * for its notice.
  */
-export const lastLegacySave: Partial<Record<LegacyKind, "original" | "cells" | "text">> = {};
+export const lastLegacySave: Partial<Record<LegacyKind, "original" | "cells" | "text" | "fresh">> = {};
 
 /**
  * The original file for an unedited document; an XLS whose cell values alone changed, with those values written into
@@ -470,7 +471,7 @@ export const lastLegacySave: Partial<Record<LegacyKind, "original" | "cells" | "
  * slide text or notes alone changed, with that text written into it (pptWrite.ts); any other edit
  * (or a document not from such a file) is refused with advice.
  */
-export async function saveLegacy(pages: readonly Page[], kind: LegacyKind): Promise<Uint8Array> {
+export async function saveLegacy(pages: readonly Page[], kind: LegacyKind, confirm?: (msg: string) => boolean): Promise<Uint8Array> {
   const src = legacySource(pages, kind);
   if (!src?.legacy) throw new Error(t(`legacysave.err.notFrom.${kind}`));
   const l = src.legacy;
@@ -482,9 +483,31 @@ export async function saveLegacy(pages: readonly Page[], kind: LegacyKind): Prom
   }
   if (kind === "xls" && xlsValuesOnly(pages)) {
     // the writer (BIFF records, SST, the compound file) loads on the first such save, not at start-up
-    const { saveXlsCells } = await import("./xlsWrite");
-    const out = saveXlsCells(pages, orig, l);
-    lastLegacySave[kind] = out === orig ? "original" : "cells";
+    const { saveXlsCells, XlsRefused } = await import("./xlsWrite");
+    try {
+      const out = saveXlsCells(pages, orig, l);
+      lastLegacySave[kind] = out === orig ? "original" : "cells";
+      return out;
+    } catch (e) {
+      if (!(e instanceof XlsRefused)) throw e;
+      // a value edit the record patcher refuses (a shared formula's first cell …): the workbook written anew below
+    }
+  }
+  // (QA 2026-11-21) a workbook opened before the XLS open read the formatting (a .omw saved then) whose cell values alone
+  // changed: not 'other edits' — say why (it would be refused as read differently anyway: xlsCellEdits "reader")
+  if (kind === "xls" && l.shape && l.shape === xlsShapeV1(pages) && allFrom(pages, "xls", src.name)) throw new Error(t("legacysave.err.xlsOldOpen"));
+  // any other edit of an .xls: the workbook written anew as BIFF8 (Excel keeps an .xls an .xls too); what it cannot
+  // hold is said first, as Excel's compatibility check does
+  // (pages of another file are refused, as before: what the .xls is made of is this workbook's sheets)
+  if (kind === "xls" && allFrom(pages, "xls", src.name)) {
+    const { writeFreshXls, xlsFreshLosses, xlsManualCalc } = await import("./xlsFresh");
+    const sheets = pages.filter((p) => p.sheet).map((p) => p.sheet!);
+    const lostF: string[] = [];
+    // (a workbook in manual calculation stays so: Excel's mode is never changed behind the person's back)
+    const out = writeFreshXls(sheets, (sh, a) => lostF.push(`${sh}!${a}`), { manual: xlsManualCalc(orig) });
+    const notes = [...xlsFreshLosses(sheets), ...(pages.some((p) => p.nodes.length) && !sheets.some((x) => x.drawings?.length) ? [t("legacysave.fresh.lose.drawings")] : []), ...(lostF.length ? [t("legacysave.fresh.lose.formulas", { n: lostF.length })] : [])];
+    if (notes.length && confirm && !confirm([t("legacysave.fresh.notesTitle"), ...notes.map((n) => "- " + n), "", t("engine.common.saveConfirm")].join("\n"))) throw new Error(SAVE_CANCELLED);
+    lastLegacySave[kind] = "fresh";
     return out;
   }
   if (kind === "doc" && docTextOnly(pages)) {
@@ -501,8 +524,5 @@ export async function saveLegacy(pages: readonly Page[], kind: LegacyKind): Prom
     lastLegacySave[kind] = out === orig ? "original" : "text";
     return out;
   }
-  // (QA 2026-11-21) a workbook opened before the XLS open read the formatting (a .omw saved then) whose cell values alone
-  // changed: not 'other edits' — say why (it would be refused as read differently anyway: xlsCellEdits "reader")
-  if (kind === "xls" && l.shape && l.shape === xlsShapeV1(pages) && allFrom(pages, "xls", src.name)) throw new Error(t("legacysave.err.xlsOldOpen"));
   throw new Error(t(`legacysave.err.edited.${kind}`));
 }

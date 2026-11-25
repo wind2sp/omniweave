@@ -241,6 +241,7 @@ function transpose(x: Tensor, perm: number[]): Tensor {
 
 function act(d: Float32Array, kind: string | undefined, a?: [number, number], post?: [number, number]) {
   if (kind === "relu") for (let i = 0; i < d.length; i++) d[i] = d[i] > 0 ? d[i] : 0;
+  else if (kind === "relu6") for (let i = 0; i < d.length; i++) d[i] = d[i] > 0 ? (d[i] < 6 ? d[i] : 6) : 0;
   else if (kind === "hardswish")
     for (let i = 0; i < d.length; i++) {
       const v = d[i];
@@ -384,24 +385,43 @@ export function conv2d(x: Tensor, w: Tensor, b: Float32Array | null, a: ConvArgs
       if (r) return r;
     }
   }
-  if (g === 1 && sh === 1 && sw === 1 && dh === 1 && dw === 1 && oh * ow >= 8 && cin * kh * kw * oh * ow <= 1 << 23) {
-    // other dense kernels at stride 1 (the recognizer's 1×3 convs): im2col, then the 1×1 kernel — channel
-    // (ci·kh + ky)·kw + kx of the column matrix is the input shifted by (ky, kx), zero outside; the weights
-    // [cout][cin][kh][kw] are already that matrix. Same sum order per output: bias, then ci, ky, kx.
-    const K = cin * kh * kw, xc = T([1, K, oh, ow]), cd = xc.d, xd = x.d;
-    for (let ci = 0; ci < cin; ci++)
-      for (let ky = 0; ky < kh; ky++)
-        for (let kx = 0; kx < kw; kx++) {
-          const base = ((ci * kh + ky) * kw + kx) * oh * ow;
-          for (let y = 0; y < oh; y++) {
-            const iy = y + ky - pt;
-            if (iy < 0 || iy >= H) continue;
-            const x0 = Math.max(0, pl - kx), x1 = Math.min(ow, Wd + pl - kx);
-            for (let q = x0; q < x1; q++) cd[base + y * ow + q] = xd[(ci * H + iy) * Wd + q + kx - pl];
+  if (g === 1 && sh === 1 && sw === 1 && dh === 1 && dw === 1 && oh * ow >= 8) {
+    // other dense kernels at stride 1 (the recognizer's 1×3 convs, MODNet's 5×5): im2col, then the 1×1 kernel —
+    // channel (ci·kh + ky)·kw + kx of the column matrix is the input shifted by (ky, kx), zero outside; the weights
+    // [cout][cin][kh][kw] are already that matrix. Same sum order per output: bias, then ci, ky, kx. A column matrix
+    // above 2²³ values is made for bands of output rows in turn.
+    const K = cin * kh * kw, xd = x.d;
+    const band = Math.max(1, Math.min(oh, Math.floor((1 << 23) / (K * ow))));
+    const wk = T([cout, K, 1, 1], w.d);
+    const o = band < oh ? T([1, cout, oh, ow]) : null;
+    let ok = true;
+    for (let y0 = 0; y0 < oh && ok; y0 += band) {
+      const bh = Math.min(band, oh - y0);
+      if (bh * ow < 8 && band < oh) {
+        ok = false;
+        break;
+      }
+      const xc = T([1, K, bh, ow]), cd = xc.d;
+      for (let ci = 0; ci < cin; ci++)
+        for (let ky = 0; ky < kh; ky++)
+          for (let kx = 0; kx < kw; kx++) {
+            const base = ((ci * kh + ky) * kw + kx) * bh * ow;
+            for (let y = 0; y < bh; y++) {
+              const iy = y0 + y + ky - pt;
+              if (iy < 0 || iy >= H) continue;
+              const x0 = Math.max(0, pl - kx), x1 = Math.min(ow, Wd + pl - kx);
+              for (let q = x0; q < x1; q++) cd[base + y * ow + q] = xd[(ci * H + iy) * Wd + q + kx - pl];
+            }
           }
-        }
-    const r = convWasm(xc, T([cout, K, 1, 1], w.d), bias, 1, 1, 1, 0, false);
-    if (r) return r;
+      const r = convWasm(xc, wk, bias, 1, 1, 1, 0, false);
+      if (!r) {
+        ok = false;
+        break;
+      }
+      if (!o) return r;
+      for (let c = 0; c < cout; c++) o.d.set(r.d.subarray(c * bh * ow, (c + 1) * bh * ow), (c * oh + y0) * ow);
+    }
+    if (o && ok) return o;
   }
   const o = T([1, cout, oh, ow]);
   const od = o.d, xd = x.d, wd = w.d;
@@ -682,6 +702,13 @@ function slice(x: Tensor, starts: number[], ends: number[], axes: number[], decr
     st[ax] = a;
     s[ax] = e - a;
   });
+  // channels of one picture (MODNet's IBNorm halves): one contiguous block
+  if (axes.length === 1 && axes[0] === 1 && x.s[0] === 1 && x.s.length >= 2) {
+    const per = x.d.length / x.s[1];
+    const o = T(s, x.d.slice(st[1] * per, (st[1] + s[1]) * per), x.int);
+    o.s = s.filter((_, i) => !decrease.includes(i));
+    return o;
+  }
   const o = T(s, undefined, x.int);
   const xs = strides(x.s), n = s.length, idx = new Array(n).fill(0);
   for (let i = 0; i < o.d.length; i++) {
@@ -733,11 +760,120 @@ function pixelShuffle(x: Tensor, rr: number): Tensor {
   return o;
 }
 
+/** Bilinear resize by a scale (ONNX Resize "linear", pytorch_half_pixel: PyTorch's align_corners = false). */
+function bilinear(x: Tensor, scale: [number, number]): Tensor {
+  const [, C, H, W] = x.s;
+  const OH = Math.floor(H * scale[0]), OW = Math.floor(W * scale[1]);
+  if (!(OH > 0 && OW > 0)) bad("bilinear_interp size");
+  const o = T([1, C, OH, OW]);
+  const map = (v: number, n: number, on: number) => (on > 1 ? Math.max(0, (v + 0.5) * (n / on) - 0.5) : 0);
+  const y0 = new Int32Array(OH), y1 = new Int32Array(OH), fy = new Float32Array(OH);
+  for (let y = 0; y < OH; y++) {
+    const f = Math.min(H - 1, map(y, H, OH));
+    y0[y] = Math.floor(f);
+    y1[y] = Math.min(H - 1, y0[y] + 1);
+    fy[y] = f - y0[y];
+  }
+  const x0 = new Int32Array(OW), x1 = new Int32Array(OW), fx = new Float32Array(OW);
+  for (let xx = 0; xx < OW; xx++) {
+    const f = Math.min(W - 1, map(xx, W, OW));
+    x0[xx] = Math.floor(f);
+    x1[xx] = Math.min(W - 1, x0[xx] + 1);
+    fx[xx] = f - x0[xx];
+  }
+  for (let c = 0; c < C; c++) {
+    const ib = c * H * W, ob = c * OH * OW;
+    for (let y = 0; y < OH; y++) {
+      const r0 = ib + y0[y] * W, r1 = ib + y1[y] * W, wy = fy[y], orow = ob + y * OW;
+      for (let xx = 0; xx < OW; xx++) {
+        const wx = fx[xx], a0 = x.d[r0 + x0[xx]], a1 = x.d[r0 + x1[xx]], b0 = x.d[r1 + x0[xx]], b1 = x.d[r1 + x1[xx]];
+        o.d[orow + xx] = (a0 + (a1 - a0) * wx) * (1 - wy) + (b0 + (b1 - b0) * wx) * wy;
+      }
+    }
+  }
+  return o;
+}
+
 export interface RunStats {
   ms: number;
   peakBytes: number;
   /** filled when present: ms per op kind */
   perOp?: Record<string, number>;
+}
+
+/** weights of a range of output channels (the conv pool's workers each run one range — convPool.ts) */
+const rangeW = new WeakMap<GNode, Map<string, { w: Tensor; b: Float32Array | null; p: Float32Array | null }>>();
+function rangeOf(m: GraphModel, n: GNode, oc0: number, oc1: number) {
+  let byRange = rangeW.get(n);
+  if (!byRange) rangeW.set(n, (byRange = new Map()));
+  const key = oc0 + ":" + oc1;
+  let r = byRange.get(key);
+  if (!r) {
+    const w = m.w.get(n.w!)!, per = w.d.length / w.s[0];
+    const b = n.b ? m.w.get(n.b)!.d : null, p = n.p ? m.w.get(n.p)!.d : null;
+    r = { w: { s: [oc1 - oc0, ...w.s.slice(1)], d: w.d.slice(oc0 * per, oc1 * per) }, b: b ? b.slice(oc0, oc1) : null, p: p && p.length > 1 ? p.slice(oc0, oc1) : p };
+    byRange.set(key, r);
+  }
+  return r;
+}
+
+/**
+ * A conv node on the CPU (with its fused activation / pixel shuffle). `oc`: only output channels [oc0, oc1) — what one
+ * worker of the conv pool computes (dense convs only, no pixel shuffle); the same sums as the whole conv's.
+ */
+export function convNode(m: GraphModel, n: GNode, x: Tensor, oc?: [number, number]): Tensor {
+  const a = n.a ?? {};
+  const part = oc ? rangeOf(m, n, oc[0], oc[1]) : null;
+  if (part && ((a.groups ?? 1) !== 1 || a.shuffle)) throw new Error("conv range: dense convs only");
+  let r = conv2d(x, part ? part.w : m.w.get(n.w!)!, part ? part.b : n.b ? m.w.get(n.b)!.d : null, { stride: a.stride, pad: a.pad, dil: a.dil, groups: a.groups });
+  if (n.act === "prelu") {
+    const sl = part ? part.p! : m.w.get(n.p!)!.d, C = r.s[1], HW = r.d.length / C, d = r.d;
+    for (let c = 0; c < C; c++) {
+      const k = sl.length === 1 ? sl[0] : sl[c];
+      for (let j = c * HW; j < (c + 1) * HW; j++) if (d[j] < 0) d[j] *= k;
+    }
+  } else act(r.d, n.act, n.actA, n.post);
+  // fused depth to space (the last conv of a super-resolution net writes its pixels in place)
+  if (a.shuffle) r = pixelShuffle(r, a.shuffle);
+  return r;
+}
+
+/**
+ * Convs another executor may take (the conv pool): returns the output, or null to run it here. Called for dense convs
+ * only, with the node's index in the graph.
+ */
+export type ConvOffload = (i: number, n: GNode, x: Tensor) => Promise<Tensor> | null;
+
+/**
+ * runGraph with dense convs handed to `offload` where it takes them (convPool.ts: output channels split across
+ * workers). Everything else, and the order, as runGraph.
+ */
+export async function runGraphAsync(m: GraphModel, input: Tensor, offload: ConvOffload): Promise<Tensor> {
+  const env = new Map<number, Val>([[m.meta.input, input]]);
+  const get = (x: number | string): Val => {
+    if (typeof x === "string") {
+      const t = m.w.get(x.slice(1));
+      if (!t) throw new Error("weight " + x);
+      return t;
+    }
+    const v = env.get(x);
+    if (!v) throw new Error("value %" + x);
+    return v;
+  };
+  const nodes = m.meta.nodes;
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const a = n.a ?? {};
+    let r: Val | null = null;
+    if (n.op === "conv" && (a.groups ?? 1) === 1 && !a.shuffle) {
+      const p = offload(i, n, get(n.in[0]) as Tensor);
+      if (p) r = await p;
+    }
+    r ??= evalNode(m, n, get);
+    n.out.forEach((o) => env.set(o, r!));
+    for (const x of n.in) if (typeof x === "number" && m.lastUse.get(x) === i && x !== m.meta.output && x !== m.meta.input) env.delete(x);
+  }
+  return get(m.meta.output) as Tensor;
 }
 
 /** One node on the CPU; `get` resolves inputs (numbered values and "$weight" names). */
@@ -746,19 +882,9 @@ export function evalNode(m: GraphModel, n: GNode, get: (x: number | string) => V
   const tt = (x: number | string) => get(x) as Tensor;
   let r: Val;
   switch (n.op) {
-    case "conv": {
-      r = conv2d(tt(n.in[0]), m.w.get(n.w!)!, n.b ? m.w.get(n.b)!.d : null, { stride: a.stride, pad: a.pad, dil: a.dil, groups: a.groups });
-      if (n.act === "prelu") {
-        const sl = m.w.get(n.p!)!.d, C = r.s[1], HW = r.d.length / C, d = r.d;
-        for (let c = 0; c < C; c++) {
-          const k = sl.length === 1 ? sl[0] : sl[c];
-          for (let j = c * HW; j < (c + 1) * HW; j++) if (d[j] < 0) d[j] *= k;
-        }
-      } else act(r.d, n.act, n.actA, n.post);
-      // fused depth to space (the last conv of a super-resolution net writes its pixels in place)
-      if (a.shuffle) r = pixelShuffle(r, a.shuffle);
+    case "conv":
+      r = convNode(m, n, tt(n.in[0]));
       break;
-    }
     case "convT":
       r = convT(tt(n.in[0]), m.w.get(n.w!)!, n.b ? m.w.get(n.b)!.d : null, a as any);
       break;
@@ -791,7 +917,26 @@ export function evalNode(m: GraphModel, n: GNode, get: (x: number | string) => V
     case "multiply":
       r = binary(tt(n.in[0]), tt(n.in[1]), MUL);
       break;
-    case "relu": case "hardswish": case "swish": case "sigmoid": case "hardsigmoid": {
+    case "inorm": {
+      // instance normalisation (MODNet's IBNorm half): per channel over H × W, then the affine scale / shift
+      const x = tt(n.in[0]), sc = tt(n.in[1]).d, bi = tt(n.in[2]).d, eps = a.eps ?? 1e-5;
+      const C = x.s[1], HW = x.d.length / C, o = T(x.s.slice());
+      for (let c = 0; c < C; c++) {
+        let mean = 0;
+        for (let j = c * HW; j < (c + 1) * HW; j++) mean += x.d[j];
+        mean /= HW;
+        let v = 0;
+        for (let j = c * HW; j < (c + 1) * HW; j++) v += (x.d[j] - mean) ** 2;
+        const k = sc[c] / Math.sqrt(v / HW + eps), sh = bi[c] - mean * k;
+        for (let j = c * HW; j < (c + 1) * HW; j++) o.d[j] = x.d[j] * k + sh;
+      }
+      r = o;
+      break;
+    }
+    case "bilinear_interp":
+      r = bilinear(tt(n.in[0]), a.scale as [number, number]);
+      break;
+    case "relu": case "relu6": case "hardswish": case "swish": case "sigmoid": case "hardsigmoid": {
       const x = tt(n.in[0]);
       const o = T(x.s.slice(), Float32Array.from(x.d));
       act(o.d, n.op, n.op === "hardsigmoid" ? [a.slope, a.offset] : undefined);

@@ -21,8 +21,11 @@ import { t } from "../../i18n";
 import { contentKey, isEmptyPh, layoutDecor, layoutPhOf } from "../../core/slides";
 import { chartFrameNow, chartRun, drawChart } from "../formats/pptxChart";
 import { chartPartWithData, workbookWithData } from "./pptxChart";
+import { CT_CHART, chartSpaceXml, chartWorkbook } from "../formats/pptxChartWrite";
+import { CT_DGM, dataModelXml } from "../formats/pptxSmartArt";
+import type { SmartData } from "../../core/smartArt";
 import { withAnimTiming } from "../formats/pptxAnim";
-import { CT_NOTES, importPptx, pptxLayoutSlides, notesParasXml, notesSlideXml, parasXml, relsXml, runXml, sectionExtXml, sectionLstXml, slidePartXml, slideWriter, solidBgXml, transitionXml, type Rasterize, type SlideEnv, type SlideTrace } from "../formats/pptx";
+import { CT_NOTES, NOTES_MASTER_XML, importPptx, pptxLayoutSlides, slideHfXml, themeXml, notesParasXml, notesSlideXml, parasXml, relsXml, runXml, sectionExtXml, sectionLstXml, slidePartXml, slideWriter, solidBgXml, transitionXml, type Rasterize, type SlideEnv, type SlideTrace } from "../formats/pptx";
 import { childNamed, childrenOf, descendantsNamed, rootOf, type XmlEl } from "./scan";
 import { entryData, readZip, rewriteZip, type ZipArchive } from "./zip";
 
@@ -47,7 +50,8 @@ const hash = (s: string) => fnv(s, 2166136261) + fnv(s, 0x9747b28c) + s.length.t
 /** Content fingerprint of a slide: everything that is drawn or played (not its name in the slide list). */
 export function slideFingerprint(p: Page): string {
   // (animations only when there are some: a slide read from a file has none, so its fingerprint is as before)
-  return hash(JSON.stringify([p.width, p.height, p.background, p.transition, p.nodes, p.groups ?? null, ...(p.animations?.length ? [p.animations] : [])]));
+  // (머리글/바닥글 only when set here: a slide read from a file has none, so its fingerprint is as before)
+  return hash(JSON.stringify([p.width, p.height, p.background, p.transition, p.nodes, p.groups ?? null, ...(p.animations?.length ? [p.animations] : []), ...(p.slideHf ? [p.slideHf] : []), ...(p.bgGrad ? [p.bgGrad] : [])]));
 }
 
 /**
@@ -543,6 +547,10 @@ interface SlideJob {
  * of one original (or it cannot be read): the caller writes the deck anew.
  */
 export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: Rasterize): Promise<PptxSurgery | null> {
+  // slides over a layout made here (core/slideLayouts.ts): the original has no such layout — the deck is written anew
+  if (pages.some((p) => p.masterId && doc.masters.some((m) => m.id === p.masterId && m.layout === "@layout"))) return null;
+  // slides drawn over one of the document's masters (a theme applied here, 슬라이드 마스터 edited here: core/slideTheme.ts)
+  // have a new look the original's masters do not hold: the deck is written anew with that master and theme
   // the original: the one most pages came from
   const count = new Map<string, number>();
   for (const p of pages) {
@@ -583,7 +591,42 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
     return { page, part: null, blocks: [] };
   });
   const warnings: string[] = [];
-  const env: SlideEnv = { doc, rasterize, addMedia: mediaAdder(pkg), counts: { flattened: 0, inShape: 0, fxPictures: 0, skipped: 0 } };
+  // a chart inserted here: its own chart part and embedded workbook (io/formats/pptxChartWrite.ts), named apart from the deck's
+  const chartCt: string[] = [];
+  let chartN = 0;
+  const addChart = (m: SlideChart) => {
+    let part: string;
+    do part = `ppt/charts/omwChart${++chartN}.xml`;
+    while (pkg.names.has(part));
+    let book: Uint8Array | null = null;
+    try {
+      book = chartWorkbook(m);
+    } catch {
+      book = null;
+    }
+    if (book) {
+      const bp = `ppt/embeddings/omwChart${chartN}.xlsx`;
+      pkg.changed.set(bp, book);
+      pkg.names.add(bp);
+      pkg.put(relsName(part), relsXml([`<Relationship Id="rId1" Type="${NS_REL}/package" Target="../embeddings/omwChart${chartN}.xlsx"/>`]));
+    }
+    pkg.put(part, chartSpaceXml(m, book ? "rId1" : null));
+    pkg.names.add(part);
+    chartCt.push(`<Override PartName="/${part}" ContentType="${CT_CHART}"/>`);
+    return part;
+  };
+  // a SmartArt graphic inserted or edited here: PowerPoint's SmartArt parts (io/formats/pptxSmartArt.ts)
+  let dgmN = 0;
+  const addSmart = (d: SmartData): string => {
+    do dgmN++;
+    while (pkg.names.has(`ppt/diagrams/omwData${dgmN}.xml`));
+    const p = `ppt/diagrams/omwData${dgmN}.xml`;
+    pkg.put(p, dataModelXml(d));
+    pkg.names.add(p);
+    chartCt.push(`<Override PartName="/${p}" ContentType="${CT_DGM}Data+xml"/>`);
+    return p;
+  };
+  const env: SlideEnv = { doc, rasterize, addMedia: mediaAdder(pkg), counts: { flattened: 0, inShape: 0, fxPictures: 0, skipped: 0 }, addChart, addSmart };
   const note = { rewritten: [] as number[], shapes: 0, anims: 0, copied: [] as number[], noNotes: 0, warn: [] as string[], pkg };
   const reachBefore = reachable(pkg);
   // the deck's layouts read as slides (only when a slide took one here)
@@ -609,6 +652,9 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
   const newRels: string[] = [];
   const ctAdd: string[] = [];
   const order: string[] = [];
+  // notes in a deck that has no notes master (PowerPoint makes one with the first notes): one is added, on a copy of
+  // the deck's theme, and listed in presentation.xml below (after the slide list is written)
+  const notesMaster = jobs.some((j) => j.page.notes?.trim()) ? (presRels.find((r) => r.type === "notesMaster")?.target ?? addNotesMaster(pkg, ctAdd)) : undefined;
   for (let si = 0; si < jobs.length; si++) {
     const j = jobs[si];
     if (j.part) {
@@ -631,7 +677,7 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
     if (split && look && j.page.background === look.page.background) sx = sx.replace(/<p:bg>[\s\S]*?<\/p:bg>/, "");
     pkg.put(part, sx);
     pkg.put(relsName(part), relsXml(w.rels));
-    if (j.page.notes?.trim() && setNotes(pkg, part, j.page.notes, ctAdd) === "noMaster") note.noNotes++;
+    if (j.page.notes?.trim() && setNotes(pkg, part, j.page.notes, ctAdd, notesMaster) === "noMaster") note.noNotes++;
     const r = `rId${++rid}`;
     newRels.push(`<Relationship Id="${r}" Type="${NS_REL}/slide" Target="slides/slide${slideN}.xml"/>`);
     ctAdd.push(`<Override PartName="/${part}" ContentType="${CT_SLIDE}"/>`);
@@ -648,7 +694,7 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
     const p = j.page;
     if (was[0] !== !!p.hidden) pkg.put(j.part, setHidden(pkg.text(j.part)!, !!p.hidden));
     if (p.layout && was[1] !== p.layout) setLayout(pkg, j.part, p.layout);
-    if (was[3] !== (p.notes ?? "") && setNotes(pkg, j.part, p.notes ?? "", ctAdd) === "noMaster") note.noNotes++;
+    if (was[3] !== (p.notes ?? "") && setNotes(pkg, j.part, p.notes ?? "", ctAdd, notesMaster) === "noMaster") note.noNotes++;
   }
   // sections named, renamed or removed here: the section list is written again from the slides
   const sectionsChanged = jobs.some((j) => {
@@ -672,6 +718,17 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
     if (newRels.length) rs2 = rs2.replace(/<\/(\w+:)?Relationships>\s*$/, (m) => newRels.join("") + m);
     pkg.put(relsName("ppt/presentation.xml"), rs2);
   }
+  // a notes master added here: in the presentation's list (after the slide masters) and relationships
+  if (notesMaster && !presRels.some((r) => r.type === "notesMaster")) {
+    const r = `rId${++rid}`;
+    const px = pkg.text("ppt/presentation.xml")!;
+    const pre = /<(\w+:)?sldMasterIdLst/.exec(px)?.[1] ?? "";
+    const lst = `<${pre}notesMasterIdLst><${pre}notesMasterId r:id="${r}"/></${pre}notesMasterIdLst>`;
+    const at = /<\/(\w+:)?sldMasterIdLst>/.exec(px);
+    pkg.put("ppt/presentation.xml", at ? px.slice(0, at.index + at[0].length) + lst + px.slice(at.index + at[0].length) : px);
+    const rs = pkg.text(relsName("ppt/presentation.xml"))!;
+    pkg.put(relsName("ppt/presentation.xml"), rs.replace(/<\/(\w+:)?Relationships>\s*$/, (m) => `<Relationship Id="${r}" Type="${NS_REL}/notesMaster" Target="${relTarget("ppt/presentation.xml", notesMaster)}"/>` + m));
+  }
   // parts no longer reachable (a removed slide, its notes; media only a rewritten shape used) leave the package
   const reachAfter = reachable(pkg);
   let ct = ctypes;
@@ -681,6 +738,45 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
     if (pkg.names.has(relsName(p))) pkg.removed.add(relsName(p));
     ct = ct.replace(new RegExp(`<(?:\\w+:)?Override\\b[^>]*PartName\\s*=\\s*"/${p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*/>`, "i"), "");
   }
+  // a theme applied here (core/slideTheme.ts): its colours and fonts into the deck's own theme parts (the format, effect
+  // and background styles stay the deck's), the theme master's shapes (its decoration, what was drawn on it in the
+  // 슬라이드 마스터 view) at the end of each slide master's shape tree — the deck's masters and layouts stay as they were
+  const usedMaster = doc.masters.find((m) => m.nodes.length > 0 && pages.some((p) => p.masterId === m.id));
+  if (doc.theme || usedMaster) {
+    const masters = relsOf(pkg, "ppt/presentation.xml").filter((r) => r.type === "slideMaster").map((r) => r.target);
+    const newTheme = doc.theme ? themeXml(doc.theme) : null;
+    for (const mp of masters) {
+      const th = relsOf(pkg, mp).find((r) => r.type === "theme")?.target;
+      const tx = th ? pkg.text(th) : null;
+      if (newTheme && th && tx) {
+        let out = tx;
+        for (const el of ["clrScheme", "fontScheme"]) {
+          const re = new RegExp(`<(\\w+:)?${el}\\b[\\s\\S]*?</\\1?${el}>`);
+          const mine = re.exec(newTheme)?.[0];
+          const m0 = re.exec(out);
+          if (mine && m0) out = out.slice(0, m0.index) + (m0[1] && m0[1] !== "a:" ? mine.replace(/<(\/?)a:/g, `<$1${m0[1]}`) : mine) + out.slice(m0.index + m0[0].length);
+        }
+        out = out.replace(/(<(?:\w+:)?theme\b[^>]*?\sname=")[^"]*(")/, `$1${doc.theme!.name.replace(/[<>&"]/g, "")}$2`);
+        if (out !== tx) pkg.put(th, out);
+      }
+      if (!usedMaster) continue;
+      const ms = pkg.text(mp);
+      if (!ms) continue;
+      const tree = /<(\w+:)?spTree\b[\s\S]*<\/\1?spTree>/.exec(ms);
+      if (!tree) continue;
+      const mrels = relsOf(pkg, mp);
+      const w = slideWriter(env, usedMaster, -1, W, H, { id: Math.max(1, ...shapeIds(ms).map(Number)) + 1, relBase: maxRid(mrels) });
+      await w.emit(usedMaster.nodes);
+      // (under the master's own shapes: the decoration is the bottom-most, as on the slides here)
+      const head = /^<(?:\w+:)?spTree\b[^>]*>[\s\S]*?<\/(?:\w+:)?grpSpPr>/.exec(tree[0]);
+      const at = tree.index + (head ? head[0].length : tree[0].indexOf(">") + 1);
+      pkg.put(mp, ms.slice(0, at) + w.shapes.join("") + ms.slice(at));
+      if (w.rels.length) {
+        const rs = pkg.text(relsName(mp)) ?? relsXml([]);
+        pkg.put(relsName(mp), rs.replace(/<\/(\w+:)?Relationships>\s*$/, (m) => w.rels.join("") + m));
+      }
+    }
+  }
   // content types of new parts (slides; media extensions)
   for (const n of pkg.changed.keys()) {
     const ext = /\.([a-z0-9]+)$/i.exec(n)?.[1]?.toLowerCase();
@@ -689,6 +785,7 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
       if (mime) ctAdd.push(`<Default Extension="${ext}" ContentType="${mime}"/>`);
     }
   }
+  ctAdd.push(...chartCt);
   if (ctAdd.length) ct = ct.replace(/<\/(\w+:)?Types>\s*$/, (m) => ctAdd.join("") + m);
   if (ct !== ctypes) pkg.put("[Content_Types].xml", ct);
   const { flattened, inShape, fxPictures } = env.counts;
@@ -704,7 +801,7 @@ export async function pptxSurgical(doc: OmwDocument, pages: Page[], rasterize?: 
   return { bytes: rewriteZip(pkg.z, pkg.changed, pkg.removed), warnings };
 }
 
-const MIME: Record<string, string> = { png: "image/png", jpeg: "image/jpeg", jpg: "image/jpeg", gif: "image/gif", bmp: "image/bmp", svg: "image/svg+xml", mp4: "video/mp4", avi: "video/x-msvideo", mov: "video/quicktime", wmv: "video/x-ms-wmv", webm: "video/webm", mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", wma: "audio/x-ms-wma", ogg: "audio/ogg", flac: "audio/flac" };
+const MIME: Record<string, string> = { xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", png: "image/png", jpeg: "image/jpeg", jpg: "image/jpeg", gif: "image/gif", bmp: "image/bmp", svg: "image/svg+xml", mp4: "video/mp4", avi: "video/x-msvideo", mov: "video/quicktime", wmv: "video/x-ms-wmv", webm: "video/webm", mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", wma: "audio/x-ms-wma", ogg: "audio/ogg", flac: "audio/flac" };
 
 /** Media parts for written shapes: an original part with the same bytes is used again, else a new ppt/media/omwN part. */
 function mediaAdder(pkg: Pkg) {
@@ -970,7 +1067,7 @@ function setLayout(pkg: Pkg, part: string, layout: string): void {
  * Speaker notes of a slide: the body text of its notes page replaced (its other shapes, formats and placeholders
  * kept), or a notes page made on the deck's notes master. "noMaster" when the deck has none to make one on.
  */
-function setNotes(pkg: Pkg, part: string, text: string, ctAdd: string[]): "ok" | "noMaster" {
+function setNotes(pkg: Pkg, part: string, text: string, ctAdd: string[], notesMaster?: string): "ok" | "noMaster" {
   const rel = relsOf(pkg, part).find((r) => r.type === "notesSlide");
   if (rel && pkg.names.has(rel.target)) {
     const s = pkg.text(rel.target);
@@ -983,7 +1080,7 @@ function setNotes(pkg: Pkg, part: string, text: string, ctAdd: string[]): "ok" |
     return "ok";
   }
   if (!text.trim()) return "ok";
-  const master = relsOf(pkg, "ppt/presentation.xml").find((r) => r.type === "notesMaster")?.target;
+  const master = notesMaster ?? relsOf(pkg, "ppt/presentation.xml").find((r) => r.type === "notesMaster")?.target;
   if (!master || !pkg.names.has(master)) return "noMaster";
   let n = 0;
   let np: string;
@@ -996,6 +1093,29 @@ function setNotes(pkg: Pkg, part: string, text: string, ctAdd: string[]): "ok" |
   pkg.put(relsName(part), rs.replace(/<\/(\w+:)?Relationships>\s*$/, (m) => add + m).replace(/<Relationships([^>]*)\/>\s*$/, `<Relationships$1>${add}</Relationships>`));
   ctAdd.push(`<Override PartName="/${np}" ContentType="${CT_NOTES}"/>`);
   return "ok";
+}
+
+/**
+ * A notes master for a deck without one (its notes pages are made on it): the notes master a new deck gets, with a
+ * copy of the first slide master's theme. Its part name; presentation.xml lists it after the slides are written.
+ */
+function addNotesMaster(pkg: Pkg, ctAdd: string[]): string | undefined {
+  const sm = relsOf(pkg, "ppt/presentation.xml").find((r) => r.type === "slideMaster")?.target;
+  const theme = sm ? relsOf(pkg, sm).find((r) => r.type === "theme")?.target : undefined;
+  const themeXml = theme && pkg.text(theme);
+  if (!themeXml) return undefined;
+  const free = (f: (n: number) => string) => {
+    let n = 0;
+    while (pkg.names.has(f(++n)));
+    return f(n);
+  };
+  const tp = free((n) => `ppt/theme/theme${n}.xml`);
+  const mp = free((n) => `ppt/notesMasters/notesMaster${n}.xml`);
+  pkg.put(tp, themeXml);
+  pkg.put(mp, NOTES_MASTER_XML);
+  pkg.put(relsName(mp), relsXml([`<Relationship Id="rId1" Type="${NS_REL}/theme" Target="${relTarget(mp, tp)}"/>`]));
+  ctAdd.push(`<Override PartName="/${tp}" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>`, `<Override PartName="/${mp}" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>`);
+  return mp;
 }
 
 /** presentation.xml with its section list replaced by `lst` (added in an extLst entry when it had none; "" removes it). */
@@ -1108,7 +1228,8 @@ async function surgeSlide(pkg: Pkg, doc: OmwDocument, job: SlideJob, si: number,
   const treeOf = (body: string[]) => s.slice(tree.start, tree.openEnd) + head.map((c) => elText(s, c)).join("") + body.join("") + tail.map((c) => elText(s, c)).join("") + `</${tree.name}>`;
   const gone = new Set<string>(), noText = new Set<string>(), paraLim = new Map<string, number>();
   let treeXml: string;
-  if (page.width !== W || page.height !== H || page.groups?.length) {
+  // (a SmartArt group is one element of the slide, kept or written as one: core/smartArt.ts)
+  if (page.width !== W || page.height !== H || page.groups?.some((g) => !g.smart)) {
     // a page of another size or with layer groups: the slide's shapes written anew (their animations go), the rest of
     // the slide (background, transition, notes, layout) as it was
     treeXml = treeOf(await write(inhChanged ? page.nodes : page.nodes.filter((n) => !inhB.ids.includes(n.id) && !layIds.has(n.id))));
@@ -1127,13 +1248,23 @@ async function surgeSlide(pkg: Pkg, doc: OmwDocument, job: SlideJob, si: number,
     });
   }
   let out = splice(s, tree, treeXml);
+  // 머리글/바닥글 set here (core/slideHf.ts): the slide's own dt / ftr / sldNum placeholders written anew at its end
+  if (page.slideHf) {
+    const tr0 = childNamed(out, childNamed(out, rootOf(out), "cSld")!, "spTree")!;
+    const old = childrenOf(out, tr0).filter((c) => c.local === "sp" && /<(?:\w+:)?ph\b[^>]*\btype="(?:dt|ftr|sldNum)"/.test(elText(out, c)));
+    for (const c of [...old].reverse()) out = out.slice(0, c.start) + out.slice(c.end);
+    const tr1 = childNamed(out, childNamed(out, rootOf(out), "cSld")!, "spTree")!;
+    const add = slideHfXml(doc, page, W, H, maxId + 1);
+    maxId += add.length;
+    out = out.slice(0, tr1.closeStart) + add.join("") + out.slice(tr1.closeStart);
+  }
   // background and transition, when they changed
   const look = JSON.parse(job.blocks[0].fp[3] ?? "null") as [string, Page["transition"]] | null;
   const r2 = rootOf(out);
   const c2 = childNamed(out, r2, "cSld")!;
   // the new layout's own background (the slide had none of its own): drawn by the layout, not written on the slide
   const layBg = !!lay && !inhChanged && page.background === lay.page.background && !childNamed(out, c2, "bg");
-  const bgChanged = !layBg && (!look || look[0] !== page.background || (inhChanged && inhB.fp[1] === "bg" && !inhNow.length));
+  const bgChanged = !layBg && (!look || look[0] !== page.background || !!page.bgGrad || (inhChanged && inhB.fp[1] === "bg" && !inhNow.length));
   if (bgChanged && look) {
     const bg = childNamed(out, c2, "bg");
     out = bg ? splice(out, bg, solidBgXml(page)) : out.slice(0, c2.openEnd) + solidBgXml(page) + out.slice(c2.openEnd);

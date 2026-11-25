@@ -4,7 +4,7 @@ import type { ApplyCtx } from "./filters";
 import { applyOps, ImageOpError, type ImageOp } from "./ops";
 import type { Img } from "./pixels";
 import { traceImage, type TraceMap, type TraceOptions } from "./trace";
-import { analyze, removeBackground, type MatteOptions } from "./matte/pipeline";
+import { analyze, MATTE_STAGES, removeBackground, type MatteOptions, type MatteStage } from "./matte/pipeline";
 import { modelFile, ocrModels, recognizePage, setModelBase, type OcrAccel, type OcrLang } from "./ocr/models";
 import type { OcrOptions } from "./ocr/pipeline";
 import { IdleRelease, localWorker, poolSize, RecPool, runLines } from "./ocr/recPool";
@@ -13,13 +13,15 @@ import { graphGpu, graphGpuAvailable, trimGraphGpu } from "./infer/graphGpu";
 import { runGraph, type GraphModel } from "./infer/graph";
 import { upscale, type UpImg, type UpscaleOptions } from "./upscale";
 import { setSrModelBase, srModel, type SrModelKind } from "./sr/models";
+import { setMatteModelBase } from "./matte/modnet";
+import { defaultConvPoolMaker, setConvPoolMaker } from "./infer/convPool";
 import { superResolve, type NetRun, type SrOptions } from "./sr/pipeline";
 
 export type WorkerRequest =
   | { id: number; kind: "ops"; img: Img; ops: ImageOp[]; ctx?: ApplyCtx }
   | { id: number; kind: "trace"; img: Img; opts: Partial<TraceOptions>; map: TraceMap }
-  | { id: number; kind: "matte"; img: Img; opts: MatteOptions }
-  | { id: number; kind: "matteAnalyze"; img: Img; opts: MatteOptions }
+  | { id: number; kind: "matte"; img: Img; opts: MatteOptions; base?: string }
+  | { id: number; kind: "matteAnalyze"; img: Img; opts: MatteOptions; base?: string }
   | { id: number; kind: "ocr"; img: Img; lang: OcrLang; opts: OcrOptions; base?: string }
   | { id: number; kind: "ocrWarm"; lang: OcrLang; base?: string }
   | { id: number; kind: "upscale"; img: UpImg; opts: UpscaleOptions }
@@ -55,6 +57,10 @@ interface WorkerScope {
 }
 
 const scope = self as unknown as WorkerScope;
+// background removal on the CPU splits its convs across a pool of workers (infer/convPool.ts)
+setConvPoolMaker(defaultConvPoolMaker());
+/** background removal's steps as progress messages: [step, steps] (MATTE_STAGES) */
+const stageTo = (id: number) => (st: MatteStage) => scope.postMessage({ id, progress: [MATTE_STAGES.indexOf(st) + 1, MATTE_STAGES.length] });
 
 // OCR acceleration. Text lines are recognized by a pool of nested workers (ocr/recPool.ts) — they stay alive between
 // pages (the model is parsed once) and end with this worker (cancelImageWork terminates it) or after two idle
@@ -134,7 +140,8 @@ scope.onmessage = async (e) => {
   const t0 = performance.now();
   try {
     if (req.kind === "matte") {
-      const r = await removeBackground(req.img, req.opts);
+      setMatteModelBase(req.base);
+      const r = await removeBackground(req.img, { ...req.opts, onStage: stageTo(req.id) });
       const transfer: Transferable[] = [r.alpha.buffer, r.cut.data.buffer];
       scope.postMessage({ id: req.id, ok: true, matte: r, ms: performance.now() - t0 }, transfer);
       return;
@@ -185,7 +192,8 @@ scope.onmessage = async (e) => {
       return;
     }
     if (req.kind === "matteAnalyze") {
-      const r = await analyze(req.img, req.opts);
+      setMatteModelBase(req.base);
+      const r = await analyze(req.img, { ...req.opts, onStage: stageTo(req.id) });
       scope.postMessage({ id: req.id, ok: true, analysis: r, ms: performance.now() - t0 });
       return;
     }

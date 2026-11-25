@@ -39,5 +39,7 @@
   "pdf.sign.histMove": "Move signature",
   "cmd.text.pdfSign": "Add Signature",
   "pdf.find.hint": "Finds text on the PDF pages. Enter: next, Shift+Enter: previous",
-  "pdf.find.searching": "Searching…"
+  "pdf.find.searching": "Searching…",
+  "pdf.select.copied": "Copied {n} characters",
+  "pdf.select.copyFailed": "Couldn't copy to the clipboard"
 }

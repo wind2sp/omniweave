@@ -40,12 +40,18 @@ export function measure(dir = "dist") {
  */
 /** The AI upscale models (public/models/sr, in git; docs/design/IMAGE_UPSCALE.md) — exactly these files. */
 export const SR_MODEL_FILES = ["realesr-general-x4v3.lwt", "realesr-general-wdn-x4v3.lwt", "realesr-animevideov3.lwt", "LICENSE"];
+/** The person matting model of background removal (public/models/matte, in git; MODNet int8) — exactly these files. */
+export const MATTE_MODEL_FILES = ["modnet.lwt", "LICENSE"];
 
 export function ruleViolations(paths, pinned = []) {
   const v = [];
   for (const p of paths) {
     if (/^models\/sr\//.test(p)) {
       if (!SR_MODEL_FILES.includes(p.slice("models/sr/".length))) v.push(`${p}: not one of the AI upscale models`);
+      continue;
+    }
+    if (/^models\/matte\//.test(p)) {
+      if (!MATTE_MODEL_FILES.includes(p.slice("models/matte/".length))) v.push(`${p}: not the person matting model`);
       continue;
     }
     if (/\.bcmap$/i.test(p) || /^pdfjs\/cmaps\//.test(p)) v.push(`${p}: loose CMap (they ship as pdfjs/cmaps.pack only)`);
@@ -66,7 +72,7 @@ export function ruleViolations(paths, pinned = []) {
  */
 export function measureGaps(paths, pinned = [], base = { ocr: true }) {
   const have = new Set(paths);
-  const need = ["pdfjs/cmaps.pack", "pdfjs/standard_fonts/FoxitSymbol.pfb", "pdfjs/standard_fonts/FoxitDingbats.pfb", ...SR_MODEL_FILES.map((p) => "models/sr/" + p)];
+  const need = ["pdfjs/cmaps.pack", "pdfjs/standard_fonts/FoxitSymbol.pfb", "pdfjs/standard_fonts/FoxitDingbats.pfb", ...SR_MODEL_FILES.map((p) => "models/sr/" + p), ...MATTE_MODEL_FILES.map((p) => "models/matte/" + p)];
   if (base.ocr) need.push(...[...pinned, "LICENSE"].map((p) => "models/ocr/" + p));
   return need.filter((p) => !have.has(p));
 }

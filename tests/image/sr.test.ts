@@ -1,5 +1,5 @@
 // AI super-resolution (core/image/sr): the bundled Real-ESRGAN models on the in-house engine, the picture classifier
-// behind "자동", and the pipeline (tiles, alpha, sizes other than 4×). Pictures: tests/image/srSet.ts (synthetic omw-*
+// behind "?먮룞", and the pipeline (tiles, alpha, sizes other than 4횞). Pictures: tests/image/srSet.ts (synthetic omw-*
 // and the repository's own screenshots). CPU backend (WebGPU is measured in the app, docs/design/IMAGE_UPSCALE.md).
 import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -10,6 +10,7 @@ import { blendModels, setSrModelReader, SR_FILES, srModel, type SrModelKind } fr
 import { deblock, resizeArea, superResolve } from "../../src/core/image/sr/pipeline";
 import { upscale } from "../../src/core/image/upscale";
 import { gaussNoise, jpegLike, omwIllustration, omwLineArt, omwPhoto, omwScreenshot, srSet } from "./srSet";
+import { cpuBudget, cpuNow, wallTimeout } from "../budget";
 
 beforeAll(() => setSrModelReader(async (f) => new Uint8Array(readFileSync(`public/models/sr/${f}`))));
 
@@ -30,7 +31,7 @@ async function sr(img: Img, kind: SrModelKind, denoise: number, W: number, H: nu
 }
 
 describe("bundled models", () => {
-  it("three LWT graphs, 4×, fused conv + PReLU and pixel shuffle; the blend of two is their weight mix", async () => {
+  it("three LWT graphs, 4횞, fused conv + PReLU and pixel shuffle; the blend of two is their weight mix", async () => {
     for (const f of Object.values(SR_FILES)) {
       const m = parseGraph(new Uint8Array(readFileSync(`public/models/sr/${f}`)));
       expect(m.meta.format).toBe("graph");
@@ -56,27 +57,27 @@ describe("bundled models", () => {
   });
 });
 
-describe("classifier (자동)", () => {
+describe("classifier (?먮룞)", () => {
   const set = srSet(192);
   it("photo vs art, damage level: accuracy on the labelled set, < 50 ms each", () => {
     // warm up (JIT) first: under the full parallel suite the very first call alone can pass 50 ms
     for (let i = 0; i < 3; i++) classifySr(set[i].img);
     let content = 0, damage = 0;
-    const times: number[] = [];
     const wrong: string[] = [];
+    const t0 = cpuNow();
     for (const c of set) {
       const r = classifySr(c.img);
       if (r.content === c.content) content++;
       else wrong.push(`${c.name}: ${r.content}`);
       if (r.damage === c.damage) damage++;
-      times.push(r.ms);
     }
+    const perCall = (cpuNow() - t0) / set.length;
     console.log(`classifier: content ${content}/${set.length}, damage ${damage}/${set.length}`, wrong.join("; "));
     expect(content / set.length).toBeGreaterThanOrEqual(0.95);
     expect(damage / set.length).toBeGreaterThanOrEqual(0.75);
-    // speed: the median call (the full parallel suite can stall a few single calls; the budget is per typical image)
-    times.sort((a, b) => a - b);
-    expect(times[times.length >> 1]).toBeLessThan(50);
+    // speed: the mean CPU time per image (tests/budget.ts: other suites' load does not count; a mean, as Windows
+    // counts CPU time in 15.6 ms ticks)
+    expect(perCall).toBeLessThan(cpuBudget(50));
   });
 
   it("reads the JPEG quality back from the pixels (photos and screenshots)", () => {
@@ -91,7 +92,7 @@ describe("classifier (자동)", () => {
   });
 });
 
-describe("Auto against a fixed model (HR → 4× smaller → damaged → AI 4×, PSNR against HR)", () => {
+describe("Auto against a fixed model (HR ??4횞 smaller ??damaged ??AI 4횞, PSNR against HR)", () => {
   it("Auto is at least as good as either model alone over the set", async () => {
     const S = 256;
     const hr: [string, Img][] = [
@@ -114,17 +115,17 @@ describe("Auto against a fixed model (HR → 4× smaller → damaged → AI 4×,
         const hq = upscale(lr, { method: "hq", width: S, height: S }) as Img;
         const r = { auto: psnr(img, auto), photo: psnr(img, ph), art: psnr(img, ar), hq: psnr(img, hq) };
         for (const k of Object.keys(sum) as (keyof typeof sum)[]) sum[k] += r[k];
-        rows.push(`${name}/${dn} → ${d.content} ${d.denoise}${d.deblock ? " deblock" : ""}: auto ${r.auto.toFixed(2)} photo ${r.photo.toFixed(2)} art ${r.art.toFixed(2)} classic ${r.hq.toFixed(2)}`);
+        rows.push(`${name}/${dn} ??${d.content} ${d.denoise}${d.deblock ? " deblock" : ""}: auto ${r.auto.toFixed(2)} photo ${r.photo.toFixed(2)} art ${r.art.toFixed(2)} classic ${r.hq.toFixed(2)}`);
       }
     const n = hr.length * dmg.length;
     console.log(rows.join("\n") + `\nmean: auto ${(sum.auto / n).toFixed(2)} photo ${(sum.photo / n).toFixed(2)} art ${(sum.art / n).toFixed(2)} classic ${(sum.hq / n).toFixed(2)}`);
     expect(sum.auto).toBeGreaterThanOrEqual(sum.photo - 0.01 * n);
     expect(sum.auto).toBeGreaterThanOrEqual(sum.art - 0.01 * n);
-  }, 300_000);
+  }, wallTimeout(300_000));
 });
 
 describe("pipeline", () => {
-  it("2×, 3× and a custom size come from the 4× result; above 4× the rest is classical", async () => {
+  it("2횞, 3횞 and a custom size come from the 4횞 result; above 4횞 the rest is classical", async () => {
     const lr = downscale(omwIllustration(160, 120, 3), 40).img;
     for (const [W, H] of [[80, 60], [120, 90], [100, 70], [200, 150]]) {
       const out = await sr(lr, "art", 0.5, W, H);
@@ -138,7 +139,7 @@ describe("pipeline", () => {
     const one = await superResolve(lr, { width: 288, height: 240, tile: 128 }, async (x) => runGraph(m, x));
     const many = await superResolve(lr, { width: 288, height: 240, tile: 24 }, async (x) => runGraph(m, x));
     expect(psnr(one, many)).toBeGreaterThan(40);
-  }, 60_000);
+  }, wallTimeout(60_000));
 
   it("transparency: alpha enlarged separately, no dark fringe on a coloured disc", async () => {
     const W = 40, src = newImg(W, W);
@@ -157,9 +158,9 @@ describe("pipeline", () => {
       if (a >= 16) expect(out.data[i], `R at alpha ${a}`).toBeGreaterThanOrEqual(225);
     }
     expect(edge).toBeGreaterThan(100);
-  }, 60_000);
+  }, wallTimeout(60_000));
 
-  it("deblock smooths small steps on the 8 × 8 grid only, area resize keeps the mean", () => {
+  it("deblock smooths small steps on the 8 횞 8 grid only, area resize keeps the mean", () => {
     const blocky = jpegLike(omwPhoto(64, 64, 2), 20);
     const d = deblock(blocky);
     let onGrid = 0, before = 0;
@@ -179,5 +180,5 @@ describe("pipeline", () => {
     const ai = await sr(lr, "art", 0.5, 192, 192);
     const hq = upscale(lr, { method: "hq", width: 192, height: 192 }) as Img;
     expect(psnr(hr, ai)).toBeGreaterThan(psnr(hr, hq) - 0.5);
-  }, 60_000);
+  }, wallTimeout(60_000));
 });

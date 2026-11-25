@@ -9,7 +9,7 @@ import { layoutText } from "../../core/text";
 import { nodeOrder } from "../../core/flow";
 import { paraText, textStats, type TextStats } from "../../core/textSearch";
 import { fitCurrent } from "../actions";
-import { editModeOf } from "../editModes";
+import { editModeOf, isPdfFormatPage } from "../editModes";
 import { IconBtn, cx } from "./controls";
 import { Icon } from "./Icons";
 import { Thumb } from "./Thumbs";
@@ -190,7 +190,11 @@ type NavView = "headings" | "pages";
 export function DocNav() {
   const t = useT();
   const set = useUI((s) => s.set);
-  const [view, setView] = useState<NavView>("headings");
+  // a PDF opens on its page thumbnails, as Acrobat's navigation pane does (a PDF rarely has heading styles: the
+  // headings view only said "no headings" — 기본 작업 점검 2026-11-24 PDF #7); a choice made here is kept
+  const pdf = useStore((s) => isPdfFormatPage(s.doc.pages.find((p) => p.id === s.pageId)));
+  const [chosen, setView] = useState<NavView | null>(null);
+  const view: NavView = chosen ?? (pdf ? "pages" : "headings");
   return (
     <aside className="dock dock-left dock-nav" aria-label={t("docmode.nav.title")}>
       <div className="dock-tabs" role="tablist">

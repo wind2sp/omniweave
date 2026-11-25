@@ -5,12 +5,14 @@
 // (properties, layers, text, save), 48 px targets, the system keyboard kept clear of the text being typed, back closes
 // the newest sheet first. Sheets (XLSX) get their own cell grid (SheetEdit).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useT, t } from "../../../i18n";
 import { useStore } from "../../../core/store";
 import { nodeBounds } from "../../../core/loom";
-import type { Page, RasterNode, SceneNode, TextNode, Vec2, VectorNode } from "../../../core/types";
+import type { Page, RasterNode, SceneNode, TextNode, TextRun, Vec2, VectorNode } from "../../../core/types";
 import { useBackClose } from "../back";
+import { layoutText } from "../../../core/text";
+import { Icon, KindIcon, kindOf, type IconName } from "../icons";
 import { ask } from "../prompt";
 import type { MobileDoc } from "../MobileApp";
 import { canOverwrite, overwrite, saveCopy, shareFile } from "../nativeFiles";
@@ -40,6 +42,33 @@ import {
 import { isEdited, openForEdit, produce, saveTargets, type EditSession, type SaveKind, type SaveTarget } from "./session";
 import { SheetEdit } from "./SheetEdit";
 import "./editor.css";
+import { docThumb } from "../../shell/recent";
+
+/** small pictures of the slides, kept per page object (an edit makes a new page object: only that one is drawn again) */
+const thumbCache = new WeakMap<Page, string | null>();
+/** the slides of a deck as a strip of thumbnails above the page bar (PowerPoint's slide list on a phone) */
+function SlideStrip({ pages, at, onPick }: { pages: Page[]; at: number; onPick: (i: number) => void }) {
+  const tr = useT();
+  const doc = useStore((s) => s.doc);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>(`[data-i="${at}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [at]);
+  return (
+    <div className="m-ed-slides" ref={ref} role="list" aria-label={tr("mobile.ed.slides")}>
+      {pages.map((p, i) => {
+        let src = thumbCache.get(p);
+        if (src === undefined) thumbCache.set(p, (src = docThumb(doc, 96, p)));
+        return (
+          <button key={p.id} type="button" role="listitem" data-i={i} className={"m-ed-slide" + (i === at ? " on" : "")} aria-current={i === at} aria-label={tr("mobile.page", { page: i + 1, total: pages.length })} onClick={() => onPick(i)}>
+            {src ? <img src={src} alt="" /> : <span className="m-ed-slide-ph" />}
+            <span className="m-ed-slide-n">{i + 1}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 type Tool = "select" | "pen" | "rect" | "ellipse" | "line" | "text" | "brush" | "eraser" | "measure";
 type SheetKind = null | "props" | "layers" | "save" | "shapes";
@@ -64,8 +93,13 @@ interface Props {
   /** a file made here, shown next in the viewer */
   onResult: (d: MobileDoc) => void;
   say: (msg: string) => void;
-  /** go on with this document in the desktop editor on the phone (every PC command), optionally running one there */
-  onDesk?: (command?: string) => void;
+  /** go on with this document in the desktop editor on the phone (every PC command), optionally running one there;
+   *  the session comes back in `resume` when the phone screen returns */
+  onDesk?: (session: EditSession, command?: string) => void;
+  /** the editing session to carry on with (back from the PC feature screen): the document in the store as it is now */
+  resume?: EditSession | null;
+  /** the file was saved in its own format (a new file or over the original): the phone's viewer shows and shares that */
+  onSavedFile?: (d: MobileDoc) => void;
 }
 
 /** testing hook (debug builds, scripts/mobile-edit-e2e.mjs) */
@@ -73,7 +107,7 @@ export const editorHook: { current: any } = { current: null };
 /** where the page is on the screen now: page px → CSS px is (x · k + left + vx, y · k + top + vy) */
 const viewState: { current: { k: number; vx: number; vy: number; left: number; top: number; z: number } | null } = { current: null };
 
-export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
+export function MobileEditor({ doc, onClose, onResult, say, onDesk, resume, onSavedFile }: Props) {
   /** the document went on to the desktop editor: its pictures stay in the engine's memory when this closes */
   const handedOver = useRef(false);
   const tr = useT();
@@ -83,10 +117,32 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
   const [tool, setTool] = useState<Tool>("select");
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [textEdit, setTextEdit] = useState<{ id: string; para: number; isNew?: boolean } | null>(null);
+  /** "누르면 고칩니다" under the page until the first edit by tapping (once per phone) */
+  const [hintSeen, setHintSeen] = useState(() => {
+    try {
+      return localStorage.getItem(HINT_KEY) === "1";
+    } catch {
+      return true;
+    }
+  });
+  const seeHint = () => {
+    setHintSeen(true);
+    try {
+      localStorage.setItem(HINT_KEY, "1");
+    } catch {}
+  };
+  useEffect(() => {
+    if (textEdit && !hintSeen) seeHint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textEdit]);
   const [color, setColor] = useState("#e5484d");
   const [width, setWidth] = useState(4);
   const [brushSize, setBrushSize] = useState(24);
   const [measured, setMeasured] = useState<string | null>(null);
+  const [saveKey, setSaveKey] = useState(0);
+  /** the 원본 button held down: the page as it was opened */
+  const [showOriginal, setShowOriginal] = useState(false);
+  useEffect(() => () => originals.clear(), []);
   const sdoc = useStore((s) => s.doc);
   const pageId = useStore((s) => s.pageId);
   const selection = useStore((s) => s.selection);
@@ -101,11 +157,14 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
     let alive = true;
     void (async () => {
       try {
+        // back from the PC feature screen: the document as it is there (its edits kept), not the file again
+        if (resume) return void setSession(resume);
         const s = await openForEdit(doc.name, doc.bytes);
         if (!alive) return;
         setSession(s);
         S().set({ pageId: S().doc.pages[0].id, selection: [] });
-        const first = s.warnings[0] ?? s.message;
+        // (what the importer reports for the record — "XLSX 시트 2개 → 2쪽" — stays out of the way; only a warning shows)
+        const first = s.warnings[0];
         if (first) say(first);
       } catch (e: any) {
         if (alive) setError(e?.message ?? String(e));
@@ -121,15 +180,45 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
     };
   }, [doc, say]);
 
+  // autosave (the desktop's journal): a phone may close the app in the background at any time — the edits come back
+  // at the next start (MobileApp offers them). Never for a protected file (no decrypted copy is written).
+  useEffect(() => {
+    if (!session) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsub = useStore.subscribe((s, prev) => {
+      if (s.doc === prev.doc || s.gestureBase) return;
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        if (!isEdited(session)) return;
+        const [j, ss, a] = await Promise.all([import("../../../io/journal"), import("../../../core/sessions"), import("../../actions")]);
+        if (a.isDocProtected() || S().doc.pages.some((p) => p.source?.protection)) return;
+        void j.journalSave(S().doc, ss.activeSessionId()).catch(() => {});
+      }, 1500);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
+  }, [session]);
+
   const edited = isEdited(session) && !!session;
   const leave = useCallback(async () => {
     if (isEdited(session)) {
-      const v = await ask({ title: t("mobile.ed.leaveTitle"), message: t("mobile.ed.leaveMsg"), confirm: true, okLabel: t("mobile.ed.leaveOk") });
+      // saving first is the first choice; throwing the edits away is there, marked as such
+      const v = await ask({ title: t("mobile.ed.leaveTitle"), message: t("mobile.ed.leaveMsg"), choices: [{ label: t("mobile.ed.leaveSave"), value: "save" }, { label: t("mobile.ed.leaveOk"), value: "discard", danger: true }] });
       if (v == null) return;
+      if (v === "save") return setSheet("save");
     }
+    void Promise.all([import("../../../io/journal"), import("../../../core/sessions")]).then(([j, ss]) => j.journalClear(ss.activeSessionId()).catch(() => {}));
     onClose();
   }, [session, onClose]);
   useBackClose(true, () => void leave());
+  // the browser tab (and the app switcher) says which file this is
+  useEffect(() => {
+    const before = document.title;
+    document.title = `${doc.name} — Omniweave`;
+    return () => void (document.title = before);
+  }, [doc.name]);
   useBackClose(sheet !== null, () => setSheet(null));
 
   // testing hook: what the end-to-end check needs (debug builds only — WebView debugging is off in release builds)
@@ -161,6 +250,24 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
     }
   };
 
+  // a table's cell: the one under the finger, in the phone's text sheet (the PC program's own cell commit: one undo
+  // step, merged cells edited at their top-left)
+  const editTable = async (id: string, p: Vec2) => {
+    const pg = S().doc.pages.find((x) => x.id === S().pageId);
+    const n = pg?.nodes.find((x) => x.id === id);
+    if (!n || n.type !== "TABLE") return;
+    const [{ cellAt, anchorOf }, { commitCell }, { invertTransform }] = await Promise.all([import("../../../core/table"), import("../../CellEditor"), import("../../../core/geom")]);
+    const lp = invertTransform(n.transform, p);
+    const hit = cellAt(n, lp[0], lp[1]);
+    if (!hit) return;
+    const at = anchorOf(n, hit.row, hit.col);
+    const cell = n.rows[at.row]?.[at.col];
+    if (!cell) return;
+    const v = await ask({ title: t("mobile.ed.cellTitle", { row: at.row + 1, col: at.col + 1 }), initial: cell.text, multiline: true, okLabel: t("mobile.ok") });
+    if (v == null) return;
+    commitCell(id, at.row, at.col, v);
+  };
+
   const goPage = (i: number) => {
     const p = sdoc.pages[Math.max(0, Math.min(sdoc.pages.length - 1, i))];
     if (p) S().set({ pageId: p.id, selection: [] });
@@ -179,17 +286,17 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
       </div>
     );
 
-  const tools: { id: Tool | "layers" | "props" | "elevate" | "shapes"; icon: string; label: string }[] = [];
+  const tools: { id: Tool | "layers" | "props" | "elevate" | "shapes"; icon: IconName; label: string }[] = [];
   if (kind !== "sheet") {
-    tools.push({ id: "select", icon: "☝︎", label: tr(kind === "doc" ? "mobile.ed.tool.edit" : "mobile.ed.tool.select") });
-    if (kind === "pdf") tools.push({ id: "elevate", icon: "T", label: tr("mobile.ed.tool.elevate") });
-    if (kind === "psd") tools.push({ id: "brush", icon: "✎︎", label: tr("mobile.ed.tool.brush") }, { id: "eraser", icon: "⌫︎", label: tr("mobile.ed.tool.eraser") });
-    else tools.push({ id: "pen", icon: "✎︎", label: tr("mobile.ed.tool.pen") });
-    tools.push({ id: "shapes", icon: "◻︎", label: tr("mobile.ed.tool.shapes") });
-    if (kind !== "doc") tools.push({ id: "text", icon: "A", label: tr("mobile.ed.tool.text") });
-    if (kind === "cad") tools.push({ id: "measure", icon: "↔︎", label: tr("mobile.ed.tool.measure") });
-    if (kind !== "doc") tools.push({ id: "layers", icon: "☰︎", label: tr("mobile.ed.tool.layers") });
-    tools.push({ id: "props", icon: "⚙︎", label: tr("mobile.ed.tool.props") });
+    tools.push({ id: "select", icon: kind === "doc" ? "edit" : "select", label: tr(kind === "doc" ? "mobile.ed.tool.edit" : "mobile.ed.tool.select") });
+    if (kind === "pdf") tools.push({ id: "elevate", icon: "text", label: tr("mobile.ed.tool.elevate") });
+    if (kind === "psd") tools.push({ id: "brush", icon: "brush", label: tr("mobile.ed.tool.brush") }, { id: "eraser", icon: "eraser", label: tr("mobile.ed.tool.eraser") });
+    else tools.push({ id: "pen", icon: "pen", label: tr("mobile.ed.tool.pen") });
+    tools.push({ id: "shapes", icon: "shapes", label: tr("mobile.ed.tool.shapes") });
+    if (kind !== "doc") tools.push({ id: "text", icon: "text", label: tr("mobile.ed.tool.text") });
+    if (kind === "cad") tools.push({ id: "measure", icon: "measure", label: tr("mobile.ed.tool.measure") });
+    if (kind !== "doc") tools.push({ id: "layers", icon: "layers", label: tr("mobile.ed.tool.layers") });
+    tools.push({ id: "props", icon: "props", label: tr("mobile.ed.tool.props") });
   }
   const shapeTool = tool === "rect" || tool === "ellipse" || tool === "line";
 
@@ -197,53 +304,76 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
     <div className="m-viewer m-editor">
       <header className="m-top m-viewer-top">
         <button className="m-icon-btn" onClick={() => void leave()} aria-label={tr("mobile.back")}>
-          ←
+          <Icon name="back" />
         </button>
         <h1 className="m-doc-name">
           {edited && <span className="m-ed-dot" aria-label={tr("mobile.ed.edited")} />}
           {doc.name}
         </h1>
         <button className="m-icon-btn" onClick={() => S().undo()} disabled={!canUndo} aria-label={tr("mobile.ed.undo")}>
-          ↶
+          <Icon name="undo" />
         </button>
         <button className="m-icon-btn" onClick={() => S().redo()} disabled={!canRedo} aria-label={tr("mobile.ed.redo")}>
-          ↷
+          <Icon name="redo" />
         </button>
+
         {onDesk && (
           <button
             className="m-icon-btn m-ed-all"
             disabled={!session}
             onClick={() => {
+              if (!session) return;
               handedOver.current = true;
-              onDesk();
+              onDesk(session);
             }}
             aria-label={tr("mobile.desk.allFeatures")}
             title={tr("mobile.desk.allFeatures")}
           >
-            ⋯
+            <Icon name="more" />
           </button>
         )}
-        <button className="m-btn m-btn-primary m-ed-save" onClick={() => setSheet("save")} disabled={!session}>
+        <button className="m-btn m-btn-primary m-ed-save" onClick={() => (setSaveKey((n) => n + 1), setSheet("save"))} disabled={!session}>
           {tr("mobile.ed.save")}
         </button>
       </header>
       {!session && <div className="m-spinner" role="progressbar" aria-label={tr("mobile.working")} />}
       {session && page && kind === "sheet" && <SheetEdit page={page} say={say} />}
       {session && page && kind !== "sheet" && (
-        <Stage page={page} kind={kind} tool={tool} color={color} width={width} brushSize={brushSize} onText={(id, para, isNew) => setTextEdit({ id, para, isNew })} onLongPress={() => setSheet("props")} onMeasured={setMeasured} say={say} />
+        <Stage page={page} kind={kind} tool={tool} color={color} width={width} brushSize={brushSize} onText={(id, para, isNew) => setTextEdit({ id, para, isNew })} onLongPress={() => setSheet("props")} onMeasured={setMeasured} say={say} onTable={(id, p) => void editTable(id, p)} original={showOriginal} />
       )}
       {measured && (
         <div className="m-ed-measure" role="status">
           {measured}
           <button className="m-icon-btn" onClick={() => setMeasured(null)} aria-label={tr("mobile.close")}>
-            ✕
+            <Icon name="close" />
           </button>
         </div>
       )}
-      {session && sdoc.pages.length > 1 && (
+      {session && sdoc.pages.length > 1 && page?.kind === "SLIDE" && <SlideStrip pages={sdoc.pages} at={pageIndex} onPick={goPage} />}
+      {session && (sdoc.pages.length > 1 || (kind !== "sheet" && canUndo)) && (
         <div className="m-ed-pagebar">
-          <button className="m-icon-btn" onClick={() => goPage(pageIndex - 1)} disabled={pageIndex <= 0} aria-label={tr("mobile.prev")}>
-            ‹
+          {kind !== "sheet" && canUndo && (
+            // held down (thumb, lower left): the page as it was opened, before the edits; let go: as it is now
+            <button
+              className={"m-ed-orig" + (showOriginal ? " on" : "")}
+              aria-label={tr("mobile.v2.holdOriginal")}
+              title={tr("mobile.v2.holdOriginal")}
+              onPointerDown={(e) => {
+                (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+                setShowOriginal(true);
+              }}
+              onPointerUp={() => setShowOriginal(false)}
+              onPointerCancel={() => setShowOriginal(false)}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <Icon name="compare" />
+              {tr(showOriginal ? "mobile.v2.originalShown" : "mobile.v2.original")}
+            </button>
+          )}
+          {sdoc.pages.length > 1 && (
+            <>
+          <button className="m-icon-btn" onClick={() => goPage(pageIndex - 1)} disabled={pageIndex <= 0} aria-label={tr("mobile.v2.prevPage")}>
+            <Icon name="prev" />
           </button>
           <button
             className="m-ed-pageno"
@@ -255,8 +385,19 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
           >
             {kind === "sheet" ? page?.name : tr("mobile.page", { page: pageIndex + 1, total: sdoc.pages.length })}
           </button>
-          <button className="m-icon-btn" onClick={() => goPage(pageIndex + 1)} disabled={pageIndex >= sdoc.pages.length - 1} aria-label={tr("mobile.next")}>
-            ›
+          <button className="m-icon-btn" onClick={() => goPage(pageIndex + 1)} disabled={pageIndex >= sdoc.pages.length - 1} aria-label={tr("mobile.v2.nextPage")}>
+            <Icon name="next" />
+          </button>
+            </>
+          )}
+        </div>
+      )}
+      {session && tools.length > 0 && tool === "select" && !hintSeen && (
+        <div className="m-ed-hint" role="note">
+          <Icon name="edit" />
+          <span>{tr(kind === "doc" ? "mobile.v2.hint.doc" : kind === "pdf" ? "mobile.v2.hint.pdf" : "mobile.v2.hint.obj")}</span>
+          <button className="m-icon-btn" onClick={seeHint} aria-label={tr("mobile.v2.hintClose")}>
+            <Icon name="close" />
           </button>
         </div>
       )}
@@ -277,7 +418,7 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
                 if (x.id === "text") say(tr("mobile.ed.hint.text"));
               }}
             >
-              <span aria-hidden>{x.id === "shapes" && shapeTool ? { rect: "◻︎", ellipse: "◯︎", line: "╱" }[tool as "rect"] : x.icon}</span>
+              <Icon name={x.id === "shapes" && shapeTool ? (tool as "rect" | "ellipse" | "line") : x.icon} />
               {x.label}
             </button>
           ))}
@@ -296,7 +437,7 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
                 }}
               >
                 <span className="m-tool-icon" aria-hidden>
-                  {{ rect: "◻︎", ellipse: "◯︎", line: "╱" }[k]}
+                  <Icon name={k} />
                 </span>
                 {tr(`mobile.ed.shape.${k}`)}
               </button>
@@ -309,7 +450,7 @@ export function MobileEditor({ doc, onClose, onResult, say, onDesk }: Props) {
         <PropsSheet page={page} kind={kind} tool={tool} color={color} setColor={setColor} width={width} setWidth={setWidth} brushSize={brushSize} setBrushSize={setBrushSize} onClose={() => setSheet(null)} onEditText={(id, para) => (setSheet(null), setTextEdit({ id, para }))} />
       )}
       {sheet === "layers" && page && <LayersSheet page={page} kind={kind} onClose={() => setSheet(null)} />}
-      {sheet === "save" && session && <SaveSheet session={session} doc={doc} onClose={() => setSheet(null)} onResult={onResult} say={say} setBusy={setBusy} onSaved={(s) => setSession({ ...s })} />}
+      {sheet === "save" && session && <SaveSheet key={saveKey} session={session} doc={doc} onClose={() => setSheet(null)} onResult={onResult} onSavedFile={onSavedFile} say={say} setBusy={setBusy} onSaved={(s) => setSession({ ...s })} />}
       {textEdit && page && <TextSheet key={textEdit.id + ":" + textEdit.para} page={page} {...textEdit} color={color} onClose={() => setTextEdit(null)} />}
       {busy && (
         <div className="m-busy" role="status">
@@ -335,6 +476,10 @@ interface StageProps {
   onLongPress: () => void;
   onMeasured: (text: string | null) => void;
   say: (msg: string) => void;
+  /** a table was tapped: the cell under the finger (page point) is edited */
+  onTable: (id: string, p: Vec2) => void;
+  /** draw the page as it was opened (the 원본 button held down) */
+  original?: boolean;
 }
 
 type Drag =
@@ -350,7 +495,10 @@ type Drag =
   | { kind: "measure"; a: Vec2; b: Vec2 }
   | { kind: "stroke"; stroke: import("../../../render/brush").Stroke; id: string };
 
-function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress, onMeasured, say }: StageProps) {
+/** each page as it was first drawn, before any edit (the editor's 원본 button); cleared with each editor */
+const originals = new Map<string, HTMLCanvasElement>();
+
+function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress, onMeasured, say, onTable, original }: StageProps) {
   const tr = useT();
   const host = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
@@ -358,6 +506,14 @@ function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress,
   const selection = useStore((s) => s.selection);
   const [size, setSize] = useState({ w: 1, h: 1 });
   const [view, setView] = useState<View>({ z: 1, x: 0, y: 0 });
+  useEffect(() => {
+    const pan = (e: Event) => {
+      const dy = (e as CustomEvent<number>).detail;
+      if (dy) setView((v) => ({ ...v, y: v.y + dy }));
+    };
+    window.addEventListener(PAN_EVENT, pan);
+    return () => window.removeEventListener(PAN_EVENT, pan);
+  }, []);
   const viewRef = useRef(view);
   viewRef.current = view;
   const [overlay, setOverlay] = useState(0);
@@ -434,6 +590,8 @@ function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress,
       });
       if (cancelled) return;
       bitmap.current = { c, scale, doc, page };
+      // not edited yet: this is the page as it was opened (kept at the sharpest scale drawn)
+      if (!S().past.length && (originals.get(page.id)?.width ?? 0) < c.width) originals.set(page.id, c);
       setPainted((n) => n + 1);
     };
     const timer = window.setTimeout(() => void draw(), stale ? 0 : 140);
@@ -456,7 +614,9 @@ function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress,
     ctx.fillStyle = "rgba(0,0,0,0.18)";
     ctx.fillRect(view.x + 2, view.y + 3, page.width * k, page.height * k);
     const b = bitmap.current;
-    if (b && b.page === page) ctx.drawImage(b.c, view.x, view.y, page.width * k, page.height * k);
+    const before = original ? originals.get(page.id) : undefined;
+    if (before) ctx.drawImage(before, view.x, view.y, page.width * k, page.height * k);
+    else if (b && b.page === page) ctx.drawImage(b.c, view.x, view.y, page.width * k, page.height * k);
     else {
       ctx.fillStyle = page.background || "#ffffff";
       ctx.fillRect(view.x, view.y, page.width * k, page.height * k);
@@ -477,7 +637,7 @@ function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress,
       ctx.drawImage(d.stroke.full as CanvasImageSource, -d.stroke.ox, -d.stroke.oy);
       ctx.restore();
     }
-  }, [size, view, painted, page, k, overlay]);
+  }, [size, view, painted, page, k, overlay, original]);
 
   // ── selection box ──
   const selNodes = page.nodes.filter((n) => selection.includes(n.id));
@@ -690,6 +850,8 @@ function Stage({ page, kind, tool, color, width, brushSize, onText, onLongPress,
         if (h) {
           if (h.type === "TEXT" && (selection.includes(h.id) || isFlowNode(h) || kind === "doc")) onText(h.id, paragraphAt(h, d.start));
           else if (h.type === "RASTER" && h.psdText && selection.includes(h.id)) onText(h.id, 0);
+          // a table's cells are edited with the PC program's table editor (the PC feature screen)
+          else if (h.type === "TABLE" && (kind === "doc" || isFlowNode(h) || selection.includes(h.id))) (select([h.id]), onTable(h.id, d.start));
           else select([h.id]);
         } else {
           if (selection.length) select([]);
@@ -1038,7 +1200,7 @@ function LayersSheet({ page, kind, onClose }: { page: Page; kind: EditKind; onCl
           {rows.map((r) => (
             <li key={r.id} className={r.on ? "" : "off"}>
               <button className="m-ed-eye" onClick={() => cad!.setLayerOn(page, r.id, !r.on)} aria-label={tr(r.on ? "mobile.ed.hide" : "mobile.ed.show")} aria-pressed={r.on}>
-                {r.on ? "◉" : "○"}
+                <Eye on={r.on} />
               </button>
               <label className="m-ed-swatch m-ed-custom m-ed-layer-color" style={{ background: r.color }} aria-label={tr("mobile.ed.layerColor", { name: r.name })}>
                 <input type="color" value={/^#[0-9a-f]{6}$/i.test(r.color) ? r.color : "#000000"} onChange={(e) => cad!.setLayerColor(page, r.id, e.target.value)} />
@@ -1048,7 +1210,7 @@ function LayersSheet({ page, kind, onClose }: { page: Page; kind: EditKind; onCl
                 <small>{tr("mobile.ed.nObjects", { n: r.count })}</small>
               </span>
               <button className="m-ed-eye" onClick={() => cad!.setLayerLocked(page, r.id, !r.locked)} aria-label={tr(r.locked ? "mobile.ed.unlock" : "mobile.ed.lock")} aria-pressed={r.locked}>
-                {r.locked ? "🔒︎" : "🔓︎"}
+                <Icon name={r.locked ? "lock" : "unlock"} />
               </button>
             </li>
           ))}
@@ -1071,17 +1233,17 @@ function LayersSheet({ page, kind, onClose }: { page: Page; kind: EditKind; onCl
             head && (
               <li key={"g" + head.id} className={"m-ed-group" + (head.visible ? "" : " off")}>
                 <button className="m-ed-eye" onClick={() => updateGroup(head.id, tr("mobile.ed.h.visible"), (x) => (x.visible = !x.visible))} aria-label={tr(head.visible ? "mobile.ed.hide" : "mobile.ed.show")} aria-pressed={head.visible}>
-                  {head.visible ? "◉" : "○"}
+                  <Eye on={head.visible} />
                 </button>
                 <span className="m-ed-lname">▾ {head.name}</span>
                 <button className="m-ed-eye" onClick={() => updateGroup(head.id, tr("mobile.ed.h.lock"), (x) => (x.locked = !x.locked))} aria-pressed={head.locked} aria-label={tr(head.locked ? "mobile.ed.unlock" : "mobile.ed.lock")}>
-                  {head.locked ? "🔒︎" : "🔓︎"}
+                  <Icon name={head.locked ? "lock" : "unlock"} />
                 </button>
               </li>
             ),
             <li key={n.id} className={(selection.includes(n.id) ? "on " : "") + (n.visible ? "" : "off ") + (g ? "m-ed-in" : "")}>
               <button className="m-ed-eye" onClick={() => updateNodes([n.id], tr("mobile.ed.h.visible"), (x) => (x.visible = !x.visible))} aria-label={tr(n.visible ? "mobile.ed.hide" : "mobile.ed.show")} aria-pressed={n.visible}>
-                {n.visible ? "◉" : "○"}
+                <Eye on={n.visible} />
               </button>
               <button className="m-ed-lname" onClick={() => select([n.id])}>
                 {n.name || n.type}
@@ -1098,7 +1260,7 @@ function LayersSheet({ page, kind, onClose }: { page: Page; kind: EditKind; onCl
                 ▼
               </button>
               <button className="m-ed-eye" onClick={() => updateNodes([n.id], tr("mobile.ed.h.lock"), (x) => (x.locked = !x.locked))} aria-pressed={n.locked} aria-label={tr(n.locked ? "mobile.ed.unlock" : "mobile.ed.lock")}>
-                {n.locked ? "🔒︎" : "🔓︎"}
+                <Icon name={n.locked ? "lock" : "unlock"} />
               </button>
             </li>,
           ];
@@ -1120,7 +1282,17 @@ function TextSheet({ page, id, para, isNew, color, onClose }: { page: Page; id: 
   const initial = node?.type === "TEXT" ? paragraphText(node, para) : psd ? psd.psdText!.text : "";
   const [text, setText] = useState(initial);
   const [p, setP] = useState(para);
+  // where this paragraph is (the keyboard leaves little of the page in view: QA ux-audit 10 — 위치 파악 어려움)
+  const pageNo = useStore((s) => s.doc.pages.filter((x) => x.kind === page.kind).findIndex((x) => x.id === page.id) + 1);
   const field = useRef<HTMLTextAreaElement>(null);
+  /** typing on the page: the paragraph's runs as they look (contenteditable), redrawn when ver changes */
+  const rich = useRef<HTMLDivElement>(null);
+  const [ver, setVer] = useState(0);
+  const [fit, setFit] = useState(1);
+  const pendingSel = useRef<[number, number] | null>(null);
+  const live = useRef(0);
+  /** the history before this edit: everything typed and formatted here becomes one undo step */
+  const start = useRef({ past: useStore.getState().past.length, doc: useStore.getState().doc });
   const composing = useRef(false);
   const [kb, setKb] = useState(0);
 
@@ -1145,12 +1317,34 @@ function TextSheet({ page, id, para, isNew, color, onClose }: { page: Page; id: 
       // the caret at the end of the paragraph, where typing usually continues
       el.setSelectionRange(el.value.length, el.value.length);
     }, 80);
+    window.setTimeout(() => {
+      const r = rich.current;
+      if (!r) return;
+      r.focus();
+      setOffsets(r, r.innerText.length, r.innerText.length);
+    }, 80);
   }, []);
 
   const commitText = () => {
     if (node?.type === "TEXT" && text !== paragraphText(node, p)) editParagraph(id, p, { text });
   };
+  const squash = () => {
+    const s0 = start.current;
+    const s = useStore.getState();
+    if (s.doc !== s0.doc && s.past.length > s0.past) useStore.setState({ past: [...s.past.slice(0, s0.past), { doc: s0.doc, label: t("mobile.ed.h.text") }] });
+  };
+  useEffect(() => () => squash(), []);
+  const onRichInput = () => {
+    const r = rich.current;
+    if (!r) return;
+    const v = r.innerText.replace(/\n/g, " ");
+    setText(v);
+    window.clearTimeout(live.current);
+    // into the page a moment after the last key: it re-flows, the paragraph's box (and what is below) follow
+    live.current = window.setTimeout(() => editParagraph(id, p, { text: v }), 120);
+  };
   const finish = async () => {
+    window.clearTimeout(live.current);
     if (psd) {
       const { applyPsdText } = await import("../../psdText/psdTextRender");
       if (text !== psd.psdText!.text) applyPsdText(page.id, id, { text });
@@ -1158,6 +1352,7 @@ function TextSheet({ page, id, para, isNew, color, onClose }: { page: Page; id: 
     // an empty new text box is not kept
     const now = useStore.getState().doc.pages.find((x) => x.id === page.id)?.nodes.find((n) => n.id === id);
     if (isNew && now?.type === "TEXT" && !now.paragraphs.some((q) => q.runs.some((r) => r.text.trim()))) deleteNodes([id]);
+    squash();
     onClose();
   };
   useBackClose(true, () => void finish());
@@ -1171,27 +1366,144 @@ function TextSheet({ page, id, para, isNew, color, onClose }: { page: Page; id: 
       return;
     }
     if (node?.type !== "TEXT") return;
+    window.clearTimeout(live.current);
     commitText();
     const el = field.current;
-    const a = el?.selectionStart ?? 0, b = el?.selectionEnd ?? 0;
+    const [a, b] = rich.current ? getOffsets(rich.current) : [el?.selectionStart ?? 0, el?.selectionEnd ?? 0];
     const cur = useStore.getState().doc.pages.find((x) => x.id === page.id)?.nodes.find((n) => n.id === id) as TextNode | undefined;
     const run = cur?.paragraphs[p]?.runs.find((r) => r.text) ?? cur?.paragraphs[p]?.runs[0];
     const size = run ? Math.max(4, Math.round(run.fontSize * (patch.fontSize ? (patch.fontSize > 0 ? 1.12 : 1 / 1.12) : 1) * 10) / 10) : undefined;
     editParagraph(id, p, { format: { a, b, patch: { ...(patch.bold !== undefined ? { bold: patch.bold } : {}), ...(patch.fontSize ? { fontSize: size } : {}), ...(patch.color ? { color: patch.color } : {}) } } }, t("mobile.ed.h.textFormat"));
     window.setTimeout(() => el?.setSelectionRange(a, b), 0);
+    if (rich.current) (pendingSel.current = [a, b]), setVer((v) => v + 1);
   };
   const paraCount = node?.type === "TEXT" ? node.paragraphs.length : 1;
+  // where this paragraph is on the page: counted over every text on it, in page order (1쪽 · 문단 5/21)
+  const texts = page.nodes.filter((n): n is TextNode => n.type === "TEXT");
+  const before = texts.slice(0, Math.max(0, texts.findIndex((n) => n.id === id))).reduce((s, n) => s + n.paragraphs.length, 0);
+  const pageParas = texts.reduce((s, n) => s + n.paragraphs.length, 0);
   const step = (dir: number) => {
     commitText();
     const cur = useStore.getState().doc.pages.find((x) => x.id === page.id)?.nodes.find((n) => n.id === id);
     if (cur?.type !== "TEXT") return;
     const np = Math.max(0, Math.min(cur.paragraphs.length - 1, p + dir));
+    window.clearTimeout(live.current);
     setP(np);
     setText(paragraphText(cur, np));
+    setVer((v) => v + 1);
   };
   const firstRun = node?.type === "TEXT" ? node.paragraphs[p]?.runs[0] : null;
+
+  // on the page: the paragraph's own box on screen (its lines, the text box's width), in its font at this zoom
+  const [, setTick] = useState(0);
+  const bar = useRef<HTMLDivElement>(null);
+  const vs = viewState.current;
+  const T = node?.type === "TEXT" ? node.transform : null;
+  const inPlace = !!(node?.type === "TEXT" && vs && T && !T.rotation);
+  let box: { left: number; top: number; width: number; height: number; font: number; line: number } | null = null;
+  if (inPlace && node?.type === "TEXT" && vs && T) {
+    const lines = layoutText(node).lines.filter((l) => l.paragraph === p);
+    const y0 = lines.length ? Math.min(...lines.map((l) => l.y)) : 0;
+    const y1 = lines.length ? Math.max(...lines.map((l) => l.y + l.height)) : (firstRun?.fontSize ?? 12) * 1.4;
+    const sx = T.scale, sy = T.scaleY ?? T.scale;
+    const k = vs.k;
+    box = {
+      left: vs.left + vs.vx + T.x * k,
+      top: vs.top + vs.vy + (T.y + y0 * sy) * k,
+      width: Math.max(80, node.width * sx * k),
+      height: Math.max(24, (y1 - y0) * sy * k),
+      font: Math.max(8, (firstRun?.fontSize ?? 12) * sy * k),
+      line: lines[0] ? (lines[0].height * sy * k) : 0,
+    };
+  }
+  // follow the page when it moves (pinch, pan, the keyboard's nudge below)
+  useEffect(() => {
+    if (!inPlace) return;
+    let raf = 0;
+    let last = "";
+    const loop = () => {
+      const v = viewState.current;
+      const key = v ? `${v.k}:${v.vx}:${v.vy}` : "";
+      if (key !== last) (last = key), setTick((n) => n + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [inPlace]);
+  useLayoutEffect(() => {
+    const r = rich.current;
+    if (!r || !inPlace || !box) return;
+    const cur = useStore.getState().doc.pages.find((x) => x.id === page.id)?.nodes.find((n) => n.id === id);
+    if (cur?.type !== "TEXT") return;
+    r.innerHTML = runsHtml(cur.paragraphs[p]?.runs ?? [], (T!.scaleY ?? T!.scale) * (viewState.current?.k ?? 1) * fit);
+    if (pendingSel.current) {
+      setOffsets(r, ...pendingSel.current);
+      pendingSel.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ver, p, fit, inPlace]);
+  // the phone's fonts wrap a little wider than the page's: shrink the overlay's type until it fits the paragraph's
+  // own lines (it never spills over the next paragraph; what is below moves as the page re-flows)
+  useLayoutEffect(() => {
+    const r = rich.current;
+    if (!r || !box) return;
+    if (r.scrollHeight > r.clientHeight + 2 && fit > 0.7) setFit((f) => Math.round(f * 0.96 * 1000) / 1000);
+  });
+  // the field as tall as its text (the phone's font wraps a little differently from the page's)
+  useEffect(() => {
+    const el = field.current;
+    if (!inPlace || !el || !box) return;
+    el.style.height = "auto";
+    el.style.height = Math.max(box.height + 8, el.scrollHeight) + "px";
+  });
+  // the keyboard came up (or the text grew): keep the paragraph between the top bar and the format bar
+  useEffect(() => {
+    if (!inPlace || !box) return;
+    const el = field.current;
+    const vv = window.visualViewport;
+    const visible = (vv ? vv.height + vv.offsetTop : window.innerHeight) - kb - (bar.current?.offsetHeight ?? 0) - 8;
+    const caretBottom = Math.min(box.top + (el?.offsetHeight ?? box.height), box.top + box.height + 400);
+    const topLimit = 64;
+    let dy = 0;
+    if (caretBottom > visible) dy = visible - caretBottom;
+    else if (box.top < topLimit) dy = topLimit - box.top;
+    if (Math.abs(dy) > 2) window.dispatchEvent(new CustomEvent(PAN_EVENT, { detail: dy }));
+  });
+
   return (
-    <div className="m-ed-textsheet" style={{ bottom: kb }} role="dialog" aria-label={tr("mobile.ed.editText")}>
+    <>
+      {inPlace && box && (
+        <div
+          ref={rich}
+          className="m-field m-ed-inplace"
+          contentEditable
+          suppressContentEditableWarning
+          spellCheck={false}
+          role="textbox"
+          aria-multiline="true"
+          aria-label={tr("mobile.ed.editText")}
+          onCompositionStart={() => (composing.current = true)}
+          onCompositionEnd={() => {
+            composing.current = false;
+            onRichInput();
+          }}
+          onInput={() => !composing.current && onRichInput()}
+          onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+          style={{
+            left: box.left - 3,
+            top: box.top - 3,
+            width: box.width + 6,
+            height: box.height + 6,
+            lineHeight: box.line ? box.line * fit + "px" : 1.4,
+            background: page.background || "#ffffff",
+          }}
+        />
+      )}
+    <div ref={bar} className={"m-ed-textsheet" + (inPlace ? " m-ed-textsheet-bar" : "")} style={{ bottom: kb }} role="dialog" aria-label={tr("mobile.ed.editText")}>
+      <p className="m-ed-textpos m-ed-where" aria-live="polite">
+        <Icon name="page" />
+        {pageParas > 1 && node?.type === "TEXT" ? tr("mobile.ed.where", { page: pageNo, n: before + p + 1, total: pageParas }) : tr("mobile.ed.wherePage", { page: pageNo })}
+      </p>
       <div className="m-ed-fmt" role="toolbar">
         <button className="m-chip" onPointerDown={(e) => e.preventDefault()} onClick={() => void fmt({ bold: !firstRun?.bold })} aria-label={tr("mobile.ed.bold")}>
           <b>B</b>
@@ -1208,15 +1520,16 @@ function TextSheet({ page, id, para, isNew, color, onClose }: { page: Page; id: 
         {paraCount > 1 && (
           <>
             <button className="m-chip" onPointerDown={(e) => e.preventDefault()} onClick={() => step(-1)} disabled={p <= 0} aria-label={tr("mobile.ed.prevPara")}>
-              ↑
+              <Icon name="up" />
             </button>
             <button className="m-chip" onPointerDown={(e) => e.preventDefault()} onClick={() => step(1)} disabled={p >= paraCount - 1} aria-label={tr("mobile.ed.nextPara")}>
-              ↓
+              <Icon name="down" />
             </button>
           </>
         )}
       </div>
-      <div className="m-ed-textrow">
+      <div className={"m-ed-textrow" + (inPlace ? " m-ed-textrow-done" : "")}>
+        {!inPlace && (
         <textarea
           ref={field}
           className="m-field m-ed-textarea"
@@ -1228,20 +1541,25 @@ function TextSheet({ page, id, para, isNew, color, onClose }: { page: Page; id: 
           onChange={(e) => setText(psd ? e.target.value : e.target.value.replace(/\n/g, " "))}
           style={{ color: node?.type === "TEXT" ? undefined : color }}
         />
+        )}
         <button className="m-btn m-btn-primary" onClick={() => void finish()}>
           {tr("mobile.ed.done")}
         </button>
       </div>
     </div>
+    </>
   );
 }
 
-function SaveSheet({ session, doc, onClose, onResult, say, setBusy, onSaved }: { session: EditSession; doc: MobileDoc; onClose: () => void; onResult: (d: MobileDoc) => void; say: (m: string) => void; setBusy: (s: string | null) => void; onSaved: (s: EditSession) => void }) {
+function SaveSheet({ session, doc, onClose, onResult, onSavedFile, say, setBusy, onSaved }: { session: EditSession; doc: MobileDoc; onClose: () => void; onResult: (d: MobileDoc) => void; onSavedFile?: (d: MobileDoc) => void; say: (m: string) => void; setBusy: (s: string | null) => void; onSaved: (s: EditSession) => void }) {
   const tr = useT();
   const pageId = useStore((s) => s.pageId);
   const sdoc = useStore((s) => s.doc);
   const [targets, setTargets] = useState<SaveTarget[]>([]);
   const [out, setOut] = useState<{ kind: SaveKind; name: string; bytes: Uint8Array; note?: string } | null>(null);
+  /** 3 저장: saved — the name and where it went */
+  const [done, setDone] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
   const [writable, setWritable] = useState(false);
   useEffect(() => {
     void saveTargets(sdoc.pages.find((p) => p.id === pageId)).then(setTargets);
@@ -1259,34 +1577,90 @@ function SaveSheet({ session, doc, onClose, onResult, say, setBusy, onSaved }: {
       setBusy(null);
     }
   };
-  const savedAs = (o: { kind: SaveKind; bytes: Uint8Array }, overwrote: boolean) => {
+  const savedAs = (o: { kind: SaveKind; bytes: Uint8Array; name: string }, overwrote: boolean) => {
     // the document now matches a saved file: leaving does not ask again (a file in the original format counts)
     if (o.kind === "same" || o.kind === "omw") onSaved(Object.assign(session, { loaded: useStore.getState().doc, ...(overwrote ? { original: o.bytes } : {}) }));
+    // the phone's viewer (and its 공유) now has the saved file, not the one opened before the edits
+    if (o.kind === "same") onSavedFile?.({ name: o.name, bytes: o.bytes, origin: "opened", path: overwrote ? doc.path : null });
+    void Promise.all([import("../../../io/journal"), import("../../../core/sessions")]).then(([j, ss]) => j.journalClear(ss.activeSessionId()).catch(() => {}));
   };
   const origExt = doc.name.split(".").pop()?.toLowerCase();
+  const same = targets.filter((x) => x.kind === "same");
+  // 형식 바꾸기 first (한글 · Word · PDF …), pictures and the work file folded under them
+  const PICTURES = ["png", "jpg", "svg", "omw"];
+  const ORDER = ["hwpx", "docx", "pdf", "pptx", "xlsx", "csv", "odt", "dxf"];
+  const others = targets.filter((x) => x.kind !== "same" && !PICTURES.includes(x.kind)).sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
+  const pictures = targets.filter((x) => PICTURES.includes(x.kind));
+  const target = (x: SaveTarget) => (
+    <li key={x.kind}>
+      <button className={"m-tool" + (x.kind === "same" ? " m-ed-keep" : "")} disabled={!!x.why} onClick={() => void make(x.kind)}>
+        <span className="m-tool-icon" aria-hidden>
+          {x.kind === "same" ? <Icon name="save" /> : <KindIcon kind={kindOf("x." + (EXT_OF[x.kind] ?? x.kind))} />}
+        </span>
+        <span className="m-tool-text">
+          <b>{x.label}</b>
+          {x.kind === "same" && !x.why && <small>{tr("mobile.v2.keepFormat")}</small>}
+          {x.why && <small className="m-ed-why">{x.why}</small>}
+        </span>
+      </button>
+    </li>
+  );
   return (
     <Sheet title={out ? out.name : tr("mobile.ed.saveTitle")} onClose={onClose}>
+      <ol className="m-steps" aria-hidden>
+        <li className={out ? "done" : "on"}>{tr("mobile.v2.step1")}</li>
+        <li className={done ? "done" : out ? "on" : ""}>{tr("mobile.v2.step2")}</li>
+        <li className={done ? "on" : ""}>{tr("mobile.v2.step3")}</li>
+      </ol>
       {!out && (
-        <ul className="m-ed-targets">
-          {targets.map((x) => (
-            <li key={x.kind}>
-              <button className="m-tool" disabled={!!x.why} onClick={() => void make(x.kind)}>
-                <span className="m-tool-icon" aria-hidden>
-                  {x.kind === "same" ? "⤓︎" : "⇢"}
-                </span>
-                <span>
-                  {x.label}
-                  {x.why && <small className="m-ed-why">{x.why}</small>}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {out && (
         <>
-          <p className="m-sheet-msg">
-            {(out.bytes.length / 1024).toFixed(0)} KB{out.note ? " · " + out.note : ""}
+          <ul className="m-ed-targets">{same.map(target)}</ul>
+          {others.length > 0 && <h3 className="m-label">{tr("mobile.v2.otherFormats")}</h3>}
+          <ul className="m-ed-targets">{others.map(target)}</ul>
+          {pictures.length > 0 && (
+            <button className="m-ed-fold" aria-expanded={more} onClick={() => setMore((v) => !v)}>
+              {tr("mobile.v2.pictures")}
+              <Icon name="next" className="m-ed-fold-chev" />
+            </button>
+          )}
+          {more && <ul className="m-ed-targets">{pictures.map(target)}</ul>}
+        </>
+      )}
+      {out && done && (
+        <div className="m-ed-done" role="status">
+          <span className="m-ed-done-mark">
+            <Icon name="check" />
+          </span>
+          <b>{tr("mobile.v2.savedTitle")}</b>
+          <p className="m-ed-path">
+            <span>{tr(isTauriApp() ? "mobile.v2.pathApp" : "mobile.v2.pathWeb")}</span>
+            <span aria-hidden> / </span>
+            <b>{done}</b>
+          </p>
+          <div className="m-sheet-btns">
+            <button className="m-btn" onClick={() => void shareFile(out.name, out.bytes)}>
+              {tr("mobile.share")}
+            </button>
+            <button className="m-btn m-btn-primary" onClick={onClose}>
+              {tr("mobile.v2.done")}
+            </button>
+          </div>
+        </div>
+      )}
+      {out && !done && (
+        <>
+          <div className="m-ed-made">
+            <KindIcon kind={kindOf(out.name)} />
+            <span>
+              <b>{out.name}</b>
+              <small>
+                {(out.bytes.length / 1024).toFixed(0)} KB{out.note ? " · " + out.note : ""}
+              </small>
+            </span>
+          </div>
+          <p className="m-ed-dest">
+            <Icon name="save" />
+            {tr(isTauriApp() ? "mobile.v2.whereApp" : "mobile.v2.whereWeb")}
           </p>
           <div className="m-sheet-btns">
             <button
@@ -1294,9 +1668,8 @@ function SaveSheet({ session, doc, onClose, onResult, say, setBusy, onSaved }: {
               onClick={async () => {
                 try {
                   if (await saveCopy(out.name, out.bytes)) {
-                    say(tr("mobile.saved", { name: out.name }));
                     savedAs(out, false);
-                    onClose();
+                    setDone(out.name);
                   }
                 } catch (e: any) {
                   say(tr("mobile.failed", { error: e?.message ?? String(e) }));
@@ -1340,4 +1713,83 @@ function SaveSheet({ session, doc, onClose, onResult, say, setBusy, onSaved }: {
       )}
     </Sheet>
   );
+}
+
+/** a layer's show / hide mark in the layer sheets: an open eye or a struck-through one (Photoshop / AutoCAD) — it was a
+ *  filled / empty circle, which did not read as "shown" (mobile review ux-audit 8: PSD) */
+function Eye({ on }: { on: boolean }) {
+  // (the phone's icon set: the same line and grid as every other icon)
+  return <Icon name={on ? "eye" : "eyeOff"} className={on ? "m-ed-eye-on" : "m-ed-eye-off"} />;
+}
+/** a save target's file extension (its kind icon) */
+const EXT_OF: Record<string, string> = { omw: "omw", pdf: "pdf", png: "png", jpg: "jpg", svg: "svg", dxf: "dxf", docx: "docx", hwpx: "hwpx", odt: "odt", pptx: "pptx", xlsx: "xlsx", csv: "csv", txt: "txt", md: "md", html: "html" };
+const isTauriApp = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const HINT_KEY = "omniweave.mobile.hint.tapToEdit";
+/** the typed paragraph asks the page to move (px, + = down) so it stays above the keyboard */
+const PAN_EVENT = "omw-ed-pan";
+
+/** a paragraph's runs as HTML spans in their own look at `k` CSS px per page px (the on-page field) */
+function runsHtml(runs: readonly TextRun[], k: number): string {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const attr = (s: string) => esc(s).replace(/"/g, "&quot;");
+  return runs
+    .filter((r) => r.text)
+    .map((r) => {
+      const deco = [r.underline ? "underline" : "", r.strike ? "line-through" : ""].filter(Boolean).join(" ") || "none";
+      const css = [
+        `font-family:${attr(`"${r.fontFamily}", var(--m-font)`)}`,
+        `font-size:${Math.max(6, r.fontSize * k * (r.script ? 0.66 : 1)).toFixed(2)}px`,
+        `font-weight:${r.bold ? 700 : 400}`,
+        `font-style:${r.italic ? "italic" : "normal"}`,
+        `text-decoration:${deco}`,
+        `color:${attr(r.color || "#000")}`,
+        r.highlight ? `background:${attr(r.highlight)}` : "",
+        // (raised / lowered without growing the line: the field keeps the page's line spacing)
+        r.script ? `position:relative;top:${r.script === "super" ? "-0.45em" : "0.2em"}` : "",
+        r.letterSpacing ? `letter-spacing:${(r.letterSpacing * k).toFixed(2)}px` : "",
+      ].filter(Boolean);
+      return `<span style="${css.join(";")}">${esc(r.text)}</span>`;
+    })
+    .join("");
+}
+
+/** the selection inside `el` as plain-text offsets [start, end] */
+function getOffsets(el: HTMLElement): [number, number] {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return [0, 0];
+  const at = (node: Node, off: number) => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    try {
+      r.setEnd(node, off);
+    } catch {
+      return 0;
+    }
+    return r.toString().length;
+  };
+  const rg = sel.getRangeAt(0);
+  const a = at(rg.startContainer, rg.startOffset), b = at(rg.endContainer, rg.endOffset);
+  return a <= b ? [a, b] : [b, a];
+}
+
+/** put the selection inside `el` at plain-text offsets */
+function setOffsets(el: HTMLElement, a: number, b: number) {
+  const find = (n: number): [Node, number] => {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let left = n;
+    let last: Text | null = null;
+    for (let x = w.nextNode() as Text | null; x; x = w.nextNode() as Text | null) {
+      if (left <= x.data.length) return [x, left];
+      left -= x.data.length;
+      last = x;
+    }
+    return last ? [last, last.data.length] : [el, 0];
+  };
+  const sel = window.getSelection();
+  if (!sel) return;
+  const r = document.createRange();
+  r.setStart(...find(a));
+  r.setEnd(...find(b));
+  sel.removeAllRanges();
+  sel.addRange(r);
 }

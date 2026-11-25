@@ -5,7 +5,7 @@
 import type { ConvLayer, Layer, Model } from "./model";
 import { convKernel, packConvWeights, type ConvKernel } from "./wasm";
 
-type T = { c: number; h: number; w: number; d: Float32Array };
+export type T = { c: number; h: number; w: number; d: Float32Array };
 
 // ---------- TS kernels ----------
 
@@ -212,6 +212,49 @@ const wasmFor = new WeakMap<Model, WasmConv | null>();
 /** Whether the WebAssembly SIMD conv is used for this engine. */
 export function cpuUsesWasm(): boolean {
   return !!convKernel();
+}
+
+/** One conv layer of `model` on the CPU (WebAssembly SIMD where it works). */
+export function convLayer(model: Model, L: ConvLayer, x: T): T {
+  if (!wasmFor.has(model)) {
+    const kr = convKernel();
+    wasmFor.set(model, kr ? new WasmConv(kr, model) : null);
+  }
+  const wc = wasmFor.get(model);
+  return wc ? wc.run(x, L) : convTs(x, L);
+}
+
+/** The layer with only output channels [oc0, oc1) (the conv pool's workers each hold one such slice of every conv). */
+export function subLayer(L: ConvLayer, oc0: number, oc1: number): ConvLayer {
+  const per = L.cin * L.k * L.k;
+  return { ...L, cout: oc1 - oc0, weight: L.weight.slice(oc0 * per, oc1 * per), bias: L.bias.slice(oc0, oc1) };
+}
+
+/** Convs another executor may take (convPool.ts): the output, or null to run it here. `i` = layer index. */
+export type LayerOffload = (i: number, L: ConvLayer, x: T) => Promise<T> | null;
+
+/** runCpu with convs handed to `offload` where it takes them; the same order and results. */
+export async function runCpuAsync(model: Model, input: Float32Array, offload: LayerOffload): Promise<Float32Array> {
+  const [c, h, w] = model.meta.input;
+  if (input.length !== c * h * w) throw new Error("input size");
+  const env = new Map<string, T>([["x", { c, h, w, d: input }]]);
+  const get = (n: string) => {
+    const t = env.get(n);
+    if (!t) throw new Error("tensor " + n);
+    return t;
+  };
+  for (let i = 0; i < model.layers.length; i++) {
+    const L = model.layers[i];
+    let r: T;
+    if (L.op === "conv") r = (await offload(i, L, get(L.in))) ?? convLayer(model, L, get(L.in));
+    else if (L.op === "pool") r = pool2(get(L.in), L.ceil);
+    else if (L.op === "up") r = upBilinear(get(L.in), L.h, L.w, L.align);
+    else if (L.op === "concat") r = concat(L.in.map(get));
+    else r = add(get(L.in[0]), get(L.in[1]));
+    env.set(L.out, r);
+    for (const x of Array.isArray(L.in) ? L.in : [L.in]) if (model.lastUse.get(x) === i && x !== "x") env.delete(x);
+  }
+  return get(model.meta.output).d;
 }
 
 /** Run the model on a CHW input (meta.input shape). Returns the output tensor (CHW). */

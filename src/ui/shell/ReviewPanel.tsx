@@ -12,6 +12,8 @@ import { closeComposer, deleteComment, editStart, goToParagraph, reply, resolveD
 import { Section, Seg, cx } from "./controls";
 import { useLang, useT } from "../../i18n";
 import "./review.css";
+import { isPdfFormatPage } from "../editModes";
+import { PdfCommentList } from "../pdf/PdfCommentList";
 
 /**
  * A file's time in the viewer's language, the clock time as the file writes it: Word's w:date and 한글's memo time are
@@ -166,6 +168,14 @@ export function ReviewTab() {
   const comments = docComments(pages);
   const threads = useMemo(() => commentThreads(comments), [comments]);
   const changes = useMemo(() => collectChanges(paras), [paras]);
+  // a PDF page: its comment list (Acrobat's comment pane) — the document's view / tracking rows do not apply there
+  const pdf = useStore((s) => isPdfFormatPage(s.doc.pages.find((p) => p.id === s.pageId)));
+  if (pdf)
+    return (
+      <div className="dock-scroll review-pane">
+        <PdfCommentList />
+      </div>
+    );
   return (
     <div className="dock-scroll review-pane">
       <Section title={t("review.view")}>

@@ -66,5 +66,6 @@
   "image.matte.inner": "内側の白い面",
   "image.matte.inner.keep": "残す",
   "image.matte.inner.remove": "消す",
-  "image.matte.inner.note": "背景色と同じ閉じた面です。自動では文字の穴(O)は消し、文書アイコンの白い紙や白い文字のような面は残します。"
+  "image.matte.inner.note": "背景色と同じ閉じた面です。自動では文字の穴(O)は消し、文書アイコンの白い紙や白い文字のような面は残します。",
+  "image.matte.personChecking": "人物かどうか確認しています…（プレビューは先に出た結果）"
 }

@@ -18,6 +18,8 @@ interface Effect {
 function effectsOf(page: Page, spids: ReadonlyMap<string, number>): Effect[] {
   const out: Effect[] = [];
   for (const a of page.animations ?? []) {
+    // a trigger's effects are in its own interactive sequence (triggerSeqs)
+    if (a.triggerId) continue;
     const spid = spids.get(a.targetNodeId);
     if (!spid) continue;
     const last = out[out.length - 1];
@@ -48,6 +50,28 @@ function effectBody(e: Effect, id: () => number): { preset: number; cls: "entr" 
   const prop = (name: string, from: string, to: string) =>
     `<p:anim calcmode="lin" valueType="num"><p:cBhvr additive="base"><p:cTn id="${id()}" dur="${d}" fill="hold"/>${tgt}<p:attrNameLst><p:attrName>${name}</p:attrName></p:attrNameLst></p:cBhvr><p:tavLst><p:tav tm="0"><p:val><p:strVal val="${from}"/></p:val></p:tav><p:tav tm="100000"><p:val><p:strVal val="${to}"/></p:val></p:tav></p:tavLst></p:anim>`;
   const op = by("OPACITY"), tr = by("TRANSLATION"), sc = by("SCALE"), rot = by("ROTATION");
+  const hide = () => `<p:set><p:cBhvr><p:cTn id="${id()}" dur="1" fill="hold"><p:stCondLst><p:cond delay="${Math.max(0, d - 1)}"/></p:stCondLst></p:cTn>${tgt}<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="hidden"/></p:to></p:set>`;
+  const goesOut = op && Number(first(op)) > Number(lastV(op));
+  // fly out (down) and zoom out: exits that move or shrink while they fade
+  if (goesOut && tr) return { preset: 2, cls: "exit", sub: 4, xml: prop("ppt_x", "#ppt_x", "#ppt_x") + prop("ppt_y", "#ppt_y", "1+#ppt_h/2") + hide() };
+  if (goesOut && sc) return { preset: 53, cls: "exit", sub: 16, xml: prop("ppt_w", "#ppt_w", "0") + prop("ppt_h", "#ppt_h", "0") + fade("out") + hide() };
+  // appear: shown at once
+  if (op && !tr && !sc && !rot && Number(first(op)) < Number(lastV(op)) && d <= 1) return { preset: 1, cls: "entr", sub: 0, xml: show() };
+  // spin (emphasis): turns in place, no fade
+  if (rot && !op) {
+    const deg = Number(lastV(rot)) - Number(first(rot));
+    return { preset: 8, cls: "emph", sub: 0, xml: `<p:animRot by="${Math.round(deg * 60000)}"><p:cBhvr><p:cTn id="${id()}" dur="${d}" fill="hold"/>${tgt}<p:attrNameLst><p:attrName>r</p:attrName></p:attrNameLst></p:cBhvr></p:animRot>` };
+  }
+  // grow / shrink (emphasis): ends at the new size
+  if (sc && !op && Number(first(sc)) === 1 && Number(lastV(sc)) !== 1) {
+    const k = Math.round(Number(lastV(sc)) * 100000);
+    return { preset: 6, cls: "emph", sub: 0, xml: `<p:animScale><p:cBhvr><p:cTn id="${id()}" dur="${d}" fill="hold"/>${tgt}</p:cBhvr><p:by x="${k}" y="${k}"/></p:animScale>` };
+  }
+  // float in (Ascend): rises a little while it fades in
+  if (tr && op) {
+    const [fx, fy] = (first(tr) as [number, number]) ?? [0, 0];
+    if (fx === 0 && fy > 0 && fy <= 60) return { preset: 42, cls: "entr", sub: 0, xml: show() + fade("in") + prop("ppt_x", "#ppt_x", "#ppt_x") + prop("ppt_y", "#ppt_y+.1", "#ppt_y") };
+  }
   // fade out: hidden when it ends
   if (op && !tr && !sc && !rot && Number(first(op)) > Number(lastV(op)))
     return {
@@ -119,7 +143,8 @@ export function animClickPars(page: Page, spids: ReadonlyMap<string, number>, ma
               if (raw && pristine(e)) return e.anims[0].pptx!.xml.replace(/(<p:cTn\b[^>]*?\sid=")\d+(")/g, (_m, a, b) => `${a}${id()}${b}`).replace(/(<p:cTn\b[^>]*?nodeType=")\w+(")/, `$1${node}$2`);
               const eid = id();
               const b = effectBody(e, id);
-              return `<p:par><p:cTn id="${eid}" presetID="${b.preset}" presetClass="${b.cls}" presetSubtype="${b.sub}" fill="hold" nodeType="${node}"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>${b.xml}</p:childTnLst></p:cTn></p:par>`;
+              const delay = Math.max(0, Math.round(e.anims[0].delay ?? 0));
+              return `<p:par><p:cTn id="${eid}" presetID="${b.preset}" presetClass="${b.cls}" presetSubtype="${b.sub}" fill="hold" nodeType="${node}"><p:stCondLst><p:cond delay="${delay}"/></p:stCondLst><p:childTnLst>${b.xml}</p:childTnLst></p:cTn></p:par>`;
             })
             .join("");
           return `<p:par><p:cTn id="${gid}" fill="hold"><p:stCondLst><p:cond delay="${Math.round(g.delay)}"/></p:stCondLst><p:childTnLst>${items}</p:childTnLst></p:cTn></p:par>`;
@@ -154,6 +179,43 @@ function closeOf(xml: string, open: number, pfx: string, name: string): { innerE
  * them at its end (a main sequence is added when it has none). Returns `timing` unchanged when nothing is to be added.
  */
 export function withAnimTiming(timing: string, page: Page, spids: ReadonlyMap<string, number>, raw = false): string {
+  const main = withMainSeq(timing, page, spids, raw);
+  return withTriggers(main, page, spids);
+}
+
+/**
+ * Trigger effects (KeyframeAnimation.triggerId): an interactive sequence per trigger shape, started by a click on it, as
+ * PowerPoint writes "트리거 › 클릭할 때". Added at the end of the timing root (a root is made when there is none).
+ */
+function withTriggers(timing: string, page: Page, spids: ReadonlyMap<string, number>): string {
+  const by = new Map<string, KeyframeAnimation[]>();
+  for (const a of page.animations ?? []) if (a.triggerId && spids.has(a.triggerId) && spids.has(a.targetNodeId)) by.set(a.triggerId, [...(by.get(a.triggerId) ?? []), a]);
+  if (!by.size) return timing;
+  let n = Math.max(2, ...[...timing.matchAll(/<(?:\w+:)?cTn\b[^>]*?\sid="(\d+)"/g)].map((m) => Number(m[1])));
+  const seqs = [...by].map(([trig, list]) => {
+    const spid = spids.get(trig)!;
+    const seqId = ++n;
+    const r = animClickPars({ ...page, animations: list.map((a, i) => ({ ...a, triggerId: undefined, trigger: i === 0 ? "ON_CLICK" : a.trigger })) }, spids, seqId, seqId);
+    n = r.lastId;
+    const tgt = `<p:tgtEl><p:spTgt spid="${spid}"/></p:tgtEl>`;
+    const pars = r.xml.replace('<p:cond delay="indefinite"/>', '<p:cond delay="0"/>');
+    return `<p:seq concurrent="1" nextAc="seek"><p:cTn id="${seqId}" restart="whenNotActive" fill="hold" evtFilter="cancelBubble" nodeType="interactiveSeq"><p:stCondLst><p:cond evt="onClick" delay="0">${tgt}</p:cond></p:stCondLst><p:endSync evt="end" delay="0"><p:rtn val="all"/></p:endSync><p:childTnLst>${pars}</p:childTnLst></p:cTn><p:nextCondLst><p:cond evt="onClick" delay="0">${tgt}</p:cond></p:nextCondLst></p:seq>`;
+  });
+  if (!timing) return `<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>${seqs.join("")}</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>`;
+  const root = /<((?:\w+:)?)cTn\b[^>]*?nodeType="tmRoot"[^>]*?>/.exec(timing);
+  if (!root) return timing;
+  const pfx = root[1];
+  const c0 = closeOf(timing, root.index, pfx, "cTn");
+  const body = c0 ? timing.slice(root.index, c0.innerEnd) : "";
+  const k = body.search(new RegExp(`<${pfx}childTnLst\\b`));
+  if (!c0 || k < 0) return timing;
+  const c = closeOf(timing, root.index + k, pfx, "childTnLst");
+  if (!c) return timing;
+  const xml = pfx === "p:" ? seqs.join("") : seqs.join("").replace(/<(\/?)p:/g, `<$1${pfx}`);
+  return timing.slice(0, c.innerEnd) + xml + timing.slice(c.innerEnd);
+}
+
+function withMainSeq(timing: string, page: Page, spids: ReadonlyMap<string, number>, raw = false): string {
   // the slide's main sequence was read into the page (pptxTiming): written anew from it, not added to
   const replace = raw && !!page.pptxTiming;
   if (!page.animations?.length && !replace) return timing;

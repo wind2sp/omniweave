@@ -93,21 +93,56 @@ export class StyleWriter {
       st.indent ? ` indent="${st.indent}"` : "",
       st.rot ? ` textRotation="${st.rot}"` : "",
     ].join("");
+    const prot = st.unlocked || st.hideFormula ? `<protection${st.unlocked ? ' locked="0"' : ""}${st.hideFormula ? ' hidden="1"' : ""}/>` : "";
     const xf =
       `<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}" xfId="0"` +
       (numFmtId ? ' applyNumberFormat="1"' : "") +
       (fontId ? ' applyFont="1"' : "") +
       (fillId ? ' applyFill="1"' : "") +
       (borderId ? ' applyBorder="1"' : "") +
-      (al ? ` applyAlignment="1"><alignment${al}/></xf>` : "/>");
+      (al ? ' applyAlignment="1"' : "") +
+      (prot ? ' applyProtection="1"' : "") +
+      (al || prot ? `>${al ? `<alignment${al}/>` : ""}${prot}</xf>` : "/>");
     const id = this.put("cellXfs", xf);
     this.cache.set(key, id);
     return id;
   }
 
+  private dxfs: string[] = [];
+  private dxfBase = -1;
+
+  /** Differential format index (dxfs) for a conditional format's look. */
+  dxfFor(st: Pick<SheetStyle, "color" | "fill" | "bold" | "italic" | "strike" | "underline">): number {
+    if (this.dxfBase < 0) {
+      const block = /<dxfs\b[^>]*?(\/>|>([\s\S]*?)<\/dxfs>)/.exec(this.xml);
+      this.dxfBase = block?.[2] ? (block[2].match(/<dxf\b(?:[^>]*\/>|[\s\S]*?<\/dxf>)/g) ?? []).length : 0;
+    }
+    const font = st.bold || st.italic || st.strike || st.underline || st.color ? `<font>${st.bold ? "<b/>" : ""}${st.italic ? "<i/>" : ""}${st.strike ? "<strike/>" : ""}${st.underline ? (st.underline === "double" ? '<u val="double"/>' : "<u/>") : ""}${st.color ? `<color rgb="${argb(st.color)}"/>` : ""}</font>` : "";
+    const fill = st.fill ? `<fill><patternFill><bgColor rgb="${argb(st.fill)}"/></patternFill></fill>` : "";
+    const x = `<dxf>${font}${fill}</dxf>`;
+    const have = this.dxfs.indexOf(x);
+    if (have >= 0) return this.dxfBase + have;
+    this.dxfs.push(x);
+    this.changed = true;
+    return this.dxfBase + this.dxfs.length - 1;
+  }
+
   /** The stylesheet with the new entries appended (counts updated). */
   result(): string {
     let s = this.xml;
+    if (this.dxfs.length) {
+      const n = this.dxfBase + this.dxfs.length;
+      const block = /<dxfs\b[^>]*?(\/>|>([\s\S]*?)<\/dxfs>)/.exec(s);
+      const inner = (block?.[2] ?? "") + this.dxfs.join("");
+      const el = `<dxfs count="${n}">${inner}</dxfs>`;
+      if (block) s = s.slice(0, block.index) + el + s.slice(block.index + block[0].length);
+      else {
+        // CT_Stylesheet: … cellXfs cellStyles dxfs tableStyles colors extLst
+        const after = /<\/cellStyles>|<cellStyles\b[^>]*\/>/.exec(s) ?? /<\/cellXfs>/.exec(s);
+        const at = after ? after.index + after[0].length : s.lastIndexOf("</styleSheet>");
+        s = s.slice(0, at) + el + s.slice(at);
+      }
+    }
     for (const tag of ["numFmts", "fonts", "fills", "borders", "cellXfs"] as const) {
       const extra = this.add[tag];
       if (!extra.length) continue;

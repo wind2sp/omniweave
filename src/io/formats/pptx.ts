@@ -13,7 +13,7 @@ import { rectContour, corner } from "../../core/vector";
 import { layoutText, lineHeightOf } from "../../core/text";
 import { paraLineRatio, wordMultipleOf } from "../../core/lineSpacing";
 import { applyTransform, scaleYOf } from "../../core/geom";
-import { layoutTable } from "../../core/table";
+import { coverMap, layoutTable } from "../../core/table";
 import {
   DEFAULT_RUN,
   MONO_FONT,
@@ -23,7 +23,9 @@ import {
   newTable,
   newText,
   newVector,
+  newGroup,
   uid,
+  type LayerGroup,
   type Align,
   type AssetRef,
   type Contour,
@@ -31,6 +33,7 @@ import {
   type Page,
   type Placeholder,
   type SceneNode,
+  type SlideChart,
   type TableCell,
   type MediaNode,
   type TableNode,
@@ -38,9 +41,11 @@ import {
   type TextParagraph,
   type TextRun,
   type Transform,
+  type TransitionType,
 } from "../../core/types";
 import { attr, child, children, descendants, esc, parseXml, textOf } from "../xml";
-import { SLIDE_LAYOUTS, builtinLayout, isBuiltinLayout, promptKey, type PhSlot, type SlideLayoutDef, type SlideLayoutId } from "../../core/slides";
+import { SLIDE_LAYOUTS, builtinLayout, isBuiltinLayout, layoutOfPage, promptKey, type PhSlot, type SlideLayoutDef, type SlideLayoutId } from "../../core/slides";
+import { isLayoutPage, layoutDecorNodes } from "../../core/slideLayouts";
 import { renumber } from "../../core/richtext";
 import { absoluteSpacing } from "../office";
 import { MAX_LEVELS, levelOf, listNumbers, resolveDef } from "../../core/lists";
@@ -52,7 +57,12 @@ import { buildTree, hasStructure, type TreeItem } from "../../core/layerTree";
 import { t as tr } from "../../i18n";
 import { effectLstXml, pptxNeedsPicture, readEffectLst } from "./pptxFx";
 import { avOf, custContours, flipContours, presetContours } from "./pptxGeom";
-import { drawChart, readChart } from "./pptxChart";
+import { chartFrameNow, chartRun, drawChart, readChart } from "./pptxChart";
+import { CT_CHART, chartFrameXml, chartSpaceXml, chartWorkbook } from "./pptxChartWrite";
+import { CT_DGM, dataModelXml, layoutOfUrn, readDataModel, smartFrameXml } from "./pptxSmartArt";
+import { smartShapes, type SmartData } from "../../core/smartArt";
+import { DEFAULT_THEME, type SlideTheme } from "../../core/slideTheme";
+import { hfBox, hfDate, HF_ALIGN, HF_GREY, slideNumber, type HfSlot } from "../../core/slideHf";
 import { readMainSeq, withAnimTiming } from "./pptxAnim";
 import type { Effect } from "../../core/style/types";
 import { applyLstStyle, emptyStyle, LEVELS, paraLevel, resolveFace, runLevel, slideAscentOf, splitScripts, themeFontsOf, type ListStyle, type ThemeFonts } from "./pptxText";
@@ -299,6 +309,8 @@ interface TextEnv {
   lnRed: number;
   /** the slide's number, for a:fld type="slidenum" (its saved text is "‹#›" on masters and layouts) */
   slideNo?: number;
+  /** the slide's relationships: a run's a:hlinkClick to a web address becomes its link */
+  rels?: Map<string, { target: string; external: boolean }>;
   /** filled with each paragraph's inherited latinLnBrk ("0" / "1" / undefined), in order */
   latinLnBrk?: (string | undefined)[];
 }
@@ -396,6 +408,10 @@ function paragraphsOf(txBody: Element, env: TextEnv, listDefs?: Map<string, List
       if (Number.isFinite(spc) && spc) base.letterSpacing = Math.round((spc / 100) * PT * scale * 100) / 100;
       const hlc = R.highlight ? colorOf(R.highlight, theme) : null;
       if (hlc) base.highlight = hlc.toUpperCase();
+      const hl = rPr && child(rPr, "hlinkClick");
+      const rid = hl && Array.from(hl.attributes).find((a) => a.name.endsWith(":id"))?.value;
+      const to = rid ? env.rels?.get(rid) : undefined;
+      if (to?.external && to.target && !attr(hl!, "action")) base.link = to.target;
       if (R.r.cap === "all") text = text.toUpperCase();
       // Latin letters in the a:latin font, Hangul / CJK in the a:ea font — as PowerPoint draws a run
       return splitScripts(text, latin, ea).map((s) => ({ ...base, text: s.text, fontFamily: s.font }));
@@ -519,6 +535,10 @@ interface Ctx {
   clips: Map<string, { m: MediaNode; endTrim: number }>;
   /** number of the slide being read (its place in the deck + firstSlideNum − 1), for slide number fields */
   slideNo?: number;
+  /** the part (slide, layout, master, drawing) whose shapes are being read: its text's hyperlinks are its relationships */
+  slidePath?: string;
+  /** the slide's SmartArt graphics read as layer groups (core/smartArt.ts), in order */
+  groups?: LayerGroup[];
 }
 
 function skip(ctx: Ctx, why: string) {
@@ -675,7 +695,7 @@ function textNode(ctx: Ctx, txBody: Element, box: Box, levels: ListStyle, bp: Re
   const l = ins("lIns", 9.6) + box.w * fl, r = ins("rIns", 9.6) + box.w * fr, top = ins("tIns", 4.8) + box.h * ft, bot = ins("bIns", 4.8) + box.h * fb;
   const ldefs = new Map<string, ListDef>();
   const lnBrk: (string | undefined)[] = [];
-  const paras = paragraphsOf(txBody, { theme: ctx.theme, fonts: ctx.fonts, levels, scale, lnRed, slideNo: ctx.slideNo, latinLnBrk: lnBrk }, ldefs);
+  const paras = paragraphsOf(txBody, { theme: ctx.theme, fonts: ctx.fonts, levels, scale, lnRed, slideNo: ctx.slideNo, rels: ctx.slidePath ? getRels(ctx.pkg, ctx.slidePath) : undefined, latinLnBrk: lnBrk }, ldefs);
   const innerW = Math.max(1, box.w - l - r);
   // PowerPoint lays out no space before the first paragraph nor after the last one of a text body (spcFirstLastPara)
   if (paras[0]?.spaceBefore && bp.spcFirstLastPara !== "1") delete paras[0].spaceBefore;
@@ -756,6 +776,7 @@ function shapesOf(ctx: Ctx, tree: Element, partPath: string, layers: (Document |
 
 /** The nodes of one shape-tree element (a shape, picture, frame, group or alternate content). */
 function shapeOf(ctx: Ctx, el: Element, partPath: string, layers: (Document | null)[], map: Map2, out: SceneNode[], fromMaster: boolean) {
+  ctx.slidePath = partPath; // whose relationships its text's links are (each shape sets it: a nested drawing part changes it)
   const { theme } = ctx;
   switch (el.localName) {
     case "grpSp": {
@@ -953,11 +974,31 @@ function shapeOf(ctx: Ctx, el: Element, partPath: string, layers: (Document | nu
       const tbl = descendants(el, "tbl")[0];
       const relIds = descendants(el, "relIds")[0];
       if (relIds && box0) {
-        // SmartArt: PowerPoint stores the drawn shapes (dsp:drawing) next to the diagram data — place those
+        // SmartArt: PowerPoint stores the drawn shapes (dsp:drawing) next to the diagram data — place those. A graphic
+        // of a layout Omniweave draws too (its data model's layout id: io/formats/pptxSmartArt.ts) becomes a SmartArt
+        // group here (its text pane edits it); one without a drawing (written by Omniweave) is drawn from its data.
         const drawing = diagramDrawing(ctx, partPath, relIds);
         const tree = drawing && descendants(getXml(ctx.pkg, drawing)!, "spTree")[0];
-        if (tree) {
-          shapesOf(ctx, tree, drawing!, [], (b) => map({ ...b, x: b.x + box0.x, y: b.y + box0.y }), out, false);
+        const dmRel = getRels(ctx.pkg, partPath).get(attr(relIds, "dm") ?? "");
+        const dm = dmRel && getXml(ctx.pkg, dmRel.target);
+        const model = dm ? readDataModel(dm) : null;
+        const layout = model && !fromMaster ? layoutOfUrn(model.layoutUrn) : null;
+        const at = out.length;
+        if (tree) shapesOf(ctx, tree, drawing!, [], (b) => map({ ...b, x: b.x + box0.x, y: b.y + box0.y }), out, false);
+        else if (layout && model!.items.length) {
+          const fb = map(box0);
+          const th = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME.colors, ...Object.fromEntries(Object.entries(theme).filter(([k2]) => /^(accent\d|dk\d|lt\d)$/.test(k2))) }, minor: resolveFace("+mn-lt", ctx.fonts, {}) ?? DEFAULT_RUN.fontFamily };
+          out.push(...smartShapes(layout, model!.items, { x: fb.x, y: fb.y, w: fb.w, h: fb.h }, th as SlideTheme));
+        }
+        if (out.length > at) {
+          if (layout && model!.items.length) {
+            const fb = map(box0);
+            const g = newGroup((descendants(el, "cNvPr")[0] && attr(descendants(el, "cNvPr")[0], "name")) || "SmartArt");
+            // (drawn by PowerPoint: the frame is where Omniweave's own drawing of it would go, should it be edited here)
+            g.smart = { layout, items: model!.items, frame: { x: fb.x, y: fb.y, w: fb.w, h: fb.h }, anchor: { x: out[at].transform.x, y: out[at].transform.y } };
+            for (const nd of out.slice(at)) nd.groupId = g.id;
+            (ctx.groups ??= []).push(g);
+          }
           break;
         }
       }
@@ -1163,7 +1204,7 @@ function mediaTiming(slide: Document, clips: Map<string, { m: MediaNode; endTrim
   }
 }
 
-function backgroundOf(doc: Document | null, theme: Theme): { color?: string; image?: string } | null {
+function backgroundOf(doc: Document | null, theme: Theme): { color?: string; image?: string; grad?: NonNullable<Page["bgGrad"]> } | null {
   if (!doc) return null;
   const bg = descendants(doc, "bg")[0];
   if (!bg) return null;
@@ -1172,7 +1213,13 @@ function backgroundOf(doc: Document | null, theme: Theme): { color?: string; ima
     const sf = child(pr, "solidFill");
     if (sf) return { color: colorOf(sf, theme) ?? undefined };
     const gf = child(pr, "gradFill");
-    if (gf) return { color: colorOf(descendants(gf, "gs")[0], theme) ?? undefined };
+    if (gf) {
+      const stops = descendants(gf, "gs").map((g) => ({ at: Math.max(0, Math.min(1, Number(attr(g, "pos")) / 100000 || 0)), color: colorOf(g, theme) ?? "#ffffff" }));
+      const lin = child(gf, "lin");
+      // a linear gradient (radial / path ones: their first colour, as before)
+      const grad = lin && stops.length >= 2 ? { angle: (Number(attr(lin, "ang")) || 0) / 60000, stops } : undefined;
+      return { color: stops[0]?.color, ...(grad ? { grad } : {}) };
+    }
     const blip = descendants(pr, "blip")[0];
     if (blip) return { image: attr(blip, "embed") ?? undefined };
   }
@@ -1359,16 +1406,17 @@ function readDeck(files: Record<string, Uint8Array>, bytes: Uint8Array, name: st
     page.source = { format: "pptx", name };
     // p:transition (possibly inside mc:AlternateContent): none = no transition (newPage's SLIDE default is FADE)
     const tr = descendants(slide, "transition")[0];
-    if (!tr || !children(tr).length) page.transition = { type: "NONE", duration: page.transition.duration };
+    const advTm = tr ? Number(attr(tr, "advTm")) : NaN;
+    const after = Number.isFinite(advTm) && attr(tr!, "advTm") !== null ? { after: advTm } : {};
+    if (!tr || !children(tr).length) page.transition = { type: "NONE", duration: page.transition.duration, ...after };
     else {
-      const push = child(tr, "push");
-      const dir = push && (attr(push, "dir") ?? "l");
       const ms = Number(attr(tr, "dur"));
       const spd = attr(tr, "spd");
-      page.transition = { type: push && dir === "l" ? "SLIDE_LEFT" : "FADE", duration: ms > 0 ? ms : spd === "fast" ? 500 : spd === "slow" ? 1000 : 750 };
+      page.transition = { type: transitionOf(tr), duration: ms > 0 ? ms : spd === "fast" ? 500 : spd === "slow" ? 1000 : 750, ...after };
     }
     const bg = backgroundOf(slide, theme) ?? backgroundOf(layout, theme) ?? backgroundOf(master, theme);
     page.background = bg?.color ?? theme.lt1 ?? "#ffffff";
+    if (bg?.grad) page.bgGrad = bg.grad;
     const nodes: SceneNode[] = [];
     let bgPicture = false;
     if (bg?.image) {
@@ -1393,6 +1441,7 @@ function readDeck(files: Record<string, Uint8Array>, bytes: Uint8Array, name: st
     }
     const tree = descendants(slide, "spTree")[0];
     ctx.clips = new Map();
+    ctx.groups = [];
     const trace: SlideTrace = { inh: nodes.length, bg: bgPicture, els: [] };
     /** shape id → the nodes read from it (its animations play on them) */
     const bySpid = new Map<string, string[]>();
@@ -1409,6 +1458,7 @@ function readDeck(files: Record<string, Uint8Array>, bytes: Uint8Array, name: st
       });
     mediaTiming(slide, ctx.clips);
     page.nodes = nodes;
+    if (ctx.groups.length) page.groups = ctx.groups;
     // the slide's animations (its main sequence), so they show, play and can be edited here (io/formats/pptxAnim.ts)
     const XS = (globalThis as { XMLSerializer?: typeof XMLSerializer }).XMLSerializer;
     const anims = XS ? readMainSeq(slide, bySpid, (e) => new XS().serializeToString(e)) : null;
@@ -1458,6 +1508,12 @@ function xfrmXml(t: Transform, w: number, h: number) {
 /** a:fld id of written slide number fields (any GUID will do; a fixed one keeps saves repeatable) */
 const SLIDENUM_FLD_ID = "{B6F15528-21DE-4FAA-801E-634DDDAF4B2B}";
 
+/**
+ * While a slide's text is written (slideWriter): gives a web address its slide relationship id, so a run's link is
+ * written as PowerPoint's a:hlinkClick. Unset elsewhere (a run's link is then left out).
+ */
+let linkRel: ((url: string) => string) | null = null;
+
 export function runXml(r: TextRun, scale: number) {
   const c = hex(r.color);
   const face = esc(r.fontFamily === MONO_FONT ? "Consolas" : r.fontFamily);
@@ -1469,7 +1525,9 @@ export function runXml(r: TextRun, scale: number) {
     (r.strike ? ' strike="sngStrike"' : "") +
     (absoluteSpacing(r) ? ` spc="${Math.round(((absoluteSpacing(r) * scale) / PT) * 100)}"` : "") +
     (r.script ? ` baseline="${r.script === "super" ? 30000 : -25000}"` : "");
-  const props = `${c ? `<a:solidFill><a:srgbClr val="${c}"/></a:solidFill>` : ""}${hl ? `<a:highlight><a:srgbClr val="${hl}"/></a:highlight>` : ""}<a:latin typeface="${face}"/><a:ea typeface="${face}"/>`;
+  // a hyperlink (삽입 › 링크, Ctrl+K): a:hlinkClick, last of the children, to an external relationship of the slide
+  const link = r.link && linkRel && !r.link.startsWith("#") ? `<a:hlinkClick r:id="${linkRel(r.link)}"/>` : "";
+  const props = `${c ? `<a:solidFill><a:srgbClr val="${c}"/></a:solidFill>` : ""}${hl ? `<a:highlight><a:srgbClr val="${hl}"/></a:highlight>` : ""}<a:latin typeface="${face}"/><a:ea typeface="${face}"/>${link}`;
   // a page number field (a slide's a:fld slidenum, a Word PAGE field) stays a field: PowerPoint shows each slide's
   // own number, the saved text being the value shown now
   if (r.field === "page" && r.text && !r.text.includes("\n"))
@@ -1561,7 +1619,22 @@ function contourPath(c: Contour, ox: number, oy: number): string {
 
 const SP_TREE_HEAD = `<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>`;
 
-const THEME = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="${NS_A}" name="Omniweave"><a:themeElements><a:clrScheme name="Omniweave"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1D1F24"/></a:dk2><a:lt2><a:srgbClr val="EEF1F6"/></a:lt2><a:accent1><a:srgbClr val="4F7CFF"/></a:accent1><a:accent2><a:srgbClr val="7C5CFF"/></a:accent2><a:accent3><a:srgbClr val="22A06B"/></a:accent3><a:accent4><a:srgbClr val="F5A524"/></a:accent4><a:accent5><a:srgbClr val="E5484D"/></a:accent5><a:accent6><a:srgbClr val="0EA5E9"/></a:accent6><a:hlink><a:srgbClr val="2F5BD3"/></a:hlink><a:folHlink><a:srgbClr val="7C5CFF"/></a:folHlink></a:clrScheme><a:fontScheme name="Omniweave"><a:majorFont><a:latin typeface="Malgun Gothic"/><a:ea typeface="Malgun Gothic"/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Malgun Gothic"/><a:ea typeface="Malgun Gothic"/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Omniweave"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`;
+/** The deck's theme part: the colour scheme and fonts of its slide theme (core/slideTheme.ts; Omniweave's own without one). */
+export function themeXml(th?: SlideTheme): string {
+  const t0 = th ?? DEFAULT_THEME;
+  // a deck without a theme keeps the colours every deck written here had
+  const c = th ? t0.colors : { ...t0.colors, dk2: "#1D1F24", lt2: "#EEF1F6", accent1: "#4F7CFF", accent2: "#7C5CFF", accent3: "#22A06B", accent4: "#F5A524", accent5: "#E5484D", accent6: "#0EA5E9", hlink: "#2F5BD3", folHlink: "#7C5CFF" };
+  const clr = (k: keyof typeof c) => `<a:${k}><a:srgbClr val="${hex(c[k]) ?? "000000"}"/></a:${k}>`;
+  const keys = ["dk1", "lt1", "dk2", "lt2", "accent1", "accent2", "accent3", "accent4", "accent5", "accent6", "hlink", "folHlink"] as const;
+  // a Korean face goes in a:ea and the Hangul script slot, a Latin one in a:latin as well
+  const face = (f: string) => {
+    // (a Korean face named in a:latin too: PowerPoint shows it in 디자인 › 글꼴 and uses it for Latin text, as the slides do)
+    const latin = f;
+    return `<a:latin typeface="${esc(latin)}"/><a:ea typeface="${esc(f)}"/><a:cs typeface=""/>${th ? `<a:font script="Hang" typeface="${esc(f)}"/>` : ""}`;
+  };
+  const name = th ? th.name : "Omniweave";
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="${NS_A}" name="${esc(name)}"><a:themeElements><a:clrScheme name="${esc(th ? t0.colorName : "Omniweave")}">${keys.map(clr).join("")}</a:clrScheme><a:fontScheme name="${esc(th ? t0.fontName : "Omniweave")}"><a:majorFont>${face(th ? t0.major : "Malgun Gothic")}</a:majorFont><a:minorFont>${face(th ? t0.minor : "Malgun Gothic")}</a:minorFont></a:fontScheme><a:fmtScheme name="Omniweave"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`;
+}
 
 /** Master text styles of a deck written anew: titles, and bulleted body levels at PowerPoint's usual sizes. */
 const MASTER_TX_STYLES = (() => {
@@ -1651,6 +1724,13 @@ export interface SlideEnv {
   addMedia: (bytes: Uint8Array, ext: string, key: string) => string;
   /** groups / clip stacks placed as pictures, pictures cropped to a shape, objects drawn with their effects, nodes left out */
   counts: { flattened: number; inShape: number; fxPictures: number; skipped: number };
+  /**
+   * a chart part (ppt/charts/…) for a slide chart, with its embedded workbook (io/formats/pptxChartWrite.ts); the slide
+   * then shows a PowerPoint chart instead of the chart's shapes. Omitted: charts are written as their shapes.
+   */
+  addChart?: (m: SlideChart) => string;
+  /** the data part of a SmartArt graphic (io/formats/pptxSmartArt.ts); omitted: it is written as its shapes */
+  addSmart?: (d: SmartData) => string;
 }
 
 /** A slide's shapes as PresentationML, with the relationships and clip timing they need. */
@@ -1676,6 +1756,24 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
   const k = Math.min(W / page.width, H / page.height); // pages of another size are scaled to fit
   const rels: string[] = start.rels ? [...start.rels] : [];
   const relId = () => `rId${start.relBase + rels.length + 1}`;
+  // text with links: one external hyperlink relationship per address
+  const links = new Map<string, string>();
+  const withLinks = (f: () => string): string => {
+    linkRel = (url) => {
+      let rid = links.get(url);
+      if (!rid) {
+        rid = relId();
+        rels.push(`<Relationship Id="${rid}" Type="${REL}/hyperlink" Target="${esc(url)}" TargetMode="External"/>`);
+        links.set(url, rid);
+      }
+      return rid;
+    };
+    try {
+      return f();
+    } finally {
+      linkRel = null;
+    }
+  };
   const shapes: string[] = [];
   const clips: ClipTiming[] = [];
   let id = start.id;
@@ -1770,6 +1868,22 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
     counts.inShape++;
     return true;
   };
+  /** A SmartArt group as PowerPoint's SmartArt (its frame where its shapes are now); false when it cannot be. */
+  const smartFrame = (it: TreeItem): boolean => {
+    if (it.kind !== "group" || !it.group.smart || !env.addSmart) return false;
+    const sd = it.group.smart;
+    const nodes = members(it);
+    const was = sd.anchor ?? smartShapes(sd.layout, sd.items, sd.frame, doc.theme ?? DEFAULT_THEME)[0]?.transform;
+    const dx = was && nodes[0] ? nodes[0].transform.x - was.x : 0, dy = was && nodes[0] ? nodes[0].transform.y - was.y : 0;
+    const part = env.addSmart(sd);
+    const rid = relId();
+    rels.push(`<Relationship Id="${rid}" Type="${REL}/diagramData" Target="../diagrams/${part.split("/").pop()}"/>`);
+    // (layout, quick style and colours: PowerPoint's built-in ones the data names — no parts, so it lays it out itself)
+    const rids: [string, string, string, string] = [rid, `${rid}lo`, `${rid}qs`, `${rid}cs`];
+    const f = sd.frame;
+    shapes.push(smartFrameXml(id++, it.group.name, rids, e((f.x + dx) * k), e((f.y + dy) * k), e(f.w * k), e(f.h * k)));
+    return true;
+  };
   const members = (it: TreeItem): SceneNode[] => (it.kind === "node" ? [it.node, ...it.clips] : [...it.children.flatMap(members), ...it.clips]);
   // groups that only pass their members through (eye on, 100 %, Pass Through or Normal) are not needed in PPTX
   const neutral = (it: TreeItem) => it.kind === "group" && it.group.opacity >= 1 && !it.group.effects?.some((x) => x.on) && (it.group.blendMode === "PASS_THROUGH" || (it.group.blendMode === "NORMAL" && it.children.every((c) => c.kind === "group" || c.node.blendMode === "NORMAL")));
@@ -1788,7 +1902,19 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
         await raster(members({ ...it, clips: clipped }));
         counts.flattened++;
       } else if (it.kind === "node") await emitNode(it.node);
-      else if (neutral(it)) await emitItems(it.children);
+      else if (it.group.smart && env.addSmart && smartFrame(it)) continue;
+      else if (neutral(it)) {
+        // a group (Ctrl+G): its members in a p:grpSp, so PowerPoint keeps them grouped (an identity frame round them)
+        const at = shapes.length;
+        await emitItems(it.children);
+        if (shapes.length - at >= 2) {
+          const inner = shapes.splice(at);
+          const bx = inner.map((x) => /<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(x)).filter((m): m is RegExpExecArray => !!m).map((m) => [+m[1], +m[2], +m[1] + +m[3], +m[2] + +m[4]]);
+          const x0 = Math.min(...bx.map((q) => q[0])), y0 = Math.min(...bx.map((q) => q[1])), x1 = Math.max(...bx.map((q) => q[2])), y1 = Math.max(...bx.map((q) => q[3]));
+          const fr = bx.length ? `<a:off x="${x0}" y="${y0}"/><a:ext cx="${x1 - x0}" cy="${y1 - y0}"/><a:chOff x="${x0}" y="${y0}"/><a:chExt cx="${x1 - x0}" cy="${y1 - y0}"/>` : `<a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/>`;
+          shapes.push(`<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${id++}" name="${esc(it.group.name)}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm>${fr}</a:xfrm></p:grpSpPr>${inner.join("")}</p:grpSp>`);
+        }
+      }
       else {
         await raster(members(it));
         counts.flattened++;
@@ -1802,7 +1928,19 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
     await emitNode0(n);
     if (id > sid) spids.set(n.id, sid);
   };
+  const chartHeads = new Map<string, SlideChart>();
+  const chartRest = new Set<string>();
   const emitNode0 = async (n: SceneNode) => {
+    if (chartRest.has(n.id)) return;
+    const cm = chartHeads.get(n.id);
+    if (cm && env.addChart) {
+      const part = env.addChart(cm);
+      const rid = relId();
+      rels.push(`<Relationship Id="${rid}" Type="${REL}/chart" Target="../charts/${part.split("/").pop()}"/>`);
+      const f = cm.frame;
+      shapes.push(chartFrameXml(id++, cm.name, rid, e(f.x * k), e(f.y * k), e(f.w * k), e(f.h * k)));
+      return;
+    }
     // effects DrawingML lacks (inner glow, stroke, overlay): the object as a picture, effects drawn in
     if (pptxNeedsPicture(n.effects)) {
       counts.fxPictures++;
@@ -1819,11 +1957,11 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
           const box = { ...n.transform, y: n.transform.y - (ph.dy ?? 0) * ky };
           const phEl = `<p:ph type="${ph.type}"${ph.idx ? ` idx="${esc(ph.idx)}"` : ""}/>`;
           const anchor = ph.anchor ? ` anchor="${ph.anchor}"` : "";
-          shapes.push(`<p:sp><p:nvSpPr><p:cNvPr id="${id++}" name="${esc(n.name)}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr>${phEl}</p:nvPr></p:nvSpPr><p:spPr>${xfrmXml(scaled(box), n.width, ph.h)}${n.background ? `<a:solidFill><a:srgbClr val="${hex(n.background) ?? "FFFFFF"}"/></a:solidFill>` : ""}${fxXml}</p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0"${anchor} rtlCol="0"><a:normAutofit/></a:bodyPr><a:lstStyle/>${parasXml(n.paragraphs, n.transform.scale * k, n.lists, n.wordBreak === "keep-all")}</p:txBody></p:sp>`);
+          shapes.push(`<p:sp><p:nvSpPr><p:cNvPr id="${id++}" name="${esc(n.name)}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr>${phEl}</p:nvPr></p:nvSpPr><p:spPr>${xfrmXml(scaled(box), n.width, ph.h)}${n.background ? `<a:solidFill><a:srgbClr val="${hex(n.background) ?? "FFFFFF"}"/></a:solidFill>` : ""}${fxXml}</p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0"${anchor} rtlCol="0"><a:normAutofit/></a:bodyPr><a:lstStyle/>${withLinks(() => parasXml(n.paragraphs, n.transform.scale * k, n.lists, n.wordBreak === "keep-all"))}</p:txBody></p:sp>`);
           break;
         }
         const h = layoutText(n).height;
-        shapes.push(`<p:sp>${nv("Sp", n.name, ' txBox="1"')}<p:spPr>${xfrmXml(scaled(n.transform), n.width, h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${n.background ? `<a:solidFill><a:srgbClr val="${hex(n.background) ?? "FFFFFF"}"/></a:solidFill>` : "<a:noFill/>"}${fxXml}</p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" spcFirstLastPara="1"><a:spAutoFit/></a:bodyPr><a:lstStyle/>${parasXml(n.paragraphs, n.transform.scale * k, n.lists, n.wordBreak === "keep-all")}</p:txBody></p:sp>`);
+        shapes.push(`<p:sp>${nv("Sp", n.name, ' txBox="1"')}<p:spPr>${xfrmXml(scaled(n.transform), n.width, h)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${n.background ? `<a:solidFill><a:srgbClr val="${hex(n.background) ?? "FFFFFF"}"/></a:solidFill>` : "<a:noFill/>"}${fxXml}</p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" spcFirstLastPara="1"><a:spAutoFit/></a:bodyPr><a:lstStyle/>${withLinks(() => parasXml(n.paragraphs, n.transform.scale * k, n.lists, n.wordBreak === "keep-all"))}</p:txBody></p:sp>`);
         break;
       }
       case "VECTOR": {
@@ -1861,15 +1999,20 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
         const l = layoutTable(n);
         const sc = n.transform.scale * k;
         const grid = n.colWidths.map((w) => `<a:gridCol w="${e(w * sc)}"/>`).join("");
+        // merged cells (셀 병합): the top-left cell spans, the cells it covers are written as hMerge / vMerge
+        const cover = coverMap(n.rows);
         const rows = n.rows
           .map((r, ri) => {
             const cells = r
-              .map((c) => {
+              .map((c, ci) => {
+                const cv = cover[ri]?.[ci];
+                const span = cv ? "" : `${(c.colSpan ?? 1) > 1 ? ` gridSpan="${Math.min(c.colSpan!, r.length - ci)}"` : ""}${(c.rowSpan ?? 1) > 1 ? ` rowSpan="${Math.min(c.rowSpan!, n.rows.length - ri)}"` : ""}`;
+                const merge = cv ? `${cv.c !== ci ? ' hMerge="1"' : ""}${cv.r !== ri ? ' vMerge="1"' : ""}` : "";
                 const run: TextRun = { ...DEFAULT_RUN, text: c.text, fontFamily: n.fontFamily, fontSize: n.fontSize, bold: !!c.bold || (n.headerRow && ri === 0), italic: !!c.italic, color: c.color ?? n.color };
                 const paras = c.text.split("\n").map((line) => `<a:p><a:pPr algn="${ALGN_OUT[c.align ?? "LEFT"]}"/>${line ? runXml({ ...run, text: line }, sc) : ""}<a:endParaRPr lang="ko-KR" sz="${Math.round(((n.fontSize * sc) / PT) * 100)}"/></a:p>`).join("");
                 const fill = c.fill ?? (n.headerRow && ri === 0 ? n.headerFill : n.background);
                 const border = (side: string) => `<a:${side} w="9525"><a:solidFill><a:srgbClr val="${hex(n.borderColor) ?? "C9CED8"}"/></a:solidFill></a:${side}>`;
-                return `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${paras}</a:txBody><a:tcPr marL="${e(6 * sc)}" marR="${e(6 * sc)}" marT="${e(4 * sc)}" marB="${e(4 * sc)}">${border("lnL")}${border("lnR")}${border("lnT")}${border("lnB")}${fill && hex(fill) ? `<a:solidFill><a:srgbClr val="${hex(fill)}"/></a:solidFill>` : "<a:noFill/>"}</a:tcPr></a:tc>`;
+                return `<a:tc${span}${merge}><a:txBody><a:bodyPr/><a:lstStyle/>${paras}</a:txBody><a:tcPr marL="${e(6 * sc)}" marR="${e(6 * sc)}" marT="${e(4 * sc)}" marB="${e(4 * sc)}">${border("lnL")}${border("lnR")}${border("lnT")}${border("lnB")}${fill && hex(fill) ? `<a:solidFill><a:srgbClr val="${hex(fill)}"/></a:solidFill>` : "<a:noFill/>"}</a:tcPr></a:tc>`;
               })
               .join("");
             return `<a:tr h="${e((l.rowY[ri + 1] - l.rowY[ri]) * sc)}">${cells}</a:tr>`;
@@ -1886,6 +2029,20 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
     }
   };
   const emit = async (nodes: readonly SceneNode[]) => {
+    // charts still drawn as they were (not changed shape by shape): a PowerPoint chart in place of their shapes
+    if (env.addChart)
+      nodes.forEach((n, i) => {
+        if (!n.chart?.data) return;
+        const [s, e] = chartRun(nodes, i);
+        const run = nodes.slice(s, e);
+        const frame = chartFrameNow(nodes, i);
+        if (!frame) return;
+        const drawn = drawChart({ ...n.chart.data, frame });
+        const key = (x: SceneNode) => JSON.stringify(x, (k, v) => (k === "id" || k === "name" || k === "chart" ? undefined : typeof v === "number" ? Math.round(v * 100) / 100 : v));
+        if (drawn.length !== run.length || drawn.some((d, k) => key(d) !== key(run[k]))) return;
+        chartHeads.set(n.id, { ...n.chart.data, frame });
+        for (const x of run.slice(1)) chartRest.add(x.id);
+      });
     if (hasStructure(nodes, page.groups)) await emitItems(buildTree(nodes, page.groups));
     else for (const n of nodes) if (n.visible) await emitNode(n);
   };
@@ -1893,10 +2050,67 @@ export function slideWriter(env: SlideEnv, page: Page, si: number, W: number, H:
 }
 
 /** p:transition for a page's transition ("" for none). */
-export const transitionXml = (p: Page) => (p.transition.type === "FADE" ? '<p:transition spd="med"><p:fade/></p:transition>' : p.transition.type === "SLIDE_LEFT" ? '<p:transition spd="med"><p:push dir="l"/></p:transition>' : "");
+/** The p:transition child of each transition type (PowerPoint 2007 elements, which every version plays). */
+const TRANSITION_EL: Record<string, string> = {
+  FADE: "<p:fade/>",
+  SLIDE_LEFT: '<p:push dir="l"/>',
+  PUSH_UP: '<p:push dir="u"/>',
+  ZOOM: "<p:zoom/>",
+  WIPE: '<p:wipe dir="r"/>',
+  SPLIT: '<p:split orient="vert" dir="out"/>',
+  COVER: '<p:cover dir="l"/>',
+  UNCOVER: '<p:pull dir="l"/>',
+  CUT: "<p:cut/>",
+  RANDOM_BARS: '<p:randomBar dir="horz"/>',
+  CIRCLE: "<p:circle/>",
+  DISSOLVE: "<p:dissolve/>",
+};
+
+/** p:transition for a page's transition ("" for none and no automatic advance): its speed and "advance after". */
+export const transitionXml = (p: Page) => {
+  const tr = p.transition;
+  const el = TRANSITION_EL[tr.type] ?? "";
+  const adv = tr.after !== undefined ? ` advTm="${Math.max(0, Math.round(tr.after))}"` : "";
+  if (!el && !adv) return "";
+  const spd = tr.duration <= 500 ? "fast" : tr.duration <= 750 ? "med" : "slow";
+  return `<p:transition spd="${spd}"${adv}>${el}</p:transition>`;
+};
+
+/** A p:transition element (its children) read back as a transition type. */
+export function transitionOf(tr: Element): TransitionType {
+  const c = children(tr).find((x) => x.localName !== "sndAc" && x.localName !== "extLst");
+  const dir = c ? attr(c, "dir") : null;
+  switch (c?.localName) {
+    case "push":
+      return dir === "u" ? "PUSH_UP" : "SLIDE_LEFT";
+    case "zoom":
+      return "ZOOM";
+    case "wipe":
+      return "WIPE";
+    case "split":
+      return "SPLIT";
+    case "cover":
+      return "COVER";
+    case "pull":
+      return "UNCOVER";
+    case "cut":
+      return "CUT";
+    case "randomBar":
+      return "RANDOM_BARS";
+    case "circle":
+      return "CIRCLE";
+    case "dissolve":
+      return "DISSOLVE";
+    default:
+      return "FADE";
+  }
+}
 
 /** p:bg of a solid page colour. */
-export const solidBgXml = (p: Page) => `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${hex(p.background) ?? "FFFFFF"}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`;
+export const solidBgXml = (p: Page) =>
+  p.bgGrad && p.bgGrad.stops.length >= 2
+    ? `<p:bg><p:bgPr><a:gradFill rotWithShape="1"><a:gsLst>${p.bgGrad.stops.map((s) => `<a:gs pos="${Math.round(s.at * 100000)}"><a:srgbClr val="${hex(s.color) ?? "FFFFFF"}"/></a:gs>`).join("")}</a:gsLst><a:lin ang="${Math.round((((p.bgGrad.angle % 360) + 360) % 360) * 60000)}" scaled="0"/></a:gradFill><a:effectLst/></p:bgPr></p:bg>`
+    : `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${hex(p.background) ?? "FFFFFF"}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`;
 
 /** A whole slide part: background, the writer's shapes, the transition and the clips' timing. `showMasterSp` false hides the layout's and master's shapes. */
 export function slidePartXml(page: Page, w: SlideWriter, showMasterSp = true): string {
@@ -1912,7 +2126,7 @@ export const notesParasXml = (text: string) => text.split("\n").map((l) => (l ? 
 export const notesSlideXml = (text: string) =>
   `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:notes xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"><p:cSld><p:spTree>${SP_TREE_HEAD}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image"/><p:cNvSpPr><a:spLocks noGrp="1" noRot="1" noChangeAspect="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldImg"/></p:nvPr></p:nvSpPr><p:spPr/></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/>${notesParasXml(text)}</p:txBody></p:sp></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:notes>`;
 
-const NOTES_MASTER_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:notesMaster xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${SP_TREE_HEAD}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image"/><p:cNvSpPr><a:spLocks noGrp="1" noRot="1" noChangeAspect="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldImg" idx="2"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="685800" y="1143000"/><a:ext cx="5486400" cy="3086100"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="12700"><a:solidFill><a:prstClr val="black"/></a:solidFill></a:ln></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" sz="quarter" idx="3"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="685800" y="4400550"/><a:ext cx="5486400" cy="3600450"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="ko-KR"/></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:notesStyle><a:lvl1pPr marL="0" algn="l"><a:defRPr sz="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:notesStyle></p:notesMaster>`;
+export const NOTES_MASTER_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:notesMaster xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${SP_TREE_HEAD}<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image"/><p:cNvSpPr><a:spLocks noGrp="1" noRot="1" noChangeAspect="1"/></p:cNvSpPr><p:nvPr><p:ph type="sldImg" idx="2"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="685800" y="1143000"/><a:ext cx="5486400" cy="3086100"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="12700"><a:solidFill><a:prstClr val="black"/></a:solidFill></a:ln></p:spPr></p:sp><p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" sz="quarter" idx="3"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="685800" y="4400550"/><a:ext cx="5486400" cy="3600450"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="ko-KR"/></a:p></p:txBody></p:sp></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:notesStyle><a:lvl1pPr marL="0" algn="l"><a:defRPr sz="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:notesStyle></p:notesMaster>`;
 
 /** Content type of a notes page part. */
 export const CT_NOTES = "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml";
@@ -1937,6 +2151,46 @@ export const sectionExtXml = (lst: string) => (lst ? `<p:ext uri="{521415D9-36F7
 
 export const relsXml = (rels: readonly string[]) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join("")}</Relationships>`;
 
+/** A slide's 머리글/바닥글 (core/slideHf.ts) as dt / ftr / sldNum placeholders with their text (fields for date and number). */
+export function slideHfXml(doc: Pick<OmwDocument, "pages" | "theme">, page: Page, W: number, H: number, firstId: number): string[] {
+  const hf = page.slideHf;
+  if (!hf) return [];
+  const k = Math.min(W / page.width, H / page.height);
+  const font = doc.theme?.minor;
+  const color = doc.theme?.dark ? "BFBFBF" : HF_GREY.slice(1);
+  const out: string[] = [];
+  const guid = (n: number) => `{6F2B0C4${n}-8A1D-4C1B-9E1A-0D0F2E3A4B5${n}}`;
+  const one = (slot: HfSlot, inner: string, name: string, idx: number, sz: string) => {
+    const [x, y, w, h] = hfBox(slot, page.width, page.height);
+    const algn = HF_ALIGN[slot] === "LEFT" ? "l" : HF_ALIGN[slot] === "CENTER" ? "ctr" : "r";
+    out.push(
+      `<p:sp><p:nvSpPr><p:cNvPr id="${firstId + out.length}" name="${name}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="${slot}" sz="${sz}" idx="${idx}"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="${e(x * k)}" y="${e(y * k)}"/><a:ext cx="${e(w * k)}" cy="${e(h * k)}"/></a:xfrm></p:spPr><p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p><a:pPr algn="${algn}"/>${inner}</a:p></p:txBody></p:sp>`,
+    );
+  };
+  const rPr = `<a:rPr lang="ko-KR" sz="1200"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill>${font ? `<a:latin typeface="${esc(font)}"/><a:ea typeface="${esc(font)}"/>` : ""}</a:rPr>`;
+  if (hf.date) {
+    const text = hf.date.auto ? hfDate(hf.date.fmt) : hf.date.text;
+    one("dt", hf.date.auto ? `<a:fld id="${guid(1)}" type="datetime1">${rPr}<a:t>${esc(text)}</a:t></a:fld>` : `<a:r>${rPr}<a:t>${esc(text)}</a:t></a:r>`, "Date Placeholder", 10, "half");
+  }
+  if (hf.footer) one("ftr", `<a:r>${rPr}<a:t>${esc(hf.footer)}</a:t></a:r>`, "Footer Placeholder", 11, "quarter");
+  if (hf.num) one("sldNum", `<a:fld id="${guid(2)}" type="slidenum">${rPr}<a:t>${slideNumber(doc, page)}</a:t></a:fld>`, "Slide Number Placeholder", 12, "quarter");
+  return out;
+}
+
+/** The master's own 머리글/바닥글 places (PowerPoint's dialog switches the slides' on and off against them). */
+function masterHfXml(W: number, H: number): string {
+  const sp = (slot: HfSlot, id: number, name: string, idx: number, inner: string) => {
+    const [x, y, w, h] = hfBox(slot, W, H);
+    const algn = HF_ALIGN[slot] === "LEFT" ? "l" : HF_ALIGN[slot] === "CENTER" ? "ctr" : "r";
+    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="${slot}" sz="${slot === "dt" ? "half" : "quarter"}" idx="${idx}"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="${e(x)}" y="${e(y)}"/><a:ext cx="${e(w)}" cy="${e(h)}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr vert="horz" lIns="91440" tIns="45720" rIns="91440" bIns="45720" rtlCol="0" anchor="ctr"/><a:lstStyle><a:lvl1pPr algn="${algn}"><a:defRPr sz="1200"><a:solidFill><a:schemeClr val="tx1"><a:tint val="75000"/></a:schemeClr></a:solidFill></a:defRPr></a:lvl1pPr></a:lstStyle><a:p>${inner}<a:endParaRPr lang="ko-KR"/></a:p></p:txBody></p:sp>`;
+  };
+  return (
+    sp("dt", 9001, "Date Placeholder", 10, `<a:fld id="{6F2B0C41-8A1D-4C1B-9E1A-0D0F2E3A4B51}" type="datetime1"><a:rPr lang="ko-KR"/><a:t>2026-01-01</a:t></a:fld>`) +
+    sp("ftr", 9002, "Footer Placeholder", 11, "") +
+    sp("sldNum", 9003, "Slide Number Placeholder", 12, `<a:fld id="{6F2B0C42-8A1D-4C1B-9E1A-0D0F2E3A4B52}" type="slidenum"><a:rPr lang="ko-KR"/><a:t>&#8249;#&#8250;</a:t></a:fld>`)
+  );
+}
+
 export async function exportPptx(doc: OmwDocument, pages: Page[], rasterize?: Rasterize): Promise<{ bytes: Uint8Array; skipped: number; warnings: string[] }> {
   const warnings: string[] = [];
   const slides = pages.length ? pages : doc.pages;
@@ -1944,7 +2198,7 @@ export async function exportPptx(doc: OmwDocument, pages: Page[], rasterize?: Ra
   const files: Zippable = {};
   const media = new Map<string, string>(); // asset hash → media path
   const defaults = new Set<string>(["xml", "rels"]);
-  const ctypes: Record<string, string> = { png: "image/png", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", bmp: "image/bmp", emf: "image/x-emf", wmf: "image/x-wmf", ...Object.fromEntries(Object.entries(MEDIA_EXT).map(([m, x]) => [x, m])) };
+  const ctypes: Record<string, string> = { png: "image/png", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", bmp: "image/bmp", emf: "image/x-emf", wmf: "image/x-wmf", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ...Object.fromEntries(Object.entries(MEDIA_EXT).map(([m, x]) => [x, m])) };
   let mediaN = 0;
   const addMedia = (bytes: Uint8Array, ext: string, key: string) => {
     let p = media.get(key);
@@ -1956,15 +2210,72 @@ export async function exportPptx(doc: OmwDocument, pages: Page[], rasterize?: Ra
     }
     return p;
   };
-  const env: SlideEnv = { doc, rasterize, addMedia, counts: { flattened: 0, inShape: 0, fxPictures: 0, skipped: 0 } };
-  // layouts: blank first, then each built-in layout the slides were made from (core/slides.ts), with real placeholders
-  const lays: SlideLayoutId[] = ["blank", ...SLIDE_LAYOUTS.filter((id) => id !== "blank" && slides.some((p) => p.layout === id))];
+  // charts: a chart part each, with its data in an embedded workbook (io/formats/pptxChartWrite.ts)
+  const charts: string[] = [];
+  const addChart = (m: SlideChart) => {
+    const n = charts.length + 1;
+    const part = `ppt/charts/chart${n}.xml`;
+    let book: Uint8Array | null = null;
+    try {
+      book = chartWorkbook(m);
+    } catch {
+      book = null;
+    }
+    if (book) {
+      files[`ppt/embeddings/Microsoft_Excel_Worksheet${n}.xlsx`] = [book, { level: 0 }];
+      defaults.add("xlsx");
+      files[`ppt/charts/_rels/chart${n}.xml.rels`] = strToU8(relsXml([`<Relationship Id="rId1" Type="${REL}/package" Target="../embeddings/Microsoft_Excel_Worksheet${n}.xlsx"/>`]));
+    }
+    files[part] = strToU8(chartSpaceXml(m, book ? "rId1" : null));
+    charts.push(part);
+    return part;
+  };
+  // SmartArt: its data, layout, style and colours parts (io/formats/pptxSmartArt.ts)
+  const diagrams: string[] = [];
+  const addSmart = (d: SmartData): string => {
+    const p = `ppt/diagrams/data${diagrams.length + 1}.xml`;
+    files[p] = strToU8(dataModelXml(d));
+    diagrams.push(p);
+    return p;
+  };
+  const env: SlideEnv = { doc, rasterize, addMedia, counts: { flattened: 0, inShape: 0, fxPictures: 0, skipped: 0 }, addChart, addSmart };
+  // masters: each master the slides are drawn with (doc.masters, the theme's — core/slideTheme.ts) becomes a slide
+  // master with its shapes; slides without one share a plain master. Each master has the layouts its slides use.
+  // (a slide drawn over a layout made here: that layout's master, and the layout as one of the master's — core/slideLayouts.ts)
+  const customOf = (p: Page) => doc.masters.find((m) => m.id === p.masterId && isLayoutPage(m));
+  const known = (p: Page): string | null => {
+    const m = p.masterId ? doc.masters.find((x) => x.id === p.masterId) : undefined;
+    if (!m) return null;
+    if (!isLayoutPage(m)) return m.id;
+    return m.masterId && doc.masters.some((x) => x.id === m.masterId && !isLayoutPage(x)) ? m.masterId : null;
+  };
+  const masterIds: (string | null)[] = [];
+  for (const p of slides) if (!masterIds.includes(known(p))) masterIds.push(known(p));
+  if (!masterIds.length) masterIds.push(null);
+  const masterOf = (p: Page) => Math.max(0, masterIds.indexOf(known(p)));
+  const layoutSets: (SlideLayoutId | Page)[][] = masterIds.map((_, mi) => {
+    const mine = slides.filter((p) => masterOf(p) === mi);
+    const custom = [...new Set(mine.map(customOf).filter((x): x is Page => !!x))];
+    return ["blank", ...SLIDE_LAYOUTS.filter((id) => id !== "blank" && mine.some((p) => !customOf(p) && p.layout === id)), ...custom];
+  });
+  const layoutBase: number[] = [];
+  let lc = 0;
+  for (const set of layoutSets) {
+    layoutBase.push(lc);
+    lc += set.length;
+  }
+  const theme = themeXml(doc.theme);
   let notesN = 0;
   for (let si = 0; si < slides.length; si++) {
     const page = slides[si];
-    const li = Math.max(0, lays.indexOf(isBuiltinLayout(page.layout) ? page.layout : "blank")) + 1;
+    const mi = masterOf(page);
+    const lays = layoutSets[mi];
+    const own = customOf(page);
+    const li = layoutBase[mi] + Math.max(0, own ? lays.indexOf(own) : lays.indexOf(isBuiltinLayout(page.layout) ? page.layout : "blank")) + 1;
     const w = slideWriter(env, page, si, W, H, { id: 2, relBase: 0, rels: [`<Relationship Id="rId1" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout${li}.xml"/>`] });
     await w.emit(page.nodes);
+    // 머리글/바닥글: the slide's date, footer and number placeholders over its content
+    w.shapes.push(...slideHfXml(doc, page, W, H, w.next()));
     if (page.notes?.trim()) {
       // speaker notes: a notes page per slide that has them
       const nn = ++notesN;
@@ -1975,38 +2286,69 @@ export async function exportPptx(doc: OmwDocument, pages: Page[], rasterize?: Ra
     files[`ppt/slides/slide${si + 1}.xml`] = strToU8(slidePartXml(page, w));
     files[`ppt/slides/_rels/slide${si + 1}.xml.rels`] = strToU8(relsXml(w.rels));
   }
+  const nM = masterIds.length;
+  // theme parts: one per master (theme1 … themeN), the notes master's after them
+  const notesTheme = nM + 1;
   if (notesN) {
     files["ppt/notesMasters/notesMaster1.xml"] = strToU8(NOTES_MASTER_XML);
-    files["ppt/notesMasters/_rels/notesMaster1.xml.rels"] = strToU8(relsXml([`<Relationship Id="rId1" Type="${REL}/theme" Target="../theme/theme2.xml"/>`]));
-    files["ppt/theme/theme2.xml"] = strToU8(THEME);
+    files["ppt/notesMasters/_rels/notesMaster1.xml.rels"] = strToU8(relsXml([`<Relationship Id="rId1" Type="${REL}/theme" Target="../theme/theme${notesTheme}.xml"/>`]));
+    files[`ppt/theme/theme${notesTheme}.xml`] = strToU8(theme);
   }
   const sections = sectionExtXml(sectionLstXml(slides, slides.map((_, i) => String(256 + i))));
   const { flattened, inShape, fxPictures, skipped } = env.counts;
+  // presentation relationships: masters rId1…rIdN, the theme rId(N+1), the slides after, the notes master last
+  const sRid = (i: number) => `rId${nM + 2 + i}`;
+  const notesRid = `rId${nM + 2 + slides.length}`;
+  const MASTER_ID = (mi: number) => 2147483648 + mi * 1000;
   files["ppt/presentation.xml"] = strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}" saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>${notesN ? `<p:notesMasterIdLst><p:notesMasterId r:id="rId${slides.length + 3}"/></p:notesMasterIdLst>` : ""}<p:sldIdLst>${slides.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 3}"/>`).join("")}</p:sldIdLst><p:sldSz cx="${e(W)}" cy="${e(H)}"/><p:notesSz cx="6858000" cy="9144000"/>${sections ? `<p:extLst>${sections}</p:extLst>` : ""}</p:presentation>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}" saveSubsetFonts="1"><p:sldMasterIdLst>${masterIds.map((_, mi) => `<p:sldMasterId id="${MASTER_ID(mi)}" r:id="rId${mi + 1}"/>`).join("")}</p:sldMasterIdLst>${notesN ? `<p:notesMasterIdLst><p:notesMasterId r:id="${notesRid}"/></p:notesMasterIdLst>` : ""}<p:sldIdLst>${slides.map((_, i) => `<p:sldId id="${256 + i}" r:id="${sRid(i)}"/>`).join("")}</p:sldIdLst><p:sldSz cx="${e(W)}" cy="${e(H)}"/><p:notesSz cx="6858000" cy="9144000"/>${sections ? `<p:extLst>${sections}</p:extLst>` : ""}</p:presentation>`,
   );
   files["ppt/_rels/presentation.xml.rels"] = strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/slideMaster" Target="slideMasters/slideMaster1.xml"/><Relationship Id="rId2" Type="${REL}/theme" Target="theme/theme1.xml"/>${slides.map((_, i) => `<Relationship Id="rId${i + 3}" Type="${REL}/slide" Target="slides/slide${i + 1}.xml"/>`).join("")}${notesN ? `<Relationship Id="rId${slides.length + 3}" Type="${REL}/notesMaster" Target="notesMasters/notesMaster1.xml"/>` : ""}</Relationships>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${masterIds.map((_, mi) => `<Relationship Id="rId${mi + 1}" Type="${REL}/slideMaster" Target="slideMasters/slideMaster${mi + 1}.xml"/>`).join("")}<Relationship Id="rId${nM + 1}" Type="${REL}/theme" Target="theme/theme1.xml"/>${slides.map((_, i) => `<Relationship Id="${sRid(i)}" Type="${REL}/slide" Target="slides/slide${i + 1}.xml"/>`).join("")}${notesN ? `<Relationship Id="${notesRid}" Type="${REL}/notesMaster" Target="notesMasters/notesMaster1.xml"/>` : ""}</Relationships>`,
   );
-  files["ppt/slideMasters/slideMaster1.xml"] = strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree>${SP_TREE_HEAD}</p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst>${lays.map((_, i) => `<p:sldLayoutId id="${2147483649 + i}" r:id="rId${i + 1}"/>`).join("")}</p:sldLayoutIdLst><p:txStyles>${MASTER_TX_STYLES}</p:txStyles></p:sldMaster>`,
-    // (schema order cSld, clrMap, sldLayoutIdLst, …, txStyles: out of it PowerPoint opens nothing — E_FAIL; tests/formats/pptxPackage.test.ts)
-  );
-  files["ppt/slideMasters/_rels/slideMaster1.xml.rels"] = strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${lays.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout${i + 1}.xml"/>`).join("")}<Relationship Id="rId${lays.length + 1}" Type="${REL}/theme" Target="../theme/theme1.xml"/></Relationships>`,
-  );
-  lays.forEach((id, i) => {
-    files[`ppt/slideLayouts/slideLayout${i + 1}.xml`] = strToU8(layoutPartXml(builtinLayout(id, W, H)));
-    files[`ppt/slideLayouts/_rels/slideLayout${i + 1}.xml.rels`] = strToU8(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>`,
+  for (let mi = 0; mi < nM; mi++) {
+    const lays = layoutSets[mi];
+    const mp = masterIds[mi] ? doc.masters.find((m) => m.id === masterIds[mi]) : undefined;
+    let rels = [...lays.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout${layoutBase[mi] + i + 1}.xml"/>`), `<Relationship Id="rId${lays.length + 1}" Type="${REL}/theme" Target="../theme/theme${mi + 1}.xml"/>`];
+    // the master page's own shapes (theme decoration, a logo) in the slide master, under every slide
+    let shapes = "";
+    if (mp) {
+      const mw = slideWriter(env, mp, -1 - mi, W, H, { id: 2, relBase: 0, rels });
+      await mw.emit(mp.nodes);
+      shapes = mw.shapes.join("");
+      rels = mw.rels;
+    }
+    const bg = mp && hex(mp.background) ? `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${hex(mp.background)}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>` : `<p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>`;
+    const hasHf = slides.some((p) => masterOf(p) === mi && p.slideHf);
+    files[`ppt/slideMasters/slideMaster${mi + 1}.xml`] = strToU8(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"><p:cSld${mp ? ` name="${esc(mp.name)}"` : ""}>${bg}<p:spTree>${SP_TREE_HEAD}${shapes}${hasHf ? masterHfXml(W, H) : ""}</p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst>${lays.map((_, i) => `<p:sldLayoutId id="${MASTER_ID(mi) + i + 1}" r:id="rId${i + 1}"/>`).join("")}</p:sldLayoutIdLst><p:txStyles>${MASTER_TX_STYLES}</p:txStyles></p:sldMaster>`,
+      // (schema order cSld, clrMap, sldLayoutIdLst, …, txStyles: out of it PowerPoint opens nothing — E_FAIL; tests/formats/pptxPackage.test.ts)
     );
-  });
-  files["ppt/theme/theme1.xml"] = strToU8(THEME);
+    files[`ppt/slideMasters/_rels/slideMaster${mi + 1}.xml.rels`] = strToU8(relsXml(rels));
+    for (let i = 0; i < lays.length; i++) {
+      const id = lays[i];
+      const n = layoutBase[mi] + i + 1;
+      const toMaster = `<Relationship Id="rId1" Type="${REL}/slideMaster" Target="../slideMasters/slideMaster${mi + 1}.xml"/>`;
+      if (typeof id === "string") {
+        files[`ppt/slideLayouts/slideLayout${n}.xml`] = strToU8(layoutPartXml(builtinLayout(id, W, H)));
+        files[`ppt/slideLayouts/_rels/slideLayout${n}.xml.rels`] = strToU8(relsXml([toMaster]));
+        continue;
+      }
+      // a layout made here: its placeholders, and its own shapes drawn under the slides made from it
+      const def = layoutOfPage(id);
+      const lw = slideWriter(env, id, -100 - n, W, H, { id: def.slots.length + 2, relBase: 0, rels: [toMaster] });
+      await lw.emit(layoutDecorNodes(id));
+      files[`ppt/slideLayouts/slideLayout${n}.xml`] = strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}" type="cust" preserve="1" userDrawn="1"><p:cSld name="${esc(id.name)}"><p:spTree>${SP_TREE_HEAD}${lw.shapes.join("")}${def.slots.map((s, k) => layoutPhXml(s, k)).join("")}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`);
+      files[`ppt/slideLayouts/_rels/slideLayout${n}.xml.rels`] = strToU8(relsXml(lw.rels));
+    }
+    files[`ppt/theme/theme${mi + 1}.xml`] = strToU8(theme);
+  }
   files["_rels/.rels"] = strToU8(
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="ppt/presentation.xml"/></Relationships>`,
   );
+  const CT = "application/vnd.openxmlformats-officedocument";
   files["[Content_Types].xml"] = strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${[...defaults].filter((x) => ctypes[x]).map((x) => `<Default Extension="${x}" ContentType="${ctypes[x]}"/>`).join("")}<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>${lays.map((_, i) => `<Override PartName="/ppt/slideLayouts/slideLayout${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>`).join("")}<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>${notesN ? `<Override PartName="/ppt/theme/theme2.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>${Array.from({ length: notesN }, (_, i) => `<Override PartName="/ppt/notesSlides/notesSlide${i + 1}.xml" ContentType="${CT_NOTES}"/>`).join("")}` : ""}${slides.map((_, i) => `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join("")}</Types>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${[...defaults].filter((x) => ctypes[x]).map((x) => `<Default Extension="${x}" ContentType="${ctypes[x]}"/>`).join("")}<Override PartName="/ppt/presentation.xml" ContentType="${CT}.presentationml.presentation.main+xml"/>${masterIds.map((_, mi) => `<Override PartName="/ppt/slideMasters/slideMaster${mi + 1}.xml" ContentType="${CT}.presentationml.slideMaster+xml"/>`).join("")}${Array.from({ length: lc }, (_, i) => `<Override PartName="/ppt/slideLayouts/slideLayout${i + 1}.xml" ContentType="${CT}.presentationml.slideLayout+xml"/>`).join("")}${masterIds.map((_, mi) => `<Override PartName="/ppt/theme/theme${mi + 1}.xml" ContentType="${CT}.theme+xml"/>`).join("")}${notesN ? `<Override PartName="/ppt/theme/theme${notesTheme}.xml" ContentType="${CT}.theme+xml"/><Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="${CT}.presentationml.notesMaster+xml"/>${Array.from({ length: notesN }, (_, i) => `<Override PartName="/ppt/notesSlides/notesSlide${i + 1}.xml" ContentType="${CT_NOTES}"/>`).join("")}` : ""}${slides.map((_, i) => `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="${CT}.presentationml.slide+xml"/>`).join("")}${charts.map((p) => `<Override PartName="/${p}" ContentType="${CT_CHART}"/>`).join("")}${diagrams.map((p) => `<Override PartName="/${p}" ContentType="${CT_DGM}Data+xml"/>`).join("")}</Types>`,
   );
   if (flattened) warnings.push(tr(flattened === 1 ? "layers.export.pptxFlattened_one" : "layers.export.pptxFlattened", { n: flattened }));
   if (fxPictures) warnings.push(tr("fx.export.pptxPictures", { n: fxPictures }));

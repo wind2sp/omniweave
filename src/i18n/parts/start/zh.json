@@ -2,6 +2,8 @@
   "start.search": "搜索模板和尺寸",
   "start.hero.new": "新建文档",
   "start.hero.newSub": "空白画板 · 1920 × 1080 px",
+  "start.hero.sheet": "空白工作簿",
+  "start.hero.sheetSub": "电子表格 · 单元格网格",
   "start.hero.open": "打开…",
   "start.hero.openSub": "omw · PDF · DOCX · HWPX · PPTX · 图片",
   "start.hero.recent": "最近的文件",
@@ -87,5 +89,18 @@
   "start.sample.storyTitle": "Omni\n新消息",
   "start.sample.storySub": "上滑查看详情",
   "start.sample.thumbTitle": "10 分钟\n搞定设计",
-  "start.sample.thumbSub": "Omni 教程 #1"
+  "start.sample.thumbSub": "Omni 教程 #1",
+  "start.cat.sheet": "表格（Excel、工作表）",
+  "start.tpl.sheet-blank": "空白工作簿",
+  "start.recent.pin": "固定到列表",
+  "start.recent.unpin": "取消固定",
+  "start.sizeName.letter": "信纸",
+  "start.sizeName.legal": "法律文书",
+  "start.sizeName.card": "名片",
+  "start.sizeName.postcard": "明信片",
+  "start.sizeName.square": "正方形",
+  "start.sizeName.story": "竖版视频",
+  "start.recent.noAccess": "浏览器未允许再次读取此文件。请再次点击以允许，或用打开 (Ctrl+O) 选择。",
+  "start.recent.emptyWebHandles": "在 Chrome 或 Edge 中用打开 (Ctrl+O) 或拖放打开的文件会显示在这里。再次打开时浏览器可能会询问一次权限。",
+  "start.recent.webStored": "由浏览器记住的文件"
 }

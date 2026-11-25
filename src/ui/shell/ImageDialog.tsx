@@ -12,7 +12,7 @@ import { runOps } from "../../core/image/run";
 import { applyImageOps, imageTarget, loadSource, opHint, opLabel, paramLabel, paramOptionLabel, paramPartLabel, previewOf } from "../imageActions";
 import { useT } from "../../i18n";
 import { Modal } from "./Dialogs";
-import { Seg } from "./controls";
+import { Seg, Select } from "./controls";
 import { useImageUI } from "./imageMenu";
 import { TraceDialog } from "./TraceDialog";
 import { MatteDialog } from "./MatteDialog";
@@ -34,7 +34,7 @@ export function ImageDialogs() {
 
 // ───────── curve editor ─────────
 
-function CurveEditor({ points, onChange, hist, color }: { points: number[]; onChange: (p: number[]) => void; hist: Uint32Array | null; color: string }) {
+export function CurveEditor({ points, onChange, hist, color }: { points: number[]; onChange: (p: number[]) => void; hist: Uint32Array | null; color: string }) {
   const t = useT();
   const svg = useRef<SVGSVGElement>(null);
   const drag = useRef<number | null>(null);
@@ -203,7 +203,12 @@ function OpDialog({ opId, onClose }: { opId: string; onClose: () => void }) {
         return (
           <div key={s.key} style={imgStyles.row}>
             <span style={imgStyles.rowHead}>{paramLabel(opId, s)}</span>
-            <Seg value={String(v)} options={s.options.map((o) => ({ value: String(o.value), label: paramOptionLabel(opId, s, o.value, o.label) }))} onChange={(x) => set(s.key, Number(x))} ariaLabel={paramLabel(opId, s)} />
+            {/* a long list (선택 색상's nine colour ranges) as a drop-down, a short one as buttons */}
+            {s.options.length > 5 ? (
+              <Select value={String(v)} tip={paramLabel(opId, s)} width={160} options={s.options.map((o) => ({ value: String(o.value), label: paramOptionLabel(opId, s, o.value, o.label) }))} onChange={(x) => set(s.key, Number(x))} />
+            ) : (
+              <Seg value={String(v)} options={s.options.map((o) => ({ value: String(o.value), label: paramOptionLabel(opId, s, o.value, o.label) }))} onChange={(x) => set(s.key, Number(x))} ariaLabel={paramLabel(opId, s)} />
+            )}
           </div>
         );
       case "triple": {

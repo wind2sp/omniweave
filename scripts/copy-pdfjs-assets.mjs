@@ -44,6 +44,8 @@ export function packCMaps(entries) {
  * tests/size/stdFonts.test.ts and qa/size/stdfonts-compare.html (docs/design/INSTALLER_SIZE.md §8).
  */
 export const STANDARD_FONTS_KEPT = ["FoxitSymbol.pfb", "FoxitDingbats.pfb", "LICENSE_FOXIT"];
+/** Fonts PDF/A saving embeds in place of left-out Helvetica / Arial (Liberation Sans) and Courier (Foxit Fixed) — public/pdfjs/pdfa/ */
+export const PDFA_FONTS = ["LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf", "LiberationSans-Italic.ttf", "LiberationSans-BoldItalic.ttf", "LICENSE_LIBERATION", "FoxitFixed.pfb", "FoxitFixedBold.pfb", "FoxitFixedItalic.pfb", "FoxitFixedBoldItalic.pfb", "LICENSE_FOXIT"];
 
 const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 if (isMain) {
@@ -54,6 +56,17 @@ if (isMain) {
     rmSync(`${dst}/standard_fonts`, { recursive: true, force: true }); // drop files of earlier builds
     mkdirSync(`${dst}/standard_fonts`, { recursive: true });
     for (const f of STANDARD_FONTS_KEPT) copyFileSync(`${src}/standard_fonts/${f}`, `${dst}/standard_fonts/${f}`);
+  }
+  // Liberation Sans (Helvetica / Arial widths) for "PDF/A로 저장": a file that leaves those fonts out gets them
+  // embedded (src/io/pdfsurgeon/acrobat.ts embedSansFonts) — read only then, never by the viewer (pdf.js keeps using
+  // the system fonts, STANDARD_FONTS_KEPT above)
+  if (existsSync(`${src}/standard_fonts`)) {
+    rmSync(`${dst}/pdfa`, { recursive: true, force: true });
+    mkdirSync(`${dst}/pdfa`, { recursive: true });
+    for (const f of PDFA_FONTS) copyFileSync(`${src}/standard_fonts/${f}`, `${dst}/pdfa/${f}`);
+    // Omni PDFA Serif (Liberation Serif cut down and renamed, Times widths): not in pdf.js — kept in assets/fonts/pdfa (cut down to the Latin characters a
+    // simple font's 256 codes can show), with its licence
+    if (existsSync("assets/fonts/pdfa")) for (const f of readdirSync("assets/fonts/pdfa")) copyFileSync(`assets/fonts/pdfa/${f}`, `${dst}/pdfa/${f}`);
   }
   if (existsSync(`${src}/cmaps`)) {
     const files = readdirSync(`${src}/cmaps`).filter((f) => f.endsWith(".bcmap"));

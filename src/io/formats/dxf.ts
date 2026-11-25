@@ -387,7 +387,8 @@ function readTables(tags: Tag[], from: number, to: number, d: CadDrawing, blockR
       // a TrueType style names its family in ACAD xdata (1001 ACAD, 1000 family)
       const ac = r.tags.findIndex((t) => t[0] === 1001 && t[1] === "ACAD");
       const fam = ac >= 0 ? r.tags.slice(ac + 1).find((t) => t[0] === 1000)?.[1] : undefined;
-      d.styles.set(name.toUpperCase(), { name, font: fam ? str(fam) : r.s(3), bigFont: r.s(4) || undefined, height: r.n(40), widthFactor: r.n(41, 1) || 1, oblique: r.n(50) });
+      const famFlags = ac >= 0 ? r.tags.slice(ac + 1).find((t) => t[0] === 1071)?.[1] : undefined;
+      d.styles.set(name.toUpperCase(), { name, font: fam ? str(fam) : r.s(3), bigFont: r.s(4) || undefined, height: r.n(40), widthFactor: r.n(41, 1) || 1, oblique: r.n(50), file: r.s(3), gen: r.n(71), ...(fam ? { family: str(fam), familyFlags: num(famFlags ?? 0) } : {}) });
     } else if (type === "BLOCK_RECORD") {
       const h = r.s(5);
       if (h) blockRecords.set(h.toUpperCase(), r.s(2));
@@ -525,6 +526,7 @@ function hatch(r: Rec): CadGeom {
   c.i--;
   const nLoops = c.n(91);
   const loops: HatchLoop[] = [];
+  const srcH: string[] = [];
   for (let l = 0; l < nLoops; l++) {
     const flags = num(c.seek(92));
     if (flags & 2) {
@@ -546,7 +548,7 @@ function hatch(r: Rec): CadGeom {
     // source boundary objects
     if (c.peek() === 97) {
       const ns = c.n(97);
-      for (let k = 0; k < ns; k++) c.take(330);
+      for (let k = 0; k < ns; k++) srcH.push(str(c.take(330)).toUpperCase());
     }
   }
   const lines: HatchLine[] = [];
@@ -580,7 +582,7 @@ function hatch(r: Rec): CadGeom {
       }
     grad = { name: r.s(470) || "LINEAR", angle: r.n(460), shift: r.n(461), single: r.n(452) === 1, tint: r.n(462, 1), colors };
   }
-  return { k: "hatch", solid, pattern: r.s(2), loops, lines, gradient: gradient || undefined, grad };
+  return { k: "hatch", solid, pattern: r.s(2), loops, lines, gradient: gradient || undefined, grad, ...(r.n(71) === 1 && srcH.length ? { src: srcH } : {}) };
 }
 
 /**
@@ -673,7 +675,7 @@ function geomOf(type: string, r: Rec, e: CadEntity): CadGeom | null {
       const sub = r.tags.filter((t) => t[0] === 100).map((t) => t[1]);
       // ATTRIB: 72 is horizontal, 74 vertical justification (73 is the field length there)
       const vj = type !== "TEXT" || sub.includes("AcDbAttribute") ? r.n(74) : r.n(73);
-      return { k: "text", p: r.p3(10), align: r.has(11) ? r.p3(11) : undefined, h: r.n(40, 1) || 1, rot: r.n(50), wf: r.has(41) && r.n(41) !== 1 ? r.n(41) : undefined, oblique: r.n(51) || undefined, text: r.s(1), style: r.s(7, "STANDARD"), hj: r.n(72), vj, mirror: r.n(71) || undefined };
+      return { k: "text", p: r.p3(10), align: r.has(11) ? r.p3(11) : undefined, h: r.n(40, 1) || 1, rot: r.n(50), wf: r.has(41) && r.n(41) !== 1 ? r.n(41) : undefined, oblique: r.n(51) || undefined, text: r.s(1), style: r.s(7, "STANDARD"), hj: r.n(72), vj, mirror: r.n(71) || undefined, ...(type === "TEXT" ? { raw: r.tags } : {}) };
     }
     case "MTEXT": {
       // 2018: an "Embedded Object" (101) follows with the column layout; its 10/11/40… are not the entity's
@@ -688,7 +690,7 @@ function geomOf(type: string, r: Rec, e: CadEntity): CadGeom | null {
       // background mask: 90 & 1 fill colour 63 / 421, & 2 the drawing's background; 45 border offset factor
       const bgf = m.n(90);
       const bg = bgf & 3 ? { color: bgf & 2 ? null : { aci: m.n(63, 256), ...(m.has(421) ? { rgb: m.n(421) & 0xffffff } : {}) }, scale: m.has(45) && m.n(45) >= 1 && m.n(45) <= 5 ? m.n(45) : 1.5 } : undefined;
-      return { k: "mtext", p: m.p3(10), h: m.n(40, 1) || 1, w: m.n(41), attach: m.n(71, 1) || 1, rot, xdir, text: mtextBody(m), style: m.s(7, "STANDARD"), spacing: m.has(44) ? m.n(44) : undefined, cols, ...(bg ? { bg } : {}) };
+      return { k: "mtext", raw: m.tags, p: m.p3(10), h: m.n(40, 1) || 1, w: m.n(41), attach: m.n(71, 1) || 1, rot, xdir, text: mtextBody(m), style: m.s(7, "STANDARD"), spacing: m.has(44) ? m.n(44) : undefined, cols, ...(bg ? { bg } : {}) };
     }
     case "INSERT":
       return { k: "insert", block: r.s(2), p: r.p3(10), sx: r.n(41, 1) || 1, sy: r.n(42, 1) || 1, rot: r.n(50), cols: Math.max(1, r.n(70, 1)), rows: Math.max(1, r.n(71, 1)), cs: r.n(44), rs: r.n(45), attribs: [], xdict: r.s(360).toUpperCase() || undefined };
@@ -707,7 +709,19 @@ function geomOf(type: string, r: Rec, e: CadEntity): CadGeom | null {
     case "DIMENSION":
     case "ARC_DIMENSION":
     case "LARGE_RADIAL_DIMENSION":
-      return { k: "dimension", block: r.s(2), text: r.s(1) || undefined, measure: r.has(42) ? r.n(42) : undefined, dimtype: r.n(70) & 7 };
+      return {
+        k: "dimension",
+        block: r.s(2),
+        text: r.s(1) || undefined,
+        measure: r.has(42) ? r.n(42) : undefined,
+        dimtype: r.n(70) & 7,
+        // definition points, so the drawing screen can write the dimension back as a DIMENSION
+        p: type === "DIMENSION" || type === "ARC_DIMENSION" || type === "LARGE_RADIAL_DIMENSION" ? Object.fromEntries([10, 11, 13, 14, 15, 16, 17].filter((c) => r.has(c)).map((c) => [String(c), r.p3(c)])) : undefined,
+        arc: type === "ARC_DIMENSION" && r.has(40) && r.has(41) ? [r.n(40), r.n(41)] : undefined,
+        large: type === "LARGE_RADIAL_DIMENSION" || undefined,
+        angle: r.has(50) ? r.n(50) : undefined,
+        flags: r.n(70),
+      };
     case "LEADER":
       return { k: "leader", pts: points(r.tags, 10), arrow: r.n(71, 1) !== 0 };
     case "MULTILEADER":
@@ -909,6 +923,21 @@ function readObjects(tags: Tag[], from: number, to: number, d: CadDrawing, block
     else if (type === "RASTERVARIABLES") d.imageFrame = r.n(70, 1);
     else if (type === "WIPEOUTVARIABLES") d.wipeoutFrame = r.n(70, 1);
     else if (type === "IMAGEDEF") d.imageDefs.set(r.s(5).toUpperCase(), r.s(1));
+    // DIMASSOC: the dimension (330 after AcDbDimAssoc), which origins (90) and each object point reference (331, 40)
+    else if (type === "DIMASSOC") {
+      const at = r.tags.findIndex((t) => t[0] === 100 && t[1] === "AcDbDimAssoc");
+      const tg = at >= 0 ? r.tags.slice(at + 1) : [];
+      const dim = str(tg.find((t) => t[0] === 330)?.[1] ?? "").toUpperCase();
+      const flags = num(tg.find((t) => t[0] === 90)?.[1] ?? 0);
+      const refs: { obj: string; param: number }[] = [];
+      for (let i = 0; i < tg.length; i++)
+        if (tg[i][0] === 1 && tg[i][1] === "AcDbOsnapPointRef") {
+          const obj = tg.slice(i + 1).find((t) => t[0] === 331);
+          const par = tg.slice(i + 1).find((t) => t[0] === 40);
+          refs.push({ obj: str(obj?.[1] ?? "").toUpperCase(), param: num(par?.[1] ?? 0) });
+        }
+      if (dim && refs.length) (d.dimAssoc ??= new Map()).set(dim, { flags, refs });
+    }
     // GROUP: description 300, unnamed 70, selectable 71, member entities 340 (named in the ACAD_GROUP dictionary)
     else if (type === "GROUP") groupObjs.set(r.s(5).toUpperCase(), { description: r.s(300), unnamed: r.n(70) === 1, selectable: r.n(71, 1) !== 0, handles: r.all(340).map((v) => str(v).toUpperCase()) });
     else if (type === "LAYOUT") {

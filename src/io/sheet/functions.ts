@@ -1,7 +1,8 @@
 // Worksheet functions of the Omniweave formula engine (calc.ts). Behaviour follows Excel's documented semantics
 // (argument coercion, blanks, errors, criteria with wildcards); names are Excel's English names.
 
-import type { Ast } from "./formula";
+import { addr, type Ast } from "./formula";
+import { sheetFilters } from "./filters";
 import { ARRAY_FUNCTIONS } from "./arrays";
 import { formatValue } from "./numfmt";
 import { parseDateText } from "./dateText";
@@ -254,6 +255,45 @@ const text1 = (f: (s: string) => V): Fn => (b, args, si, r, c, d) => {
 };
 const is = (f: (v: Scalar) => boolean): Fn => (b, args, si, r, c, d) => f(sc(b, args[0], si, r, c, d));
 
+/** PERCENTILE(array, k): inclusive (Excel's PERCENTILE / .INC) or exclusive (.EXC) interpolation. */
+function percentileOf(b: Book, a: Ast | undefined, si: number, r: number, c: number, d: number, k: number, exc: boolean): V {
+  const xs = nums(b, a ? [a] : [], si, r, c, d);
+  if (xs instanceof Err) return xs;
+  if (!xs.length) return E.num;
+  const s = [...xs].sort((p, q) => p - q);
+  const n = s.length;
+  const pos = exc ? k * (n + 1) - 1 : k * (n - 1);
+  if (k < 0 || k > 1 || pos < 0 || pos > n - 1) return E.num;
+  const lo = Math.floor(pos);
+  return fix15(lo + 1 < n ? s[lo] + (pos - lo) * (s[lo + 1] - s[lo]) : s[lo]);
+}
+function percentile(b: Book, args: Ast[], si: number, r: number, c: number, d: number, exc: boolean): V {
+  const k = num(b, args[1], si, r, c, d);
+  return k instanceof Err ? k : percentileOf(b, args[0], si, r, c, d, k, exc);
+}
+/** A financial function of numbers: the rate first, the others in order (missing optional ones undefined). */
+function fin(f: (rate: number, rest: number[]) => number | Err): Fn {
+  return (b, args, si, r, c, d) => {
+    const v: number[] = [];
+    for (let i = 0; i < args.length; i++) {
+      const x = num(b, args[i], si, r, c, d);
+      if (x instanceof Err) return x;
+      v.push(x);
+    }
+    const out = f(v[0], v.slice(1));
+    return out instanceof Err ? out : Number.isFinite(out) ? out : E.num;
+  };
+}
+function ipmt(rate: number, per: number, nper: number, pv: number, fv: number, type: number): number | Err {
+  if (per < 1 || per > nper) return E.num;
+  const pmt = rate === 0 ? -(pv + fv) / nper : (-(pv * (1 + rate) ** nper + fv) * rate) / ((1 + rate * type) * ((1 + rate) ** nper - 1));
+  if (type === 1 && per === 1) return 0;
+  if (rate === 0) return 0;
+  // the balance before the period (Excel's FV), its interest: type 1 pays at the start, so one payment less
+  const fvAt = (n: number) => -(pv * (1 + rate) ** n + (pmt * (1 + rate * type) * ((1 + rate) ** n - 1)) / rate);
+  return type === 1 ? (fvAt(per - 2) - pmt) * rate : fvAt(per - 1) * rate;
+}
+
 function rankOf(xs: number[], x: number, asc: boolean): number | Err {
   if (!xs.includes(x)) return E.na;
   return xs.filter((y) => (asc ? y < x : y > x)).length + 1;
@@ -265,7 +305,71 @@ function textOfNumber(b: Book, x: number, code: string) {
 
 const CURRENCY: Record<string, string> = { ko: "₩", ja: "¥", zh: "¥", en: "$" };
 
+/**
+ * SUBTOTAL / AGGREGATE-style summaries (부분합, the AutoFilter totals): the cells of the reference arguments, without
+ * cells that hold SUBTOTAL / AGGREGATE themselves and without rows a filter hides (and, for 101–111, rows hidden by
+ * hand too), summed up with Excel's function numbers 1–11.
+ */
+function subtotalOf(b: Book, k: number, refs: Ast[], si: number, r: number, c: number, d: number): V {
+  const fn = k > 100 ? k - 100 : k;
+  if (!Number.isInteger(fn) || fn < 1 || fn > 11) return E.value;
+  const xs: Scalar[] = [];
+  for (const a of refs) {
+    const v = ev(b, a, si, r, c, d);
+    if (!isRange(v)) {
+      if (v instanceof Err) return v;
+      return E.value;
+    }
+    const sh = v.sheet;
+    const hidden = new Set(sh.hiddenRows ?? []);
+    // rows a filter hides: inside the data rows of the sheet's AutoFilter or a table's
+    const fareas = sheetFilters(sh).map((x) => /^[A-Z]+(\d+):[A-Z]+(\d+)$/.exec(x.f.ref)).filter((m): m is RegExpExecArray => !!m).map((m) => [Number(m[1]) - 1, Number(m[2]) - 1]);
+    const filtered = (row: number) => fareas.some(([a, b]) => row > a && row <= b);
+    const g = b.trim(v).g;
+    let err: Err | null = null;
+    b.each(b.trim(v), (x, i, j) => {
+      const row = g.r0 + i;
+      const cell = sh.cells[addr(row, g.c0 + j)];
+      if (cell?.f && /\b(SUBTOTAL|AGGREGATE)\s*\(/i.test(cell.f)) return;
+      if (hidden.has(row) && (k > 100 || filtered(row))) return;
+      if (x instanceof Err) err ??= x;
+      xs.push(x);
+    });
+    if (err) return err;
+  }
+  const ns = xs.filter((x): x is number => typeof x === "number");
+  switch (fn) {
+    case 1:
+      return ns.length ? fix15(sum(ns) / ns.length) : E.div0;
+    case 2:
+      return ns.length;
+    case 3:
+      return xs.filter((x) => x !== null && x !== "").length;
+    case 4:
+      return ns.length ? Math.max(...ns) : 0;
+    case 5:
+      return ns.length ? Math.min(...ns) : 0;
+    case 6:
+      return ns.length ? ns.reduce((a, x) => a * x, 1) : 0;
+    case 7:
+      return ns.length < 2 ? E.div0 : Math.sqrt(variance(ns, true));
+    case 8:
+      return ns.length < 1 ? E.div0 : Math.sqrt(variance(ns, false));
+    case 9:
+      return sum(ns);
+    case 10:
+      return ns.length < 2 ? E.div0 : variance(ns, true);
+    default:
+      return ns.length < 1 ? E.div0 : variance(ns, false);
+  }
+}
+
 export const FUNCTIONS: Record<string, Fn> = {
+  SUBTOTAL: (b, args, si, r, c, d) => {
+    const k = num(b, args[0], si, r, c, d);
+    if (k instanceof Err) return k;
+    return subtotalOf(b, Math.trunc(k), args.slice(1), si, r, c, d);
+  },
   // math
   SUM: numsFn((xs) => sum(xs)),
   PRODUCT: numsFn((xs) => (xs.length ? xs.reduce((a, x) => a * x, 1) : 0)),
@@ -1016,7 +1120,135 @@ export const FUNCTIONS: Record<string, Fn> = {
     return x instanceof Err ? x : Math.abs(Math.trunc(x)) % 2 === 1;
   },
   NA: () => E.na,
+  // statistics: the most frequent value, percentiles (inclusive / exclusive), quartiles
+  MODE: numsFn((xs) => {
+    const n = new Map<number, number>();
+    let best: number | null = null, bn = 1;
+    for (const x of xs) {
+      const k = (n.get(x) ?? 0) + 1;
+      n.set(x, k);
+      if (k > bn) (best = x), (bn = k);
+    }
+    return best ?? E.na;
+  }),
+  PERCENTILE: (b, args, si, r, c, d) => percentile(b, args, si, r, c, d, false),
+  "PERCENTILE.EXC": (b, args, si, r, c, d) => percentile(b, args, si, r, c, d, true),
+  QUARTILE: (b, args, si, r, c, d) => {
+    const q = num(b, args[1], si, r, c, d);
+    if (q instanceof Err) return q;
+    if (q < 0 || q > 4) return E.num;
+    return percentileOf(b, args[0], si, r, c, d, Math.floor(q) / 4, false);
+  },
+  // financial: payments, values and rates of an annuity (Excel's formulas, type 0 = end of period)
+  PMT: fin((rate, [nper, pv, fv = 0, type = 0]) => (rate === 0 ? -(pv + fv) / nper : (-(pv * (1 + rate) ** nper + fv) * rate) / ((1 + rate * type) * ((1 + rate) ** nper - 1)))),
+  FV: fin((rate, [nper, pmt, pv = 0, type = 0]) => (rate === 0 ? -(pv + pmt * nper) : -(pv * (1 + rate) ** nper + (pmt * (1 + rate * type) * ((1 + rate) ** nper - 1)) / rate))),
+  PV: fin((rate, [nper, pmt, fv = 0, type = 0]) => (rate === 0 ? -(fv + pmt * nper) : -(fv + (pmt * (1 + rate * type) * ((1 + rate) ** nper - 1)) / rate) / (1 + rate) ** nper)),
+  NPER: fin((rate, [pmt, pv, fv = 0, type = 0]) => {
+    if (rate === 0) return pmt === 0 ? E.num : -(pv + fv) / pmt;
+    const k = pmt * (1 + rate * type);
+    const v = (k - fv * rate) / (k + pv * rate);
+    return v <= 0 ? E.num : Math.log(v) / Math.log(1 + rate);
+  }),
+  IPMT: fin((rate, [per, nper, pv, fv = 0, type = 0]) => ipmt(rate, per, nper, pv, fv, type)),
+  PPMT: fin((rate, [per, nper, pv, fv = 0, type = 0]) => {
+    const i = ipmt(rate, per, nper, pv, fv, type);
+    if (i instanceof Err) return i;
+    const p = rate === 0 ? -(pv + fv) / nper : (-(pv * (1 + rate) ** nper + fv) * rate) / ((1 + rate * type) * ((1 + rate) ** nper - 1));
+    return p - i;
+  }),
+  NPV: (b, args, si, r, c, d) => {
+    const rate = num(b, args[0], si, r, c, d);
+    if (rate instanceof Err) return rate;
+    const xs = nums(b, args.slice(1), si, r, c, d);
+    if (xs instanceof Err) return xs;
+    return xs.reduce((a, x, i) => a + x / (1 + rate) ** (i + 1), 0);
+  },
+  RATE: (b, args, si, r, c, d) => {
+    const v: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      if (!args[i]) break;
+      const x = num(b, args[i], si, r, c, d);
+      if (x instanceof Err) return x;
+      v.push(x);
+    }
+    const [nper, pmt, pv, fv = 0, type = 0, guess = 0.1] = v;
+    // Newton's method on the annuity equation (Excel: 20 iterations, 1e-7)
+    let x = guess;
+    for (let it = 0; it < 100; it++) {
+      const f = (q: number) => (Math.abs(q) < 1e-12 ? pv + pmt * nper + fv : pv * (1 + q) ** nper + (pmt * (1 + q * type) * ((1 + q) ** nper - 1)) / q + fv);
+      const y = f(x), dy = (f(x + 1e-7) - y) / 1e-7;
+      if (!Number.isFinite(dy) || dy === 0) return E.num;
+      const nx = x - y / dy;
+      if (Math.abs(nx - x) < 1e-10) return nx;
+      x = nx;
+    }
+    return E.num;
+  },
+  // lookup: XMATCH (exact, next smaller / larger, wildcard; first-to-last or last-to-first), ADDRESS
+  XMATCH: (b, args, si, r, c, d) => {
+    const key = sc(b, args[0], si, r, c, d);
+    if (key instanceof Err) return key;
+    const rng = range(b, args[1], si, r, c, d);
+    if (rng instanceof Err) return rng;
+    const mode = num(b, args[2], si, r, c, d, 0), dir = num(b, args[3], si, r, c, d, 1);
+    if (mode instanceof Err) return mode;
+    if (dir instanceof Err) return dir;
+    const g = grid(b, rng);
+    const byRow = g.rows === 1 && g.cols > 1;
+    const n = byRow ? g.cols : g.rows;
+    const at = (k: number) => (byRow ? g.at(0, k) : g.at(k, 0));
+    const re = mode === 2 && typeof key === "string" ? new RegExp("^" + key.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/~\*/g, "\u0001").replace(/~\?/g, "\u0002").replace(/\*/g, ".*").replace(/\?/g, ".").replace(/\u0001/g, "\\*").replace(/\u0002/g, "\\?") + "$", "i") : null;
+    let best = -1;
+    const order = dir < 0 ? Array.from({ length: n }, (_, k) => n - 1 - k) : Array.from({ length: n }, (_, k) => k);
+    for (const k of order) {
+      const v = at(k);
+      if (v === null) continue;
+      if (re ? typeof v === "string" && re.test(v) : compare(v, key) === 0) return k + 1;
+      if (mode === -1 && compare(v, key) < 0 && (best < 0 || compare(v, at(best)!) > 0)) best = k;
+      if (mode === 1 && compare(v, key) > 0 && (best < 0 || compare(v, at(best)!) < 0)) best = k;
+    }
+    return best < 0 ? E.na : best + 1;
+  },
+  ADDRESS: (b, args, si, r, c, d) => {
+    const row = num(b, args[0], si, r, c, d), col = num(b, args[1], si, r, c, d), abs = num(b, args[2], si, r, c, d, 1);
+    if (row instanceof Err) return row;
+    if (col instanceof Err) return col;
+    if (abs instanceof Err) return abs;
+    const a1 = args[3] ? toBool(sc(b, args[3], si, r, c, d)) : true;
+    const sheet = args[4] ? txt(b, args[4], si, r, c, d) : "";
+    if (sheet instanceof Err) return sheet;
+    if (row < 1 || col < 1) return E.value;
+    const R = Math.floor(row), C = Math.floor(col);
+    const rAbs = abs === 1 || abs === 2, cAbs = abs === 1 || abs === 3;
+    const ref = a1 === false
+      ? `R${rAbs ? R : `[${R}]`}C${cAbs ? C : `[${C}]`}`
+      : `${cAbs ? "$" : ""}${addr(0, C - 1).replace(/\d+$/, "")}${rAbs ? "$" : ""}${R}`;
+    return sheet ? `${/^[A-Za-z_][\w.]*$/.test(sheet) ? sheet : `'${sheet.replace(/'/g, "''")}'`}!${ref}` : ref;
+  },
+  // dates: the working day `days` working days away (weekends and holidays skipped)
+  WORKDAY: (b, args, si, r, c, d) => {
+    const s = dateArg(b, args[0], si, r, c, d), n = num(b, args[1], si, r, c, d);
+    if (s instanceof Err) return s;
+    if (n instanceof Err) return n;
+    const hol = new Set<number>();
+    if (args[2]) {
+      const h = nums(b, [args[2]], si, r, c, d);
+      if (h instanceof Err) return h;
+      h.forEach((x) => hol.add(Math.floor(x)));
+    }
+    let x = Math.floor(s);
+    const step = n < 0 ? -1 : 1;
+    for (let k = 0; k < Math.abs(Math.trunc(n)); ) {
+      x += step;
+      const w = (x + 6) % 7; // 0 Sunday
+      if (w !== 0 && w !== 6 && !hol.has(x)) k++;
+    }
+    return x;
+  },
 };
+FUNCTIONS["MODE.SNGL"] = FUNCTIONS.MODE;
+FUNCTIONS["PERCENTILE.INC"] = FUNCTIONS.PERCENTILE;
+FUNCTIONS["QUARTILE.INC"] = FUNCTIONS.QUARTILE;
 FUNCTIONS["RANK.EQ"] = FUNCTIONS.RANK;
 FUNCTIONS.AVERAGEA = FUNCTIONS.AVERAGE;
 Object.assign(FUNCTIONS, ARRAY_FUNCTIONS);

@@ -141,6 +141,9 @@ function opsLabel(ops: ImageOp[]): string {
 }
 
 let busy = false;
+/** calls that came while one was running: they run after it, in order (Photoshop queues an adjustment after the
+ *  last instead of dropping it — QA image-design-cad: 자동 톤 then at once 자동 색상 was refused) */
+const waiting: (() => void)[] = [];
 
 /**
  * Apply ops to the selected raster / image node as one undoable step. Returns null when nothing was selected or
@@ -153,8 +156,8 @@ export async function applyImageOps(ops: ImageOp[], label = opsLabel(ops)): Prom
     return null;
   }
   if (busy) {
-    S().notify(tr("image.busy"));
-    return null;
+    await new Promise<void>((go) => waiting.push(go));
+    return applyImageOps(ops, label);
   }
   busy = true;
   try {
@@ -202,6 +205,49 @@ export async function applyImageOps(ops: ImageOp[], label = opsLabel(ops)): Prom
     return null;
   } finally {
     busy = false;
+    waiting.shift()?.();
+  }
+}
+
+/**
+ * The picture layer's pixels replaced by `make(pixels)` in one history step (filters with their own dialog that are no
+ * registry op, such as 픽셀 유동화): the same write-back as applyImageOps. False when nothing was done.
+ */
+export async function applyImageResult(label: string, make: (img: Img) => Img | Promise<Img>): Promise<boolean> {
+  const t = imageTarget();
+  if (!t) {
+    S().notify(tr("image.needTarget"));
+    return false;
+  }
+  try {
+    const src = await loadSource(t.node);
+    const out = await make(src.img);
+    const s = S();
+    const cur = findPage(s.doc, t.pageId)?.nodes.find((n) => n.id === t.node.id);
+    if (!cur || cur !== t.node) {
+      s.notify(tr("image.changed"));
+      return false;
+    }
+    if (cur.type === "RASTER") {
+      const { tiles, changed } = imgToTiles(out, src.ox, src.oy, cur.tiles);
+      if (!changed) return s.notify(tr("image.noChange", { label })), false;
+      s.commit(label, (d) => {
+        const n = draftPage(d, t.pageId)?.nodes.find((x) => x.id === cur.id);
+        if (n && n.type === "RASTER") n.tiles = tiles;
+      });
+      return true;
+    }
+    if (cur.type !== "IMAGE") return false;
+    const asset = makeAsset(await encodePng(out), "image/png", `${(s.doc.assets[cur.assetId]?.name ?? cur.name).replace(/\.[^.]+$/, "")}.png`);
+    s.commit(label, (d) => {
+      d.assets[asset.id] = asset;
+      const n = draftPage(d, t.pageId)?.nodes.find((x) => x.id === cur.id);
+      if (n && n.type === "IMAGE") n.assetId = asset.id;
+    });
+    return true;
+  } catch (e) {
+    S().notify(tr("image.failed", { error: e instanceof Error ? e.message : String(e) }));
+    return false;
   }
 }
 

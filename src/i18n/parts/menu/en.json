@@ -79,5 +79,12 @@
   "menu.export.kind.show": "Presentation",
   "menu.export.kind.table": "Table",
   "cmd.help.storeUpdates": "Updates: Microsoft Store",
-  "menu.toast.mergedAsPixels": "Drew the picture / shape layers into pixels and merged them (Ctrl+Z undoes)"
+  "menu.toast.mergedAsPixels": "Drew the picture / shape layers into pixels and merged them (Ctrl+Z undoes)",
+  "cmd.edit.pasteInFront": "Paste in Front",
+  "cmd.edit.pasteInBack": "Paste in Back",
+  "cmd.edit.pasteOnAllArtboards": "Paste on All Artboards",
+  "cmd.edit.transformAgain": "Transform Again",
+  "menu.hist.pasteFront": "Paste in Front",
+  "menu.hist.pasteBack": "Paste in Back",
+  "design.hist.again": "Transform Again"
 }

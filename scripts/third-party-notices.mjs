@@ -185,6 +185,14 @@ md.push(
 const u2 = readIf("src/assets/models/LICENSE-U2NET.txt");
 md.push(u2 ? fence(u2) : "_src/assets/models/LICENSE-U2NET.txt not found._", "");
 
+md.push("### MODNet (Apache License 2.0)", "");
+md.push(
+  "Background removal of person photos bundles the weights of **MODNet** (Zhanghan Ke, Jiayu Sun, Kaican Li, Qiong Yan, Rynson W.H. Lau, *MODNet: Real-Time Trimap-Free Portrait Matting via Objective Decomposition*, AAAI 2022), from https://github.com/ZHKKKe/MODNet, whose README states that the code, models and demos of the repository (except the GIF files under doc/gif) are released under the Apache License 2.0. The file used is the official ONNX export `modnet_photographic_portrait_matting.onnx` linked from the repository's onnx/README.md (25,888,640 bytes, SHA-256 `07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9`).",
+  "",
+  "**Changes (Apache-2.0 §4(b)):** converted once by `scripts/convert-modnet.mjs` into Omniweave's LWT graph format (`models/matte/modnet.lwt`): the ONNX file read as data only; shape sub-graphs folded, the Relu / Clip after a convolution fused into it, the squeeze-and-excitation matrix products turned into 1×1 convolutions; convolution weights stored as 8-bit integers with one single-precision scale per output channel. No retraining. The network is run by Omniweave's own code (Loom Infer); no ONNX Runtime or other inference library is shipped. The license text (the Apache License 2.0, as above for U²-Netp) ships next to the weights (`models/matte/LICENSE`).",
+  "",
+);
+
 md.push("### PP-OCRv5 text detection and Korean recognition (Apache License 2.0)", "");
 md.push(
   "Text recognition (OCR) bundles the weights of **PP-OCRv5_mobile_det** and **korean_PP-OCRv5_mobile_rec** by the PaddlePaddle Authors (PaddleOCR, https://github.com/PaddlePaddle/PaddleOCR), from the official model repositories https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det and https://huggingface.co/PaddlePaddle/korean_PP-OCRv5_mobile_rec (pinned revisions, file sizes and SHA-256 in `tests/fixtures/ocr/models-manifest.json`), licensed under the Apache License 2.0. The character list of the recognizer comes from the same repository.",

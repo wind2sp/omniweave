@@ -6,8 +6,11 @@
 //     hp:pagePr); unchanged sections keep their original text;
 //   • a new hard page break (Ctrl+Enter, a new page) → a break is added before the item that starts the page
 //     (DOCX: Word's page-break paragraph, HWPX: pageBreak="1" on that paragraph);
-//   • what cannot be expressed in place — sections added or removed, a break removed, an item that had a break
-//     deleted, empty pages — makes the save fall back to writing the file anew (with the usual notice).
+//   • a section added inside an original one (구역 나누기) → DOCX: a section-break paragraph before the item that starts
+//     it, holding a copy of the enclosing section's settings element with the part's own paper / margins / columns
+//     (LayoutDiff.addSections; HWPX writes the file anew);
+//   • what cannot be expressed in place — sections removed, a break removed, an item that had a break deleted, empty
+//     pages — makes the save fall back to writing the file anew (with the usual notice).
 
 import { legacyWordPages, sameSetup, type PageSetup } from "../../core/pageSetup";
 import { PAGE_PRESETS, type Page } from "../../core/types";
@@ -20,6 +23,13 @@ export interface LayoutDiff {
   addBreaks: Map<string, number>;
   /** section (original order) → its new setup, for sections whose paper or margins changed */
   setups: Map<number, PageSetup>;
+  /**
+   * sections added here, by the item that starts the part after each new boundary: the original section (order) whose
+   * settings element is copied to end the part before it, and that part's setup
+   */
+  addSections?: Map<string, { orig: number; setup: PageSetup }>;
+  /** the current sections (order) that are such added parts: their headers / footers are the enclosing section's */
+  addedSections?: Set<number>;
   /** nothing to change */
   none: boolean;
 }
@@ -52,10 +62,30 @@ export function layoutDiff(pages: Page[], flow: FlowItem[], starts: number[], or
       curSec.push(idAt(p.from));
     }
   const origSec = orig.sections.slice(1).map((s) => origIds[s.start]);
-  if (curSec.length !== origSec.length || curSec.some((id, i) => id !== origSec[i])) throw new SurgeryUnavailable("sections");
+  // every original section still starts where it did, in order; sections may be added inside them (구역 나누기)
+  // owner[j]: the original section the current section j lies in
+  const owner = [0];
+  let k = 0;
+  for (const id of curSec) {
+    if (k < origSec.length && id === origSec[k]) k++;
+    else if (origSec.includes(id)) throw new SurgeryUnavailable("sections");
+    owner.push(k);
+  }
+  if (k !== origSec.length) throw new SurgeryUnavailable("sections");
+  // an original section's own settings element ends its last part; the parts before it get new ones
+  const last = new Map<number, number>();
+  owner.forEach((o, j) => last.set(o, j));
   const setups = new Map<number, PageSetup>();
+  const addSections = new Map<string, { orig: number; setup: PageSetup }>();
+  const added = new Set<number>();
   lay.sections.forEach((s, j) => {
-    if (orig.sections[j] && !sameSetup(s, orig.sections[j].setup)) setups.set(j, s);
+    const o = owner[j] ?? 0;
+    if (last.get(o) === j) {
+      if (orig.sections[o] && !sameSetup(s, orig.sections[o].setup)) setups.set(o, s);
+    } else {
+      addSections.set(curSec[j], { orig: o, setup: s });
+      added.add(j);
+    }
   });
   // hard page breaks (an empty page is one more break before the next item)
   const cur = new Map<string, number>();
@@ -86,5 +116,5 @@ export function layoutDiff(pages: Page[], flow: FlowItem[], starts: number[], or
     if (extra < 0) throw new SurgeryUnavailable("break removed");
     if (extra) addBreaks.set(id, extra);
   }
-  return { addBreaks, setups, none: !addBreaks.size && !setups.size };
+  return { addBreaks, setups, ...(addSections.size ? { addSections, addedSections: added } : {}), none: !addBreaks.size && !setups.size && !addSections.size };
 }

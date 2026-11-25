@@ -7,6 +7,8 @@
 import type { Img } from "../pixels";
 import { SAL, saliency, type Backend } from "../infer";
 import { decideFast, decideWithSaliency, imageFeatures, NEEDS_AI, needsReview, saliencyStats, type ImageFeatures, type MatteType, type SaliencyStats } from "./classify";
+import { extendBody } from "./person";
+import { looksLikePerson, personMatte, personStats, withHeadHint } from "./modnet";
 import { chromaKey, chromaScreen, flatBackground, paperRemoval, studioKey, borderModel, type InnerHoles, type SelectResult } from "./select";
 import { dropComponents, hintPixels, hintSaliency, type MatteHint } from "./hints";
 import { clamp01, composeCutout, DEFAULT_EDGE, GUIDE, guidedFilter, hardenAlpha, matteBand, resizePlane, rgbPlanes, shapeAlpha, upsampleAlpha, workSize, type EdgeOptions } from "./refine";
@@ -24,7 +26,18 @@ export interface MatteOptions {
   inner?: InnerHoles;
   /** subject / background points clicked on the preview (fractions of the picture size) */
   hints?: MatteHint[];
+  /** false: never use the person matting model (modnet.ts) — tests, comparisons, and the quick first result of a
+   *  staged display (the person result follows when `personCandidate` says it may differ) */
+  person?: boolean;
+  /** false: the CPU runs the models on one thread, without the conv pool (measurements, tests) */
+  pool?: boolean;
+  /** what is being done now (the image worker reports it as progress): the subject model, the person model, the edges */
+  onStage?: (stage: MatteStage) => void;
 }
+
+/** steps of background removal, in order (progress: index + 1 of MATTE_STAGES.length) */
+export const MATTE_STAGES = ["subject", "person", "refine"] as const;
+export type MatteStage = (typeof MATTE_STAGES)[number];
 
 export interface MatteResult {
   /** full-resolution matte, 0..255 */
@@ -43,7 +56,11 @@ export interface MatteResult {
   backend?: Backend;
   /** the hints took over from the saliency map (region grow) */
   grown?: boolean;
-  ms: { classify: number; ai: number; refine: number; total: number };
+  /** a person photo: the matte came from the person matting model (MODNet, modnet.ts) */
+  person?: boolean;
+  /** the subject looked like a person (a result made with `person: false` may change with the person model) */
+  personCandidate?: boolean;
+  ms: { classify: number; ai: number; refine: number; total: number; person?: number };
 }
 
 /** Edge defaults per type (radius in working-res px at 1024: the band where local fg / bg colours are estimated for decontamination). */
@@ -63,19 +80,41 @@ function now() {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
 }
 
-/** Classification only (cheap for graphics / scans / screens; runs U²-Netp for photos). */
-export async function analyze(img: Img, opts: Pick<MatteOptions, "sal" | "backend"> = {}) {
+/** Classification only (cheap for graphics / scans / screens; runs U²-Netp for photos, and MODNet for photos whose
+ *  subject looks like a person — a confirmed person photo is a "portrait", one that is not is never a "portrait"). */
+export async function analyze(img: Img, opts: Pick<MatteOptions, "sal" | "backend" | "person" | "onStage" | "pool"> = {}) {
   const t0 = now();
   const features = imageFeatures(img);
   const fast = decideFast(features);
   if (fast) return { ...fast, detected: fast.type, features, review: needsReview(fast.type, fast.confidence), ms: now() - t0, aiMs: 0 };
   const t1 = now();
-  const s = opts.sal ?? (await saliency(img, { backend: opts.backend }));
+  opts.onStage?.("subject");
+  const s = opts.sal ?? (await saliency(img, { backend: opts.backend, pool: opts.pool }));
   const aiMs = opts.sal ? 0 : now() - t1;
   const salStats = saliencyStats(img, s.map, SAL, s.hi);
   const d = decideWithSaliency(features, salStats);
-  return { ...d, detected: d.type, features, salStats, sal: { map: s.map, hi: s.hi, lo: s.lo ?? 0 }, backend: s.backend, review: needsReview(d.type, d.confidence), ms: now() - t0, aiMs };
+  // a person photo (modnet.ts): U²-Netp's subject looks like a person in frame and the person model's matte agrees
+  let person: boolean | undefined;
+  let personMs = 0;
+  const personCandidate = PERSON_TYPES.has(d.type) && (d.type === "portrait" || looksLikePerson(personStats(img, s.map, SAL)));
+  if (opts.person !== false && personCandidate) {
+    opts.onStage?.("person");
+    const t2 = now();
+    const pm = await personMatte(img, { pool: opts.pool });
+    personMs = now() - t2;
+    if (pm) {
+      person = looksLikePerson(personStats(img, pm.map, pm.side));
+      if (person) d.type = "portrait";
+      // (the classifier's own "portrait" without a person in it — a statue, a doll — is matted as an object)
+      else if (d.type === "portrait") d.type = "object";
+    }
+  }
+  return { ...d, detected: d.type, person, personCandidate, features, salStats, sal: { map: s.map, hi: s.hi, lo: s.lo ?? 0 }, backend: s.backend, review: needsReview(d.type, d.confidence), ms: now() - t0, aiMs: aiMs + personMs };
 }
+
+/** photo types a person can be detected as (the classifier sees a person as portrait, object, complex, animal — and a
+ *  studio portrait on a plain backdrop as a product) */
+const PERSON_TYPES = new Set<MatteType>(["portrait", "object", "complex", "animal", "product"]);
 
 const userShaped = (e: EdgeOptions) => e.smooth > 0 || e.feather > 0 || e.contrast > 0 || e.shift !== 0;
 
@@ -105,10 +144,10 @@ function fromSelect(img: Img, r: SelectResult, amount: number): Img {
  * guided upsampling. `band` holds the local foreground / background colours (radius = edge.radius) for
  * decontamination. The band's colour-line alpha is not used: on real photos it added halos (MATTE_EVAL.md).
  */
-export function aiMatte(img: Img, map: Float32Array, w: number, h: number, edge: EdgeOptions) {
+export function aiMatte(img: Img, map: Float32Array, w: number, h: number, edge: EdgeOptions, side = SAL) {
   const W = img.width;
   const I = rgbPlanes(img, w, h);
-  const S = resizePlane({ w: SAL, h: SAL, d: map }, w, h).d;
+  const S = resizePlane({ w: side, h: side, d: map }, w, h).d;
   const scale = Math.max(w, h) / 1024;
   const g = hardenAlpha(guidedFilter(I, S, w, h, Math.max(2, Math.round(GUIDE.radius * scale)), GUIDE.eps), GUIDE.harden);
   const band = matteBand(I, g, w, h, Math.max(2, Math.round(edge.radius * scale)));
@@ -121,25 +160,41 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
   const a = await analyze(img, opts);
   const tClassify = a.ms - a.aiMs;
   const type = opts.type ?? a.type;
-  const edge: EdgeOptions = { ...DEFAULT_EDGE, ...TYPE_EDGE[type], ...opts.edge };
   const W = img.width, H = img.height;
   let sal = "sal" in a ? a.sal : opts.sal ? { map: opts.sal.map, hi: opts.sal.hi, lo: opts.sal.lo ?? 0 } : undefined;
   let backend = "backend" in a ? a.backend : opts.sal?.backend;
   let tAi = a.aiMs;
   if (NEEDS_AI.has(type) && !sal) {
     const t = now();
-    const s = await saliency(img, { backend: opts.backend });
+    const s = await saliency(img, { backend: opts.backend, pool: opts.pool });
     sal = { map: s.map, hi: s.hi, lo: s.lo };
     backend = s.backend;
     tAi = now() - t;
   }
+  // a portrait (a person photo the classifier confirmed with the person model, or the user's choice): the person
+  // matting model's matte (modnet.ts) is the map from here on — unless it found nothing there
+  let map = sal?.map;
+  let side = SAL, person = false, tPerson: number | undefined;
+  if (map && type === "portrait" && opts.person !== false) {
+    opts.onStage?.("person");
+    const t = now();
+    const pm = await personMatte(img, { pool: opts.pool });
+    tPerson = now() - t;
+    if (pm && personStats(img, pm.map, pm.side).area >= 0.02) {
+      map = pm.map;
+      side = pm.side;
+      person = true;
+    }
+  }
+  const edge: EdgeOptions = { ...DEFAULT_EDGE, ...TYPE_EDGE[type], ...opts.edge };
+  opts.onStage?.("refine");
   const t1 = now();
   const hints = opts.hints ?? [];
-  // the map the matte is built from: the saliency map, edited by the subject hints (the original stays in `sal`)
+  // the map the matte is built from: the saliency map (or the person matte), edited by the subject hints (the
+  // original stays in `sal`)
   let grown = false;
-  let map = sal?.map;
   if (map && hints.length && NEEDS_AI.has(type)) {
-    const h = hintSaliency(img, map, SAL, hints);
+    const h = hintSaliency(img, map, side, person ? withHeadHint(map, side, hints) : hints);
     map = h.map;
     grown = h.grown;
   }
@@ -191,8 +246,11 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
     }
   } else {
     const { w, h } = workSize(W, H);
-    const m = aiMatte(img, map!, w, h, edge);
+    const m = aiMatte(img, map!, w, h, edge, side);
     alpha = m.alpha;
+    // a person whose body the subject model missed (it saw the head): the body under it is kept too (person.ts)
+    // (not when the person marked places to remove: their 지울 곳 points decide there)
+    if ((type === "portrait" || type === "object" || type === "complex") && !hints.some((h) => !h.fg)) extendBody(img, alpha);
     cut = composeCutout(img, alpha, m.band.bg, m.band.fg, w, h, edge.decontaminate);
   }
   const tRefine = now() - t1;
@@ -208,7 +266,9 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
     sal,
     backend,
     grown,
-    ms: { classify: tClassify, ai: tAi, refine: tRefine, total: now() - T0 },
+    person,
+    personCandidate: "personCandidate" in a ? a.personCandidate : undefined,
+    ms: { classify: tClassify, ai: tAi, refine: tRefine, total: now() - T0, ...(tPerson !== undefined ? { person: tPerson } : {}) },
   };
 }
 

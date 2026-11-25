@@ -4,8 +4,8 @@
 //
 //   surface   first tab        tab row (after 파일)                                        body
 //   doc       홈               홈 · 삽입 · 레이아웃 · 참조 · 검토 · 보기 · 그리기 (+ 맥락 탭) ribbon
-//   sheet     홈               홈                                                        ribbon
-//   pdf       PDF              PDF · 주석 · 쪽 · 보호 · 보기 (+ 맥락 탭)                     ribbon
+//   sheet     홈               홈 · 삽입 · 페이지 레이아웃 · 수식 · 데이터 · 검토 · 보기 (+ 차트 디자인) ribbon
+//   pdf       PDF              PDF · 주석 · 쪽 · 도구 · 보호 · 보기 (+ 맥락 탭)              ribbon
 //   cad       CAD              CAD · 보기 · 출력                                           ribbon (+ command line below)
 //   slide     홈               홈 · 삽입 · 디자인 · 전환 · 애니메이션 · 슬라이드 쇼 · 보기 (+ 맥락) ribbon
 //   image     (menus)          편집▾ · 이미지▾ · 레이어▾ · 선택▾ · 필터▾ · 보기▾               options bar + left toolbox
@@ -26,9 +26,9 @@ export const isMenuSurface = (s: Surface) => MENU_SURFACES.includes(s);
 /** Tab ids of each surface, in order; the first is the format's own tab. Labels: `topui.tab.<surface>.<id>`. */
 export const RIBBON_TABS: Record<Surface, string[]> = {
   doc: ["home", "insert", "layout", "references", "review", "view", "draw"],
-  sheet: ["home"],
-  pdf: ["pdf", "comment", "pages", "protect", "view"],
-  cad: ["cad", "view", "output"],
+  sheet: ["home", "insert", "layout", "formulas", "data", "review", "view"],
+  pdf: ["pdf", "comment", "pages", "tools", "protect", "view"],
+  cad: ["cad", "annot", "insert", "view", "output"],
   slide: ["home", "insert", "design", "transitions", "animations", "show", "view"],
   image: ["edit", "image", "layer", "select", "filter", "view"],
   design: ["edit", "object", "type", "select", "effect", "view"],
@@ -48,8 +48,10 @@ export const KEY_TIPS: Record<string, string> = {
   comment: "C",
   pages: "G",
   protect: "T",
+  tools: "X",
   cad: "A",
   output: "O",
+  annot: "M",
   design: "G",
   transitions: "K",
   animations: "M",
@@ -62,6 +64,8 @@ export const KEY_TIPS: Record<string, string> = {
   object: "O",
   type: "Y",
   effect: "C",
+  formulas: "M",
+  data: "A",
   ctx: "J",
 };
 

@@ -1,11 +1,12 @@
 // Global keyboard shortcuts. Ignored while typing in a field, presenting, or editing text.
 
 import { PAGE_EDITORS } from "../appKeys";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import type { Mode } from "../../core/store";
 import { currentPage, selectedNodes, useStore } from "../../core/store";
+import { fitAllBoards } from "../artboards";
 import { newSlide, pickedPages, startShow, targetSlides } from "../slideActions";
-import { duplicatePages } from "../pageActions";
+import { duplicatePages, selectPage } from "../pageActions";
 import { deleteSelected, duplicateSelected, fitCurrent, openAny, reorderSelected, saveDoc, selectAll, updateSelected } from "../actions";
 import { isTyping, zoomStep, zoomTo } from "./ops";
 import { setWorkMode } from "./ModeSwitch";
@@ -15,7 +16,8 @@ import { addLayer, deleteLayers, duplicateLayers } from "../layers";
 import { groupSelection, selectedGroup, toggleClipping, ungroupSelection } from "../groups";
 import { endTransformSession, startTransformSession, useXform } from "../xform";
 import { applyCrop, cancelCrop, startCrop, useCrop } from "../cropTool";
-import { armClipboardMarker, copySelection, cutSelection, hasClipboard, mergeDown, mergeDownPair, pasteClipboard, pasteSoon } from "../menuActions";
+import { armClipboardMarker, copySelection, cutSelection, hasClipboard, mergeDown, mergeDownPair, pasteClipboard, pasteOnAllArtboards, pasteSoon } from "../menuActions";
+import { transformAgain } from "../transformAgain";
 import { t as tr } from "../../i18n";
 import { insertBreak, onDocumentPage } from "../pageSetupActions";
 import { flowUndo, startNote } from "../docFlow";
@@ -27,6 +29,8 @@ import { cad } from "../cad/hooks";
 import { cycleTab } from "../../core/sessions";
 import { closeTab } from "../tabs";
 import { imageDesignKey } from "../imageDesignKeys";
+import { psKey } from "../ps/psKeys";
+import { toggleFullScreen } from "../viewModes";
 import { pathKey } from "../pathTools";
 import { undoDrawnPoint } from "../pathCanvas";
 import { applyNumberFormat, inSheetGrid, switchSheet } from "../sheet/sheetActions";
@@ -69,7 +73,9 @@ function runRouted(id: string) {
 }
 
 export function useGlobalShortcuts(enabled: boolean) {
-  useEffect(() => {
+  // (a layout effect: on before the first paint — with a passive effect a key pressed the moment the window showed
+  // its first words could come before the listener: realuse c-ctrl-o-startup 2026-11-25)
+  useLayoutEffect(() => {
     if (!enabled) return;
     window.addEventListener("keydown", globalKey);
     return () => window.removeEventListener("keydown", globalKey);
@@ -81,6 +87,18 @@ export function globalKey(e: KeyboardEvent) {
   const s = S();
   if (s.presenting || e.defaultPrevented) return;
   const mod = e.ctrlKey || e.metaKey;
+  // the start screen (it comes up a moment after the window): Ctrl+O opens a file, as on Word's start screen; no
+  // other shortcut reaches the document behind it. The key was lost before: these shortcuts were off while it was up,
+  // and the screen's own key listener came a frame late (realuse c-ctrl-o-startup 2026-11-25: 0/10 on the start
+  // screen, 8/10 right after the page came up)
+  if (useUI.getState().welcome) {
+    if (mod && !e.altKey && !e.shiftKey && e.code === "KeyO") {
+      e.preventDefault();
+      useUI.getState().set({ welcome: false });
+      void openAny();
+    }
+    return;
+  }
   // letter keys by position when the layout gives no Latin letter (Korean IME: "ㅍ" or "Process"),
   // by character otherwise (so AZERTY Ctrl+Z stays Ctrl+Z)
   const k = /^[a-z]$/i.test(e.key) || !/^Key[A-Z]$/.test(e.code) ? e.key.toLowerCase() : e.code.slice(3).toLowerCase();
@@ -93,7 +111,8 @@ export function globalKey(e: KeyboardEvent) {
   const want = bound?.cmd;
 
   // Save works everywhere (and must never trigger the browser's "save page").
-  if (mod && k === "s") {
+  // (Ctrl+Alt+Shift+S is Word's styles pane: the key table has it)
+  if (mod && k === "s" && !e.altKey) {
     e.preventDefault();
     saveNow(e.shiftKey);
     return;
@@ -130,7 +149,8 @@ export function globalKey(e: KeyboardEvent) {
     return;
   }
   // find (Ctrl+F) / find & replace (Ctrl+H) — instead of the browser's find bar and history
-  if (!modal && mod && !e.shiftKey && !e.altKey && (e.code === "KeyF" || e.code === "KeyH")) {
+  // (not where the key table gives the key to something else: Illustrator's Ctrl+F is Paste in Front)
+  if (!modal && mod && !e.shiftKey && !e.altKey && (e.code === "KeyF" || e.code === "KeyH") && (!want || want === "edit.find" || want === "edit.replace")) {
     e.preventDefault();
     // in a sheet: Excel's Find and Replace of the sheet (ui/sheet/SheetDialogs.tsx)
     if (inSheetGrid()) return sheetCommand(e.code === "KeyF" ? "find" : "replace");
@@ -144,11 +164,20 @@ export function globalKey(e: KeyboardEvent) {
     useUI.getState().set({ shellDialog: "shortcuts" });
     return;
   }
+  // F11 full screen (the drawing screen keeps AutoCAD's F11, object snap tracking)
+  if (!modal && e.key === "F11" && !e.ctrlKey && !e.altKey && !e.shiftKey && !cadScreenNow()) {
+    e.preventDefault();
+    void toggleFullScreen();
+    return;
+  }
   if (e.key === "F5") {
     // never the browser's reload. A slide show belongs to the slide / design modes (keymap.ts): slides F5 from the
     // first slide, Shift+F5 from this one (PowerPoint); a design's show starts here. Word's F5 (이동) is not here yet.
     e.preventDefault();
     if (!typing && !modal && (want === "slide.showFromStart" || want === "slide.showFromCurrent")) startShow(want === "slide.showFromStart");
+    if (!typing && !modal && want === "slide.presenterView") startShow(false, true);
+    // Photoshop: Shift+F5 편집 › 칠 (ui/ps/psKeys.ts)
+    else if (!typing && !modal && want === "edit.fill") psKey(e, k, want);
     return;
   }
   // 새 메모 (Word Ctrl+Alt+M) on the text selected in the document body — also while typing there
@@ -198,6 +227,14 @@ export function globalKey(e: KeyboardEvent) {
     fn();
   };
 
+  // a PDF page with nothing picked: Acrobat's page keys — PgDn / PgUp / → / ← next and previous page, Home / End the
+  // first and last (QA 2026-11-24: none of them did anything)
+  if (!mod && !e.altKey && !s.selection.length && pdfSearchNode(currentPage() ?? { nodes: [] })) {
+    const ids = s.doc.pages.map((p) => p.id);
+    const at = ids.indexOf(s.pageId);
+    const to = e.key === "PageDown" || e.key === "ArrowRight" ? at + 1 : e.key === "PageUp" || e.key === "ArrowLeft" ? at - 1 : e.key === "Home" ? 0 : e.key === "End" ? ids.length - 1 : -2;
+    if (to !== -2) return run(() => void (to >= 0 && to < ids.length && to !== at && selectPage(ids[to])));
+  }
   // 쪽 나누기 (Ctrl+Enter) / 구역 나누기 (Alt+Shift+Enter) on a document page, as in Word and 한글 (while editing
   // text the editor splits at the caret instead)
   // (not while a free-transform session waits for its Enter / Esc)
@@ -211,13 +248,18 @@ export function globalKey(e: KeyboardEvent) {
   // Enter / Space repeat, Esc cancel) — docs/design/CAD_SCREEN.md; Illustrator's design keys stay out (Ctrl+Y = redo)
   if (cadScreenNow()) {
     if (!modal && cad.key?.(e)) return e.preventDefault();
-  } else if (!modal && imageDesignKey(e, k)) return e.preventDefault();
+  } else if (!modal && (imageDesignKey(e, k) || psKey(e, k, want))) return e.preventDefault();
 
   if (mod) {
     // the general Ctrl keys run the command the key table gives this chord here — a key that means something else
     // in this program (Word Ctrl+J, PowerPoint Ctrl+T …) does nothing rather than a layer / transform thing
     if (want?.startsWith("mode.")) return modal ? undefined : run(() => setWorkMode(want.slice(5) as Mode));
     if (want?.startsWith("sheet.fmt.")) return modal ? undefined : run(() => applyNumberFormat(want.slice(10) as Parameters<typeof applyNumberFormat>[0]));
+    // Acrobat's keys on a PDF page (keymap.ts PDF rows: Ctrl+Shift+N 쪽 이동, Ctrl+D 문서 속성, Ctrl+Shift+R 쪽 회전)
+    if (want?.startsWith("pdf.")) {
+      const c = command(want);
+      return c && (!c.when || c.when()) ? run(c.run) : undefined;
+    }
     switch (want) {
       // view aids
       case "view.snap":
@@ -245,6 +287,17 @@ export function globalKey(e: KeyboardEvent) {
       case "edit.pasteInPlace":
         if (!modal && hasClipboard()) run(() => void pasteClipboard(true));
         return;
+      // Illustrator (design mode): Paste in Front / in Back (Ctrl+F / Ctrl+B), on All Artboards (Ctrl+Alt+Shift+V),
+      // Transform Again (Ctrl+D)
+      case "edit.pasteInFront":
+      case "edit.pasteInBack":
+        if (!modal && hasClipboard()) run(() => void pasteClipboard(false, want === "edit.pasteInFront" ? "front" : "back"));
+        return;
+      case "edit.pasteOnAllArtboards":
+        if (!modal && hasClipboard()) run(() => void pasteOnAllArtboards());
+        return;
+      case "edit.transformAgain":
+        return modal ? undefined : run(() => void transformAgain());
       case "edit.paste":
         return modal ? undefined : pasteSoon();
       // layer groups (Ctrl+G / Ctrl+Shift+G) and clipping mask (Ctrl+Alt+G), as in Photoshop
@@ -275,6 +328,13 @@ export function globalKey(e: KeyboardEvent) {
         // slides: with nothing selected on the slide, Ctrl+D duplicates the slide (the ones picked in the list)
         if (currentEditMode() === "SLIDE" && !s.selection.length && currentPage()?.kind === "SLIDE") return run(() => void duplicatePages(targetSlides(pickedPages())));
         return run(duplicateSelected);
+      case "format.copyFormat":
+      case "format.pasteFormat": {
+        // 서식 복사 / 붙여넣기 on picked objects (a text being edited handles these keys itself: ui/formatPainter.ts)
+        const c = command(want);
+        if (c && enabled(c)) return run(c.run);
+        return;
+      }
       case "slide.new":
         // Ctrl+M: a new slide after this one, with the layout that usually follows (slide mode)
         return run(() => void newSlide());
@@ -282,6 +342,10 @@ export function globalKey(e: KeyboardEvent) {
         return run(selectAll);
       case "view.fit":
         return run(fitCurrent);
+      case "view.fitAllBoards":
+        return run(fitAllBoards);
+      case "file.exportScreens":
+        return modal ? undefined : run(() => useUI.getState().set({ shellDialog: "exportScreens" }));
       case "view.actual":
         return run(() => zoomTo(1));
       case "view.zoomIn":
@@ -301,6 +365,19 @@ export function globalKey(e: KeyboardEvent) {
       case "text.underline":
         if (toggleTextStyle(want.slice(5) as "bold" | "italic" | "underline")) e.preventDefault();
         return;
+      // the design mode's Illustrator commands bound in the key table (Create Outlines, Compound Path, Move …):
+      // whatever the command itself does, when it can be used
+      case "type.createOutlines":
+      case "path.compoundMake":
+      case "path.compoundRelease":
+      case "xform.move":
+      // design 2: Blend make / release (Ctrl+Alt+B, Ctrl+Alt+Shift+B)
+      case "object.blendMake":
+      case "object.blendRelease": {
+        const c = command(want);
+        if (!modal && c && enabled(c)) run(c.run);
+        return;
+      }
     }
     return;
   }
@@ -328,7 +405,7 @@ export function globalKey(e: KeyboardEvent) {
   }
   // document edit mode: letters are text (the body flow engine types them at the caret), not tool keys
   if (e.key.length === 1 && currentEditMode() === "DOCUMENT" && docHooks.key?.(e)) return e.preventDefault();
-  if (k === "c" && !e.shiftKey && !e.repeat && currentProfile().toolKeys) return run(startCrop);
+  if (k === "c" && !e.shiftKey && !e.repeat && currentProfile().toolKeys && currentProfile().id !== "DESIGN") return run(startCrop);
   // the mode's own tool letters (editModes PROFILES keys); "+" "-" "\" by character — a letter of another script (Korean
   // IME ㅕ, Cyrillic г) by its key position, like the rest of this handler
   const ch = /^[!-~]$/.test(e.key) && !/^[a-z]$/i.test(e.key) ? e.key : k;

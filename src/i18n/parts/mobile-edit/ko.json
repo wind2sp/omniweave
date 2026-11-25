@@ -123,5 +123,8 @@
   "mobile.ed.notEditable": "이 파일은 그림으로만 열립니다(편집할 내용이 없음)",
   "dxfwrite.export.label": "DXF 도면(.dxf)",
   "dxfwrite.export.hint": "이 쪽의 선·글자를 레이어별로 DXF R12로 — 채우기·선 종류·굵기는 빠짐",
-  "dxfwrite.export.dwgNote": "DWG로는 저장하지 않아요 — DXF로 내보내면 AutoCAD에서 열 수 있어요"
+  "dxfwrite.export.dwgNote": "DWG로는 저장하지 않아요 — DXF로 내보내면 AutoCAD에서 열 수 있어요",
+  "mobile.ed.where": "{page}쪽 · 문단 {n}/{total}",
+  "mobile.ed.wherePage": "{page}쪽",
+  "mobile.ed.slides": "슬라이드 목록"
 }

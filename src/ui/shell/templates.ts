@@ -15,9 +15,10 @@ import { withWordDefaults } from "../../core/lineSpacing";
 import { t } from "../../i18n";
 import { ctx2d, makeCanvas } from "../../render/draw";
 import { paintPage } from "../../render/weave";
+import { tableToSheet } from "../../io/sheet/pages";
 
-export type TemplateCategory = "doc" | "present" | "image" | "print" | "sns" | "photo";
-export const CATEGORIES: TemplateCategory[] = ["doc", "present", "image", "print", "sns", "photo"];
+export type TemplateCategory = "doc" | "sheet" | "present" | "image" | "print" | "sns" | "photo";
+export const CATEGORIES: TemplateCategory[] = ["doc", "sheet", "present", "image", "print", "sns", "photo"];
 export type SizeUnit = "px" | "mm" | "cm" | "in";
 export const UNITS: SizeUnit[] = ["px", "mm", "cm", "in"];
 const PX_PER: Record<SizeUnit, number> = { px: 1, mm: 96 / 25.4, cm: 96 / 2.54, in: 96 };
@@ -190,6 +191,9 @@ export const TEMPLATES: Template[] = [
   },
   // 프레젠테이션
   // a new presentation starts on a title slide with its placeholders (core/slides.ts), like a new deck in a slide editor
+  // a blank workbook (Excel's 빈 통합 문서): one empty sheet page — the grid is the sheet itself (ui/sheet); QA 2026-11-24:
+  // a spreadsheet could only be had by opening an .xlsx
+  { id: "sheet-blank", cat: "sheet", kind: "DOCUMENT", w: 794, h: 1123, unit: "mm", build: (p) => void ((p.background = "#ffffff"), (p.sheet = tableToSheet("Sheet1", [[{ text: "" }]], [64]))) },
   { id: "slide-blank", cat: "present", kind: "SLIDE", w: 1280, h: 720, unit: "px", build: (p) => withLayout(p, "title") },
   {
     id: "slide-pitch", cat: "present", kind: "SLIDE", w: 1280, h: 720, unit: "px",
@@ -331,6 +335,21 @@ export function templateSize(tp: Template, landscape: boolean): { w: number; h: 
   return landscape ? { w: long, h: short } : { w: short, h: long };
 }
 
+/** paper and screen names a size is known by (searched on the start screen: "A4", "letter", "FHD" …) */
+const SIZE_NAMES: { mm?: [number, number]; px?: [number, number]; names: string; local?: string }[] = [
+  { mm: [210, 297], names: "A4" }, { mm: [297, 420], names: "A3" }, { mm: [148, 210], names: "A5" }, { mm: [105, 148], names: "A6" },
+  { mm: [182, 257], names: "B5" }, { mm: [257, 364], names: "B4" }, { mm: [215.9, 279.4], names: "Letter", local: "letter" }, { mm: [215.9, 355.6], names: "Legal", local: "legal" },
+  { mm: [90, 50], names: "business card", local: "card" }, { mm: [100, 148], names: "postcard", local: "postcard" },
+  { px: [1920, 1080], names: "FHD Full HD 1080p 16:9" }, { px: [3840, 2160], names: "4K UHD 16:9" }, { px: [1280, 720], names: "HD 720p 16:9" },
+  { px: [1080, 1080], names: "square 1:1", local: "square" }, { px: [1080, 1350], names: "4:5" }, { px: [1080, 1920], names: "9:16 story", local: "story" },
+];
+/** The names of a size (either way round), for search. */
+export function sizeNames(w: number, h: number): string {
+  const mw = fromPx(w, "mm"), mh = fromPx(h, "mm");
+  const near = (a: [number, number], x: number, y: number, tol: number) => (Math.abs(a[0] - x) <= tol && Math.abs(a[1] - y) <= tol) || (Math.abs(a[0] - y) <= tol && Math.abs(a[1] - x) <= tol);
+  return SIZE_NAMES.filter((s) => (s.mm && near(s.mm, mw, mh, 1.2)) || (s.px && near(s.px, w, h, 1))).map((s) => (s.local ? `${s.names} ${t(`start.sizeName.${s.local}`)}` : s.names)).join(" ");
+}
+
 /** "210 × 297 mm" / "1920 × 1080 px" */
 export function formatSize(w: number, h: number, unit: SizeUnit): string {
   const f = (v: number) => {
@@ -386,6 +405,15 @@ export function templateThumb(tp: Template, landscape: boolean, width: number, l
   const cv = makeCanvas(page.width * scale, page.height * scale);
   try {
     paintPage(ctx2d(cv), doc, page, null, scale);
+    // a sheet page has no objects: its thumbnail shows the cell grid
+    if (page.sheet) {
+      const g = ctx2d(cv);
+      g.strokeStyle = "#d4d7de";
+      g.lineWidth = 1;
+      const cw = 64 * scale * 1.6, rh = 20 * scale * 1.6;
+      for (let x = cw / 2; x < cv.width; x += cw) (g.beginPath(), g.moveTo(Math.round(x) + 0.5, 0), g.lineTo(Math.round(x) + 0.5, cv.height), g.stroke());
+      for (let y = rh; y < cv.height; y += rh) (g.beginPath(), g.moveTo(0, Math.round(y) + 0.5), g.lineTo(cv.width, Math.round(y) + 0.5), g.stroke());
+    }
   } catch {
     /* a sample that cannot be drawn just shows its page colour */
   }

@@ -5,6 +5,8 @@ import { hfEditNode, parseHfId } from "../../core/headerFooter";
 import { useT } from "../../i18n";
 import { useCrop } from "../cropTool";
 import type { Surface } from "../ribbonTabs";
+import { tableAt, useChartSel } from "../sheet/sheetFeatures";
+import { useSheetUI } from "../sheet/sheetActions";
 
 export interface RibbonContext {
   /** hf · crop · table · picture · shape · text · object */
@@ -13,17 +15,32 @@ export interface RibbonContext {
 }
 
 /** Surfaces that have a contextual tab (the image / design modes show the options bar instead). */
-const CTX_SURFACES: Surface[] = ["doc", "pdf", "slide"];
+const CTX_SURFACES: Surface[] = ["doc", "pdf", "slide", "sheet"];
 
 export function useRibbonContext(surface: Surface): RibbonContext | null {
   const t = useT();
   const cropping = useCrop((s) => !!s.id);
+  const chartPicked = useChartSel((s) => s.i >= 0 && s.pageId != null) && surface === "sheet";
+  // the active cell in an Excel table: 테이블 디자인
+  const inTable = useStore((s) => {
+    if (surface !== "sheet") return false;
+    const pg = findPage(s.doc, s.pageId);
+    return !!pg?.sheet?.tables?.length && pg.id;
+  });
+  const tableSel = useSheetUI((s) => (inTable ? s.sel[inTable] : undefined));
+  const tablePage = useStore((s) => (inTable ? findPage(s.doc, inTable)?.sheet : undefined));
   const hf = useStore((s) => !!(s.editingTextId && parseHfId(s.editingTextId) && hfEditNode(s.doc, s.editingTextId)));
   const kinds = useStore((s) => {
     const pg = findPage(s.doc, s.pageId);
     return [...new Set((pg?.nodes ?? []).filter((n) => s.selection.includes(n.id)).map((n) => n.type))].sort().join(",");
   });
   if (!CTX_SURFACES.includes(surface)) return null;
+  // a chart picked on a sheet: Excel's 차트 디자인
+  if (surface === "sheet") {
+    if (chartPicked) return { key: "chart", label: t("sheetx.ctx.chart") };
+    if (tablePage && tableSel && tableAt(tablePage, tableSel.ar, tableSel.ac)) return { key: "table", label: t("sheetx.table.design") };
+    return null;
+  }
   if (hf && surface === "doc") return { key: "hf", label: t("docmode.ctx.headerFooter") };
   if (cropping) return { key: "crop", label: t("docmode.ctx.picture") };
   if (!kinds) return null;

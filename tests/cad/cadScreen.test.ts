@@ -255,6 +255,8 @@ describe("command line on an imported drawing", () => {
     close(segsOfId(d.id)[0].a, [150, 210]);
     const arc = added(before) as VectorNode[];
     expect(arc.length).toBe(1);
+    // a curve, not a filled region (it was drawn and exported as a solid HATCH: realuse cad-fillet 2026-11-25)
+    expect(arc[0].fill).toBeNull();
     const as = nodeSegs(arc[0], cad());
     close(as[0].a, [140, 200]);
     close(as[as.length - 1].b, [150, 210]);
@@ -315,7 +317,9 @@ describe("command line on an imported drawing", () => {
     const a = line("0,0", "10,0");
     S().set({ selection: [a.id] });
     const before = ids();
+    // AR is ARRAY, which asks the type first (AutoCAD); R = rectangular
     submit("AR");
+    submit("R");
     submit("3");
     submit("2");
     submit("20");

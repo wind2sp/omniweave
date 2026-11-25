@@ -66,21 +66,28 @@ function line(pts: [number, number][], color: string, width: number, name: strin
 export function readChart(doc: Document, frame: { x: number; y: number; w: number; h: number }, name: string, colorOf: (el: Element | undefined) => string | null, accent: (i: number) => string, font: string): SlideChart | null {
   const plot = descendants(doc, "plotArea")[0];
   if (!plot) return null;
-  const kindEl = children(plot).find((c) => /^(bar|line|pie|doughnut|area)Chart$/.test(c.localName));
+  const kinds = children(plot).filter((c) => /^(bar|line|pie|doughnut|area|scatter)Chart$/.test(c.localName));
+  const kindEl = kinds[0];
   if (!kindEl) return null;
-  const series: Series[] = children(kindEl, "ser").map((s, i) => {
-    const sp = child(s, "spPr");
-    const fill = sp && (child(sp, "solidFill") ?? (child(sp, "ln") && child(child(sp, "ln")!, "solidFill")));
-    return {
-      name: cache(child(s, "tx"))[0] ?? `${i + 1}`,
-      values: cache(child(s, "val")).map((v) => Number(v) || 0),
-      color: fill ? colorOf(fill) : null,
-    };
-  });
+  // columns with lines / areas over them (two chart groups on one plot): a combo chart
+  const combo = kinds.length > 1 && kinds[0].localName === "barChart" && kinds.slice(1).every((k) => k.localName === "lineChart" || k.localName === "areaChart");
+  const series: Series[] = (combo ? kinds : [kindEl]).flatMap((ke) =>
+    children(ke, "ser").map((s, i) => {
+      const sp = child(s, "spPr");
+      const fill = sp && (child(sp, "solidFill") ?? (child(sp, "ln") && child(child(sp, "ln")!, "solidFill")));
+      return {
+        name: cache(child(s, "tx"))[0] ?? `${i + 1}`,
+        values: cache(child(s, "val") ?? child(s, "yVal")).map((v) => Number(v) || 0),
+        color: fill ? colorOf(fill) : null,
+        ...(combo && ke.localName !== "barChart" ? { type: ke.localName === "lineChart" ? ("line" as const) : ("area" as const) } : {}),
+      };
+    }),
+  );
   if (!series.length) return null;
   const local = kindEl.localName;
-  const kind: SlideChart["kind"] =
-    local === "barChart" ? (attr(child(kindEl, "barDir") ?? kindEl, "val") === "bar" ? "bar" : "col") : local === "lineChart" ? "line" : local === "pieChart" ? "pie" : local === "doughnutChart" ? "doughnut" : "area";
+  const kind: SlideChart["kind"] = combo
+    ? "combo"
+    : local === "barChart" ? (attr(child(kindEl, "barDir") ?? kindEl, "val") === "bar" ? "bar" : "col") : local === "lineChart" ? "line" : local === "pieChart" ? "pie" : local === "doughnutChart" ? "doughnut" : local === "scatterChart" ? "scatter" : "area";
   // the axis text size the chart saved (a:defRPr sz of the axes' c:txPr; PowerPoint's default chart: 11.97 pt)
   const axSz = descendants(plot, "defRPr").map((d) => Number(attr(d, "sz"))).find((v) => v > 0);
   const title = descendants(doc, "title")[0];
@@ -89,7 +96,7 @@ export function readChart(doc: Document, frame: { x: number; y: number; w: numbe
   return {
     kind,
     name,
-    categories: cache(child(children(kindEl, "ser")[0], "cat")),
+    categories: cache(child(children(kindEl, "ser")[0], "cat") ?? child(children(kindEl, "ser")[0], "xVal")),
     series,
     ...(title && !(autoDel && attr(autoDel, "val") === "1") ? { title: own || null } : {}),
     ...(axSz ? { axSz } : {}),
@@ -176,7 +183,10 @@ function drawShapes(m: SlideChart): SceneNode[] {
     return out;
   }
   const horizontal = m.kind === "bar";
-  const bars = m.kind === "bar" || m.kind === "col";
+  const bars = m.kind === "bar" || m.kind === "col" || m.kind === "combo";
+  const scatter = m.kind === "scatter";
+  // a combo chart's columns: the series not drawn as a line or an area
+  const barSers = m.kind === "combo" ? sers.filter((s) => !s.type) : sers;
   // the automatic value axis: 5 % headroom over the largest value, a 1-2-5 major unit giving about six intervals
   const hi = Math.max(0, ...sers.flatMap((s) => s.values));
   const min = Math.min(0, ...sers.flatMap((s) => s.values));
@@ -211,17 +221,27 @@ function drawShapes(m: SlideChart): SceneNode[] {
   const gapW = m.gapWidth / 100 || 1.5;
   // c:overlap: bars of a category overlap by this share of a bar (negative: a gap between them; PowerPoint's default -27 %)
   const ov = Math.max(-1, Math.min(1, m.overlap / 100 || 0));
-  const barW = band / (sers.length + (sers.length - 1) * -ov + gapW);
-  for (let i = 0; i < n; i++) {
+  const barW = band / (barSers.length + (barSers.length - 1) * -ov + gapW);
+  // scatter: the X values are the categories read as numbers, on a value axis of their own
+  const xs = cats.map((c, i) => (Number.isFinite(Number(c)) && c !== "" ? Number(c) : i + 1));
+  const xHi = Math.max(1, ...xs), xLo = Math.min(0, ...xs);
+  const xStep = unit125((xHi - xLo) / 6 || 1);
+  const xTop = Math.ceil(xHi / xStep - 1e-9) * xStep;
+  const xAt = (v: number) => px0 + ((v - xLo) / (xTop - xLo || 1)) * pw;
+  if (scatter)
+    for (let v = xLo; v <= xTop + 1e-9; v += xStep) out.push(label(round2(v), xAt(v) - fs * 2, py0 + ph + fs * 0.3, fs * 4, fs, gray, "CENTER", font));
+  for (let i = 0; i < n && !scatter; i++) {
     const c0 = (horizontal ? py0 : px0) + band * i;
     const cat = cats[i] ?? `${i + 1}`;
     if (horizontal) out.push(label(cat, x + pad, c0 + band / 2 - fs * 0.6, fs * 3.6, fs, gray, "RIGHT", font));
     else out.push(label(cat, c0, py0 + ph + fs * 0.3, band, fs, gray, "CENTER", font));
     if (!bars) continue;
-    sers.forEach((s, k) => {
+    barSers.forEach((s) => {
+      const k = sers.indexOf(s);
+      const kb = barSers.indexOf(s);
       const v = s.values[i] ?? 0;
       const color = s.color ?? accent((k % 6) + 1);
-      const b0 = c0 + barW * (gapW / 2 + k * (1 - ov));
+      const b0 = c0 + barW * (gapW / 2 + kb * (1 - ov));
       if (horizontal) {
         const x0 = px0 + val(Math.min(0, v)) * pw, x1 = px0 + val(Math.max(0, v)) * pw;
         out.push(box(x0, b0, x1 - x0, barW, color, `${name} ${s.name}`));
@@ -231,24 +251,44 @@ function drawShapes(m: SlideChart): SceneNode[] {
       }
     });
   }
-  if (!bars)
-    sers.forEach((s, k) => {
-      const color = s.color ?? accent((k % 6) + 1);
-      const pts = s.values.map((v, i): [number, number] => [px0 + band * (i + 0.5), py0 + ph - val(v) * ph]);
-      if (pts.length > 1) out.push(line(pts, color, 2.25, `${name} ${s.name}`));
-    });
+  sers.forEach((s, k) => {
+    const as = m.kind === "area" || s.type === "area" ? "area" : m.kind === "line" || s.type === "line" ? "line" : scatter ? "dot" : null;
+    if (!as) return;
+    const color = s.color ?? accent((k % 6) + 1);
+    const pts = s.values.map((v, i): [number, number] => [scatter ? xAt(xs[i] ?? i + 1) : px0 + band * (i + 0.5), py0 + ph - val(v) * ph]);
+    if (as === "area" && pts.length > 1) {
+      const base = py0 + ph - val(Math.max(0, min)) * ph;
+      const a = newVector([{ closed: true, nodes: [[pts[0][0], base] as [number, number], ...pts, [pts[pts.length - 1][0], base] as [number, number]].map(([px, py]) => corner(px, py)) }], `${name} ${s.name}`);
+      a.fill = color;
+      a.stroke = null;
+      a.strokeWidth = 0;
+      a.transform = { x: 0, y: 0, rotation: 0, scale: 1 };
+      out.push(a);
+    } else if (as === "line" && pts.length > 1) out.push(line(pts, color, 2.25, `${name} ${s.name}`));
+    else if (as === "dot")
+      for (const [px, py] of pts) {
+        const d = newVector([ellipseContour(px, py, fs * 0.3, fs * 0.3)], `${name} ${s.name}`);
+        d.fill = color;
+        d.stroke = null;
+        d.strokeWidth = 0;
+        d.transform = { x: 0, y: 0, rotation: 0, scale: 1 };
+        out.push(d);
+      }
+  });
   // the category axis line
   out.push(horizontal ? line([[px0, py0], [px0, py0 + ph]], grid, 0.75, name) : line([[px0, py0 + ph], [px0 + pw, py0 + ph]], grid, 0.75, name));
-  if (legendH) legend(out, sers.map((s) => s.name), (i) => sers[i].color ?? accent((i % 6) + 1), x, y + h - legendH, w, fs, gray, font);
+  // (a line series' key is a short line, as PowerPoint draws it)
+  if (legendH) legend(out, sers.map((s) => s.name), (i) => sers[i].color ?? accent((i % 6) + 1), x, y + h - legendH, w, fs, gray, font, (i) => m.kind === "line" || sers[i].type === "line");
   return out;
 }
 
-function legend(out: SceneNode[], items: string[], color: (i: number) => string, x: number, y: number, w: number, fs: number, gray: string, font: string) {
+function legend(out: SceneNode[], items: string[], color: (i: number) => string, x: number, y: number, w: number, fs: number, gray: string, font: string, isLine: (i: number) => boolean = () => false) {
   const itemW = items.map((t) => fs * 1.2 + t.length * fs * 0.62 + fs);
   const total = itemW.reduce((a, b) => a + b, 0);
   let lx = x + Math.max(0, (w - total) / 2);
   items.forEach((t, i) => {
-    out.push(box(lx, y + fs * 0.45, fs * 0.6, fs * 0.6, color(i), t));
+    if (isLine(i)) out.push(line([[lx - fs * 0.3, y + fs * 0.75], [lx + fs * 0.6, y + fs * 0.75]], color(i), 2.25, t));
+    else out.push(box(lx, y + fs * 0.45, fs * 0.6, fs * 0.6, color(i), t));
     out.push(label(t, lx + fs * 0.9, y, itemW[i] - fs * 0.9, fs, gray, "LEFT", font));
     lx += itemW[i];
   });

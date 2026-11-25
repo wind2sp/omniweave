@@ -95,10 +95,10 @@ describe("the whole key table", () => {
 
 describe("the keys each program's users press go where they mean", () => {
   const cases: [KeyContext, string, string | undefined][] = [
-    // Ctrl+K: hyperlink (not here yet) in Word / 한글 / PowerPoint / Excel / AutoCAD, preferences in Photoshop / Illustrator / Acrobat
-    ["WORD", "Ctrl+K", "act.linkMissing"],
-    ["HWP", "Ctrl+K", "act.linkMissing"],
-    ["SLIDE", "Ctrl+K", "act.linkMissing"],
+    // Ctrl+K: hyperlink in Word / 한글 / PowerPoint (not here yet in Excel / AutoCAD), preferences in Photoshop / Illustrator / Acrobat
+    ["WORD", "Ctrl+K", "insert.link"],
+    ["HWP", "Ctrl+K", "insert.link"],
+    ["SLIDE", "Ctrl+K", "insert.link"],
     ["SHEET", "Ctrl+K", "act.linkMissing"],
     ["CAD", "Ctrl+K", "act.linkMissing"],
     ["IMAGE", "Ctrl+K", "file.settings"],
@@ -126,17 +126,22 @@ describe("the keys each program's users press go where they mean", () => {
     ["HWP", "Alt+N", "file.new"],
     ["HWP", "Alt+P", "file.print"],
     ["HWP", "Alt+T", "format.paragraph"],
-    ["HWP", "Alt+L", undefined],
+    ["HWP", "Alt+L", "format.font"],
     ["HWP", "Ctrl+F10", "insert.symbol"],
     ["WORD", "Alt+S", undefined],
     // Word
     ["WORD", "F12", "file.saveAs"],
     ["WORD", "Ctrl+Enter", "insert.pageBreak"],
     ["WORD", "Ctrl+Alt+1", "act.doc.heading1"],
-    ["WORD", "Ctrl+D", undefined],
+    ["WORD", "Ctrl+D", "format.font"],
     ["WORD", "Ctrl+J", undefined],
     ["WORD", "Ctrl+T", undefined],
-    ["WORD", "Ctrl+Shift+N", undefined],
+    // Word: Ctrl+Shift+N is the Normal style (never a new layer); styles pane, bookmark, update fields; 한글 F6 스타일
+    ["WORD", "Ctrl+Shift+N", "format.normalStyle"],
+    ["WORD", "Ctrl+Alt+Shift+S", "format.stylesPane"],
+    ["WORD", "Ctrl+Shift+F5", "insert.bookmark"],
+    ["WORD", "F9", "references.updateFields"],
+    ["HWP", "F6", "format.stylesPane"],
     ["WORD", "Ctrl+G", undefined],
     // PowerPoint
     ["SLIDE", "Ctrl+M", "slide.new"],
@@ -156,7 +161,7 @@ describe("the keys each program's users press go where they mean", () => {
     ["IMAGE", "Ctrl+E", "image.mergeDown"],
     ["DESIGN", "Ctrl+7", "image.clippingMask"],
     // Acrobat: Ctrl+Shift+N is 쪽 이동 — never a new layer on a PDF page
-    ["PDF", "Ctrl+Shift+N", undefined],
+    ["PDF", "Ctrl+Shift+N", "pdf.goToPage"],
     // Illustrator
     ["DESIGN", "Ctrl+J", "act.path.join"],
     ["DESIGN", "Ctrl+Y", "act.design.outline"],

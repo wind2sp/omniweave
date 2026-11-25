@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // Continuous release management.
 //
-//   node scripts/release.mjs patch|minor|major|<x.y.z>[-beta.N] [--date YYYY-MM-DD|none] [--dry]
+//   node scripts/release.mjs patch|minor|major|<x.y.z>[-beta.N] [--date YYYY-MM-DD|none] [--dry] [--approved "<note>"]
 //
+// 0. the release gate (scripts/release-gate.mjs, docs/RELEASING.md "배포 관문") must pass first: full vitest, the
+//    real-use run on every channel for this commit, no regression, the cross-version check, and the CEO's go-ahead on
+//    whatever is still × / △ (--approved "<who, when, where>"). Otherwise nothing is bumped and no tag is made.
 // 1. bumps the version in package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml (+ its Cargo.lock entry) and
 //    website/config.json (they must always agree — the updater compares them)
 // 2. moves the "Unreleased" notes in CHANGELOG.md under the new version, or, when that section is
@@ -29,7 +32,7 @@ const arg = args[0];
 const dry = args.includes("--dry");
 const dateArg = args.includes("--date") ? args[args.indexOf("--date") + 1] : undefined;
 if (!arg) {
-  console.error("usage: node scripts/release.mjs patch|minor|major|<x.y.z>[-pre] [--date YYYY-MM-DD|none] [--dry]");
+  console.error('usage: node scripts/release.mjs patch|minor|major|<x.y.z>[-pre] [--date YYYY-MM-DD|none] [--dry] [--approved "<note>"]');
   process.exit(1);
 }
 if (dateArg !== undefined && dateArg !== "none" && !/^\d{4}-\d{2}-\d{2}$/.test(dateArg)) throw new Error(`invalid --date: ${dateArg}`);
@@ -59,6 +62,19 @@ else if (arg === "major") next = `${m[0] + 1}.0.0`;
 else if (/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(arg)) next = arg;
 else throw new Error(`invalid version: ${arg}`);
 if (cmp(next, FLOOR) <= 0) throw new Error(`${next} is not above ${FLOOR}, a version already given out — installed apps would not update to it`);
+
+// 0. release gate (docs/RELEASING.md "배포 관문"): the real-use run of this very commit, on every channel, or no bump.
+// 0.2.2 went out on unit tests and department reports alone and dozens of features turned out missing — never again.
+{
+  const approved = args.includes("--approved") ? args[args.indexOf("--approved") + 1] : undefined;
+  const { releaseGate } = await import("./release-gate.mjs");
+  const g = releaseGate({ version: next, approved, write: !dry });
+  if (g.remaining.length) console.log(`\n남은 ×·△ ${g.remaining.length}개 (docs/qa/parity/feature-matrix.md):\n  ` + g.remaining.join("\n  "));
+  if (!g.ok) {
+    console.error(`\n배포 관문을 통과하지 못했습니다 — 판을 올리지 않습니다 (태그 금지):\n  - ${g.problems.join("\n  - ")}\n`);
+    if (!dry) process.exit(1);
+  } else console.log(`\n배포 관문 통과${approved ? ` (남은 항목 확인: ${approved})` : ""}`);
+}
 
 // 1. versions
 pkg.version = next;

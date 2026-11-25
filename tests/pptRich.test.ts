@@ -19,6 +19,7 @@ import { bodyFormat, insertText, markerLength, splitParagraph } from "../src/cor
 import type { ImageNode, OmwDocument, TableNode, TextNode, VectorNode } from "../src/core/types";
 import { t } from "../src/i18n";
 import { custContours } from "../src/io/formats/pptxGeom";
+import { cpuNow, cpuBudget, wallTimeout } from "./budget";
 
 beforeAll(() => {
   (globalThis as any).DOMParser = DOMParser;
@@ -376,17 +377,17 @@ describe("hostile PPT files (QA 2026-11-21)", () => {
         }));
       }
       for (const c of cases) {
-        const t0 = Date.now();
+        const t0 = cpuNow();
         try {
           await formatForExt("ppt")!.open({ name: "omni-cut.ppt", path: null, bytes: c }, {} as any);
         } catch (e) {
           expect(e).not.toBeInstanceOf(RangeError);
           expect(String((e as Error).message)).not.toMatch(/Offset is outside|Cannot read properties/);
         }
-        expect(Date.now() - t0).toBeLessThan(5000);
+        expect(cpuNow() - t0).toBeLessThan(cpuBudget(5000));
       }
     }
-  }, 120000);
+  }, wallTimeout(120000));
 });
 
 describe("a:arcTo in a freeform path (QA 2026-11-21: drawn as a line before)", () => {

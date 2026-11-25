@@ -219,3 +219,30 @@ describe("PPTX surgeon (stage 1)", () => {
     expect(s1).toContain("p14:media");
   });
 });
+
+describe("Office Surgeon PPTX: notes in a deck without a notes master", () => {
+  it("a notes master is added (on a copy of the theme) and the notes page is made on it; nothing is dropped", async () => {
+    const { doc, bytes } = open("qa/samples/store-sample/ko/omni-store-slides.pptx");
+    expect(Object.keys(files(bytes)).some((n) => /notesMaster/.test(n))).toBe(false);
+    doc.pages[0] = { ...doc.pages[0], notes: "OMWNOTE 발표자 노트" };
+    const r = (await pptxSurgical(doc, doc.pages))!;
+    expect(r).not.toBeNull();
+    expect(r.warnings).toEqual([]);
+    const b = files(r.bytes);
+    const pres = text(b, "ppt/presentation.xml"), rels = text(b, "ppt/_rels/presentation.xml.rels");
+    const rid = pres.match(/notesMasterId r:id="(rId\d+)"/)?.[1];
+    expect(rid).toBeTruthy();
+    expect(pres.indexOf("notesMasterIdLst")).toBeGreaterThan(pres.indexOf("sldMasterIdLst"));
+    expect(pres.indexOf("notesMasterIdLst")).toBeLessThan(pres.indexOf("sldIdLst"));
+    expect(rels).toContain(`Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster" Target="notesMasters/notesMaster1.xml"`);
+    expect(text(b, "ppt/notesMasters/_rels/notesMaster1.xml.rels")).toMatch(/relationships\/theme" Target="..\/theme\/theme\d+\.xml"/);
+    const ct = text(b, "[Content_Types].xml");
+    expect(ct).toContain('PartName="/ppt/notesMasters/notesMaster1.xml"');
+    const notes = Object.keys(b).filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n));
+    expect(notes).toHaveLength(1);
+    expect(text(b, notes[0])).toContain("OMWNOTE 발표자 노트");
+    for (const n of Object.keys(b).filter((n) => /theme\/theme\d+\.xml$/.test(n))) expect(ct).toContain(`PartName="/${n}"`);
+    // read back: the slide's notes
+    expect(importPptx(r.bytes, "x.pptx").pages[0].notes).toContain("OMWNOTE");
+  });
+});

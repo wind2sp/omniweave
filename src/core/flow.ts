@@ -15,6 +15,7 @@ import { advance, graphemes, hwpLinesSig, layoutText, runScale, spacingOverlap, 
 import { coverMap, layoutTable, richBox, richOf } from "./table";
 import { bodyBox, columnBoxes, flowHeight } from "./pageSetup";
 import { hfPush } from "./headerFooter";
+import { pageBorderNodes } from "./pageBorder";
 import { wordMultipleOf } from "./lineSpacing";
 import { countNotes, hasNotes, noteBody, notePrOf, notesOf, numberNotes, sepGeom, sepNode, type SepGeom } from "./notes";
 import { markerLength } from "./richtext";
@@ -1423,6 +1424,7 @@ export function flowPageLike(like: Page, n: number): Page {
   };
   if (like.margins) p.margins = { ...like.margins };
   if (like.columns) p.columns = { ...like.columns };
+  if (like.border) p.border = { ...like.border };
   if (like.source) {
     const { office: _o, fragments: _f, ...src } = like.source;
     p.source = src;
@@ -1577,6 +1579,11 @@ export function reflowSegment(pages: readonly Page[], start: number, story?: Sto
     for (const sl of mine) {
       if (!sl.rule) continue;
       noteNodes.push(colRuleNode(`${page.id}:colsep${++rule === 1 ? "1" : rule}`, sl.rule.x, sl.rule.top, sl.rule.len, oldNotes.get(`${page.id}:colsep${rule === 1 ? "1" : rule}`)));
+    }
+    // 쪽 테두리 (Page.border, core/pageBorder.ts): its lines, the same objects while unchanged
+    for (const n of pageBorderNodes(page)) {
+      const o = oldNotes.get(n.id);
+      noteNodes.push(o && JSON.stringify(o) === JSON.stringify(n) ? o : n);
     }
     if (st.inline?.size) for (const fr of flowNodes.filter((n): n is TextNode => n.type === "TEXT")) placeInline(fr, st, flowNodes, objOffsets);
     // free objects keep their place in the stacking order: those below the first flow node stay below

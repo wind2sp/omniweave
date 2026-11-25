@@ -303,6 +303,25 @@ pub fn spell_android<R: Runtime>(app: &tauri::AppHandle<R>, cmd: &str, lang: Str
     }
 }
 
+#[derive(serde::Serialize)]
+struct PresentArgs {
+    on: bool,
+}
+
+/// A slide show on the phone: the screen turned sideways and the system bars hidden (on), or back as before (off).
+#[tauri::command]
+pub async fn present_mode<R: Runtime>(app: tauri::AppHandle<R>, on: bool) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        app.state::<Share<R>>().0.run_mobile_plugin::<()>("present", PresentArgs { on }).map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, PresentArgs { on });
+        Ok(())
+    }
+}
+
 /// Keep read access to a picked document across restarts (recent files); false when the provider does not allow it.
 #[tauri::command]
 pub async fn persist_uri<R: Runtime>(app: tauri::AppHandle<R>, uri: String) -> bool {

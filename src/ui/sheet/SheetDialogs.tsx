@@ -9,9 +9,12 @@ import type { Page } from "../../core/types";
 import { useT } from "../../i18n";
 import { addr, colLetters, parseAddr, parseRange } from "../../io/sheet/formula";
 import { filterValues, guessHeader, shownText } from "../../io/sheet/sortFilter";
+import { filterOf } from "../../io/sheet/filters";
 import { Modal } from "../shell/Dialogs";
+import { FeatureDialog } from "./SheetFeatureDialogs";
+import { hideLines } from "./sheetFeatures";
 import { cx } from "../shell/controls";
-import { clearRange, enterText, lang, norm, selOf, setSel } from "./sheetActions";
+import { clearRange, copyFromMenu, enterText, lang, norm, pasteFromMenu, pasteValues, selOf, setSel, useSheetClip } from "./sheetActions";
 import {
   changeLines,
   doFindAll,
@@ -20,6 +23,8 @@ import {
   doReplaceAll,
   fillDir,
   insertOrDelete,
+  shiftCells,
+  setFilterCustom,
   listItems,
   openDlg,
   quickSort,
@@ -85,7 +90,9 @@ export function SheetDialogs({ page, refocus }: { page: Page; refocus: () => voi
     case "delete":
       return <LinesDialog page={page} del={dlg.kind === "delete"} onClose={done} />;
     case "filter":
-      return <FilterMenu page={page} col={dlg.col} x={dlg.x} y={dlg.y} onClose={done} />;
+      return <FilterMenu page={page} col={dlg.col} table={dlg.table} x={dlg.x} y={dlg.y} onClose={done} />;
+    case "customFilter":
+      return <CustomFilterDialog page={page} col={dlg.col} table={dlg.table} op={dlg.op} text={dlg.text} onClose={done} />;
     case "list":
       return <ListPopup page={page} r={dlg.r} c={dlg.c} x={dlg.x} y={dlg.y} onClose={done} />;
     case "invalid":
@@ -94,6 +101,8 @@ export function SheetDialogs({ page, refocus }: { page: Page; refocus: () => voi
       return <ContextMenu page={page} x={dlg.x} y={dlg.y} head={dlg.head} onClose={done} />;
     case "note":
       return null; // drawn by the grid beside the cell (NoteEditor)
+    default:
+      return <FeatureDialog page={page} dlg={dlg} onClose={done} />;
   }
 }
 
@@ -132,7 +141,7 @@ function FindDialog({ page, replace, onClose }: { page: Page; replace: boolean; 
       </div>
       <label className="sheet-find-row">
         <span>{t("sheet.find.what")}</span>
-        <input autoFocus value={q} onChange={(e) => set({ q: e.target.value })} onFocus={(e) => e.target.select()} />
+        <input autoFocus data-autofocus value={q} onChange={(e) => set({ q: e.target.value })} onFocus={(e) => e.target.select()} />
       </label>
       {tab === "replace" && (
         <label className="sheet-find-row">
@@ -144,6 +153,30 @@ function FindDialog({ page, replace, onClose }: { page: Page; replace: boolean; 
         <label>
           <input type="checkbox" checked={!!opts.matchCase} onChange={(e) => set({ opts: { ...opts, matchCase: e.target.checked } })} />
           {t("sheet.find.matchCase")}
+        </label>
+        {/* 서식…: the active cell's formats looked for (Excel's 셀에서 서식 선택), 서식 찾기 지우기 */}
+        <label className="sheet-find-fmt">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const s = selOf(page.id);
+              const st = page.sheet!.styles[page.sheet!.cells[addr(s.ar, s.ac)]?.s ?? 0] ?? {};
+              set({ opts: { ...opts, format: { bold: !!st.bold, italic: !!st.italic, ...(st.fill ? { fill: st.fill } : {}), ...(st.color ? { color: st.color } : {}) } } });
+            }}
+          >
+            {t("sheetx.findfmt.pick")}
+          </button>
+          {opts.format && (
+            <>
+              <span className="sx-hint" style={{ fontWeight: opts.format.bold ? 700 : 400, fontStyle: opts.format.italic ? "italic" : undefined, background: opts.format.fill, color: opts.format.color }}>
+                {t("sheetx.findfmt.preview")}
+              </span>
+              <button type="button" className="btn btn-ghost" onClick={() => set({ opts: { ...opts, format: undefined } })}>
+                {t("sheetx.findfmt.clear")}
+              </button>
+            </>
+          )}
         </label>
         <label>
           <input type="checkbox" checked={!!opts.whole} onChange={(e) => set({ opts: { ...opts, whole: e.target.checked } })} />
@@ -177,10 +210,10 @@ function FindDialog({ page, replace, onClose }: { page: Page; replace: boolean; 
             </button>
           </>
         )}
-        <button type="button" className="btn btn-ghost" disabled={!q} onClick={() => doFindAll(page.id)}>
+        <button type="button" className="btn btn-ghost" disabled={!q && !opts.format} onClick={() => doFindAll(page.id)}>
           {t("sheet.find.findAll")}
         </button>
-        <button type="button" className="btn btn-primary" disabled={!q} onClick={() => doFindNext(page.id)}>
+        <button type="button" className="btn btn-primary" disabled={!q && !opts.format} onClick={() => doFindNext(page.id)}>
           {t("sheet.find.findNext")}
         </button>
       </div>
@@ -297,17 +330,41 @@ function SortDialog({ page, onClose }: { page: Page; onClose: () => void }) {
 
 // ───── Insert / Delete ─────
 
+type LinesChoice = "right" | "down" | "left" | "up" | "row" | "col";
+const LINES_KEYS: Record<LinesChoice, string> = { right: "i", down: "d", left: "l", up: "u", row: "r", col: "c" };
+
+/** Excel's 삽입 / 삭제 box: 셀을 오른쪽으로·아래로 밀기 (삭제: 왼쪽으로·위로), 행 전체, 열 전체; the letters pick. */
 function LinesDialog({ page, del, onClose }: { page: Page; del: boolean; onClose: () => void }) {
   const t = useT();
-  const [axis, setAxis] = useState<"row" | "col">("row");
+  const g0 = norm(selOf(page.id));
+  const choices: LinesChoice[] = del ? ["left", "up", "row", "col"] : ["right", "down", "row", "col"];
+  // (Excel: a selection wider than it is tall shifts down / up, otherwise right / left)
+  const wide = g0.c1 - g0.c0 > g0.r1 - g0.r0;
+  const [pick, setPick] = useState<LinesChoice>(del ? (wide ? "up" : "left") : wide ? "down" : "right");
+  const ok = () => {
+    onClose();
+    if (pick === "row" || pick === "col") insertOrDelete(page.id, del, pick);
+    else shiftCells(page.id, g0, pick);
+  };
+  const label: Record<LinesChoice, string> = { right: "sheetx.cells.right", down: "sheetx.cells.down", left: "sheetx.cells.left", up: "sheetx.cells.up", row: "sheetx.cells.rowAll", col: "sheetx.cells.colAll" };
   return (
     <Modal labelledBy="sheet-lines-title" onClose={onClose} className="sheet-dlg modal-sm">
+      <div
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          const c = choices.find((x) => LINES_KEYS[x] === e.key.toLowerCase());
+          if (c) setPick(c);
+          else if (e.key === "Enter") ok();
+          else return;
+          e.preventDefault();
+        }}
+      >
       <h2 id="sheet-lines-title">{t(del ? "sheet.b.delete" : "sheet.b.insert")}</h2>
-      <div className="sheet-radios">
-        {(["row", "col"] as const).map((k) => (
+      <div className="sheet-radios" role="radiogroup">
+        {choices.map((k) => (
           <label key={k}>
-            <input type="radio" name="sheet-lines" checked={axis === k} onChange={() => setAxis(k)} />
-            {t(k === "row" ? "sheet.dlg.entireRow" : "sheet.dlg.entireCol")}
+            <input type="radio" name="sheet-lines" checked={pick === k} onChange={() => setPick(k)} />
+            {t(label[k])}
           </label>
         ))}
       </div>
@@ -319,13 +376,11 @@ function LinesDialog({ page, del, onClose }: { page: Page; del: boolean; onClose
           type="button"
           className="btn btn-primary"
           data-autofocus
-          onClick={() => {
-            onClose();
-            insertOrDelete(page.id, del, axis);
-          }}
+          onClick={ok}
         >
           {t("sheet.dlg.ok")}
         </button>
+      </div>
       </div>
     </Modal>
   );
@@ -333,10 +388,73 @@ function LinesDialog({ page, del, onClose }: { page: Page; del: boolean; onClose
 
 // ───── AutoFilter menu ─────
 
-function FilterMenu({ page, col, x, y, onClose }: { page: Page; col: number; x: number; y: number; onClose: () => void }) {
+/** 숫자 필터 / 텍스트 필터 items: the condition (OOXML operator + wildcards) and its label key */
+const NUM_OPS: [string, string][] = [["equal", "eq"], ["notEqual", "ne"], ["greaterThan", "gt"], ["greaterThanOrEqual", "ge"], ["lessThan", "lt"], ["lessThanOrEqual", "le"], ["between", "between"], ["custom", "custom"]];
+const TEXT_OPS: [string, string][] = [["equal", "eq"], ["notEqual", "ne"], ["begins", "begins"], ["ends", "ends"], ["contains", "contains"], ["notContains", "notContains"], ["custom", "custom"]];
+
+/** 사용자 지정 자동 필터: two conditions with 그리고 / 또는 (text conditions as wildcards: 시작 문자 abc*, 포함 *abc*). */
+function CustomFilterDialog({ page, col, table, op, text, onClose }: { page: Page; col: number; table?: string; op: string; text: boolean; onClose: () => void }) {
+  const t = useT();
+  const OPS: [string, string][] = text
+    ? [["equal", "eq"], ["notEqual", "ne"], ["begins", "begins"], ["ends", "ends"], ["contains", "contains"], ["notContains", "notContains"], ["greaterThan", "gt"], ["lessThan", "lt"]]
+    : [["equal", "eq"], ["notEqual", "ne"], ["greaterThan", "gt"], ["greaterThanOrEqual", "ge"], ["lessThan", "lt"], ["lessThanOrEqual", "le"]];
+  const first = op === "between" ? "greaterThanOrEqual" : op === "custom" ? "equal" : op;
+  const [a, setA] = useState({ op: first, val: "" });
+  const [b, setB] = useState({ op: op === "between" ? "lessThanOrEqual" : "equal", val: "" });
+  const [and, setAnd] = useState(true);
+  const toItem = (x: { op: string; val: string }) =>
+    x.op === "begins" ? { op: "equal" as const, val: `${x.val}*` } : x.op === "ends" ? { op: "equal" as const, val: `*${x.val}` } : x.op === "contains" ? { op: "equal" as const, val: `*${x.val}*` } : x.op === "notContains" ? { op: "notEqual" as const, val: `*${x.val}*` } : { op: x.op as "equal", val: x.val };
+  const ok = () => {
+    const items = [a, b].filter((x) => x.val !== "").map(toItem);
+    onClose();
+    if (items.length) setFilterCustom(page.id, col, { ...(and && items.length > 1 ? { and: true } : {}), items }, table);
+  };
+  const row = (x: { op: string; val: string }, set: (v: { op: string; val: string }) => void, first: boolean) => (
+    <div className="sx-row sheet-cf-row">
+      <select aria-label={t("sheetx.cf.op")} value={x.op} onChange={(e) => set({ ...x, op: e.target.value })}>
+        {OPS.map(([o, k]) => (
+          <option key={o} value={o}>
+            {t(`sheetx.cf.op.${k}`)}
+          </option>
+        ))}
+      </select>
+      <input aria-label={t("sheetx.cf.value")} autoFocus={first} data-autofocus={first || undefined} value={x.val} onChange={(e) => set({ ...x, val: e.target.value })} />
+    </div>
+  );
+  return (
+    <Modal labelledBy="sheet-cf-title" onClose={onClose} className="sheet-dlg">
+      <div onKeyDown={(e) => (e.stopPropagation(), e.key === "Enter" && ok())}>
+        <h2 id="sheet-cf-title">{t("sheetx.cf.title")}</h2>
+        <p className="sx-hint">{t("sheetx.cf.hint")}</p>
+        {row(a, setA, true)}
+        <div className="sheet-radios" role="radiogroup">
+          <label>
+            <input type="radio" name="sheet-cf-and" checked={and} onChange={() => setAnd(true)} />
+            {t("sheetx.cf.and")}
+          </label>
+          <label>
+            <input type="radio" name="sheet-cf-and" checked={!and} onChange={() => setAnd(false)} />
+            {t("sheetx.cf.or")}
+          </label>
+        </div>
+        {row(b, setB, false)}
+        <div className="modal-actions">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            {t("sheet.dlg.cancel")}
+          </button>
+          <button type="button" className="btn btn-primary" onClick={ok}>
+            {t("sheet.dlg.ok")}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function FilterMenu({ page, col, table, x, y, onClose }: { page: Page; col: number; table?: string; x: number; y: number; onClose: () => void }) {
   const t = useT();
   const sh = page.sheet!;
-  const f = sh.filter!;
+  const f = filterOf(sh, table)!;
   const { values, blank } = useMemo(() => {
     // the values of the column with the other columns' filters applied (Excel lists what is reachable)
     const others = { ...f, cols: Object.fromEntries(Object.entries(f.cols ?? {}).filter(([k]) => Number(k) !== col)) };
@@ -346,6 +464,17 @@ function FilterMenu({ page, col, x, y, onClose }: { page: Page; col: number; x: 
     return filterValues(vis, f, col, lang());
   }, [sh, f, col]);
   const cur = f.cols?.[col];
+  // a column of numbers gets 숫자 필터, else 텍스트 필터 (Excel)
+  const numeric = useMemo(() => {
+    const g = parseRange(f.ref)!;
+    let n = 0, s = 0;
+    for (let r = g.r0 + 1; r <= Math.min(g.r1, g.r0 + 2000); r++) {
+      const v = sh.cells[addr(r, g.c0 + col)]?.v;
+      if (typeof v === "number") n++;
+      else if (v !== undefined && v !== "") s++;
+    }
+    return n > s;
+  }, [sh, f.ref, col]);
   const [checked, setChecked] = useState<Set<string>>(() => new Set(cur?.vals && !cur.other ? values.filter((v) => cur.vals!.some((w) => w.toLowerCase() === v.toLowerCase())) : values));
   const [blanks, setBlanks] = useState(cur?.vals && !cur.other ? !!cur.blank : true);
   const [search, setSearch] = useState("");
@@ -356,12 +485,14 @@ function FilterMenu({ page, col, x, y, onClose }: { page: Page; col: number; x: 
   const sortBy = (desc: boolean) => {
     const g = parseRange(f.ref)!;
     setSel(page.id, { ar: g.r0, ac: g.c0 + col, r0: g.r0, c0: g.c0 + col, r1: g.r0, c1: g.c0 + col });
-    quickSort(page.id, desc);
+    // a table sorts its own rows (header kept); the sheet's filter as before
+    if (table) sortRange(page.id, g, [{ col: g.c0 + col, desc }], true);
+    else quickSort(page.id, desc);
     onClose();
   };
   const ok = () => {
     const everything = values.every((v) => checked.has(v)) && (!blank || blanks);
-    setFilterColumn(page.id, col, everything ? null : [...checked], blanks && blank);
+    setFilterColumn(page.id, col, everything ? null : [...checked], blanks && blank, table);
     onClose();
   };
   return (
@@ -378,13 +509,26 @@ function FilterMenu({ page, col, x, y, onClose }: { page: Page; col: number; x: 
         className="menu-item"
         disabled={!cur}
         onClick={() => {
-          setFilterColumn(page.id, col, null);
+          setFilterColumn(page.id, col, null, false, table);
           onClose();
         }}
       >
         <span className="menu-label">{t("sheet.filter.clear")}</span>
       </button>
-      <input className="sheet-filter-search" placeholder={t("sheet.filter.search")} aria-label={t("sheet.filter.search")} value={search} autoFocus onChange={(e) => setSearch(e.target.value)} />
+      {/* 숫자 필터 / 텍스트 필터: the conditions box, with the condition picked */}
+      <details className="sheet-filter-cond">
+        <summary className="menu-item">
+          <span className="menu-label">{t(numeric ? "sheetx.cf.number" : "sheetx.cf.text")}</span>
+        </summary>
+        <div className="sheet-filter-conds">
+          {(numeric ? NUM_OPS : TEXT_OPS).map(([op, key]) => (
+            <button key={key} type="button" className="menu-item" onClick={() => openDlg({ kind: "customFilter", col, table, op, text: !numeric })}>
+              <span className="menu-label">{t(`sheetx.cf.op.${key}`)}</span>
+            </button>
+          ))}
+        </div>
+      </details>
+      <input className="sheet-filter-search" placeholder={t("sheet.filter.search")} aria-label={t("sheet.filter.search")} value={search} autoFocus data-autofocus onChange={(e) => setSearch(e.target.value)} />
       <div className="sheet-filter-list">
         <label>
           <input
@@ -546,9 +690,25 @@ function ContextMenu({ page, x, y, head, onClose }: { page: Page; x: number; y: 
   };
   return (
     <div ref={ref} className="menu-pop" role="menu" style={style} onKeyDown={(e) => e.stopPropagation()}>
+      {/* Excel's cell menu starts with the clipboard (QA 2026-11-24: it had none of it) */}
+      {item(t("sheet.menu.cut"), () => copyFromMenu(page.id, g, true), { kbd: "Ctrl+X" })}
+      {item(t("sheet.menu.copy"), () => copyFromMenu(page.id, g, false), { kbd: "Ctrl+C" })}
+      {item(t("sheet.menu.paste"), () => void pasteFromMenu(page.id, { r: sel.ar, c: sel.ac }).then((area) => area && setSel(page.id, { ...sel, r0: area.r0, c0: area.c0, r1: area.r1, c1: area.c1 })), { kbd: "Ctrl+V" })}
+      {item(t("sheet.menu.pasteValues"), () => {
+        const area = pasteValues(page.id, { r: sel.ar, c: sel.ac });
+        if (area) setSel(page.id, { ...sel, r0: area.r0, c0: area.c0, r1: area.r1, c1: area.c1 });
+      }, { disabled: !useSheetClip.getState().clip || useSheetClip.getState().clip!.cut })}
+      {item(t("sheetx.ps.menu"), () => openDlg({ kind: "pasteSpecial" }), { kbd: "Ctrl+Alt+V", disabled: !useSheetClip.getState().clip || useSheetClip.getState().clip!.cut })}
+      {sep("s0")}
       {item(t("sheet.b.insert"), lines(false), { kbd: "Ctrl++" })}
       {item(t("sheet.b.delete"), lines(true), { kbd: "Ctrl+-" })}
+      {head && item(t("sheetx.hide"), () => hideLines(page.id, head, g, true))}
+      {head && item(t("sheetx.unhide"), () => hideLines(page.id, head, g, false))}
       {item(t("sheet.menu.clear"), () => clearRange(page.id, g), { kbd: "Delete" })}
+      {sep("sx0")}
+      {item(t("sheetx.fmt.title") + "…", () => openDlg({ kind: "fmt" }), { kbd: "Ctrl+1" })}
+      {!head && item(sh.links?.[a] ? t("sheetx.link.edit") + "…" : t("sheetx.link.title") + "…", () => openDlg({ kind: "link" }), { kbd: "Ctrl+K" })}
+      {!head && item(t("sheetx.name.define") + "…", () => openDlg({ kind: "name" }))}
       {!head && (
         <>
           {sep("s1")}
@@ -583,9 +743,14 @@ export function NoteEditor({ page, a, box, onDone }: { page: Page; a: string; bo
       className="sheet-note sheet-note-edit"
       style={{ left: box.x, top: box.y }}
       aria-label={t("sheet.note.label")}
-      autoFocus
+      autoFocus data-autofocus
       value={text}
       spellCheck={false}
+      // (Excel: an existing note opens with the caret after its text)
+      onFocus={(e) => {
+        const n = e.target.value.length;
+        e.target.setSelectionRange(n, n);
+      }}
       onChange={(e) => setText(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {

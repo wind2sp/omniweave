@@ -20,6 +20,8 @@ export interface Ask {
   confirm?: boolean;
   /** the OK button's own words */
   okLabel?: string;
+  /** buttons of their own instead of Cancel / OK (the first primary): the answer is the chosen one's value */
+  choices?: { label: string; value: string; danger?: boolean }[];
 }
 
 let show: ((a: Ask | null, done?: (v: string | null) => void) => void) | null = null;
@@ -75,7 +77,7 @@ export function PromptHost() {
         <h2>{a.title}</h2>
         {a.message && <p className="m-sheet-msg">{a.message}</p>}
         {a.error && <p className="m-sheet-error">{a.error}</p>}
-        {!a.confirm && (
+        {!a.confirm && !a.choices && (
         <Field
           ref={field as any}
           className="m-field"
@@ -97,14 +99,27 @@ export function PromptHost() {
             ))}
           </div>
         )}
-        <div className="m-sheet-btns">
-          <button type="button" className="m-btn" onClick={() => finish(null)}>
-            {tr("mobile.cancel")}
-          </button>
-          <button type="submit" className="m-btn m-btn-primary">
-            {a.okLabel ?? tr("mobile.ok")}
-          </button>
-        </div>
+        {a.choices ? (
+          <div className="m-sheet-btns m-sheet-choices">
+            {a.choices.map((c, i) => (
+              <button key={c.value} type="button" className={"m-btn" + (i === 0 ? " m-btn-primary" : "") + (c.danger ? " m-btn-danger" : "")} onClick={() => finish(c.value)}>
+                {c.label}
+              </button>
+            ))}
+            <button type="button" className="m-btn" onClick={() => finish(null)}>
+              {tr("mobile.cancel")}
+            </button>
+          </div>
+        ) : (
+          <div className="m-sheet-btns">
+            <button type="button" className="m-btn" onClick={() => finish(null)}>
+              {tr("mobile.cancel")}
+            </button>
+            <button type="submit" className="m-btn m-btn-primary">
+              {a.okLabel ?? tr("mobile.ok")}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

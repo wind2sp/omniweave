@@ -165,5 +165,6 @@
   "shell.hist.bullets": "Bullets",
   "shell.hist.numbering": "Numbering",
   "shell.hist.heading": "Heading {level}",
-  "shell.hist.body": "Body Text"
+  "shell.hist.body": "Body Text",
+  "shell.saveAsType": "Save ({ext})"
 }

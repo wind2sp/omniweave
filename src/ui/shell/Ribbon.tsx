@@ -2,15 +2,20 @@
 // swaps instantly according to the active tool, the selection and the page kind.
 
 import { current } from "immer";
+import { useEffect } from "react";
 import * as RT from "../../core/richtext";
 import { chooseTool, findPage, ONE_SHOT_TOOLS, useStore, type Tool } from "../../core/store";
-import { useShapeStroke } from "../drawDefaults";
+import { CUSTOM_SHAPES, PT, useShapeParams, useShapeStroke, type CustomShapeId } from "../drawDefaults";
+import { BOARD_GAP, addBoard, boardsOf, deleteBoard, setBoardProps } from "../artboards";
 import type { Align, BlendMode, Page, SceneNode, TextNode, TextParagraph, TransitionType, VectorNode } from "../../core/types";
 import { addPage, elevatePdf, reorderSelected, runPathfinder, setPageProps, updateSelected } from "../actions";
 import { richApi, useRichStatus, type RichApi, type RichStatus } from "../RichTextEditor";
 import type { ListCtx } from "../../core/lists";
 import type { ListDef } from "../../core/style/types";
-import { ColorField, IconBtn, NumField, Select, Seg, Sep, cx } from "./controls";
+import { ColorField, IconBtn, Menu, NumField, Select, Seg, Sep, cx, type MenuItem } from "./controls";
+import { picLayoutOf, setPicLayout, type PicLayout } from "../docFlow";
+import { isFlowPageAt } from "../../core/flow";
+import { installRibbonOverflow } from "./ribbonOverflow";
 import { Icon, type IconName } from "./Icons";
 import { nodeLive, pageLive, plainLive, type Live } from "./ops";
 import { ChartDataButton, ShowButtons, SlideStructureTools } from "./SlideMode";
@@ -21,13 +26,15 @@ import { MODEL_BLEND_MODES } from "../../core/style/blend";
 import { t, useT } from "../../i18n";
 import { CANVAS_CROP, CROP_PRESETS, applyCrop, cancelCrop, resetCrop, setCropAngle, setCropCustom, setCropRatio, startCrop, useCrop } from "../cropTool";
 import { hfEditNode, parseHfId } from "../../core/headerFooter";
-import { fontScale, keyOfTool, useCadScreen, useCadScreenNow, useEditMode, useProfile } from "../editModes";
+import { fontScale, isPdfFormatPage, keyOfTool, useCadScreen, useCadScreenNow, useEditMode, useProfile } from "../editModes";
 import { CadRibbon } from "../cad/lazy";
 import { AnchorBar } from "./AnchorBar";
 import { OmeSwatches } from "./OmeSwatches";
 import { isPathTool } from "../pathTools";
 import { GroupButton, TOOL_GROUPS, groupOf, pickGroupItem, type GroupItem } from "./ToolGroup";
 import { FgBg, StrokeOptions, ToolOptions, hasToolOptions } from "./ToolOptions";
+import { BrushExtras, PS_BRUSH_TOOLS } from "../ps/BrushExtras";
+import { TONE_TOOLS, ToningExtras } from "../ps/toning";
 import { DocRibbon } from "./DocRibbon";
 import { PdfRibbon } from "./PdfRibbon";
 import { SlideRibbon } from "./SlideRibbon";
@@ -35,6 +42,8 @@ import { useRibbonContext } from "./ribbonContext";
 import { activeTab, isMenuSurface, useRibbonTab, useSurface } from "../ribbonTabs";
 import { SheetRibbon } from "../sheet/SheetRibbon";
 import { PdfFormBtn } from "../pdf/PdfFormLayer"; // PDF form fields
+import { kbdFor } from "../keymap";
+import { meshPaint } from "../designMesh";
 import { PdfAnnotBtns } from "../pdf/PdfAnnotLayer"; // PDF comments
 import { canLink, closeHeaderFooter, editHeaderFooter, evenOddOn, insertField, linkedNow, titlePageOn, toggleEvenOdd, toggleLinked, toggleTitlePage } from "../headerFooterActions";
 
@@ -63,9 +72,14 @@ export const TOOLS: { id: Tool; icon: IconName; label: string; key: string }[] =
   // image mode (ui/pixelSelect.ts) — shown only where the edit mode's profile offers them (ui/editModes.ts)
   toolDef("marquee", "marquee", "M"),
   toolDef("lasso", "lasso", "L"),
+  toolDef("polyLasso", "polyLasso", "L"),
   toolDef("wand", "wand", "W"),
   toolDef("eyedropper", "eyedropper", "I"),
   toolDef("gradient", "gradient", "G"),
+  toolDef("bucket", "bucket", "G"),
+  toolDef("dodge", "dodge", "O"),
+  toolDef("burn", "burn", "O"),
+  toolDef("sponge", "sponge", "O"),
   toolDef("zoom", "zoom", "Z"),
   // design mode (ui/designTools.ts)
   toolDef("anchorAdd", "anchorAdd", "+"),
@@ -73,6 +87,35 @@ export const TOOLS: { id: Tool; icon: IconName; label: string; key: string }[] =
   toolDef("anchorConvert", "anchorConvert", "Shift+C"),
   toolDef("curvature", "curvature", "Shift+`"),
   toolDef("line", "line", "\\"),
+  toolDef("roundRect", "roundRect", ""),
+  toolDef("polygon", "polygon", ""),
+  toolDef("star", "star", ""),
+  toolDef("customShape", "customShape", ""),
+  toolDef("rotateTool", "rotate", ""),
+  toolDef("reflectTool", "cadMirror", ""),
+  toolDef("scaleTool", "cadScale", ""),
+  toolDef("shearTool", "shear", ""),
+  toolDef("flare", "flare", ""),
+  toolDef("shapeBuilder", "shapeBuilder", "Shift+M"),
+  toolDef("blendTool", "blendTool", "W"),
+  toolDef("pencil", "pencil", "N"),
+  toolDef("scissors", "scissors", "C"),
+  toolDef("knife", "knife", ""),
+  toolDef("objWand", "wand", "Y"),
+  toolDef("smoothTool", "pencil", ""),
+  toolDef("meshTool", "mesh", "U"),
+  toolDef("perspGrid", "perspective", "Shift+P"),
+  toolDef("perspSelect", "perspSelect", "Shift+V"),
+  toolDef("artboard", "pages", ""),
+  toolDef("typePath", "text", ""),
+  // image mode retouching and selection (ui/ps/canvasExt.ts)
+  toolDef("spotHeal", "spotHeal", "J"),
+  toolDef("heal", "heal", "J"),
+  toolDef("patch", "patch", "J"),
+  toolDef("clone", "clone", "S"),
+  toolDef("quickSelect", "quickSelect", "W"),
+  toolDef("objectSelect", "objectSelect", "W"),
+  toolDef("vtext", "vtext", "T"),
 ];
 
 const optDef = <V extends string>(prefix: string, value: V) => ({
@@ -84,7 +127,7 @@ const optDef = <V extends string>(prefix: string, value: V) => ({
 
 export const BLEND_OPTIONS: { value: BlendMode; label: string }[] = MODEL_BLEND_MODES.map((v) => optDef("ribbon.blend", v));
 
-export const TRANSITIONS: { value: TransitionType; label: string }[] = (["NONE", "FADE", "SLIDE_LEFT", "ZOOM"] as TransitionType[]).map((v) => optDef("ribbon.transition", v));
+export const TRANSITIONS: { value: TransitionType; label: string }[] = (["NONE", "CUT", "FADE", "SLIDE_LEFT", "PUSH_UP", "WIPE", "SPLIT", "COVER", "UNCOVER", "RANDOM_BARS", "CIRCLE", "DISSOLVE", "ZOOM"] as TransitionType[]).map((v) => optDef("ribbon.transition", v));
 
 export const FONTS = ["Pretendard", "Noto Sans KR", "Malgun Gothic", "Nanum Gothic", "Nanum Myeongjo", "Batang", "Gulim", "Arial", "Georgia", "Consolas"];
 
@@ -94,9 +137,11 @@ const countLabel = (label: string, n: number) => (n > 1 ? t("ribbon.chipCount", 
 
 /** Tool families: a small gap separates them in the strip. */
 const TOOL_FAMILY: Record<Tool, number> = {
-  select: 0, direct: 0, marquee: 0, lasso: 0, wand: 0,
-  eyedropper: 1, brush: 1, eraser: 1, gradient: 1,
-  pen: 2, curvature: 2, anchorAdd: 2, anchorDel: 2, anchorConvert: 2, rect: 2, ellipse: 2, line: 2, text: 2,
+  select: 0, direct: 0, marquee: 0, lasso: 0, polyLasso: 0, wand: 0, quickSelect: 0, objectSelect: 0, spotHeal: 1, heal: 1, patch: 1, clone: 1, vtext: 2,
+  eyedropper: 1, brush: 1, eraser: 1, gradient: 1, bucket: 1, dodge: 1, burn: 1, sponge: 1,
+  pen: 2, curvature: 2, anchorAdd: 2, anchorDel: 2, anchorConvert: 2, rect: 2, ellipse: 2, line: 2, text: 2, roundRect: 2, polygon: 2, star: 2, customShape: 2,
+  rotateTool: 1, reflectTool: 1, scaleTool: 1, shearTool: 1, shapeBuilder: 1, blendTool: 1, flare: 2, pencil: 1, scissors: 1, knife: 1, objWand: 0, smoothTool: 1, meshTool: 2, perspGrid: 2, perspSelect: 0,
+  artboard: 3, typePath: 2,
   hand: 3, zoom: 3,
 };
 
@@ -163,7 +208,7 @@ export function ToolStrip({ vertical = false }: { vertical?: boolean } = {}) {
       family: 0.5,
       node: (
         <span className="tool-wrap">
-          <IconBtn icon="crop" tip={t("ribbon.tool.cropTip")} kbd="C" pressed={cropping} size="lg" className="tool-btn" onClick={() => (cropping ? undefined : startCrop())} />
+          <IconBtn icon="crop" tip={t("ribbon.tool.cropTip")} kbd={profile.id === "DESIGN" ? undefined : "C"} pressed={cropping} size="lg" className="tool-btn" onClick={() => (cropping ? undefined : startCrop())} />
         </span>
       ),
     });
@@ -200,17 +245,20 @@ function PageCtxLabel() {
 
 // ───────── contexts ─────────
 
-function BrushCtx({ eraser }: { eraser: boolean }) {
+function BrushCtx({ eraser, tool }: { eraser: boolean; tool?: string }) {
   const t = useT();
   const brush = useStore((s) => s.brush);
   const setB = (p: Partial<typeof brush>) => S().set({ brush: { ...S().brush, ...p } });
   const image = useEditMode() === "IMAGE";
   return (
     <>
-      <CtxChip icon={eraser ? "eraser" : "brush"} label={eraser ? t("ribbon.tool.eraser") : t("ribbon.tool.brush")} />
+      <CtxChip icon={tool && PS_BRUSH_TOOLS.has(tool) ? tool : eraser ? "eraser" : "brush"} label={tool && PS_BRUSH_TOOLS.has(tool) ? t(`ribbon.tool.${tool}`) : eraser ? t("ribbon.tool.eraser") : t("ribbon.tool.brush")} />
       <NumField icon="brush" tip={t("ribbon.brush.size")} value={brush.size} min={1} max={500} unit="px" width={78} live={plainLive((v) => setB({ size: v }))} />
       <NumField icon="hardness" tip={t("ribbon.brush.hardness")} value={brush.hardness} scale={100} min={0} max={100} unit="%" width={72} live={plainLive((v) => setB({ hardness: v }))} />
-      <NumField icon="opacity" tip={t("ribbon.opacity")} value={brush.opacity} scale={100} min={1} max={100} unit="%" width={72} live={plainLive((v) => setB({ opacity: v }))} />
+      {/* the toning tools (O): 범위 · 노출 or 모드 · 흐름 in place of the opacity (ui/ps/toning.tsx) */}
+      {tool && TONE_TOOLS.has(tool) ? <ToningExtras tool={tool} /> : <NumField icon="opacity" tip={t("ribbon.opacity")} value={brush.opacity} scale={100} min={1} max={100} unit="%" width={72} live={plainLive((v) => setB({ opacity: v }))} />}
+      {/* Photoshop: flow and brush presets (ui/ps/BrushExtras.tsx) */}
+      {image && <BrushExtras />}
       {image ? <FgBg /> : !eraser && <ColorField tip={t("ribbon.brush.color")} value={brush.color} live={plainLive((v) => setB({ color: v }))} showHex />}
       <span className="ctx-hint">{image ? t("imgmode.brush.hint") : t("ribbon.brush.hint")}</span>
     </>
@@ -255,7 +303,7 @@ function VectorCtx({ nodes, anchors }: { nodes: VectorNode[]; anchors?: boolean 
       {anchors && <AnchorBar />}
       <CtxChip icon="vector" label={countLabel(t("ribbon.node.VECTOR"), nodes.length)} />
       <OmeSwatches />
-      <ColorField label={t("ribbon.fill")} tip={t("ribbon.fillColor")} value={n.fill} live={nodeLive<string>(t("ribbon.fill"), (x, v) => (x.fill = v))} onNone={() => updateSelected(t("ribbon.noFill"), (x) => (x.fill = null))} />
+      <ColorField label={t("ribbon.fill")} tip={t("ribbon.fillColor")} value={n.fill} live={nodeLive<string>(t("ribbon.fill"), (x, v) => void (meshPaint(x, v) || (x.fill = v)))} onNone={() => updateSelected(t("ribbon.noFill"), (x) => (x.fill = null))} />
       <ColorField label={t("ribbon.stroke")} tip={t("ribbon.strokeColor")} value={n.stroke} live={nodeLive<string>(t("ribbon.strokeColor"), (x, v) => (x.stroke = v))} onNone={() => updateSelected(t("ribbon.noStroke"), (x) => (x.stroke = null))} />
       <StrokeWidth value={n.strokeWidth} live={nodeLive(t("ribbon.strokeWidth"), (x, v: number) => (x.strokeWidth = v))} />
       {useEditMode() === "DESIGN" && <StrokeOptions node={n} />}
@@ -286,6 +334,7 @@ interface TextTarget {
   toggle: (k: RT.ToggleKey) => void;
   script: (s: "super" | "sub") => void;
   setRun: <K extends keyof RT.RunFormat>(k: K, v: RT.RunFormat[K] | null, label: string) => void;
+  applyRun?: (patch: RT.RunPatch, label: string) => void;
   runLive: <K extends keyof RT.RunFormat>(k: K, label: string) => Live<RT.RunFormat[K]>;
   setPara: (patch: RT.ParaPatch, label: string) => void;
   paraLive: <K extends keyof RT.ParaPatch>(k: K, label: string) => Live<NonNullable<RT.ParaPatch[K]>>;
@@ -298,6 +347,8 @@ interface TextTarget {
   listDefs: () => ListDef[];
   listRedefine: (listId: string, def: string, lists: ListDef[], start?: number | null) => void;
   breakBefore?: (patch?: RT.ParaPatch) => boolean;
+  transform?: RichApi["transform"];
+  snapshot?: RichApi["snapshot"];
 }
 
 /** List edit over every selected text node (whole-box formatting); new definitions are stored on the nodes. */
@@ -333,6 +384,7 @@ function wholeTarget(nodes: TextNode[]): TextTarget {
     toggle: (k) => textParas(t(`ribbon.text.${k}`), (p) => RT.toggleAll(p, k)),
     script: (s) => textParas(t(s === "super" ? "ribbon.text.super" : "ribbon.text.sub"), (p) => RT.scriptAll(p, s)),
     setRun: (k, v, label) => textParas(label, (p) => RT.formatAll(p, { [k]: v } as RT.RunPatch)),
+    applyRun: (patch, label) => textParas(label, (p) => RT.formatAll(p, patch)),
     runLive: (k, label) => textParasLive(label, (p, v) => RT.formatAll(p, { [k]: v } as RT.RunPatch)),
     setPara: (patch, label) => textParas(label, (p) => RT.applyParaFormat(p, ...allParas(p), patch)),
     paraLive: (k, label) => textParasLive(label, (p, v) => RT.applyParaFormat(p, ...allParas(p), { [k]: v } as RT.ParaPatch)),
@@ -343,6 +395,8 @@ function wholeTarget(nodes: TextNode[]): TextTarget {
     outline: (def, lists) => textLists(t("paragraph.hist.outline"), lists, (p, lc) => RT.applyOutline(p, def, lc).paras),
     listStart: (start) => textLists(t("paragraph.hist.listStart"), undefined, (p, lc) => RT.setListStart(p, Math.max(0, p.findIndex((q) => q.list)), start, lc).paras),
     listDefs: () => nodes[0].lists ?? [],
+    transform: (fn, label) => textParas(label, (p) => fn(p, RT.fullRange(p))?.paras ?? p),
+    snapshot: () => ({ paras: ps, sel: RT.fullRange(ps) }),
     listRedefine: (listId, def, lists, start) =>
       textLists(t("paragraph.hist.listFormat"), lists, (p, lc) => {
         const r = RT.redefineList(p, listId, def, lc).paras;
@@ -407,9 +461,9 @@ function TextCtx({ nodes }: { nodes: TextNode[] }) {
       {/* font size in pt on documents and slides, px on images and screen designs (editModes fontUnit) */}
       <NumField label={t("ribbon.text.size")} tip={t("ribbon.text.fontSize")} value={f.fontSize ?? null} min={fu === "pt" ? 3 : 4} max={fu === "pt" ? 300 : 400} step={fu === "pt" ? 0.5 : 1} precision={1} scale={fontScale(fu)} unit={fu} width={88} live={tg.runLive("fontSize", t("ribbon.text.fontSize"))} />
       <span className="btn-row">
-        <IconBtn icon="bold" tip={t("ribbon.text.bold")} kbd="Ctrl+B" pressed={f.bold === true} onClick={() => tg.toggle("bold")} />
-        <IconBtn icon="italic" tip={t("ribbon.text.italic")} kbd="Ctrl+I" pressed={f.italic === true} onClick={() => tg.toggle("italic")} />
-        <IconBtn icon="underline" tip={t("ribbon.text.underline")} kbd="Ctrl+U" pressed={f.underline === true} onClick={() => tg.toggle("underline")} />
+        <IconBtn icon="bold" tip={t("ribbon.text.bold")} kbd={kbdFor("text.bold")} pressed={f.bold === true} onClick={() => tg.toggle("bold")} />
+        <IconBtn icon="italic" tip={t("ribbon.text.italic")} kbd={kbdFor("text.italic")} pressed={f.italic === true} onClick={() => tg.toggle("italic")} />
+        <IconBtn icon="underline" tip={t("ribbon.text.underline")} kbd={kbdFor("text.underline")} pressed={f.underline === true} onClick={() => tg.toggle("underline")} />
         <GlyphBtn tip={t("ribbon.text.strike")} kbd="Ctrl+Shift+X" on={f.strike === true} onClick={() => tg.toggle("strike")}>
           <s>{t("ribbon.text.strikeGlyph")}</s>
         </GlyphBtn>
@@ -488,6 +542,28 @@ function TextCtx({ nodes }: { nodes: TextNode[] }) {
   );
 }
 
+/**
+ * 텍스트 줄 바꿈 (Word's Wrap Text / 한글 본문과의 배치) of a picture or shape on a flowing document page: in line with
+ * text, square, top and bottom, behind / in front of text (the same as the 레이아웃 옵션 button beside it, docFlow).
+ */
+function PicWrapMenu({ nodes }: { nodes: SceneNode[] }) {
+  const t = useT();
+  const pages = useStore((s) => s.doc.pages);
+  const pageId = useStore((s) => s.pageId);
+  const n = nodes.length === 1 ? nodes[0] : undefined;
+  const cur = picLayoutOf(n);
+  const pi = pages.findIndex((p) => p.id === pageId);
+  if (!n || !cur || !isFlowPageAt(pages, pi)) return null;
+  const items: MenuItem[] = PIC_LAYOUTS.map((l) => ({ label: t(`docflow.layout.${l}`), checked: cur === l, onSelect: () => void setPicLayout(n.id, l) }));
+  return (
+    <>
+      <Sep />
+      <Menu className="btn btn-ghost" tip={t("docflow.layout.title")} button={<><Icon name="image" size={14} /><span>{t("docflow.layout.title")}</span><Icon name="chevron" size={12} /></>} items={items} />
+    </>
+  );
+}
+const PIC_LAYOUTS: PicLayout[] = ["inline", "square", "topBottom", "behind", "front"];
+
 function ImageCtx({ nodes }: { nodes: SceneNode[] }) {
   const t = useT();
   const kinds = [...new Set(nodes.map((n) => n.type))];
@@ -505,6 +581,7 @@ function ImageCtx({ nodes }: { nodes: SceneNode[] }) {
       <OpacityBlend nodes={nodes} />
       <Sep />
       <ArrangeBtns />
+      <PicWrapMenu nodes={nodes} />
       <Sep />
       <AlignButtons withFlip={!optionsBar} />
       {hasPdf && (
@@ -554,10 +631,25 @@ function ShapeDefaultsCtx({ tool }: { tool: Tool }) {
   const stroke = useStore((s) => s.stroke);
   const strokeNone = useShapeStroke((s) => s.none);
   const width = useShapeStroke((s) => s.width);
-  const label = t(`ribbon.tool.${tool === "rect" || tool === "ellipse" || tool === "pen" ? tool : "text"}`);
+  const params = useShapeParams();
+  const drawn = ["rect", "ellipse", "pen", "roundRect", "polygon", "star", "customShape"].includes(tool);
+  const label = t(`ribbon.tool.${drawn ? tool : "text"}`);
   return (
     <>
-      <CtxChip icon={tool === "rect" ? "rect" : tool === "ellipse" ? "ellipse" : tool === "pen" ? "pen" : "text"} label={label} />
+      <CtxChip icon={(drawn ? tool : "text") as IconName} label={label} />
+      {/* Illustrator's shape options: the corner radius, the polygon's sides, the star's points (↑ ↓ while drawing) */}
+      {tool === "roundRect" && <NumField label={t("ribbon.shape.radius")} tip={t("ribbon.shape.radius")} value={params.radius / PT} min={0} max={500} step={1} unit="pt" width={84} live={plainLive((v) => params.set({ radius: v * PT }))} />}
+      {tool === "polygon" && <NumField label={t("ribbon.shape.sides")} tip={t("ribbon.shape.sides")} value={params.sides} min={3} max={100} width={70} live={plainLive((v) => params.set({ sides: Math.round(v) }))} />}
+      {tool === "customShape" && (
+        <Select<CustomShapeId>
+          tip={t("ribbon.shape.custom")}
+          value={params.custom}
+          width={120}
+          options={(Object.keys(CUSTOM_SHAPES) as CustomShapeId[]).map((value) => ({ value, label: t(`shell.name.custom.${value}`) }))}
+          onChange={(v) => params.set({ custom: v })}
+        />
+      )}
+      {tool === "star" && <NumField label={t("ribbon.shape.points")} tip={t("ribbon.shape.points")} value={params.points} min={3} max={100} width={70} live={plainLive((v) => params.set({ points: Math.round(v) }))} />}
       {tool !== "text" && (
         <>
           <OmeSwatches />
@@ -567,8 +659,28 @@ function ShapeDefaultsCtx({ tool }: { tool: Tool }) {
         </>
       )}
       <span className="ctx-hint">
-        {tool === "pen" ? t("ribbon.shape.penHint") : tool === "text" ? t("ribbon.shape.textHint") : t("ribbon.shape.drawHint")}
+        {tool === "pen" ? t("ribbon.shape.penHint") : tool === "text" ? t("ribbon.shape.textHint") : tool === "polygon" || tool === "star" || tool === "roundRect" ? t("ribbon.shape.drawHintMore") : t("ribbon.shape.drawHint")}
       </span>
+    </>
+  );
+}
+
+// the artboard tool (Illustrator's Artboard tool options): the current artboard's size, a new one, delete, fit all
+function ArtboardCtx({ page }: { page: Page }) {
+  const t = useT();
+  const n = useStore((s) => boardsOf(s.doc).length);
+  return (
+    <>
+      <CtxChip icon="pages" label={page.name} />
+      <NumField label="W" tip={t("design.board.width")} value={page.width} min={1} max={16383} unit="px" width={84} live={plainLive((v) => setBoardProps(page.id, { width: v }))} />
+      <NumField label="H" tip={t("design.board.height")} value={page.height} min={1} max={16383} unit="px" width={84} live={plainLive((v) => setBoardProps(page.id, { height: v }))} />
+      <button type="button" className="btn btn-ghost" data-tip={t("design.board.addTip")} onClick={() => addBoard(page.width + BOARD_GAP, 0, page.width, page.height)}>
+        <Icon name="plus" size={14} /> {t("design.board.add")}
+      </button>
+      <button type="button" className="btn btn-ghost" disabled={n < 2} data-tip={t("design.board.deleteTip")} onClick={() => deleteBoard()}>
+        <Icon name="trash" size={14} /> {t("design.board.delete")}
+      </button>
+      <span className="ctx-hint">{t("design.board.hint")}</span>
     </>
   );
 }
@@ -700,6 +812,7 @@ function CropCtx() {
   const canvas = useCrop((s) => s.id === CANVAS_CROP);
   const custom = useCrop((s) => s.custom);
   const angle = useCrop((s) => s.angle);
+  const straighten = useCrop((s) => s.straighten);
   const ratios = CROP_PRESETS.map((r) => {
     const label = t(`ribbon.cropRatio.${r.id}`, undefined, r.label);
     return { value: r.id, label, tip: r.id !== "free" ? t("ribbon.crop.ratioLock", { label }) : t("ribbon.crop.ratioFree") };
@@ -713,6 +826,12 @@ function CropCtx() {
           <NumField tip={t("ribbon.crop.customW")} label="W" value={custom[0]} min={0.01} max={10000} precision={2} width={64} live={plainLive((v) => setCropCustom(v, custom[1]))} />
           <NumField tip={t("ribbon.crop.customH")} label="H" value={custom[1]} min={0.01} max={10000} precision={2} width={64} live={plainLive((v) => setCropCustom(custom[0], v))} />
         </>
+      )}
+      {canvas && (
+        <button type="button" className={cx("btn", "btn-ghost", straighten && "on")} aria-pressed={straighten} data-tip={t("ribbon.crop.levelTip")} onClick={() => useCrop.getState().set({ straighten: !straighten })}>
+          <Icon name="rotate" size={14} />
+          <span>{t("ribbon.crop.level")}</span>
+        </button>
       )}
       {canvas && <NumField icon="rotate" tip={t("ribbon.crop.straightenTip")} label={t("ribbon.crop.straighten")} value={angle} min={-45} max={45} step={0.1} precision={1} unit="°" width={70} live={plainLive((v) => setCropAngle(v))} />}
       <button type="button" className="btn btn-ghost" data-tip={t("ribbon.crop.showAllTip")} onClick={resetCrop}>
@@ -758,13 +877,16 @@ export function ContextArea() {
         <CropCtx />
       </div>
     );
-  if (tool === "brush" || tool === "eraser") {
+  if (tool === "brush" || tool === "eraser" || PS_BRUSH_TOOLS.has(tool)) {
     key = tool;
-    body = <BrushCtx eraser={tool === "eraser"} />;
+    body = <BrushCtx eraser={tool === "eraser"} tool={tool} />;
   } else if (isPathTool(tool) && nodes.length && nodes.every((n) => n.type === "VECTOR")) {
     // pen family / direct selection on paths: the anchor options, then the path's fill / stroke
     key = "vector-path";
     body = <VectorCtx nodes={nodes as VectorNode[]} anchors />;
+  } else if (tool === "artboard" && page) {
+    key = "artboard";
+    body = <ArtboardCtx page={page} />;
   } else if (hasToolOptions(tool)) {
     // image / design tools (marquee, lasso, wand, gradient, line, anchor points…): their options bar
     key = "tool-" + tool;
@@ -789,11 +911,21 @@ export function ContextArea() {
           {body}
         </>
       );
-  } else if (tool === "rect" || tool === "ellipse" || tool === "pen" || tool === "text") {
+  } else if (tool === "rotateTool" || tool === "reflectTool" || tool === "scaleTool" || tool === "shearTool" || tool === "shapeBuilder" || tool === "blendTool" || tool === "flare") {
+    key = "xf-" + tool;
+    body = (
+      <>
+        <CtxChip icon={tool === "rotateTool" ? "rotate" : tool === "reflectTool" ? "cadMirror" : tool === "scaleTool" ? "cadScale" : tool === "shearTool" ? "shear" : tool === "flare" ? "flare" : tool === "blendTool" ? "blendTool" : "shapeBuilder"} label={t(`ribbon.tool.${tool}`)} />
+        <span className="ctx-hint">{t(tool === "shapeBuilder" ? "ribbon.sb.hint" : tool === "blendTool" ? "ribbon.blendTool.hint" : tool === "flare" ? "ribbon.flare.hint" : "ribbon.xf.hint")}</span>
+      </>
+    );
+  } else if (tool === "rect" || tool === "ellipse" || tool === "pen" || tool === "text" || tool === "roundRect" || tool === "polygon" || tool === "star" || tool === "customShape") {
     key = "shape-" + tool;
     body = <ShapeDefaultsCtx tool={tool} />;
   } else if (page) {
-    const isPdf = page.kind === "PDF" || page.nodes.some((n) => n.type === "PDF");
+    // a PDF to the viewer (an Illustrator / EPS file is a design: its artboard strip, never the PDF tabs or 승격)
+    const art = ["ai", "eps"].includes(page.source?.format?.toLowerCase() ?? "");
+    const isPdf = !art && (isPdfFormatPage(page) || page.nodes.some((n) => n.type === "PDF"));
     // the page strip follows the edit mode (ui/editModes.ts); master and PDF pages keep their own
     const eff = page.kind === "MASTER" ? "MASTER" : isPdf ? "PDF" : editMode;
     key = "page-" + eff;
@@ -814,6 +946,8 @@ export function ContextArea() {
  * design modes, one options bar for the current tool (their tools are in the toolbox left of the canvas).
  */
 export function Ribbon() {
+  // a ribbon wider than the window scrolls sideways, with » / « (shell/ribbonOverflow.ts)
+  useEffect(installRibbonOverflow, []);
   const surface = useSurface();
   const chosen = useRibbonTab((s) => s.tab[surface]);
   const ctx = useRibbonContext(surface);
@@ -821,7 +955,7 @@ export function Ribbon() {
   const drawing = useStore((s) => !!s.doc.pages.find((p) => p.id === s.pageId)?.source?.cad);
   useCadScreenNow();
   if (surface === "cad") return <CadRibbon tab={tab} />;
-  if (surface === "sheet") return <SheetRibbon />;
+  if (surface === "sheet") return <SheetRibbon tab={tab} />;
   if (surface === "doc") return <DocRibbon tab={tab} ctx={ctx} />;
   if (surface === "pdf") return <PdfRibbon tab={tab} ctx={ctx} />;
   if (surface === "slide") return <SlideRibbon tab={tab} ctx={ctx} />;

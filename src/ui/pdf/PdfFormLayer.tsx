@@ -127,7 +127,24 @@ export function PdfFormLayer() {
   // typed values of the whole file (a field may have widgets on several pages)
   const valueOf = (f: FormField): FormValue => (f.name in values ? values[f.name] : f.value);
   const commit = (f: FormField, v: FormValue) => setFormValue(page.id, node.id, hash!, f.name, v, valueOf(f));
-  const editable = spots.filter((s) => !s.field.readOnly);
+  // Tab goes through the page the way Acrobat does: by the page's /Tabs — rows (R: top to bottom, then left to right
+  // as the page is shown), columns (C: left to right, then top to bottom) — and otherwise (none, or S structure) in the
+  // order the page lists its annotations; fields without a place in /Annots keep their form order after those
+  const tabs = info.tabs?.[node.pageIndex] ?? null;
+  const sameRow = (a: Spot, b: Spot) => Math.abs(a.y + a.h / 2 - (b.y + b.h / 2)) < Math.min(a.h, b.h) / 2;
+  const sameCol = (a: Spot, b: Spot) => Math.abs(a.x + a.w / 2 - (b.x + b.w / 2)) < Math.min(a.w, b.w) / 2;
+  const orderOf = (s: Spot) => s.field.widgets[s.wi].order ?? Number.MAX_SAFE_INTEGER;
+  const editable = spots
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => !s.field.readOnly)
+    .sort((p, q) =>
+      tabs === "R"
+        ? sameRow(p.s, q.s) ? p.s.x - q.s.x : p.s.y - q.s.y
+        : tabs === "C"
+          ? sameCol(p.s, q.s) ? p.s.y - q.s.y : p.s.x - q.s.x
+          : orderOf(p.s) - orderOf(q.s) || p.i - q.i,
+    )
+    .map(({ s }) => s);
   const move = (from: Spot, dir: 1 | -1) => {
     const i = editable.findIndex((s) => keyOf(s) === keyOf(from));
     const next = editable[(i + dir + editable.length) % editable.length];

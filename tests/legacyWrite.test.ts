@@ -12,7 +12,8 @@ import { describe, expect, it } from "vitest";
 import { unzipSync } from "fflate";
 import { cfbStreams, readCfb, readCfbTree, writeCfb, type CfbNode } from "../src/io/formats/cfb";
 import { exportById, formatForExt } from "../src/io/formats";
-import { LEGACY_KINDS, legacyFingerprint, legacyKeepable, legacySource, legacyUnchanged, without, type LegacyKind } from "../src/io/formats/legacyWrite";
+import { LEGACY_KINDS, lastLegacySave, legacyFingerprint, legacyKeepable, legacySource, legacyUnchanged, without, type LegacyKind } from "../src/io/formats/legacyWrite";
+import { readXls } from "../src/io/sheet/readXls";
 import { newImage, newVector, type OmwDocument, type Page } from "../src/core/types";
 import { makeAsset } from "../src/core/assets";
 import { packOmw, unpackOmw } from "../src/io/omw";
@@ -93,6 +94,13 @@ describe("edits are refused", () => {
     expect(eq(await save(doc, kind), bytes)).toBe(true); // unedited: the original
     edit(doc);
     expect(legacyUnchanged(doc.pages, kind)).toBe(false);
+    // an .xls is written anew instead (Excel keeps an .xls an .xls on any edit — io/formats/xlsFresh.ts)
+    if (kind === "xls") {
+      const out = await save(doc, kind);
+      expect(lastLegacySave.xls).toBe("fresh");
+      expect(readXls(out, "en").sheets.length).toBeGreaterThan(0);
+      return;
+    }
     await expect(save(doc, kind)).rejects.toThrow();
   };
   const texts = (doc: OmwDocument) => doc.pages.flatMap((p) => p.nodes).filter((n) => n.type === "TEXT") as any[];
@@ -250,7 +258,7 @@ describe("what is not an edit, and what is refused outright", () => {
     const later = p0.nodes.filter((n) => n !== frame);
     p0.nodes = [frame];
     const pagesWere = doc.pages.length;
-    doc.pages.splice(1, 0, { ...without(p0, ["hf", "notePr", "comments", "trackChanges"]), id: "pg-2", name: "omw · 2", breakBefore: "flow", nodes: [{ ...frame, id: "n-rest", paragraphs: [cont, ...tail] }, ...later] } as Page);
+    doc.pages.splice(1, 0, { ...without(p0, ["hf", "notePr", "comments", "trackChanges", "docStyles"]), id: "pg-2", name: "omw · 2", breakBefore: "flow", nodes: [{ ...frame, id: "n-rest", paragraphs: [cont, ...tail] }, ...later] } as Page);
     expect(doc.pages.length).toBe(pagesWere + 1);
     expect(legacyFingerprint("doc", doc.pages)).toBe(before);
     expect(legacyUnchanged(doc.pages, "doc")).toBe(true);

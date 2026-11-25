@@ -228,6 +228,11 @@ function programKey(data: Uint8Array, map: Map<number, number>): string {
 
 const families = new WeakMap<object, string | null>();
 const registered = new Set<string>();
+/** the sfnt each registered family was made from (Create Outlines reads the glyphs' own outlines from it) */
+const familyBytes = new Map<string, Uint8Array>();
+
+/** The font program bytes (sfnt) behind an embedded font's FontFace family, or null for any other family. */
+export const embeddedFontBytes = (family: string): Uint8Array | null => familyBytes.get(family) ?? null;
 
 /**
  * The FontFace family of an embedded font program (registered on first use: document.fonts.add + load, which fires
@@ -245,6 +250,7 @@ export function embeddedFontFamily(program: { data: Uint8Array; uniToGid: () => 
       if (!sfnt) fam = null;
       else {
         registered.add(fam);
+        familyBytes.set(fam, sfnt);
         try {
           const face = new g.FontFace(fam, sfnt);
           g.document.fonts.add(face);

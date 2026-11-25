@@ -8,6 +8,7 @@ import { elevatePage, openSurgeonDoc, saveSurgical } from "../../src/io/pdfsurge
 import { decodeFilters, StreamDecodeError } from "../../src/io/pdfsurgeon/filters";
 import { parseOps, PdfDict } from "../../src/io/pdfsurgeon/syntax";
 import { fallbackFont, samplePdf } from "./helpers";
+import { cpuNow, cpuBudget, wallTimeout } from "../budget";
 
 const enc = new TextEncoder();
 const OPTS = { prefix: "fz", fallbackFont };
@@ -44,7 +45,7 @@ describe("PDF Surgeon — hostile input", () => {
     const bomb = zeroBomb(300);
     expect(bomb.length).toBeLessThan(2_000_000);
     expect(() => decodeFilters(bomb, [{ name: "FlateDecode", parms: null }])).toThrow(StreamDecodeError);
-  }, 60_000);
+  }, wallTimeout(60_000));
 
   it("predictor parameters cannot force a giant allocation", () => {
     const p = new PdfDict();
@@ -65,7 +66,7 @@ describe("PDF Surgeon — hostile input", () => {
     // RunLength: 2 input bytes → 128 output bytes
     const rl = new Uint8Array(4_000_000);
     for (let i = 0; i < rl.length; i += 2) (rl[i] = 129), (rl[i + 1] = 7);
-    const t0 = performance.now();
+    const t0 = cpuNow();
     let out: Uint8Array | null = null;
     try {
       out = decodeFilters(rl, [{ name: "RunLengthDecode", parms: null }]);
@@ -73,8 +74,8 @@ describe("PDF Surgeon — hostile input", () => {
       expect(e).toBeInstanceOf(StreamDecodeError);
     }
     if (out) expect(out.length).toBe(128 * 2_000_000);
-    expect(performance.now() - t0).toBeLessThan(20_000);
-  }, 60_000);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(20_000));
+  }, wallTimeout(60_000));
 
   it("deeply nested arrays in a content stream are a syntax note, not a crash", async () => {
     const deep = enc.encode("[".repeat(200_000) + "]".repeat(200_000) + " Tj");
@@ -93,7 +94,7 @@ describe("PDF Surgeon — hostile input", () => {
     const r = await within(Promise.resolve().then(() => elevatePage(doc, 0, OPTS)), 30_000);
     expect(r.notes.length).toBeGreaterThan(0);
     expect(r.textCount + r.vectorCount).toBe(0);
-  }, 60_000);
+  }, wallTimeout(60_000));
 
   it("a Form XObject that draws itself is detected as a cycle", async () => {
     const bytes = await pdfWith(enc.encode("/X0 Do"), undefined, (doc, page) => {
@@ -133,5 +134,5 @@ describe("PDF Surgeon — hostile input", () => {
         expect(e).not.toBeInstanceOf(RangeError);
       }
     }
-  }, 300_000);
+  }, wallTimeout(300_000));
 });

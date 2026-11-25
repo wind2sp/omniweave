@@ -3,7 +3,7 @@
 // as they are when it is put in (Word's TOC field is updated by hand too); the marks are a screen-only ¶ at the end
 // of every paragraph of the document body.
 
-import { caretBox, flowLines, gatherStory, isFlowPageAt, nodeOrder, segmentAt } from "../core/flow";
+import { caretBox, flowLines, gatherStory, isFlowPageAt, nodeOrder, reflowPages, segmentAt } from "../core/flow";
 import { formatPageNumber, hfInfo } from "../core/headerFooter";
 import { useStore } from "../core/store";
 import { newTable, uid, type OmwDocument, type Page, type TableCell, type TextParagraph } from "../core/types";
@@ -56,7 +56,25 @@ export function insertToc(): boolean {
   const pg = s.doc.pages.find((p) => p.id === s.pageId)!;
   const m = pg.margins;
   const bodyW = Math.max(200, pg.width - (m?.left ?? 76) - (m?.right ?? 76));
-  const size = 14;
+  const title = t("docmode.toc.title");
+  const tbl = newTable(tocRows(entries, title), [bodyW - 56, 56], title);
+  tbl.headerRow = false;
+  // (no visible lines: the page colour, which every writer keeps as a colour)
+  tbl.borderColor = "#ffffff";
+  tbl.background = null;
+  tbl.fontSize = TOC_SIZE;
+  tbl.rowHeight = 22;
+  tbl.toc = true;
+  const ok = insertObject(tbl);
+  if (ok) S().notify(t("docmode.toc.done", { n: entries.length }));
+  return ok;
+}
+
+const TOC_SIZE = 14;
+
+/** The rows of a 목차: its title, then one row per heading (text, page number). */
+function tocRows(entries: { level: number; text: string; page: string }[], title: string): TableCell[][] {
+  const size = TOC_SIZE;
   const para = (text: string, level: number, bold: boolean, align: TextParagraph["align"] = "LEFT"): TextParagraph => ({
     id: uid("p"),
     runs: [{ text, fontFamily: "Pretendard", fontSize: size, bold, italic: false, underline: false, color: "#1d1f24" }],
@@ -66,24 +84,53 @@ export function insertToc(): boolean {
     ...(level > 1 ? { indentLeft: (level - 1) * 18 } : {}),
     spaceAfter: 2,
   });
-  const title = t("docmode.toc.title");
-  const rows: TableCell[][] = [
+  return [
     [{ text: title, bold: true, colSpan: 2, richText: [para(title, 1, true)] }, { text: "" }],
     ...entries.map((e): TableCell[] => [
       { text: e.text, bold: e.level === 1, richText: [para(e.text, e.level, e.level === 1)] },
       { text: e.page, align: "RIGHT", richText: [para(e.page, 1, e.level === 1, "RIGHT")] },
     ]),
   ];
-  const tbl = newTable(rows, [bodyW - 56, 56], title);
-  tbl.headerRow = false;
-  // (no visible lines: the page colour, which every writer keeps as a colour)
-  tbl.borderColor = "#ffffff";
-  tbl.background = null;
-  tbl.fontSize = size;
-  tbl.rowHeight = 22;
-  const ok = insertObject(tbl);
-  if (ok) S().notify(t("docmode.toc.done", { n: entries.length }));
-  return ok;
+}
+
+/**
+ * 목차 업데이트 (Word Update Table / 한글 차례 새로 고침): every 목차 the app put in (TableNode.toc) lists the headings
+ * and their pages as they are now — one undo step; twice over, as a longer or shorter 목차 moves the pages after it.
+ */
+export function updateToc(): boolean {
+  const s = S();
+  const has = (pages: Page[]) => pages.some((p) => p.nodes.some((n) => n.type === "TABLE" && n.toc));
+  if (!has(s.doc.pages)) {
+    s.notify(t("docux.toc.noToc"));
+    return false;
+  }
+  const title = t("docmode.toc.title");
+  let pages = s.doc.pages as Page[];
+  for (let pass = 0; pass < 2; pass++) {
+    const rows = tocRows(tocEntries({ pages }), title);
+    let head = true;
+    pages = reflowPages(
+      pages.map((p) => {
+        if (!p.nodes.some((n) => n.type === "TABLE" && n.toc)) return p;
+        return {
+          ...p,
+          nodes: p.nodes.flatMap((n) => {
+            if (n.type !== "TABLE" || !n.toc) return [n];
+            // (a 목차 the flow cut over pages: its first piece takes all the rows, the flow cuts it again)
+            if (n.flowCont) return [];
+            const out = head ? [{ ...n, rows }] : [n];
+            head = false;
+            return out;
+          }),
+        };
+      }),
+    );
+  }
+  s.commit(t("docux.toc.update"), (d) => {
+    d.pages = pages as typeof d.pages;
+  });
+  s.notify(t("docux.toc.updated", { n: tocEntries({ pages }).length }));
+  return true;
 }
 
 // ───────── 문단 부호 ─────────

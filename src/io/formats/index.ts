@@ -10,7 +10,7 @@ import { exportDocx, exportHwpx, parseDocxFlow, parseHwpxFlow, type OfficeImport
 import type { OfficePic } from "../officeDrawing";
 import { importPdf, saveSameTypePdf } from "../pdf";
 import { aiNoPdfContentMsg, aiXmpThumbnail, detectAiWithoutPdfContent } from "../pdfsurgeon";
-import { collectTables, exportCsv, importCsv } from "./csv";
+import { collectTables, csvAsSheet, exportCsv, importCsv } from "./csv";
 import { importEpub } from "./epub";
 import { importOdp } from "./odp";
 import { importOdt } from "./odt";
@@ -23,6 +23,7 @@ import { flowLegacyPages, keepLegacy, LEGACY_KINDS, lastLegacySave, legacySource
 import { exportMarkdown, importMarkdown } from "./markdown";
 import { encodePng } from "./png";
 import { exportPptx, importPptx, type Rasterize } from "./pptx";
+import { docxDml } from "./docxDml";
 import { t, useLang } from "../../i18n";
 import { importPsdPage } from "./psd";
 import { seedCmykStore } from "../../core/image/cmykComposite";
@@ -75,6 +76,9 @@ function picAssets(pics: OfficePic[] = []) {
   });
   return { assets, placed };
 }
+
+/** Shapes and text boxes read from a word-processor file, placed like pictures (no bytes: no asset). */
+const shapesPlaced = (shapes: OfficePic[]) => shapes.map((pic) => ({ pic, assetId: "" }));
 
 /** Save a fresh DOCX / HWPX: what it cannot hold (pictures in formats Word and 한글 do not show) is confirmed first. */
 function freshOffice(confirm: ((msg: string) => boolean) | undefined, make: (notes: string[]) => Uint8Array): Uint8Array {
@@ -244,14 +248,14 @@ export const FORMATS: FormatDef[] = [
     level: "문단·글자 서식 열기·편집·저장", // i18n: later
     saveAs: "docx",
     open: async (f, ctx) => {
-      const report: OfficeImportReport & { blockItems: number[]; pictures: OfficePic[] } = { notesDropped: 0, blockItems: [], pictures: [], afterTableParas: true };
+      const report: OfficeImportReport & { blockItems: number[]; pictures: OfficePic[]; shapes: OfficePic[] } = { notesDropped: 0, blockItems: [], pictures: [], shapes: [], dml: docxDml, afterTableParas: true };
       const items = parseDocxFlow(f.bytes, report);
       const pics = picAssets(report.pictures);
-      const pages = officePages(items, baseName(f.name), report.layout, report.lists, pics.placed);
+      const pages = officePages(items, baseName(f.name), report.layout, report.lists, [...pics.placed, ...shapesPlaced(report.shapes)]);
       pages.forEach((p) => (p.source = { format: "docx", name: f.name }));
       // Office Surgeon: the original file and its block map (on the first page only) for a source-preserving save
       const asset = ctx?.decrypted ? null : makeAsset(f.bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", f.name);
-      const office = asset && docxMeta(pages, report.blockItems, asset, report.pictures, pics.assets);
+      const office = asset && docxMeta(pages, report.blockItems, asset, report.pictures, pics.assets, report.shapes);
       if (office && pages[0].source) pages[0].source.office = office;
       return { ...officeOpened(pages, "DOCX", items, report), assets: { ...pics.assets, ...(office && asset ? { [asset.id]: asset } : {}) } };
     },
@@ -273,14 +277,14 @@ export const FORMATS: FormatDef[] = [
         bytes = r.value;
         protection = { scheme: "hwpx-odf", secretId: rememberSecret(r.password) };
       }
-      const report: OfficeImportReport & { sectionBlocks: { part: string; items: number[] }[]; pictures: OfficePic[] } = { notesDropped: 0, sectionBlocks: [], pictures: [] };
+      const report: OfficeImportReport & { sectionBlocks: { part: string; items: number[] }[]; pictures: OfficePic[]; shapes: OfficePic[] } = { notesDropped: 0, sectionBlocks: [], pictures: [], shapes: [] };
       const items = parseHwpxFlow(bytes, report);
       const pics = picAssets(report.pictures);
-      const pages = officePages(items, baseName(f.name), report.layout, report.lists, pics.placed);
+      const pages = officePages(items, baseName(f.name), report.layout, report.lists, [...pics.placed, ...shapesPlaced(report.shapes)]);
       pages.forEach((p) => (p.source = { format: "hwpx", name: f.name, ...(protection ? { protection } : {}) }));
       // Office Surgeon (stage 1: not for password-protected files, so no decrypted copy is ever kept)
       const asset = protection || ctx?.decrypted ? null : makeAsset(f.bytes, "application/hwp+zip", f.name);
-      const office = asset && hwpxMeta(pages, report.sectionBlocks, asset, report.pictures, pics.assets);
+      const office = asset && hwpxMeta(pages, report.sectionBlocks, asset, report.pictures, pics.assets, report.shapes);
       if (office && pages[0].source) pages[0].source.office = office;
       return { ...officeOpened(pages, "HWPX", items, report), assets: { ...pics.assets, ...(office && asset ? { [asset.id]: asset } : {}) } };
     },
@@ -345,16 +349,16 @@ export const FORMATS: FormatDef[] = [
         const pages = legacyPages(r, f.name, "hwp");
         return { pages, mode: "DOCUMENT", warnings: r.warnings, message: t("engine.open.hwpText", { paras: r.blocks.filter((b) => b.kind === "para").length, tables: r.blocks.filter((b) => b.kind === "table").length, pages: pages.length, warning: r.warnings[0] }) };
       }
-      const report: OfficeImportReport & { sectionBlocks: { part: string; items: number[] }[]; pictures: OfficePic[] } = { notesDropped: 0, sectionBlocks: [], pictures: [] };
+      const report: OfficeImportReport & { sectionBlocks: { part: string; items: number[] }[]; pictures: OfficePic[]; shapes: OfficePic[] } = { notesDropped: 0, sectionBlocks: [], pictures: [], shapes: [] };
       const items = parseHwpxFlow(hwpx, report);
       const pics = picAssets(report.pictures);
-      const pages = officePages(items, baseName(f.name), report.layout, report.lists, pics.placed);
+      const pages = officePages(items, baseName(f.name), report.layout, report.lists, [...pics.placed, ...shapesPlaced(report.shapes)]);
       // saved as HWPX: the converted package is the Office Surgeon original, so a save keeps everything it holds
       // (styles, borders, tab and number shapes, 한글's line layout …) and rewrites only what was edited
       const name = f.name.replace(/\.hwp$/i, ".hwpx");
       pages.forEach((p) => (p.source = { format: "hwpx", name }));
       const asset = makeAsset(hwpx, "application/hwp+zip", name);
-      const office = hwpxMeta(pages, report.sectionBlocks, asset, report.pictures, pics.assets);
+      const office = hwpxMeta(pages, report.sectionBlocks, asset, report.pictures, pics.assets, report.shapes);
       if (office && pages[0].source) pages[0].source.office = office;
       // the .hwp itself too: unedited, it saves as HWP byte for byte, a text edit into its own records (export "hwp",
       // io/formats/hwp5Write.ts); the fingerprint of the pages as opened tells the edits apart
@@ -475,7 +479,8 @@ export const FORMATS: FormatDef[] = [
     open: async (f, ctx) => {
       if (ctx.asSource) return openTextLike(f, ctx, "csv-src");
       const r = importCsv(f.bytes, f.name);
-      return { pages: r.pages, mode: "DOCUMENT", message: t("engine.open.csv", { rows: r.rows.toLocaleString(), cols: r.cols, pages: r.pages.length }) + (r.truncated ? " " + t("engine.open.csvTruncated") : "") };
+      // a CSV opens as a sheet, as in Excel (the grid, formulas, sorting); its file text stays on the page for saving
+      return { pages: csvAsSheet(r.pages), mode: "DOCUMENT", message: t("engine.open.csv", { rows: r.rows.toLocaleString(), cols: r.cols, pages: r.pages.length }) + (r.truncated ? " " + t("engine.open.csvTruncated") : "") };
     },
   },
   {
@@ -586,6 +591,13 @@ export const FORMATS: FormatDef[] = [
       const sniffed = imageMime(f.bytes);
       const mime = sniffed ?? (ext === "svg" ? "image/svg+xml" : ext === "jpg" ? "image/jpeg" : ext === "ico" ? "image/x-icon" : `image/${ext}`);
       if (mime === "image/tiff") return openTiff(f);
+      // SVG artwork opens as editable paths wherever it is opened from (the phone editor takes pages, not a picture
+      // to place: a plain SVG failed there with "opens only as a picture"); one that needs more stays a picture
+      if (mime === "image/svg+xml") {
+        const { svgArtPage } = await import("../svgVectors");
+        const page = svgArtPage(f.bytes, f.name);
+        if (page) return { pages: [page], assets: {} };
+      }
       return { place: { kind: "image", bytes: f.bytes, mime, name: f.name } };
     },
   },
@@ -764,9 +776,9 @@ function legacyExport(kind: LegacyKind): ExportDef {
     },
     // (read after the save: what it wrote)
     get doneNote() {
-      return lastLegacySave[kind] === "cells" ? t("legacysave.savedCells.xls") : lastLegacySave[kind] === "text" ? t(`legacysave.savedText.${kind}`) : t(`legacysave.saved.${kind}`);
+      return lastLegacySave[kind] === "fresh" ? t("legacysave.savedFresh.xls") : lastLegacySave[kind] === "cells" ? t("legacysave.savedCells.xls") : lastLegacySave[kind] === "text" ? t(`legacysave.savedText.${kind}`) : t(`legacysave.saved.${kind}`);
     },
-    run: async (d) => saveLegacy(d.pages, kind),
+    run: async (d, _p, c) => saveLegacy(d.pages, kind, c.confirm),
   };
 }
 
@@ -1010,7 +1022,8 @@ export const EXPORTS: ExportDef[] = [
     },
     ext: "csv",
     filter: { name: "CSV", extensions: ["csv"] },
-    run: async (d) => (needTable(d), exportCsv(d.pages)),
+    // (a sheet page is written from its cells: a CSV opened as a sheet keeps its encoding, delimiter and records)
+    run: async (d) => (d.pages.some((p) => p.sheet) || needTable(d), exportCsv(d.pages)),
   },
   {
     id: "md",
@@ -1067,8 +1080,8 @@ export const EXPORTS: ExportDef[] = [
     run: async (d) => exportSrt(d.pages),
   },
   {
-    // a drawing page as DXF R12 (layers, lines / polylines, texts; cad/dxfWrite.ts) — an export, never "the original
-    // format": a DXF / DWG opened here keeps its original as an asset, and a rewrite would drop hatches, blocks, dimensions
+    // a drawing page as DXF R2000 (layers with lineweights / linetypes, arcs, polylines, hatches, blocks, texts;
+    // cad/dxfWrite2000.ts) — an export, never "the original format": a DXF / DWG opened here keeps its original as an asset
     id: "dxf",
     get label() {
       return t("dxfwrite.export.label");
@@ -1079,7 +1092,7 @@ export const EXPORTS: ExportDef[] = [
     ext: "dxf",
     filter: { name: "DXF", extensions: ["dxf"] },
     fileName: (d, p) => (p.source?.cad ? baseName(p.source.name) : pageFileStem(d, p)),
-    run: async (_d, p) => (await import("./cad/dxfWrite")).writeDxf(p).bytes,
+    run: async (d, p) => (await import("./cad/dxfWrite2000")).writeDxf2000(p, d.pages).bytes,
   },
   {
     id: "psd",
@@ -1103,7 +1116,7 @@ export const EXPORTS: ExportDef[] = [
 const SHEET_AS_PRINTED = new Set(["png", "jpg", "webp", "pdf", "pdf-image", "svg", "psd"]);
 for (const e of EXPORTS) {
   // (DOC / XLS / PPT: the original file — the pages as they are decide whether it is unedited)
-  if (e.id === "xlsx" || (LEGACY_KINDS as readonly string[]).includes(e.id)) continue;
+  if (e.id === "xlsx" || e.id === "csv" || (LEGACY_KINDS as readonly string[]).includes(e.id)) continue;
   const run = e.run;
   e.run = async (d, p, c) => {
     const x = SHEET_AS_PRINTED.has(e.id) ? await expandSheetPrintPages(d, p) : expandSheetPages(d, p);

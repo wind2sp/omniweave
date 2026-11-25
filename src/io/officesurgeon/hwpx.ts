@@ -14,13 +14,13 @@
 import { strFromU8 } from "fflate";
 import { getBlob } from "../../core/assets";
 import { hashString } from "../../core/hash";
-import { DEFAULT_RUN, type NoteRef, type OfficeSourceBlock, type OfficeSourceMeta, type Page, type Revision, type TableCell, type TableNode, type TextParagraph, type TextRun } from "../../core/types";
+import { DEFAULT_RUN, newParagraph, type NoteRef, type OfficeSourceBlock, type OfficeSourceMeta, type Page, type PageBorder, type Revision, type TableCell, type TableNode, type TextParagraph, type TextRun } from "../../core/types";
 import { t } from "../../i18n";
 import { TABLE_LINE, coverMap, spanOf } from "../../core/table";
-import { sameColumns, type PageSetup } from "../../core/pageSetup";
+import { sameBorder, sameColumns, type PageSetup } from "../../core/pageSetup";
 import { layoutDiff, legacyLayout } from "./layout";
 import { HF_MAP_VERSION, hfAddedToOldMap, hfStateKey, hwpxHFChanged } from "./hf";
-import { collectFlow, flowNotes, hwpxLeftOut, hwpxCharPrXml, hwpxLineSpacing, hwpxColPrXml, hwpxPagePrXml, hwpxHeaderMaps, hwpxText, parseHwpxFlow, pageListDefs, HWPX_NUMFMT_OUT, type HwpxHeaderMaps, type OfficeImportReport, type OfficeItem, type OfficeTable } from "../office";
+import { borderFill, hwpxTblXml, hwpxSeqNum, hwpxPageBorderFillXml, hwpxPageBorderFills, HWPX_NO_PAGE_BORDER, collectFlow, flowNotes, hwpxLeftOut, hwpxCharPrXml, hwpxLineSpacing, hwpxColPrXml, hwpxPagePrXml, hwpxHeaderMaps, hwpxDutmalXml, hwpxLinked, hwpxText, parseHwpxFlow, pageListDefs, HWPX_NUMFMT_OUT, type HwpxHeaderMaps, type OfficeImportReport, type OfficeItem, type OfficeTable } from "../office";
 import { MAX_LEVELS, isBulletLevel, levelOf, resolveDef, toHwpxLevelText } from "../../core/lists";
 import type { ListDef } from "../../core/style/types";
 import { esc } from "../xml";
@@ -30,8 +30,11 @@ import { childrenOf, descendantsNamed, rootOf, type XmlEl } from "./scan";
 import { entryData, readZip, rewriteZip, type ZipArchive } from "./zip";
 import type { AssetRef } from "../../core/types";
 import { HWPX_MEDIA, hwpxPicXml, itemTops, picFormat, picPixels, picTargets, type OfficePic, type PicMedia } from "../officeDrawing";
+import { MODEL_SHAPES, shapeChanges, shapeMap, shapesKept } from "./shapes";
+import { hwpxShapeXml } from "../officeShapes";
 import { MODEL_PICTURES, bytesHash, emptyHwpxPara, patchElement, picChanges, picMap, type PicEdit } from "./pics";
-import { MODEL_HEADING_STYLES, MODEL_REVIEW } from "./common";
+import { MODEL_HEADING_STYLES, MODEL_PARA_STYLES, MODEL_REVIEW, sameOutlineLevels } from "./common";
+import { paragraphInStyle, type DocStyle } from "../../core/docStyles";
 import { isRemoved } from "../../core/review";
 import { HwpxReview, withPoints } from "./hwpxReview";
 import { docComments } from "../../core/review";
@@ -43,14 +46,14 @@ const tn = (key: string, n: number) => t(n === 1 ? `${key}_one` : key, { n });
 const tableKey = (tb: { colWidths: number[]; headerRow: boolean } & Partial<TableNode>) => hashString(tablePropsKey(tb as TableNode));
 const LANGS = ["HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER"];
 /** run children that are text (rewritten); every other child (controls, objects) is kept */
-const TEXT_KIDS = new Set(["t"]);
+const TEXT_KIDS = new Set(["t", "dutmal"]); // (덧말: text of the paragraph, written from the model — office.ts hwpxDutmalXml)
 /** controls that may stay in front of the text without changing the meaning */
 const LEADING_OK = new Set(["secPr", "ctrl"]);
 /** page-level controls (columns, header, footer, page number…): their place in the paragraph does not matter */
 const PAGE_CTRLS = new Set(["colPr", "header", "footer", "pageNum", "pageNumCtrl", "pageHiding", "newNum"]);
 
 /** Block map of a freshly imported HWPX (null when the import and the element counts disagree). */
-export function hwpxMeta(pages: Page[], sections: { part: string; items: number[] }[], asset: { id: string; hash: string }, pics?: OfficePic[], assets?: Record<string, AssetRef>): OfficeSourceMeta | null {
+export function hwpxMeta(pages: Page[], sections: { part: string; items: number[] }[], asset: { id: string; hash: string }, pics?: OfficePic[], assets?: Record<string, AssetRef>, shapes?: OfficePic[]): OfficeSourceMeta | null {
   const flow = collectFlow(pages);
   if (sections.reduce((a, s) => a + s.items.reduce((x, y) => x + y, 0), 0) !== flow.length) return null;
   let i = 0;
@@ -64,8 +67,10 @@ export function hwpxMeta(pages: Page[], sections: { part: string; items: number[
     }),
   }));
   // pictures read (report.pictures): model 5 with the picture map; an import without them is a model 4 map
-  const meta: OfficeSourceMeta = { engine: WORD_ENGINE_VERSION, model: pics ? MODEL_VERSION : MODEL_HEADING_STYLES, hf: HF_MAP_VERSION, hfKey: hfStateKey(pages), assetId: asset.id, hash: asset.hash, parts };
+  // (shapes read, report.shapes: model 11 with the shape map — a text box's paragraphs are then no items)
+  const meta: OfficeSourceMeta = { engine: WORD_ENGINE_VERSION, model: pics ? (shapes ? MODEL_VERSION : MODEL_PARA_STYLES) : MODEL_HEADING_STYLES, hf: HF_MAP_VERSION, hfKey: hfStateKey(pages), assetId: asset.id, hash: asset.hash, parts };
   if (pics?.length) meta.pics = picMap(pages, pics, assets);
+  if (pics && shapes?.length) meta.shapes = shapeMap(pages, shapes);
   // footnotes / endnotes (model 7): each note's instId and the fingerprint of its text
   if (pics) meta.notes = flowNotes(flow).map((n) => ({ k: n.kind, id: n.src ?? "", fp: noteFp(n) }));
   return meta;
@@ -90,7 +95,7 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
   };
   // the original as the importer saw it: its items in block order (formats to compare against)
   // (a map from model 5 on was made by the importer that reads pictures: the original is read the same way)
-  const report: OfficeImportReport & { sectionBlocks: { part: string; items: number[] }[] } = { notesDropped: 0, sectionBlocks: [], ...((meta.model ?? 1) >= MODEL_PICTURES ? { pictures: [] } : {}), ...((meta.model ?? 1) < MODEL_REVIEW ? { noReview: true as const } : {}) };
+  const report: OfficeImportReport & { sectionBlocks: { part: string; items: number[] }[] } = { notesDropped: 0, sectionBlocks: [], ...((meta.model ?? 1) >= MODEL_PICTURES ? { pictures: [] } : {}), ...((meta.model ?? 1) >= MODEL_SHAPES ? { shapes: [] } : {}), ...((meta.model ?? 1) < MODEL_REVIEW ? { noReview: true as const } : {}), ...((meta.model ?? 1) < MODEL_PARA_STYLES ? { noParaStyle: true as const } : {}) };
   const reread = parseHwpxFlow(orig, report);
   // a map older than model version 2: the original in the shape that importer read it (common.ts legacyParaView)
   const origItems: OfficeItem[] =
@@ -117,6 +122,8 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
   const origLayout = report.layout;
   if (!origLayout) throw new SurgeryUnavailable("layout");
   const diff = legacy ?? layoutDiff(pages, flow, starts, meta.parts.flatMap((p) => p.blocks.flatMap((b) => b.ids)), origLayout);
+  // (a section added here: written in place for DOCX only — 한글's hp:secPr is the first paragraph's, the file anew)
+  if (diff.addSections?.size) throw new SurgeryUnavailable("sections");
   // headers / footers / page numbers: 한글 keeps them as controls in body paragraphs — a change is written anew (hf.ts)
   if (!legacy && hwpxHFChanged(meta, pages)) throw new SurgeryUnavailable("header / footer");
   const where = new Map<string, { part: number; b: number; k: number }>();
@@ -124,12 +131,27 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
   const pos = new Map<string, number>();
   flow.forEach((it, i) => pos.has(itemId(it)) || pos.set(itemId(it), i));
   // lists whose numbering changed (format, bullet, start: common.ts relistPlan) get an hh:numbering / hh:bullet of
-  // their own; the outline numbering (개요) goes with the 개요 styles: a change of it is written anew
+  // their own. The outline numbering (개요 번호) is the section's: headings numbered by it are OUTLINE paragraphs —
+  // with the file's own outline numbering as it is, or (another 개요 번호 모양 chosen) a numbering made from the
+  // definition that the sections name as their outline shape (as 한글 does: one 개요 번호 모양 per section)
   const defsNow = pageListDefs(pages);
   const changedDefs = changedListDefs(defsNow, report.lists);
   const plan = relistPlan(flowParas(flow), origParas(flow, (id) => origById.get(id)), fileListDefs(origItems.flatMap((it) => (it.kind === "p" ? [it.p] : it.table.paras))), changedDefs, defsNow);
   if (plan.unsafe) throw new SurgeryUnavailable(plan.unsafe);
-  for (const p of plan.at.keys()) if (/^h[1-6]$/.test(p.role ?? "") || resolveDef(p.list!.def, defsNow).outline) throw new SurgeryUnavailable("outline numbering");
+  const fileOutline = (report.lists ?? []).find((d) => d.outline) ?? null;
+  let newOutline: ListDef | null = null;
+  {
+    const numbered = flowParas(flow).filter((p) => p.list && resolveDef(p.list.def, defsNow).outline);
+    const used = new Set(numbered.map((p) => resolveDef(p.list!.def, defsNow)));
+    // (only headings carry an outline number in place; one 개요 번호 모양 for the document)
+    if (numbered.some((p) => !/^h[1-6]$/.test(p.role ?? "")) || used.size > 1) {
+      if (numbered.some((p) => plan.at.has(p) || !fileOutline || resolveDef(p.list!.def, defsNow).id !== fileOutline.id)) throw new SurgeryUnavailable("outline numbering");
+    } else if (used.size === 1) {
+      const def = [...used][0];
+      if (!fileOutline || !sameOutlineLevels(def, fileOutline)) newOutline = def;
+    }
+    for (const p of plan.at.keys()) if (/^h[1-6]$/.test(p.role ?? "") && !(p.list && resolveDef(p.list.def, defsNow).outline)) throw new SurgeryUnavailable("outline numbering");
+  }
   const intact = meta.parts.map((part) =>
     part.blocks.map((bl) => {
       if (!bl.ids.length) return true;
@@ -149,8 +171,10 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
     const known = new Map(meta.notes.map((m) => [`${m.k}:${m.id}`, m.fp]));
     const used = new Set<string>();
     for (const n of curNotes) {
-      const key = `${n.kind}:${n.src ?? ""}`;
-      if (n.src == null || !known.has(key) || used.has(key)) throw new SurgeryUnavailable("new note");
+      // a note made here: 한글's footnote / endnote control written where its reference is (HwpxWriter.newNoteXml)
+      if (n.src == null) continue;
+      const key = `${n.kind}:${n.src}`;
+      if (!known.has(key) || used.has(key)) throw new SurgeryUnavailable("new note");
       used.add(key);
       if (noteFp(n) !== known.get(key)) noteEdits.push({ src: n.src, note: n });
     }
@@ -162,13 +186,30 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
   const curComments = review ? docComments(pages) : [];
   const commentsChanged = review && JSON.stringify(curComments) !== JSON.stringify(origComments);
   const trackChanged = review && !!pages[0]?.trackChanges !== hwpxTracking(read(HEADER));
-  if (!commentsChanged && !trackChanged && !noteEdits.length && !pc.any && diff.none && flow.length === origIds.length && flow.every((it, i) => itemId(it) === origIds[i]) && intact.every((p) => p.every(Boolean))) return { bytes: orig, unchanged: true, warnings: pc.skipped ? [tn("engine.office.picsSkipped", pc.skipped)] : [] };
+  // named styles changed or made here (core/docStyles.ts): their hh:style elements
+  const sheet = (meta.model ?? 1) >= MODEL_PARA_STYLES ? pages[0]?.docStyles : undefined;
+  const stylesEdited = !!sheet?.some((x) => x.edited);
+  // shapes and text boxes (model 11 map; shapes.ts): a changed or deleted one → the file is written anew (stage 1)
+  const sc = shapeChanges(pages, meta);
+  if (sc.changed) throw new SurgeryUnavailable("shape changed");
+  if (!stylesEdited && !commentsChanged && !trackChanged && !noteEdits.length && !pc.any && !sc.added.length && diff.none && flow.length === origIds.length && flow.every((it, i) => itemId(it) === origIds[i]) && intact.every((p) => p.every(Boolean))) return { bytes: orig, unchanged: true, warnings: pc.skipped ? [tn("engine.office.picsSkipped", pc.skipped)] : [] };
   const bin = new HwpxBinData(zip);
 
   const rereadParas = reread.flatMap((it) => (it.kind === "p" ? [it.p] : []));
   // (or the outline items 개요 7–9 of a document without a numbered heading: QA hwpx-outline)
   const outlineDef = (rereadParas.find((q) => q.list && /^h[1-6]$/.test(q.role ?? "")) ?? rereadParas.find((q) => q.list?.id === "hwpx-outline"))?.list?.def ?? null;
   const w = new HwpxWriter(strFromU8(read(HEADER)), hwpxHeaderMaps(read(HEADER)), (meta.model ?? 1) < MODEL_OPTIONAL_FIELDS, outlineDef, plan, defsNow);
+  // notes made here: their number among the notes of their kind, in document order (한글 numbers them again itself)
+  {
+    const count = { foot: 0, end: 0 };
+    for (const n of curNotes) {
+      count[n.kind]++;
+      if (n.src == null) w.newNotes.set(n, count[n.kind]);
+    }
+  }
+  if ((meta.model ?? 1) >= MODEL_PARA_STYLES) w.sheet = sheet ?? [];
+  // another 개요 번호 모양: a numbering of it, named by every section as its outline shape
+  const outlineShape = newOutline ? w.outlineNumbering(newOutline) : null;
   if (review) {
     const order: TextParagraph[] = [];
     for (const it of flow) {
@@ -230,6 +271,22 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
       else (t.after ? at.after : at.before).push(holderPara(w, run, m, t.before, t.below));
     });
   }
+  // new shapes and text boxes (io/officeShapes.ts): anchored in the paragraph at their place, like a floating picture
+  // (a hidden one: 한글 has no hidden objects — the save said so first)
+  if (sc.added.length) {
+    const ids = flow.map(itemId);
+    let shapeId = 1960000000;
+    picTargets(sc.added.filter((x) => x.node.visible), ids, itemTops(pages)).forEach((t) => {
+      const xml = hwpxShapeXml(t.pic, { id: () => shapeId++, paras: (ps) => (ps.length ? ps : [newParagraph("")]).map((q) => w.freshPara(q)).join("") });
+      const run = `<hp:run charPrIDRef="0">${xml}<hp:t/></hp:run>`;
+      const fresh = () => injectHwpxRuns(w.freshPara({ id: "", runs: [], align: "LEFT", lineSpacing: 1, indent: 0, spaceAfter: 0 } as TextParagraph), run);
+      if (t.item < 0) return void lost.push(fresh());
+      const at = picsAt.get(ids[t.item]) ?? { before: [], after: [], runs: "" };
+      picsAt.set(ids[t.item], at);
+      if (flow[t.item].kind === "p") at.runs += run;
+      else (t.after ? at.after : at.before).push(fresh());
+    });
+  }
   /** an item's paragraph with the new pictures at it (a section's settings paragraph stays its first) */
   const withPics = (ids: readonly string[], xml: string, si: number, block = -1) => {
     let before = "", after = "", runs = "";
@@ -279,8 +336,8 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
     };
     seen.add(id);
     if (!o) {
-      if (it.kind === "table") throw new SurgeryUnavailable("new table");
-      emit(cur, withPics([id], br(cur, w.freshPara(it.p)), cur));
+      // a new table: 한글's hp:tbl in a paragraph of its own (its border fills added to the header)
+      emit(cur, withPics([id], br(cur, it.kind === "table" ? w.freshTable(it.t) : w.freshPara(it.p)), cur));
       continue;
     }
     cur = o.part;
@@ -299,6 +356,8 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
     }
     // a picture change in a paragraph that is rewritten (its text changed): not placed here
     if (picEdited.has(`${meta.parts[cur].part}|${o.b}`)) throw new SurgeryUnavailable("picture in a changed paragraph");
+    // (a shape or text box read from the file in an element that is rewritten: not placed here either, stage 1)
+    if (meta.shapes?.some((x) => x.part === meta.parts[cur].part && x.b === o.b)) throw new SurgeryUnavailable("shape in a changed paragraph");
     // a changed block: a paragraph on its own, or a paragraph holding tables whose own text is unchanged
     const items = bl.ids.map((bid) => flow[pos.get(bid) ?? -1]);
     if (bl.ids.length === 1 && it.kind === "p" && !holdsObjects(s.xml, el)) {
@@ -315,11 +374,15 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
   // changed paper / margins: the hp:pagePr of those sections' hp:secPr (numbered across the section files)
   const bySrc = new Map<number, PageSetup>();
   const colsChanged = new Set<number>();
+  const borderChanged = new Set<number>();
   for (const [j, s] of diff.setups) {
     const src = origLayout.sections[j]?.src;
     if (src === undefined) throw new SurgeryUnavailable("section settings");
     bySrc.set(src, s);
     if (!sameColumns(origLayout.sections[j].setup.columns, s.columns)) colsChanged.add(src);
+    // 쪽 테두리 changed: a border fill of its line in header.xml and the section's page border fills referring to it
+    // (QA 11-25 real use: it was written as a whole file, asking first)
+    if (!sameBorder(s.border, origLayout.sections[j].setup.border)) borderChanged.add(src);
   }
   let secBase = 0;
   const enc = new TextEncoder();
@@ -337,6 +400,9 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
     if (si === sections.length - 1) s.out.push(...lost, ...[...picsAt.values()].flatMap((a) => [...a.before, ...a.after]));
     const first = s.els[0], end = s.els[s.els.length - 1];
     let body = s.out.join("");
+    // every shape read from the file is still in it (its paragraph deleted, the shape still on the page: written anew)
+    if (!shapesKept(meta, meta.parts[si]?.part ?? "", s.xml, s.els, body, "hwpx")) throw new SurgeryUnavailable("shape's paragraph deleted");
+    if (outlineShape !== null) body = body.replace(/(<hp:secPr\b[^>]*?\soutlineShapeIDRef=")\d+"/g, `$1${outlineShape}"`);
     const origSecs = (s.xml.match(SECPR) ?? []).length;
     if ([...bySrc.keys()].some((k) => k >= secBase && k < secBase + origSecs)) {
       let l = 0;
@@ -347,7 +413,8 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
         const setup = bySrc.get(at);
         if (!setup) return all;
         if (!/<hp:pagePr\b[\s\S]*?<\/hp:pagePr>/.test(sec)) throw new SurgeryUnavailable("pagePr");
-        const out = sec.replace(/<hp:pagePr\b[\s\S]*?<\/hp:pagePr>/, hwpxPagePrXml(setup));
+        let out = sec.replace(/<hp:pagePr\b[\s\S]*?<\/hp:pagePr>/, hwpxPagePrXml(setup));
+        if (borderChanged.has(at)) out = w.withPageBorder(out, setup.border);
         if (!colsChanged.has(at)) return out + (cols ?? "");
         return out + `<hp:ctrl>${hwpxColPrXml(setup.columns)}</hp:ctrl>`;
       });
@@ -371,6 +438,7 @@ export function saveHwpxSurgical(pages: Page[], meta: OfficeSourceMeta, assets?:
     changed.set(meta.parts[si].part, enc.encode(head + body + tail));
   });
   if (noteEdits.some((e) => e.src)) throw new SurgeryUnavailable("note");
+  w.writeStyles();
   if (w.headerChanged) changed.set(HEADER, enc.encode(w.header));
   bin.commit(changed);
   const warnings = [...w.warnings(), ...(w.review?.warnings() ?? [])];
@@ -551,6 +619,8 @@ class HwpxWriter {
     const { head, ...rest } = this.maps.paraPr.get(pp) ?? { align: "LEFT" as const, lineSpacing: 1.6, indent: 0, spaceAfter: 4 };
     const role = this.roleOf(pp, st);
     const out: TextParagraph = { id: "", runs: [], ...rest, ...(role ? { role } : {}) };
+    // (model 10: the paragraph's named style but 바탕글)
+    if (this.sheet && st !== "0" && this.maps.styles.some((x) => x.id === st)) out.style = st;
     if (this.legacyModel) return legacyParaView(out);
     // list membership as the importer reads it (office.ts parseHwpxFlow)
     const kind = head?.type === "NUMBER" ? "n" : head?.type === "BULLET" ? "b" : null;
@@ -588,6 +658,23 @@ class HwpxWriter {
   private shapeXml(tag: string, id: string): string | null {
     const re = new RegExp(`<hh:${tag}\\b[^>]*\\sid="${id}"[^>]*?(?:/>|>[\\s\\S]*?</hh:${tag}>)`);
     return re.exec(this.header)?.[0] ?? null;
+  }
+
+  /**
+   * A section's hp:secPr with new page border fills (쪽 테두리): a border fill of the line appended to the header, the
+   * three hp:pageBorderFill referring to it; none (taken off) → the header's first border fill, as 한글 writes it.
+   */
+  withPageBorder(sec: string, b: PageBorder | undefined): string {
+    const fills = b && b.width > 0 ? hwpxPageBorderFills(this.append("borderFills", "borderFill", (id) => hwpxPageBorderFillXml(id, b)), b) : HWPX_NO_PAGE_BORDER;
+    const re = /<hp:pageBorderFill\b[^>]*?(?:\/>|>[\s\S]*?<\/hp:pageBorderFill>)/g;
+    const first = sec.search(re);
+    if (first < 0) {
+      const end = sec.lastIndexOf("</hp:secPr>");
+      if (end < 0) throw new SurgeryUnavailable("page border");
+      return sec.slice(0, end) + fills + sec.slice(end);
+    }
+    const rest = sec.slice(first).replace(re, "");
+    return sec.slice(0, first) + fills + rest;
   }
 
   /** append a shape to a header list (hh:charProperties / hh:paraProperties), updating its itemCnt; its new id */
@@ -658,8 +745,57 @@ class HwpxWriter {
     return { pp: id, st: this.styleFor(p, st) };
   }
 
+  /** the document's style sheet (model 10; core/docStyles.ts): named styles are written; null = a map before it */
+  sheet: DocStyle[] | null = null;
+  private styleIds = new Map<string, string>();
+  private inStyle = false;
+
+  /** hh:style id of the sheet's style `id`: the file's own, or — made or changed here — written into the header */
+  private styleId(id: string): string {
+    const done = this.styleIds.get(id);
+    if (done) return done;
+    const s = this.sheet?.find((x) => x.id === id);
+    const exists = this.maps.styles.some((x) => x.id === id && x.type === "PARA");
+    if (!s || !s.edited) return exists ? id : "0";
+    // its shapes: the style's look as paragraph and character shapes (copies of its own, or of 바탕글's)
+    const own = this.maps.styles.find((x) => x.id === id) ?? this.maps.styles.find((x) => x.id === "0");
+    const tpl = paragraphInStyle(this.sheet!, id);
+    this.inStyle = true;
+    let pp: string, cp: string;
+    try {
+      // (against its own style: a 개요 style's shape is a heading by that style, no outline shape needed)
+      pp = this.paraFor({ ...tpl, style: undefined, role: s.role }, own?.pp ?? "0", own?.id ?? "0").pp;
+      cp = this.charFor({ ...this.runOf(s.run), text: "" }, own ? [own.cp] : []);
+    } finally {
+      this.inStyle = false;
+    }
+    const next = s.next ? (this.maps.styles.some((x) => x.id === s.next) ? s.next : this.styleIds.get(s.next) ?? null) : null;
+    let out: string;
+    if (exists) {
+      out = id;
+      this.header = this.header.replace(new RegExp(`<hh:style\\b[^>]*\\sid="${id}"[^>]*?/?>`), (el) =>
+        el.replace(/\sparaPrIDRef="[^"]*"/, ` paraPrIDRef="${pp}"`).replace(/\scharPrIDRef="[^"]*"/, ` charPrIDRef="${cp}"`).replace(/\sname="[^"]*"/, ` name="${esc(s.name)}"`),
+      );
+      this.headerChanged = true;
+    } else {
+      out = this.append("styles", "style", (nid) => `<hh:style id="${nid}" type="PARA" name="${esc(s.name)}" engName="${esc(s.engName ?? "")}" paraPrIDRef="${pp}" charPrIDRef="${cp}" nextStyleIDRef="${next ?? nid}" langID="1042" lockForm="0"/>`);
+    }
+    this.styleIds.set(id, out);
+    return out;
+  }
+
+  /** every style made or changed here, also one no paragraph uses (the header written once more) */
+  writeStyles() {
+    for (const s of this.sheet ?? []) if (s.edited && s.type === "para") this.styleId(s.id);
+  }
+
   /** a heading by style that is no longer one (or the reverse) goes back to the normal style */
   private styleFor(p: TextParagraph, st: string): string {
+    // model 10: the paragraph's named style (a style made or changed here written into the header first)
+    if (this.sheet && !this.inStyle) {
+      const want = p.style ?? "0";
+      if (want !== st || this.sheet.some((x) => x.id === want && x.edited)) return this.styleId(want);
+    }
     const byStyle = this.maps.styleHeading.get(st);
     const level = p.role && /^h([1-6])$/.exec(p.role)?.[1];
     return byStyle && (!level || Number(level) !== byStyle) ? "0" : st;
@@ -687,7 +823,9 @@ class HwpxWriter {
       if (this.maps.styleHeading.get(st) !== Number(hLevel)) throw new SurgeryUnavailable("heading shape");
       return { type: "NONE", idRef: 0, level: 0 };
     }
-    if ((p.role ?? "") === (was.role ?? "")) return null;
+    // outline numbering put on a heading (개요 번호): an OUTLINE shape at its level (the section's outline numbering)
+    const outlined = !!hLevel && !!p.list && resolveDef(p.list.def, this.defs).outline;
+    if ((p.role ?? "") === (was.role ?? "") && !(outlined && !was.list)) return null;
     if (!p.role) return { type: "NONE", idRef: 0, level: 0 };
     const level = /^h([1-6])$/.exec(p.role)?.[1];
     const want = level ? "OUTLINE" : p.role === "li" ? "BULLET" : "NUMBER";
@@ -783,6 +921,11 @@ class HwpxWriter {
     return Number(id);
   }
 
+  /** An hh:numbering of a 개요 번호 모양 (the definition's levels, from 1) for the sections' outline shape; its id. */
+  outlineNumbering(def: ListDef): number {
+    return this.numberingFor(def, { list: "outline", starts: new Map(), seen: new Set() } as ListSegment);
+  }
+
   /** a header list the document does not have yet (hh:numberings / hh:bullets), before the first of `before` */
   private ensureList(list: string, before: string[]) {
     const self = new RegExp(`<hh:${list}\\b([^>]*?)\\s*/>`).exec(this.header);
@@ -799,6 +942,23 @@ class HwpxWriter {
 
   /** while a note's paragraphs are written: the control its own mark is (the original note's hp:autoNum) */
   noteMarkXml: string | null = null;
+  /** notes made here, with their number among the notes of their kind (document order) */
+  newNotes = new Map<NoteRef, number>();
+  private nextNoteId = 1980000000;
+  private isNewNote = (n: NoteRef | undefined) => !!n && n.src == null && this.newNotes.has(n);
+  /** 한글's footnote / endnote control of a note made here, its paragraphs written as new paragraphs */
+  private newNoteXml(note: NoteRef): string {
+    const n = this.newNotes.get(note) ?? 1;
+    const tag = note.kind === "end" ? "hp:endNote" : "hp:footNote";
+    const was = this.noteMarkXml;
+    this.noteMarkXml = `<hp:ctrl><hp:autoNum num="${n}" numType="${note.kind === "end" ? "ENDNOTE" : "FOOTNOTE"}"><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="" suffixChar=")" supscript="0"/></hp:autoNum></hp:ctrl>`;
+    try {
+      const ps = (note.paras.length ? note.paras : [newParagraph("")]).map((q) => this.freshPara(q)).join("");
+      return `<hp:ctrl><${tag} number="${n}" suffixChar="41" instId="${this.nextNoteId++}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps}</hp:subList></${tag}></hp:ctrl>`;
+    } finally {
+      this.noteMarkXml = was;
+    }
+  }
 
   /** rewritten paragraphs that had tracked changes (written accepted) / memos (not written: stage 2) */
   private trackedParas = new Set<string>();
@@ -813,7 +973,7 @@ class HwpxWriter {
    */
   private reviewRunsXml(p: TextParagraph, near: string[], R: HwpxReview): string {
     // (memos on no text at their place: QA hwpx-memo)
-    const pts = withPoints(markedBodyRuns(p).filter((r) => r.text && !r.note), R.points(p), (r) => !r.noteMark);
+    const pts = withPoints(markedBodyRuns(p).filter((r) => r.text && (!r.note || this.isNewNote(r.note))), R.points(p), (r) => !r.noteMark);
     const runs = pts.runs;
     const pointXml = (ids: string[] | undefined) => (ids ?? []).map((id) => R.beginXml(id) + R.endXml(id)).join("");
     const kindOf = (rev?: Revision): "insert" | "delete" | null => (!rev ? null : rev.kind === "ins" || rev.kind === "moveTo" ? "insert" : rev.kind === "del" || rev.kind === "moveFrom" ? "delete" : null);
@@ -830,8 +990,10 @@ class HwpxWriter {
       return m || pt ? `<hp:run charPrIDRef="${cp}">${pt}${m ? `<hp:t>${m}</hp:t>` : ""}</hp:run>` : `<hp:run charPrIDRef="${cp}"/>`;
     }
     const nb = R.neighbours.get(p) ?? { before: [], after: [] };
-    return runs
-      .map((r, k) => {
+    // (a link: 한글's hyperlink field around its runs, office.ts hwpxLinked)
+    return hwpxLinked(
+      runs,
+      (r, k) => {
         const cs = r.comments ?? [];
         const prev = k > 0 ? runs[k - 1].comments ?? [] : nb.before;
         const next = k < runs.length - 1 ? runs[k + 1].comments ?? [] : nb.after;
@@ -848,10 +1010,13 @@ class HwpxWriter {
           text = `<hp:${kind}Begin Id="${id}" TcId="${tc}"/>${text}<hp:${kind}End Id="${id}" TcId="${tc}" paraend="${pe ? 1 : 0}"/>`;
         }
         if (last && !markDone) text += markOnly();
-        const body = r.noteMark && this.noteMarkXml ? this.noteMarkXml : `<hp:t>${text}</hp:t>`;
+        // (덧말: 한글's hp:dutmal, office.ts hwpxDutmalXml; a caption number: 한글's automatic 그림 / 표 / 수식 number)
+        const seq = r.field === "seq" && !kind ? hwpxSeqNum(r) : null;
+        const body = r.note ? this.newNoteXml(r.note) : r.noteMark && this.noteMarkXml ? this.noteMarkXml : r.ruby && !kind ? hwpxDutmalXml(r) : seq ? seq + (text !== hwpxText(r.text) ? `<hp:t>${text.replace(hwpxText(r.text), "")}</hp:t>` : "") : `<hp:t>${text}</hp:t>`;
         return `<hp:run charPrIDRef="${this.charFor(r, near)}">${pointXml(pts.before.get(k))}${begins}${body}${ends}${last ? pointXml(pts.tail) : ""}</hp:run>`;
-      })
-      .join("");
+      },
+      (x) => `<hp:run charPrIDRef="${this.charFor(runs[0], near)}">${x}</hp:run>`,
+    );
   }
 
   private runsXml(p: TextParagraph, near: string[]): string {
@@ -860,9 +1025,10 @@ class HwpxWriter {
     // tracked changes come out accepted: deleted text left out, inserted text as text (core/review.ts)
     if (p.runs.some((r) => r.rev || r.fmtRev)) this.trackedParas.add(p.id);
     if (p.runs.some((r) => r.comments?.length)) this.memoParas.add(p.id);
-    const runs = markedBodyRuns(p).filter((r) => r.text && !r.note && !isRemoved(r));
+    const runs = markedBodyRuns(p).filter((r) => r.text && (!r.note || this.isNewNote(r.note)) && !isRemoved(r));
     if (!runs.length) return `<hp:run charPrIDRef="${this.charFor(p.runs[0] ?? { ...DEFAULT_RUN, fontSize: 10 * PT }, near)}"/>`;
-    return runs.map((r) => `<hp:run charPrIDRef="${this.charFor(r, near)}">${r.noteMark && this.noteMarkXml ? this.noteMarkXml : `<hp:t>${hwpxText(r.text)}</hp:t>`}</hp:run>`).join("");
+    // (a link: 한글's hyperlink field around its runs, office.ts hwpxLinked; a note made here: its control)
+    return hwpxLinked(runs, (r) => `<hp:run charPrIDRef="${this.charFor(r, near)}">${r.note ? this.newNoteXml(r.note) : r.noteMark && this.noteMarkXml ? this.noteMarkXml : r.ruby ? hwpxDutmalXml(r) : (r.field === "seq" && hwpxSeqNum(r)) || `<hp:t>${hwpxText(r.text)}</hp:t>`}</hp:run>`, (x) => `<hp:run charPrIDRef="${this.charFor(runs[0], near)}">${x}</hp:run>`);
   }
 
   /** A note's text written anew inside its control (instId `src`) in a section's paragraphs; null when not there. */
@@ -889,6 +1055,25 @@ class HwpxWriter {
       this.noteMarkXml = null;
       this.lastPP = was;
     }
+  }
+
+  // ── tables ──
+
+  private bfIds = new Map<string, string>();
+  private nextTblId = 1970000000;
+  /** id of a border fill with this border colour and cell fill (added to the header the first time) */
+  private borderFillOf(border: string, fill: string | null): string {
+    const k = `${border}|${fill ?? ""}`;
+    let id = this.bfIds.get(k);
+    if (!id) this.bfIds.set(k, (id = this.append("borderFills", "borderFill", (x) => borderFill(Number(x), border, fill))));
+    return id;
+  }
+
+  /** A new table (made here) in a paragraph of its own, as the full writer writes it (office.ts hwpxTblXml). */
+  freshTable(t: TableNode): string {
+    const tbl = hwpxTblXml(t, { id: this.nextTblId++, para: (p) => this.freshPara(p), bf: (b, f) => this.borderFillOf(b, f) });
+    const holder = this.freshPara({ id: "", runs: [], align: "LEFT", lineSpacing: 1, indent: 0, spaceAfter: 4 });
+    return injectHwpxRuns(holder, `<hp:run charPrIDRef="0">${tbl}<hp:t/></hp:run>`);
   }
 
   // ── paragraphs ──
@@ -951,6 +1136,8 @@ class HwpxWriter {
           return fs.every((x) => R.has(id(x)) && !onRuns.has(id(x)));
         });
       }
+      // (model 10: a 그림 / 표 / 수식 number is a SEQ field run of the model, written where it is — not kept here)
+      if (this.sheet) keep = keep.filter((k) => !(k.local === "ctrl" && childrenOf(s, k).length === 1 && childrenOf(s, k)[0].local === "autoNum" && /\snumType="(PICTURE|TABLE|EQUATION)"/.test(s.slice(childrenOf(s, k)[0].start, childrenOf(s, k)[0].openEnd))));
       if (settingsOnly) keep = keep.filter((k) => k.local === "secPr" || (k.local === "ctrl" && childrenOf(s, k).every((x) => PAGE_CTRLS.has(x.local))));
       if (!keep.length) continue;
       // a field (hyperlink, cross reference…) around text cannot be placed again in stage 1

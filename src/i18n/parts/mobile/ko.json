@@ -9,7 +9,7 @@
   "mobile.sign": "서명하기",
   "mobile.markup": "표시",
   "mobile.share": "공유",
-  "mobile.saveCopy": "새 파일로 저장",
+  "mobile.saveCopy": "새로 저장",
   "mobile.noUpload": "파일은 이 휴대폰에서만 처리됩니다",
   "mobile.home": "홈",
   "mobile.files": "파일",
@@ -42,7 +42,7 @@
   "mobile.theme.light": "밝게",
   "mobile.theme.dark": "어둡게",
   "mobile.licensesNote": "사용한 오픈 소스의 라이선스는 앱과 함께 배포되는 THIRD_PARTY_NOTICES에 있습니다.",
-  "mobile.markedSuffix": "_서명",
+  "mobile.markedSuffix": "_표시",
   "mobile.mk.move": "선택",
   "mobile.mk.pen": "펜",
   "mobile.mk.highlight": "형광펜",
@@ -96,5 +96,6 @@
   "mobile.signaturesCleared": "저장된 서명을 지웠습니다.",
   "mobile.toPdf": "PDF로",
   "mobile.untitledDoc": "문서",
-  "mobile.untitledImage": "사진"
+  "mobile.untitledImage": "사진",
+  "mobile.searchNoText": "‘{q}’을 찾지 못했습니다 — 이 문서의 글자는 그림으로만 들어 있습니다. 더보기 › 글자 인식(OCR)을 하면 찾을 수 있습니다."
 }

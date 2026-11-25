@@ -5,9 +5,10 @@
 // ("coming"), so the layout people know from Word / 한글 is complete without pretending.
 
 import type { ReactNode } from "react";
+import { useViewModes } from "../viewModes";
 import { findPage, useStore } from "../../core/store";
 import type { RibbonContext } from "./ribbonContext";
-import type { Align, PageColumns, TextNode } from "../../core/types";
+import type { Align, PageBorder, PageColumns, TextNode } from "../../core/types";
 import { DEFAULT_COL_GAP, PAPERS, PX_PER_MM, marginsOf, paperPx, type PageSetup } from "../../core/pageSetup";
 import { PX_PER } from "../../core/units";
 import { hfEditNode, parseHfId } from "../../core/headerFooter";
@@ -15,18 +16,20 @@ import { useRichStatus } from "../RichTextEditor";
 import { useCellSel } from "../CellEditor";
 import { flowActive, insertColumnBreak, insertContinuousBreak, useDocView } from "../docFlow";
 import { insertToc, toggleFormatMarks } from "../docExtrasUi";
+import { usePainter } from "../formatPainter";
 import { command, enabled } from "../commands";
 import { docLengthUnit, fontScale } from "../editModes";
 import { fitPageView, fitWidthView } from "../docView";
 import { viewportNow } from "../actions";
-import { applyPageSetup, columnsHere, setColumns } from "../pageSetupActions";
+import { applyPageSetup, columnsHere, pageBorderHere, setColumns, setPageBorder } from "../pageSetupActions";
 import { toggleGrid, toggleGuides, toggleRulers } from "../aids";
 import { ColorField, IconBtn, Menu, NumField, Select, Seg, cx, type MenuItem } from "./controls";
 import { Icon, type IconName } from "./Icons";
 import { zoomStep, zoomTo, type Live } from "./ops";
 import { ContextArea, FONTS, ToolStrip, textTargetNow } from "./Ribbon";
 import { useUI } from "./uiStore";
-import { useLang, useT } from "../../i18n";
+import { StyleGallery } from "./StyleDialogs";
+import { t as tr, useLang, useT } from "../../i18n";
 import { setSpellOn, spellAvailable, useSpell } from "../spell";
 import { SpellStatus } from "./SpellStatus";
 import { resolveDoc, resolveHere, setTrackingNow, startComment, useReview } from "../reviewActions";
@@ -44,9 +47,9 @@ export function Group({ label, children, className }: { label: string; children:
 }
 
 /** Large button: icon over a short label. */
-export function BigBtn({ icon, label, tip, kbd, onClick, disabled, on }: { icon: IconName; label: string; tip?: string; kbd?: string; onClick: () => void; disabled?: boolean; on?: boolean }) {
+export function BigBtn({ icon, label, tip, kbd, why, onClick, disabled, on }: { icon: IconName; label: string; tip?: string; kbd?: string; why?: string; onClick: () => void; disabled?: boolean; on?: boolean }) {
   return (
-    <button type="button" className={cx("rbig", on && "on")} data-tip={tip ?? label} data-kbd={kbd} aria-label={label} aria-pressed={on} disabled={disabled} onClick={onClick}>
+    <button type="button" className={cx("rbig", on && "on")} data-tip={tip ?? label} data-kbd={kbd} data-why={why} aria-label={label} aria-pressed={on} disabled={disabled} onClick={onClick}>
       <Icon name={icon} size={20} />
       <span>{label}</span>
     </button>
@@ -54,9 +57,9 @@ export function BigBtn({ icon, label, tip, kbd, onClick, disabled, on }: { icon:
 }
 
 /** Small button: icon and label in a row. */
-export function SmallBtn({ icon, label, tip, kbd, onClick, disabled, on }: { icon?: IconName; label: string; tip?: string; kbd?: string; onClick: () => void; disabled?: boolean; on?: boolean }) {
+export function SmallBtn({ icon, label, tip, kbd, why, onClick, disabled, on }: { icon?: IconName; label: string; tip?: string; kbd?: string; why?: string; onClick: () => void; disabled?: boolean; on?: boolean }) {
   return (
-    <button type="button" className={cx("rsmall", on && "on")} data-tip={tip ?? label} data-kbd={kbd} aria-pressed={on} disabled={disabled} onClick={onClick}>
+    <button type="button" className={cx("rsmall", on && "on")} data-tip={tip ?? label} data-kbd={kbd} data-why={why} aria-pressed={on} disabled={disabled} onClick={onClick}>
       {icon && <Icon name={icon} size={15} />}
       <span>{label}</span>
     </button>
@@ -72,6 +75,16 @@ export const can = (id: string) => {
   const c = command(id);
   return !!c && enabled(c);
 };
+/** Why command `id` is greyed out, when there is a reason a person can act on (tooltip of a greyed button). */
+export function whyOff(id: string): string | undefined {
+  // the command's own reason first (commands.ts whyNot)
+  const own = command(id)?.whyNot?.();
+  if (own) return own;
+  if (id === "edit.undo") return tr("tooltip.why.undo");
+  if (id === "edit.redo") return tr("tooltip.why.redo");
+  if (/^(edit\.(cut|copy|delete|duplicate)|object\.|format\.(font|paragraph|painter|bold|italic|underline))/.test(id)) return tr("tooltip.why.select");
+  return undefined;
+}
 /** Is the command's check on now (toggles: 서식 표시, 양식 채우기…)? */
 export const checkedNow = (id: string) => !!command(id)?.checked?.();
 
@@ -80,7 +93,7 @@ export function CmdBig({ id, icon, label, tip, kbd }: { id: string; icon: IconNa
   const t = useT();
   const c = command(id);
   const l = label ?? t(`cmd.${id}`);
-  return <BigBtn icon={icon} label={l} tip={tip ?? l} kbd={kbd ?? c?.kbd} disabled={!can(id)} on={c?.checked ? checkedNow(id) : undefined} onClick={() => run(id)} />;
+  return <BigBtn icon={icon} label={l} tip={tip ?? l} kbd={kbd ?? c?.kbd} why={whyOff(id)} disabled={!can(id)} on={c?.checked ? checkedNow(id) : undefined} onClick={() => run(id)} />;
 }
 
 /** A small button that runs command `id`. */
@@ -88,13 +101,12 @@ export function CmdSmall({ id, icon, label, tip }: { id: string; icon?: IconName
   const t = useT();
   const c = command(id);
   const l = label ?? t(`cmd.${id}`);
-  return <SmallBtn icon={icon ?? c?.icon} label={l} tip={tip ?? l} kbd={c?.kbd} disabled={!can(id)} on={c?.checked ? checkedNow(id) : undefined} onClick={() => run(id)} />;
+  return <SmallBtn icon={icon ?? c?.icon} label={l} tip={tip ?? l} kbd={c?.kbd} why={whyOff(id)} disabled={!can(id)} on={c?.checked ? checkedNow(id) : undefined} onClick={() => run(id)} />;
 }
 
 // ───────── Home ─────────
 
 const NOOP: Live<any> = { set: () => {} };
-const STYLE_LEVELS = [0, 1, 2, 3] as const;
 
 /**
  * 홈: clipboard · font · paragraph · styles · editing. `slide` (PowerPoint's 홈): the slide group (new / layout / reset
@@ -107,12 +119,12 @@ export function HomePanel({ slide }: { slide?: ReactNode } = {}) {
   useStore((s) => s.editingTextId);
   useStore((s) => s.doc);
   useRichStatus();
+  usePainter((s) => s.armed);
   const tg = textTargetNow();
   const on = !!tg;
   const f = tg?.fmt ?? {};
   const p = tg?.para ?? {};
   const fontOpts = (f.fontFamily && !FONTS.includes(f.fontFamily) ? [f.fontFamily, ...FONTS] : FONTS).map((x) => ({ value: x, label: x }));
-  const level = p.role === "" ? 0 : p.role === "h1" ? 1 : p.role === "h2" ? 2 : p.role === "h3" ? 3 : -1;
   const editing = !!useStore.getState().editingTextId;
   return (
     // pressing a ribbon button must not take the focus (and the text selection) from the text being edited
@@ -124,9 +136,20 @@ export function HomePanel({ slide }: { slide?: ReactNode } = {}) {
     >
       <Group label={t("docmode.group.clipboard")}>
         <BigBtn icon="copy" label={t("docmode.paste")} tip={t("cmd.edit.paste")} kbd="Ctrl+V" disabled={!can("edit.paste")} onClick={() => run("edit.paste")} />
+        {/* 붙여넣기 옵션 (Word's ▾ under 붙여넣기): keep the format, or the text only */}
+        <Menu
+          className="rsplit"
+          tip={t("docux.pasteOptions")}
+          button={<Icon name="chevron" size={12} />}
+          items={() => [
+            { label: t("docux.pasteKeep"), kbd: "Ctrl+V", disabled: !can("edit.paste"), onSelect: () => run("edit.paste") },
+            { label: t("cmd.edit.pasteText"), kbd: "Ctrl+Shift+V", disabled: !can("edit.pasteText"), onSelect: () => run("edit.pasteText") },
+          ]}
+        />
         <div className="rcol">
-          <SmallBtn label={t("cmd.edit.cut")} kbd="Ctrl+X" disabled={!can("edit.cut")} onClick={() => run("edit.cut")} />
-          <SmallBtn label={t("cmd.edit.copy")} kbd="Ctrl+C" disabled={!can("edit.copy")} onClick={() => run("edit.copy")} />
+          <SmallBtn label={t("cmd.edit.cut")} kbd="Ctrl+X" why={whyOff("edit.cut")} disabled={!can("edit.cut")} onClick={() => run("edit.cut")} />
+          <SmallBtn label={t("cmd.edit.copy")} kbd="Ctrl+C" why={whyOff("edit.copy")} disabled={!can("edit.copy")} onClick={() => run("edit.copy")} />
+          <SmallBtn icon="brush" label={t("cmd.format.painter")} tip={t("docux.painterTip")} kbd="Ctrl+Shift+C" why={whyOff("format.painter")} disabled={!can("format.painter")} on={checkedNow("format.painter")} onClick={() => run("format.painter")} />
         </div>
       </Group>
       {slide}
@@ -140,13 +163,13 @@ export function HomePanel({ slide }: { slide?: ReactNode } = {}) {
             <IconBtn icon="bold" tip={t("ribbon.text.bold")} kbd="Ctrl+B" pressed={f.bold === true} disabled={!on} onClick={() => tg?.toggle("bold")} />
             <IconBtn icon="italic" tip={t("ribbon.text.italic")} kbd="Ctrl+I" pressed={f.italic === true} disabled={!on} onClick={() => tg?.toggle("italic")} />
             <IconBtn icon="underline" tip={t("ribbon.text.underline")} kbd="Ctrl+U" pressed={f.underline === true} disabled={!on} onClick={() => tg?.toggle("underline")} />
-            <button type="button" className={cx("ibtn", "ibtn-md", "rt-glyph", f.strike === true && "on")} data-tip={t("ribbon.text.strike")} data-kbd="Ctrl+Shift+X" aria-pressed={f.strike === true} disabled={!on} onClick={() => tg?.toggle("strike")}>
+            <button type="button" className={cx("ibtn", "ibtn-md", "rt-glyph", f.strike === true && "on")} data-tip={t("ribbon.text.strike")} aria-label={t("ribbon.text.strike")} data-kbd="Ctrl+Shift+X" aria-pressed={f.strike === true} disabled={!on} onClick={() => tg?.toggle("strike")}>
               <s>{t("ribbon.text.strikeGlyph")}</s>
             </button>
-            <button type="button" className={cx("ibtn", "ibtn-md", "rt-glyph", f.script === "super" && "on")} data-tip={t("ribbon.text.super")} aria-pressed={f.script === "super"} disabled={!on} onClick={() => tg?.script("super")}>
+            <button type="button" className={cx("ibtn", "ibtn-md", "rt-glyph", f.script === "super" && "on")} data-tip={t("ribbon.text.super")} aria-label={t("ribbon.text.super")} aria-pressed={f.script === "super"} disabled={!on} onClick={() => tg?.script("super")}>
               x<sup>2</sup>
             </button>
-            <button type="button" className={cx("ibtn", "ibtn-md", "rt-glyph", f.script === "sub" && "on")} data-tip={t("ribbon.text.sub")} aria-pressed={f.script === "sub"} disabled={!on} onClick={() => tg?.script("sub")}>
+            <button type="button" className={cx("ibtn", "ibtn-md", "rt-glyph", f.script === "sub" && "on")} data-tip={t("ribbon.text.sub")} aria-label={t("ribbon.text.sub")} aria-pressed={f.script === "sub"} disabled={!on} onClick={() => tg?.script("sub")}>
               x<sub>2</sub>
             </button>
             <ColorField tip={t("ribbon.text.color")} value={f.color ?? null} live={tg ? tg.runLive("color", t("ribbon.text.color")) : NOOP} />
@@ -159,6 +182,8 @@ export function HomePanel({ slide }: { slide?: ReactNode } = {}) {
           <div className="rrow">
             <IconBtn icon="bullets" tip={t("ribbon.text.bulletList")} pressed={p.listDef === "bullet"} disabled={!on} onClick={() => tg?.listApply("bullet")} />
             <IconBtn icon="numbering" tip={t("ribbon.text.numberList")} pressed={p.listDef === "decimal"} disabled={!on} onClick={() => tg?.listApply("decimal")} />
+            {/* 글머리표·번호·개요 번호 모양 (Word 다단계 목록 / 한글 개요 번호): the list dialog (QA 11-25 real use: not in the document ribbon) */}
+            <IconBtn icon="outline" tip={t("paragraph.ribbon.listDialog")} disabled={!on} onClick={() => useUI.getState().set({ shellDialog: "listFormat" })} />
             <IconBtn icon="indentLess" tip={t("paragraph.ribbon.levelUp")} kbd="Shift+Tab" disabled={!on} onClick={() => tg?.listLevel(-1)} />
             <IconBtn icon="indentMore" tip={t("paragraph.ribbon.levelDown")} kbd="Tab" disabled={!on} onClick={() => tg?.listLevel(1)} />
             <IconBtn icon="pilcrow" tip={t("paragraph.ribbon.paraDialog")} disabled={!on} onClick={() => useUI.getState().set({ shellDialog: "paragraph" })} />
@@ -191,14 +216,8 @@ export function HomePanel({ slide }: { slide?: ReactNode } = {}) {
         </Group>
       ) : (
         <Group label={t("docmode.group.styles")} className={cx("rg-styles", !on && "is-off")}>
-          <div className="style-gallery" role="listbox" aria-label={t("docmode.group.styles")}>
-            {STYLE_LEVELS.map((lv) => (
-              <button key={lv} type="button" role="option" aria-selected={level === lv} className={cx("style-card", `sc-${lv}`, level === lv && "on")} disabled={!on} onClick={() => tg?.heading(lv)}>
-                <span className="style-sample">{t("docmode.styleSample")}</span>
-                <span className="style-name">{lv ? t("ribbon.text.heading", { n: lv }) : t("ribbon.text.body")}</span>
-              </button>
-            ))}
-          </div>
+          {/* the document's named styles (core/docStyles.ts): apply, right-click 수정… · 업데이트, ▾ 새 스타일 · 스타일 창 */}
+          <StyleGallery on={on} label={t("docmode.group.styles")} />
         </Group>
       )}
       <Group label={t("docmode.group.editing")}>
@@ -247,9 +266,17 @@ function InsertPanel() {
           ]}
         />
       </Group>
+      {/* Word 삽입 › 링크: 책갈피 (Ctrl+Shift+F5), 상호 참조 */}
+      <Group label={t("docref.group.links")}>
+        <CmdBig id="insert.link" icon="link" label={t("cmd.insert.link")} />
+        <CmdBig id="insert.bookmark" icon="outline" label={t("docref.bm.button")} />
+        <CmdBig id="references.crossRef" icon="link" label={t("docref.ref.button")} />
+      </Group>
       <Group label={t("docmode.group.text")}>
         <BigBtn icon="textBox" label={t("docmode.textBox")} onClick={() => run("insert.text")} />
         <BigBtn icon="symbol" label={t("docmode.symbol")} onClick={() => run("insert.symbol")} />
+        <BigBtn icon="ruby" label={t("cmd.insert.ruby")} disabled={!can("insert.ruby")} onClick={() => run("insert.ruby")} />
+        <CmdBig id="insert.autotextList" icon="text" label={t("autotext.button")} />
       </Group>
       <Group label={t("docmode.group.headerFooter")}>
         <BigBtn icon="header" label={t("headerfooter.header")} disabled={!can("insert.header")} onClick={() => run("insert.header")} />
@@ -285,6 +312,17 @@ function ReferencesPanel() {
       </Group>
       <Group label={t("topui.group.toc")}>
         <BigBtn icon="outline" label={t("topui.toc")} tip={t("docmode.toc.tip")} onClick={() => void insertToc()} />
+        <div className="rcol">
+          <CmdSmall id="references.updateToc" icon="rotate" />
+        </div>
+      </Group>
+      {/* 캡션 (Word 참조 › 캡션): insert a caption, cross-reference, update the fields (F9) */}
+      <Group label={t("docref.group.captions")}>
+        <CmdBig id="references.caption" icon="image" label={t("docref.caption.button")} />
+        <div className="rcol">
+          <CmdSmall id="references.crossRef" icon="link" />
+          <CmdSmall id="references.updateFields" icon="rotate" />
+        </div>
       </Group>
       <span className="ctx-hint">{t("topui.references.hint")}</span>
     </div>
@@ -292,6 +330,16 @@ function ReferencesPanel() {
 }
 
 // ───────── Layout ─────────
+
+/** 쪽 테두리 presets (Word's 0.75 pt box 24 pt from the paper's edge; thick, double, dotted, dashed) and 없음. */
+function borderItems(t: (k: string) => string): MenuItem[] {
+  const cur = pageBorderHere();
+  const mk = (style: PageBorder["style"]): PageBorder => ({ style, width: 1, color: "#000000", space: 32, from: "page" });
+  return [
+    { label: t("docux.border.none"), checked: !cur, onSelect: () => void setPageBorder(null) },
+    ...(["single", "thick", "double", "dashed", "dotted"] as const).map((st) => ({ label: t(`docux.border.${st}`), checked: cur?.style === st, onSelect: () => void setPageBorder(mk(st)) })),
+  ];
+}
 
 /** Margin presets (mm): Word's Normal / Narrow / Wide and 한글's default. */
 const MARGIN_PRESETS: { id: string; m: [number, number, number, number]; hf?: [number, number] }[] = [
@@ -375,6 +423,8 @@ function LayoutPanel() {
         ]} />
         <Menu className="rbig" tip={t("docmode.sizeTip")} button={<><Icon name="paper" size={20} /><span>{t("docmode.size")}</span></>} items={[...paperItems, { sep: true }, { label: t("docmode.margins.custom"), onSelect: () => useUI.getState().set({ shellDialog: "pageSetup" }) }]} />
         <Menu className="rbig" tip={t("docmode.cols.tip")} button={<><Icon name="columns" size={20} /><span>{t("docmode.columns")}</span></>} items={colItems} />
+        {/* 쪽 테두리 (Word 페이지 테두리, 한글 쪽 테두리): a box around the pages of this section */}
+        <Menu className="rbig" tip={t("docux.border.tip")} button={<><Icon name="margins" size={20} /><span>{t("docux.border.title")}</span></>} items={() => borderItems(t)} />
         <Menu className="rbig" tip={t("docmode.breaksTip")} button={<><Icon name="pageBreak" size={20} /><span>{t("docmode.breaks")}</span></>} items={() => [
           { label: t("docmode.pageBreak"), kbd: "Ctrl+Enter", disabled: !can("insert.pageBreak"), onSelect: () => run("insert.pageBreak") },
           { label: t("docmode.sectionBreakNext"), kbd: "Alt+Shift+Enter", disabled: !can("insert.sectionBreak"), onSelect: () => run("insert.sectionBreak") },
@@ -413,6 +463,10 @@ function ReviewPanel() {
       <Group label={t("spell.group")}>
         <BigBtn icon="check" label={t("spell.toggle")} tip={can ? t("spell.toggleTip") : t("spell.web")} on={can && on} disabled={!can} onClick={() => setSpellOn(!on)} />
       </Group>
+      <Group label={t("doccompare.group")}>
+        <CmdBig id="text.wordCount" icon="text" label={t("doccompare.wordCount")} kbd="Ctrl+Shift+G" />
+        <CmdBig id="review.compare" icon="doc" label={t("doccompare.button")} />
+      </Group>
       <Group label={t("review.comments")}>
         <BigBtn icon="comment" label={t("review.newComment")} tip={t("review.newCommentTip")} kbd="Ctrl+Alt+M" onClick={() => void startComment()} />
         <SmallBtn icon="panelRight" label={t("review.tab")} onClick={openPane} />
@@ -443,12 +497,26 @@ export function docZoom(kind: "page" | "width" | "100") {
   S().set({ view: kind === "width" ? fitWidthView(page, vp.w) : fitPageView(page, vp.w, vp.h) });
 }
 
+/** 보기 방식: Word's 읽기 모드 and full screen (F11), on every 보기 tab */
+export function ViewModesGroup() {
+  const t = useT();
+  useViewModes((s) => s.reading);
+  useViewModes((s) => s.fullscreen);
+  return (
+    <Group label={t("view.group.modes")}>
+      <CmdBig id="view.readMode" icon="doc" tip={t("view.readModeTip")} />
+      <CmdBig id="view.fullScreen" icon="fit" kbd="F11" />
+    </Group>
+  );
+}
+
 function ViewPanel() {
   const t = useT();
   const ui = useUI();
   const marks = useDocView((st) => !!st.marks);
   return (
     <div className="rpanel">
+      <ViewModesGroup />
       <Group label={t("docmode.group.zoom")}>
         <BigBtn icon="zoomPage" label={t("docmode.onePage")} onClick={() => docZoom("page")} />
         <BigBtn icon="zoomWidth" label={t("docmode.pageWidth")} onClick={() => docZoom("width")} />

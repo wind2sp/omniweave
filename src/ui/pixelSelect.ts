@@ -334,7 +334,10 @@ export function activeLayer(page: Page): SceneNode | null {
     if (sel.includes(n.id) && !lockedInTree(n, idx)) return n;
   }
   const pick = pickableOn(page);
-  return [...page.nodes].reverse().find((n) => n.type === "RASTER" && pick(n)) ?? null;
+  // nothing selected: the top pixel layer, as Photoshop always has an active layer — an opened PNG / JPG (a picture
+  // node) counts, so Delete on a selection clears its pixels (it cleared nothing: realuse img-color-range 2026-11-25)
+  const top = [...page.nodes].reverse();
+  return top.find((n) => n.type === "RASTER" && pick(n)) ?? top.find((n) => n.type === "IMAGE" && pick(n) && !lockedInTree(n, idx)) ?? null;
 }
 
 const PIXEL_TYPES = new Set<SceneNode["type"]>(["RASTER", "IMAGE", "PDF", "VECTOR", "TEXT"]);
@@ -428,6 +431,11 @@ export function paintTarget(page: Page, erase: boolean, imageMode: boolean, rast
   const selected = page.nodes.filter((n) => s.selection.includes(n.id) && pixels(n));
   const open = selected.find((n) => !lockedInTree(n, idx) && shownInTree(n, idx));
   if (open) {
+    // image pixels locked (Photoshop): no painting on the layer
+    if (open.lockPixels) {
+      s.notify(t("psfeat.lock.pixels"));
+      return null;
+    }
     if (open.type === "RASTER") return open;
     if (erase || imageMode) return rasterize(page, open);
   } else if (selected.length) {
@@ -550,6 +558,31 @@ export function applyGradient(a: [number, number], b: [number, number]) {
     g.fillStyle = gr;
     g.fillRect(-page.width, -page.height, page.width * 3, page.height * 3);
   }, { opacity: S().brush.opacity });
+}
+
+/**
+ * Paint bucket (G, Shift+G): the area of colour around the click (the wand's tolerance and 연속, on the active layer
+ * unless 모든 레이어 샘플링), inside the selection if there is one, filled with the foreground colour at the brush's
+ * opacity — one history step; the selection itself stays as it was.
+ */
+export function bucketFill(p: [number, number]) {
+  const page = currentPage();
+  if (!page) return;
+  const st = usePixelSel.getState();
+  const px = samplePixels(page, st.sampleAll || !activeLayer(page));
+  if (!px) return;
+  const region = wandMask(px.data, px.w, px.h, p[0], p[1], st.wandTolerance, st.wandContiguous);
+  const sel = activeMask();
+  const m = sel && sel.w === region.w && sel.h === region.h ? combine(sel, region, "intersect") : region;
+  const bounds = maskBounds(m);
+  if (!bounds) return;
+  const keep = { mask: st.mask, pageId: st.pageId, bounds: st.bounds, outline: st.outline };
+  usePixelSel.setState({ mask: m, pageId: page.id, bounds });
+  try {
+    paintThroughSelection(t("imgmode.hist.bucket"), fillAll(S().brush.color), { opacity: S().brush.opacity });
+  } finally {
+    usePixelSel.setState(keep);
+  }
 }
 
 /**

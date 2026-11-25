@@ -67,9 +67,9 @@ describe("ColorPicker", () => {
 describe("fill / stroke sections", () => {
   it("render a solid fill and stroke with width and unit, and a capability badge for the page's format", () => {
     useLang.getState().set("en", false);
-    const f = renderToStaticMarkup(createElement(FillSection, { fills: fillsFromLegacy("#123456"), onChange: () => {}, format: "docx", node: "VECTOR" }));
+    const f = renderToStaticMarkup(createElement(FillSection, { fills: fillsFromLegacy("#123456"), onChange: () => {}, format: "xlsx", node: "VECTOR" }));
     expect(f).toContain("Fill");
-    expect(f).toContain("Saving as DOCX: Not saved");
+    expect(f).toContain("Saving as XLSX: Not saved");
     const s = renderToStaticMarkup(createElement(StrokeSection, { strokes: strokesFromLegacy("#000000", 3), onChange: () => {}, format: "pptx" }));
     expect(s).toContain("Stroke width");
     expect(s).toContain('value="3"');

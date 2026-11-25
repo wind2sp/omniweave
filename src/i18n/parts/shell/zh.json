@@ -165,5 +165,6 @@
   "shell.hist.bullets": "项目符号",
   "shell.hist.numbering": "编号",
   "shell.hist.heading": "标题 {level}",
-  "shell.hist.body": "正文"
+  "shell.hist.body": "正文",
+  "shell.saveAsType": "保存 ({ext})"
 }

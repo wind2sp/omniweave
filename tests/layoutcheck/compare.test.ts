@@ -23,6 +23,9 @@ describe("simulateParagraph reproduces layoutText", () => {
     ["long token", para("가나다라마바사아자차카타파하가나다라마바사아자차카타파하 끝"), 120],
     ["indent + left", para("들여쓰기와 왼쪽 여백이 있는 문단을 여러 줄로 나눕니다 계속 씁니다", { indent: 20, indentLeft: 10 }), 180],
     ["hanging", para("내어쓰기 문단은 첫 줄이 왼쪽으로 나옵니다 계속 이어지는 문장", { indent: -15, indentLeft: 30 }), 180],
+    // 덧말 (TextRun.ruby): Word's (room around a wide one, the line raised) and 한글's (lineTop: the line taller)
+    ["ruby, Word", { ...para(""), runs: [{ ...DEFAULT_RUN, fontSize: 13.3, text: "덧말 시험 문장의 " }, { ...DEFAULT_RUN, fontSize: 13.3, text: "漢字", ruby: { text: "Omniweave Omniweave" } }, { ...DEFAULT_RUN, fontSize: 13.3, text: " 다음 줄로 넘어가는 긴 글" }] }, 160],
+    ["ruby, 한글", { ...para("", { lineTop: true, lineSpacing: 1.6 }), runs: [{ ...DEFAULT_RUN, fontSize: 13.3, text: "덧말 시험 문장의 " }, { ...DEFAULT_RUN, fontSize: 13.3, text: "본말", ruby: { text: "아래 덧말", below: true } }, { ...DEFAULT_RUN, fontSize: 13.3, text: " 다음 " }, { ...DEFAULT_RUN, fontSize: 13.3, text: "漢字", ruby: { text: "한자" } }, { ...DEFAULT_RUN, fontSize: 13.3, text: " 줄로 넘어가는 긴 글" }] }, 160],
     ["letter spacing + runs", { ...para(""), runs: [{ ...DEFAULT_RUN, fontSize: 14, text: "자간이 있는 ", letterSpacing: 1.5 }, { ...DEFAULT_RUN, fontSize: 18, bold: true, text: "굵은 글자와 큰 글자 섞기 " }, { ...DEFAULT_RUN, fontSize: 12, text: "작은 글자\n다음 줄" }] }, 160],
   ];
   it("on seeded random paragraphs (any layoutText change must be mirrored in simulate.ts)", () => {

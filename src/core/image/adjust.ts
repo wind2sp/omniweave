@@ -360,3 +360,44 @@ export function autoColor(img: Img, p: { clip?: number } = {}): Img {
   });
   return applyLuts(st, luts[0], luts[1], luts[2]);
 }
+
+// ───────── selective colour (선택 색상) ─────────
+
+/** 0 reds · 1 yellows · 2 greens · 3 cyans · 4 blues · 5 magentas · 6 whites · 7 neutrals · 8 blacks (Photoshop's list) */
+export type SelectiveColorRange = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+/** How much of a pixel belongs to `range` (0…1), Photoshop's split of a colour into its max / mid / min channel. */
+export function selectiveAmount(range: number, r: number, g: number, b: number): number {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), md = r + g + b - mx - mn;
+  switch (range) {
+    case 0: return r === mx && r > md ? (mx - md) / 255 : 0; // reds: red is the largest
+    case 1: return b === mn && b < md ? (md - mn) / 255 : 0; // yellows: blue is the smallest
+    case 2: return g === mx && g > md ? (mx - md) / 255 : 0;
+    case 3: return r === mn && r < md ? (md - mn) / 255 : 0;
+    case 4: return b === mx && b > md ? (mx - md) / 255 : 0;
+    case 5: return g === mn && g < md ? (md - mn) / 255 : 0;
+    case 6: return mn > 127.5 ? (mn - 127.5) / 127.5 : 0; // whites: every channel over half
+    case 7: return mx === 0 || mn === 255 ? 0 : 1 - (Math.abs(mx - 127.5) + Math.abs(mn - 127.5)) / 255;
+    case 8: return mx < 127.5 ? (127.5 - mx) / 127.5 : 0; // blacks: every channel under half
+    default: return 0;
+  }
+}
+
+/**
+ * 선택 색상 (Photoshop Selective Color): cyan / magenta / yellow / black (−100…100 %) added to or taken from the pixels
+ * of one colour range, as ink on the red / green / blue channels (cyan ink = less red). 상대: the change is a share of
+ * the ink already there; 절대: of the whole range.
+ */
+export function selectiveColor(img: Img, p: { range: number; c: number; m: number; y: number; k: number; absolute?: number }): Img {
+  const adj = [p.c / 100, p.m / 100, p.y / 100], k = p.k / 100, abs = !!p.absolute;
+  return mapRgb(img, (r, g, b, o) => {
+    const a = selectiveAmount(p.range, r, g, b);
+    const v = [r, g, b];
+    for (let i = 0; i < 3; i++) {
+      if (!a) { o[i] = v[i]; continue; }
+      const ink = 1 - v[i] / 255;
+      const d = abs ? adj[i] + k : adj[i] * ink + k * ink;
+      o[i] = clamp255(v[i] - a * d * 255);
+    }
+  });
+}

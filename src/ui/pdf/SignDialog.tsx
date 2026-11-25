@@ -64,6 +64,20 @@ export function SignDialog({ onDone, onCancel }: { onDone: (s: { png: Uint8Array
   const [err, setErr] = useState<string | null>(null);
   const pad = useRef<HTMLCanvasElement>(null);
   const last = useRef<[number, number] | null>(null);
+  /** the strokes drawn (pad pixels) — on a phone they also go to the phone's signature list */
+  const strokes = useRef<number[][]>([]);
+  /** on a phone: the signatures the phone keeps (ui/mobile/markup.tsx), picked with one tap */
+  const [saved, setSaved] = useState<{ id: string; url: string; use: () => Promise<{ png: Uint8Array; w: number; h: number }> }[]>([]);
+  useEffect(() => {
+    if (!document.documentElement.classList.contains("phone-desk")) return;
+    let urls: string[] = [];
+    void import("../mobile/markup").then(async (m) => {
+      const list = await Promise.all(m.loadSignatures().map(async (sg) => ({ sg, img: await m.signatureImage(sg) })));
+      urls = list.map((x) => URL.createObjectURL(new Blob([x.img.png as BlobPart], { type: "image/png" })));
+      setSaved(list.map((x, i) => ({ id: x.sg.id, url: urls[i], use: async () => x.img })));
+    });
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, []);
 
   const clear = () => {
     const c = pad.current;
@@ -71,6 +85,7 @@ export function SignDialog({ onDone, onCancel }: { onDone: (s: { png: Uint8Array
     const g = c.getContext("2d")!;
     g.fillStyle = "#ffffff";
     g.fillRect(0, 0, c.width, c.height);
+    strokes.current = [];
     setEmpty(true);
     setErr(null);
   };
@@ -101,6 +116,7 @@ export function SignDialog({ onDone, onCancel }: { onDone: (s: { png: Uint8Array
     g.lineTo(...p);
     g.stroke();
     last.current = p;
+    strokes.current[strokes.current.length - 1]?.push(Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10);
   };
 
   const pick = async (f: File | undefined) => {
@@ -128,6 +144,11 @@ export function SignDialog({ onDone, onCancel }: { onDone: (s: { png: Uint8Array
     if (!ink) return setErr(t("pdf.sign.empty"));
     const s = { png: await pngOf(ink), w: ink.width, h: ink.height };
     lastSignature = s;
+    // a phone: the signature drawn here joins the phone's list too (the phone screen's 서명하기 shows it)
+    if (mode === "draw" && document.documentElement.classList.contains("phone-desk") && strokes.current.length) {
+      const m = await import("../mobile/markup");
+      m.rememberSignature(strokes.current, 3.2);
+    }
     onDone(s);
   };
 
@@ -135,6 +156,16 @@ export function SignDialog({ onDone, onCancel }: { onDone: (s: { png: Uint8Array
     <div className="pdf-sign-backdrop" onPointerDown={(e) => e.stopPropagation()}>
       <div className="pdf-sign-dialog" role="dialog" aria-modal="true" aria-label={t("pdf.sign.title")}>
         <h3>{t("pdf.sign.title")}</h3>
+        {saved.length > 0 && (
+          // the phone app's saved signatures (one list on the phone: the phone screen's 서명하기 and this)
+          <div className="pdf-sign-saved">
+            {saved.map((s) => (
+              <button key={s.id} type="button" className="btn" aria-label={t("pdf.sign.title")} onClick={() => void s.use().then(onDone)}>
+                <img src={s.url} alt="" />
+              </button>
+            ))}
+          </div>
+        )}
         <div className="seg" role="tablist">
           <button type="button" role="tab" className={"seg-btn" + (mode === "draw" ? " on" : "")} aria-selected={mode === "draw"} onClick={() => setMode("draw")}>
             {t("pdf.sign.draw")}
@@ -152,6 +183,7 @@ export function SignDialog({ onDone, onCancel }: { onDone: (s: { png: Uint8Array
             if (mode !== "draw" || e.button !== 0) return;
             capture(e.target as Element, e.pointerId);
             last.current = null;
+            strokes.current.push([]);
             stroke(at(e));
             setEmpty(false);
           }}

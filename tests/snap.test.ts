@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildSnapIndex, equalSpacing, nearRect, smartGuideSegments, snapAngle, snapAxis, snapPoint, snapRect } from "../src/core/snap";
 import type { Rect } from "../src/core/geom";
+import { cpuNow, cpuBudget } from "./budget";
 
 const R = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
 const page = { width: 1000, height: 800 };
@@ -139,16 +140,16 @@ describe("performance on large pages", () => {
     let seed = 7;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
     for (let i = 0; i < 10_000; i++) objs.push(R(rnd() * 20000, rnd() * 20000, 10 + rnd() * 200, 10 + rnd() * 200));
-    const t0 = performance.now();
+    const t0 = cpuNow();
     const ix = buildSnapIndex({ page: { width: 20000, height: 20000 }, objects: objs, grid: { size: 100, sub: 4 } });
-    const tBuild = performance.now() - t0;
-    const t1 = performance.now();
+    const tBuild = cpuNow() - t0;
+    const t1 = cpuNow();
     for (let i = 0; i < 1000; i++) snapRect(ix, R(rnd() * 20000, rnd() * 20000, 120, 80), 3, { equal: true });
-    const tMoves = performance.now() - t1;
+    const tMoves = cpuNow() - t1;
     console.log(`snap perf: build ${tBuild.toFixed(1)} ms, ${(tMoves / 1000).toFixed(3)} ms per move`);
     // generous bounds (the full suite runs files in parallel); measured alone: build ~50 ms, ~0.1 ms per move
-    expect(tBuild).toBeLessThan(3000);
-    expect(tMoves / 1000).toBeLessThan(10);
+    expect(tBuild).toBeLessThan(cpuBudget(3000));
+    expect(tMoves / 1000).toBeLessThan(cpuBudget(10));
     // viewport culling keeps only nearby candidates
     expect(nearRect(objs, R(0, 0, 2000, 1000), 100).length).toBeLessThan(objs.length / 20);
   });

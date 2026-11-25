@@ -88,6 +88,13 @@ const FTAB: Record<number, [string, number]> = {};
     FTAB[Number(i)] = [n, Number(a)];
   });
 
+/** A function's Ftab index and fixed argument count (-1: variable), for the XLS writer (io/formats/xlsFresh.ts). */
+export function ftabOf(name: string): [number, number] | undefined {
+  const up = name.toUpperCase();
+  for (const [i, [n, a]] of Object.entries(FTAB)) if (n === up) return [Number(i), a];
+  return undefined;
+}
+
 // ───────────────────────── records ─────────────────────────
 
 interface Rec {
@@ -129,7 +136,7 @@ function readSst(wb: Uint8Array, recs: readonly Rec[], i: number): { strings: st
   o += 4;
   const unique = u32(wb, o);
   o += 4;
-  for (let k = 0; k < unique && p < parts.length; k++) {
+  for (let k = 0; k < unique && p < parts.length; k++) { work++;
     need(3);
     const cch = u16(wb, o);
     let flags = wb[o + 2];
@@ -146,7 +153,7 @@ function readSst(wb: Uint8Array, recs: readonly Rec[], i: number): { strings: st
       o += 4;
     }
     let s = "";
-    for (let left = cch; left > 0; ) {
+    for (let left = cch; left > 0; ) { work++;
       if (o >= end) {
         if (!next()) break;
         flags = wb[o++];
@@ -286,7 +293,7 @@ function decodeTokens(b: Uint8Array, o: number, cce: number, end: number, r: num
     const n = ctx.names[i - 1];
     return n ? (n.builtin ? "_xlnm." + n.name : n.name) : null;
   };
-  while (p < stop) {
+  while (p < stop) { work++;
     const ptg = b[p++];
     const base = ptg >= 0x20 ? 0x20 | (ptg & 0x1f) : ptg;
     switch (base) {
@@ -478,7 +485,16 @@ function decodeTokens(b: Uint8Array, o: number, cce: number, end: number, r: num
 // ───────────────────────── the workbook ─────────────────────────
 
 /** Read every worksheet of an .xls. `books`: each sheet's workbook id (the same ids give the same models again). */
+/**
+ * Loop steps the last readXls took (records, shared strings and their pieces, formula tokens): what the damaged-file
+ * tests bound — each step reads at least one byte of the file, so a reader that stays linear takes fewer steps than
+ * the file has bytes, however busy the machine is (wall-clock limits failed under a loaded test run).
+ */
+let work = 0;
+export const lastXlsWork = () => work;
+
 export function readXls(bytes: Uint8Array, lang: SheetLang = "en", books?: readonly (string | undefined)[], messages?: { encrypted: string; biff5: string; noWorkbook: string }): XlsReadResult {
+  work = 0;
   const cfb = readCfb(bytes);
   const wb = cfb.get("Workbook");
   if (!wb) throw new XlsUnreadable(cfb.get("Book") ? messages?.biff5 ?? "BIFF5" : messages?.noWorkbook ?? "no Workbook stream");
@@ -508,7 +524,7 @@ export function readXls(bytes: Uint8Array, lang: SheetLang = "en", books?: reado
   const xti: FormulaCtx["xti"] = [];
   const defNames: DefName[] = [];
   let i = 1;
-  for (; i < recs.length && recs[i].type !== EOF; i++) {
+  for (; i < recs.length && recs[i].type !== EOF; i++) { work++;
     const r = recs[i], o = r.off, d = wb.subarray(o, o + r.len);
     switch (r.type) {
       case 0x0031: {
@@ -794,7 +810,7 @@ export function readXls(bytes: Uint8Array, lang: SheetLang = "en", books?: reado
     const noteRecs: { r: number; c: number; id: number; author: string }[] = [];
     let lastObj = -1;
     let depth = 0;
-    for (let k = start + 1; k < recs.length; k++) {
+    for (let k = start + 1; k < recs.length; k++) { work++;
       const r = recs[k];
       if (r.type === BOF) {
         depth++;

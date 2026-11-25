@@ -2,6 +2,8 @@
   "start.search": "양식·크기 찾기",
   "start.hero.new": "새 문서",
   "start.hero.newSub": "빈 아트보드 · 1920 × 1080 px",
+  "start.hero.sheet": "빈 통합 문서",
+  "start.hero.sheetSub": "표 계산 · 셀 격자",
   "start.hero.open": "열기…",
   "start.hero.openSub": "omw · PDF · DOCX · HWPX · PPTX · 이미지",
   "start.hero.recent": "최근 파일",
@@ -87,5 +89,18 @@
   "start.sample.storyTitle": "Omni\n새 소식",
   "start.sample.storySub": "위로 밀어 자세히 보기",
   "start.sample.thumbTitle": "10분 만에\n끝내는 디자인",
-  "start.sample.thumbSub": "Omni 따라 하기 #1"
+  "start.sample.thumbSub": "Omni 따라 하기 #1",
+  "start.cat.sheet": "표 (엑셀·시트)",
+  "start.tpl.sheet-blank": "빈 통합 문서",
+  "start.recent.pin": "목록에 고정",
+  "start.recent.unpin": "고정 해제",
+  "start.sizeName.letter": "레터",
+  "start.sizeName.legal": "리걸",
+  "start.sizeName.card": "명함",
+  "start.sizeName.postcard": "엽서",
+  "start.sizeName.square": "정사각",
+  "start.sizeName.story": "세로 영상",
+  "start.recent.noAccess": "브라우저가 이 파일을 다시 읽도록 허락하지 않았습니다. 다시 눌러 허락하거나 열기(Ctrl+O)로 고르세요.",
+  "start.recent.emptyWebHandles": "Chrome·Edge에서 열기(Ctrl+O)나 끌어다 놓기로 연 파일이 여기에 나타납니다. 다시 열 때 브라우저가 한 번 허락을 물을 수 있습니다.",
+  "start.recent.webStored": "브라우저에 기억된 파일"
 }

@@ -113,6 +113,12 @@ export function svgEffectsFilter(id: string, effects: readonly Effect[] | undefi
         }
         break;
       }
+      case "blur": {
+        const o = id2();
+        p.push(`<feGaussianBlur in="${src}" stdDeviation="${n(toPx(e.radius))}" result="${o}"/>`);
+        src = o;
+        break;
+      }
       case "softEdge": {
         const R = toPx(e.radius);
         const o = id2(), b = id2(), s = id2();

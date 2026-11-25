@@ -1,0 +1,411 @@
+/* Slide 디자인 tab, slide insert dialogs, presenter view (ui/shell/SlideDesign.tsx, ui/Presenter.tsx). */
+
+.sd-gallery {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+  max-width: 560px;
+  overflow-x: auto;
+  padding: 2px;
+}
+.sd-theme,
+.sd-tstyle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line, #3a3f4b);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex: none;
+}
+.sd-theme:hover,
+.sd-tstyle:hover,
+.sd-kind:hover,
+.sd-row:hover {
+  border-color: var(--accent, #7c5cff);
+}
+.sd-theme.on,
+.sd-tstyle.on,
+.sd-kind.on,
+.sd-row.on {
+  border-color: var(--accent, #7c5cff);
+  box-shadow: 0 0 0 1px var(--accent, #7c5cff) inset;
+}
+.sd-theme-svg {
+  display: block;
+  border-radius: 3px;
+}
+.sd-name {
+  font-size: 11px;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sd-pop {
+  position: fixed;
+  z-index: 3000;
+  padding: 8px;
+  min-width: 220px;
+}
+.sd-pop-wide {
+  min-width: 280px;
+}
+.sd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.sd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sd-sw {
+  display: inline-flex;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+}
+.sd-sw i {
+  display: block;
+  width: 12px;
+  height: 16px;
+}
+.sd-aa {
+  font-size: 22px;
+  width: 40px;
+}
+.sd-h {
+  font-weight: 600;
+  margin: 2px 0 6px;
+}
+.sd-bg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+}
+.sd-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sd-swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+.sd-swatch {
+  height: 20px;
+  border: 1px solid rgba(127, 127, 127, 0.5);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.sd-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.sd-hf-body,
+.sd-chart-body,
+.sd-smart-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.sd-hf-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.sd-indent {
+  margin-left: 24px;
+}
+.sd-input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line, #3a3f4b);
+  border-radius: 5px;
+  background: var(--field, transparent);
+  color: inherit;
+}
+.sd-hf-prev {
+  flex: none;
+  margin-top: 28px;
+}
+.sd-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 160px;
+  flex: none;
+}
+.sd-kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sd-cat {
+  font-size: 11px;
+  opacity: 0.7;
+  min-width: 44px;
+}
+.sd-chart-side {
+  flex: 1;
+}
+.sd-chart-prev,
+.sd-smart-prev {
+  border: 1px solid var(--line, #3a3f4b);
+  border-radius: 4px;
+  background: #fff;
+}
+.sd-smart-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.sd-textpane {
+  width: 100%;
+  min-width: 220px;
+  height: 180px;
+  font: inherit;
+  padding: 6px;
+  border: 1px solid var(--line, #3a3f4b);
+  border-radius: 5px;
+  background: var(--field, transparent);
+  color: inherit;
+  resize: vertical;
+}
+.modal.modal-lg.sd-smart {
+  width: min(900px, 96vw);
+}
+.modal.sd-chart {
+  width: min(640px, 96vw);
+}
+.sd-tgrid-wrap {
+  padding: 2px;
+}
+.sd-tgrid {
+  display: grid;
+  grid-template-columns: repeat(10, 18px);
+  gap: 2px;
+}
+.sd-tcell {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line, #6b7280);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.sd-tcell.on {
+  background: var(--accent, #7c5cff);
+  border-color: var(--accent, #7c5cff);
+}
+.sd-tstyles {
+  max-width: 470px;
+}
+
+/* ───────── presenter view and show tools ───────── */
+
+.pv {
+  position: fixed;
+  inset: 0;
+  z-index: 1002;
+  background: #1b1d22;
+  color: #e8eaf0;
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+.pv-top {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.pv-timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 600;
+}
+.pv-clock {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+  opacity: 0.85;
+}
+.pv-cur {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pv-cur canvas,
+.pv-next canvas {
+  max-width: 100%;
+  max-height: 100%;
+  background: #000;
+}
+.pv-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.pv-next {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pv-notes {
+  flex: 1;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  font-size: var(--pv-notes, 20px);
+  padding: 8px 10px;
+  background: #23262d;
+  border-radius: 6px;
+}
+.pv-bar {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pv-bar button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #3a3f4b;
+  border-radius: 6px;
+  background: #2a2e36;
+  color: inherit;
+  cursor: pointer;
+}
+.pv-bar button.on {
+  border-color: #7c5cff;
+  background: #3a2f6b;
+}
+.pv-count {
+  margin: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+.show-ink {
+  position: fixed;
+  inset: 0;
+  z-index: 1003;
+}
+.show-goto {
+  position: fixed;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  z-index: 1004;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.show-tools {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 1004;
+  display: flex;
+  gap: 6px;
+  opacity: 0.15;
+  transition: opacity 0.2s;
+}
+.show-tools:hover {
+  opacity: 1;
+}
+.show-tools button {
+  width: 34px;
+  height: 34px;
+  border-radius: 17px;
+  border: none;
+  background: rgba(40, 40, 40, 0.85);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.show-tools button.on {
+  background: #7c5cff;
+}
+
+.anim-row .anim-ctl {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  justify-content: flex-end;
+}
+
+/* the 전환 / 애니메이션 galleries: fixed cells, names on two lines instead of cut (PowerPoint's gallery) */
+.sd-anim-gallery {
+  max-width: 640px;
+}
+.sd-anim-gallery .sd-theme {
+  width: 64px;
+  min-height: 58px;
+  flex: none;
+  justify-content: flex-start;
+}
+.sd-anim-gallery .sd-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: 62px;
+  line-height: 1.15;
+  font-size: 10.5px;
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* 애니메이션 › 타이밍 (AnimTiming.tsx): 시작 · 재생 시간 · 지연, one under the other as in PowerPoint */
+.anim-timing .anim-timing-start {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-ui);
+  color: var(--text-2);
+}
+.anim-timing .anim-timing-start > span:first-child {
+  min-width: 34px;
+}
+/* the animation pane's rows: the object's name on its own line, the row's settings under it (the dock is narrow) */
+.anim-row {
+  flex-wrap: wrap;
+}
+.anim-row .anim-ctl {
+  flex-basis: 100%;
+  padding-left: calc(28px * var(--ui-scale));
+}

@@ -8,8 +8,9 @@ import { setChartData } from "../chartEdit";
 import { Modal } from "./Dialogs";
 import { Seg } from "./controls";
 
-type Kind = "col" | "bar" | "line" | "pie";
-const KINDS: Kind[] = ["col", "bar", "line", "pie"];
+type Kind = SlideChart["kind"];
+const KINDS: Kind[] = ["col", "bar", "line", "pie", "area", "scatter", "doughnut", "combo"];
+type SerAs = "col" | "line" | "area";
 
 /** A number as typed ("1,234.5", "12%" → 0.12); null when it is not one. */
 export function parseChartNumber(s: string): number | null {
@@ -25,6 +26,8 @@ export function ChartDialog({ headId, data, onClose }: { headId: string; data: S
   const [kind, setKind] = useState<SlideChart["kind"]>(data.kind);
   const [cats, setCats] = useState<string[]>(() => [...data.categories]);
   const [names, setNames] = useState<string[]>(() => data.series.map((s) => s.name));
+  // a combo chart: each series as columns, a line or an area
+  const [as, setAs] = useState<SerAs[]>(() => data.series.map((s, k) => s.type ?? (data.kind !== "combo" && k === data.series.length - 1 && data.series.length > 1 ? "line" : "col")));
   const [vals, setVals] = useState<string[][]>(() => data.series.map((s) => data.categories.map((_, i) => String(s.values[i] ?? 0))));
   const bad = vals.some((col) => col.some((v) => parseChartNumber(v) === null));
 
@@ -40,16 +43,18 @@ export function ChartDialog({ headId, data, onClose }: { headId: string; data: S
   };
   const addSer = () => {
     setNames((n) => [...n, t("slideLayout.chart.newSeries", { n: n.length + 1 })]);
+    setAs((a) => [...a, "col"]);
     setVals((cur) => [...cur, cats.map(() => "0")]);
   };
   const dropSer = () => {
     if (names.length <= 1) return;
     setNames((n) => n.slice(0, -1));
+    setAs((a) => a.slice(0, -1));
     setVals((cur) => cur.slice(0, -1));
   };
   const ok = () => {
     if (bad) return;
-    const series = names.map((name, k) => ({ name, values: vals[k].map((v) => parseChartNumber(v) ?? 0), color: data.series[k]?.color ?? null }));
+    const series = names.map((name, k) => ({ name, values: vals[k].map((v) => parseChartNumber(v) ?? 0), color: data.series[k]?.color ?? null, ...(kind === "combo" && as[k] !== "col" ? { type: as[k] as "line" | "area" } : {}) }));
     const { frame: _f, ...rest } = data;
     setChartData(headId, { ...rest, kind, categories: cats, series });
     onClose();
@@ -72,6 +77,15 @@ export function ChartDialog({ headId, data, onClose }: { headId: string; data: S
               {names.map((n, k) => (
                 <th key={k} scope="col">
                   <input value={n} aria-label={t("slideLayout.chart.seriesName", { n: k + 1 })} onChange={(e) => setNames((cur) => cur.map((x, kk) => (kk === k ? e.target.value : x)))} />
+                  {kind === "combo" && (
+                    <select className="chart-as" aria-label={t("slideLayout.chart.seriesAs", { name: n })} value={as[k] ?? "col"} onChange={(e) => setAs((cur) => cur.map((x, kk) => (kk === k ? (e.target.value as SerAs) : x)))} onKeyDown={(e) => e.stopPropagation()}>
+                      {(["col", "line", "area"] as const).map((v) => (
+                        <option key={v} value={v}>
+                          {t(`slideLayout.chart.as.${v}`)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </th>
               ))}
             </tr>

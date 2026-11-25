@@ -52,7 +52,8 @@ export function hwp5Fingerprint(pages: readonly Page[]): { fp: string; shape: st
   // (QA 2026-11-15, stage 3) a floating picture is not moved by the flow (only body text, tables and pictures in the
   // line are flow nodes, core/flow.ts): where it is on its page is the user's — moving it is an edit
   const objects = ps
-    .flatMap((p) => p.nodes.filter((n) => !n.notes && n.type !== "TEXT" && n.type !== "TABLE"))
+    // (a text box — a TEXT node outside the body flow, io/officeShapes.ts — is such an object too: one drawn here is an edit)
+    .flatMap((p) => p.nodes.filter((n) => !n.notes && (n.type !== "TEXT" || !n.flow) && n.type !== "TABLE"))
     .map((n) => {
       const { x, y, ...tr } = n.transform as unknown as Record<string, unknown>;
       const place = (n as { place?: { mode?: string } }).place;

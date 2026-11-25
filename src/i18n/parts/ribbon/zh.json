@@ -252,6 +252,8 @@
   "ribbon.cropRatio.custom": "自定义",
   "ribbon.crop.customW": "比例宽度",
   "ribbon.crop.customH": "比例高度",
+  "ribbon.crop.level": "拉直",
+  "ribbon.crop.levelTip": "拉直 — 沿应为水平（或竖直）的线拖出一条线，图像会相应旋转摆正",
   "ribbon.crop.straighten": "角度",
   "ribbon.crop.straightenTip": "拉直 — 裁剪框角度（应用后内容旋转，使裁剪框水平）"
 }

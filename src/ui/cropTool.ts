@@ -32,10 +32,12 @@ interface CropState {
   pivot: Vec2;
   /** the box was drawn or changed in this session: until then a drag on the picture draws a new box (Photoshop) */
   drawn: boolean;
+  /** 똑바로 펴기 (Photoshop's Straighten button on the crop options): the next drag draws the line to make level */
+  straighten: boolean;
   set: (p: Partial<CropState>) => void;
 }
 
-export const useCrop = create<CropState>((set) => ({ id: null, rect: null, full: null, ratio: "free", custom: [3, 2], angle: 0, pivot: [0, 0], drawn: false, set: (p) => set(p) }));
+export const useCrop = create<CropState>((set) => ({ id: null, rect: null, full: null, ratio: "free", custom: [3, 2], angle: 0, pivot: [0, 0], drawn: false, straighten: false, set: (p) => set(p) }));
 const C = () => useCrop.getState();
 
 let original: Rect | undefined;
@@ -276,6 +278,23 @@ export function setCropAngle(angle: number) {
   const c: Vec2 = [cx * Math.cos(a0) - cy * Math.sin(a0) + f.x, cx * Math.sin(a0) + cy * Math.cos(a0) + f.y];
   // the box centre stays where it is on the page; the frame now turns about it
   C().set({ angle: a, pivot: c, rect: { x: c[0] - rect.w / 2, y: c[1] - rect.h / 2, w: rect.w, h: rect.h } });
+}
+
+/**
+ * 똑바로 펴기: the line drawn from `a` to `b` (page px) along what should be level — a horizon, or a wall's edge
+ * (steeper than 45°: made upright) — turns the box by its slant, so applying the crop turns the picture straight.
+ */
+export function straightenAngle(a: Vec2, b: Vec2): number | null {
+  if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 2) return null;
+  let d = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+  while (d > 45) d -= 90;
+  while (d <= -45) d += 90;
+  return d;
+}
+export function straightenBy(a: Vec2, b: Vec2) {
+  C().set({ straighten: false });
+  const d = straightenAngle(a, b);
+  if (d !== null) setCropAngle(C().angle + d);
 }
 
 /**

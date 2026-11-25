@@ -31,5 +31,6 @@
   "docflow.layout.topBottom": "위/아래",
   "docflow.layout.behind": "글 뒤로",
   "docflow.layout.front": "글 앞으로",
-  "docflow.hist.makeBody": "본문 만들기"
+  "docflow.hist.makeBody": "본문 만들기",
+  "docflow.hist.splitTable": "표 나누기"
 }

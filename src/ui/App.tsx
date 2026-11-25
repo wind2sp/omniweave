@@ -1,5 +1,6 @@
 // Application shell: top bar, adaptive ribbon, docks around the Loom canvas, status bar.
 import { SecurityDialogs } from "./shell/SecurityDialogs";
+import { ExportLossDialog } from "./shell/ExportLossDialog";
 import { ImageExportDialog } from "./shell/ImageExportDialog";
 import { useHistory } from "../core/history";
 
@@ -11,7 +12,7 @@ import { activeSessionId, claimTab, isPristineActive, newSession } from "../core
 import { anyDirty, confirmAllSaved } from "./tabs";
 import { TabDialogs } from "./shell/TabDialogs";
 import { isTauri } from "../io/platform";
-import { fitCurrent, isDocProtected, openAndRemember, openDemoIfRequested, openInTab, openStartupFile } from "./actions";
+import { fitCurrent, viewIsFitted, isDocProtected, openAndRemember, openDemoIfRequested, openInTab, openStartupFile } from "./actions";
 import { dropClaimed, droppedFiles } from "./fileDrop";
 import { CanvasView } from "./CanvasView";
 import { NotesPane, SlideSorter } from "./shell/SlideMode";
@@ -34,8 +35,11 @@ import { useGlobalShortcuts } from "./shell/shortcuts";
 import { StatusBar } from "./shell/StatusBar";
 import { ToolsDialog } from "./shell/ToolsDialog";
 import { ShellDialogs } from "./shell/ShellDialogs";
+import { DocStyleDialogs } from "./shell/StyleDialogs";
 import { PageOrganizer } from "./shell/PageOrganizer";
 import { TopBar } from "./shell/TopBar";
+import { ReadingBar } from "./shell/ReadingBar";
+import { installViewModeKeys, useViewModes } from "./viewModes";
 import { DOCK_MAX, DOCK_MIN, uiScaleFactor, useUI } from "./shell/uiStore";
 import { t, useT } from "../i18n";
 import { startEditModes, useCadScreenNow, useProfile } from "./editModes";
@@ -181,7 +185,8 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
   const [firstRun, setFirstRun] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  useGlobalShortcuts(!recovery && !ui.welcome);
+  // (on while the start screen is up too: there only Ctrl+O works — shortcuts.ts globalKey)
+  useGlobalShortcuts(!recovery);
 
   // theme
   useEffect(() => {
@@ -241,14 +246,20 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
       });
   };
 
-  // Shuttle autosave: 1.5s after the last change, only while there are unsaved edits
+  // Shuttle autosave, only while there are unsaved edits: 1.5s after the last change, or at most once every 1 / 5 / 10
+  // minutes (settings: 자동 저장 간격, as Word's / 한글's recovery interval), or not at all
+  const autoSave = useUI((s) => s.autoSave);
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || autoSave === "off") return;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const every = autoSave === "now" ? 0 : Number(autoSave) * 60_000;
     const unsub = useStore.subscribe((s, prev) => {
       if (s.doc === prev.doc || !s.dirty || s.gestureBase || useHistory.getState().previewId) return;
+      // an interval: the first change starts the clock, later ones wait for it (the copy then has all of them)
+      if (every && timer !== undefined) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
+        timer = undefined;
         const st = S();
         // nothing to recover in an untouched new document (edited and undone back to it, too)
         if (!st.dirty || isPristine(st.doc)) return void journalClear(activeSessionId()).catch(() => {});
@@ -258,13 +269,13 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
         journalSave(st.doc, activeSessionId())
           .then(() => useUI.getState().set({ journalAt: Date.now() }))
           .catch(() => {});
-      }, 1500);
+      }, every || 1500);
     });
     return () => {
       clearTimeout(timer);
       unsub();
     };
-  }, [ready]);
+  }, [ready, autoSave]);
 
   // warn before closing with unsaved changes in any tab (browser); the desktop window asks with its own dialog
   useEffect(() => {
@@ -298,15 +309,24 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
     };
   }, []);
 
-  // keep the page fitted when docks open/close
+  // keep the page fitted when docks open/close — only a fitted view: a view zoomed by hand stays where it is
+  // (CAD: Ctrl+1 opening the properties after a zoom window jumped back to the whole sheet)
   const prevDocks = useRef(`${ui.leftOpen}${ui.rightOpen}`);
   useEffect(() => {
     const key = `${ui.leftOpen}${ui.rightOpen}`;
     if (key !== prevDocks.current) {
       prevDocks.current = key;
-      requestAnimationFrame(() => fitCurrent());
+      requestAnimationFrame(() => viewIsFitted() && fitCurrent());
     }
   }, [ui.leftOpen, ui.rightOpen]);
+
+  // full screen / reading mode: Esc leaves them; the view refits to what is left on the screen
+  useEffect(() => installViewModeKeys(), []);
+  const reading = useViewModes((s) => s.reading);
+  const fullscreen = useViewModes((s) => s.fullscreen);
+  useEffect(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => fitCurrent()));
+  }, [reading, fullscreen]);
 
   // a file dropped anywhere opens as a document of its own (the page canvas places pictures itself; places with a
   // drop of their own claim it, ui/fileDrop.ts) — never navigating the window away, never doing nothing
@@ -331,12 +351,12 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
   }, []);
 
   return (
-    <div className={cx("app", phone && "phone-desk-app")} style={{ ["--left-w" as any]: `${Math.round(ui.leftW * uiK)}px`, ["--right-w" as any]: `${Math.round(ui.rightW * uiK)}px` }}>
-      <TopBar />
-      <Ribbon />
+    <div className={cx("app", phone && "phone-desk-app", reading && "reading-mode")} style={{ ["--left-w" as any]: `${Math.round(ui.leftW * uiK)}px`, ["--right-w" as any]: `${Math.round(ui.rightW * uiK)}px` }}>
+      {reading ? <ReadingBar /> : <TopBar />}
+      {!reading && <Ribbon />}
       <main className="workspace">
-        <ToolBox />
-        {ui.leftOpen ? (
+        {!reading && <ToolBox />}
+        {reading ? null : ui.leftOpen ? (
           <>
             <LeftDock />
             <Splitter side="left" />
@@ -364,7 +384,7 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
           )}
           {cadOn && <CadCommandLine />}
         </div>
-        {ui.rightOpen ? (
+        {reading ? null : ui.rightOpen ? (
           <>
             <Splitter side="right" />
             <RightDock />
@@ -429,9 +449,11 @@ export function App({ phone }: { phone?: PhoneDeskMode } = {}) {
       <PageOrganizer />
       <ToolsDialog />
       <SecurityDialogs />
+      <ExportLossDialog />
       <ImageExportDialog />
       <TabDialogs />
       <ShellDialogs />
+      <DocStyleDialogs />
       {presenting && <Presenter />}
     </div>
   );

@@ -1,0 +1,5 @@
+# files the Android build (tauri android build / gradle) writes back with LF line ends: kept LF in the working tree too,
+# so a build leaves `git status` clean on Windows checkouts (core.autocrlf=true)
+src-tauri/Cargo.toml text eol=lf
+src-tauri/gen/android/gradlew text eol=lf
+src-tauri/gen/android/app/src/main/AndroidManifest.xml text eol=lf

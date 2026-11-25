@@ -8,12 +8,13 @@
 /**
  * Switches for before / after comparison (dev builds expose them as `window.__omwCrisp`); all on in use.
  * exactTiles: weave tiles at the exact device zoom once the zoom settles (weave.ts tileScale).
+ * pdfScreen: PDF / AI pages rendered at the exact device scale and put down 1:1 (render/draw.ts drawPdfScreen).
  * lcdText: opaque weave tiles on opaque pages, so canvas glyphs get LCD (subpixel) anti-aliasing.
  * snapUi: overlay lines / handles / page frame on the device-pixel grid (CanvasView).
  * snapContent: table rules on whole device pixels in on-screen tiles only (pixelGrid; export unchanged).
  * backing: canvas backing store sized from devicePixelContentBoxSize (exact 1:1 with the screen).
  */
-export const crisp = { exactTiles: true, lcdText: true, snapUi: true, snapContent: true, backing: true };
+export const crisp = { exactTiles: true, lcdText: true, snapUi: true, snapContent: true, backing: true, pdfScreen: true };
 
 /** Device pixels for a hairline UI stroke: 1 at 100–149 %, 2 at 150–249 %, … */
 export function hairDev(dpr: number): number {

@@ -24,16 +24,20 @@ import { endCut, joinSplit, joinTable, nodeOrder, unpiece } from "../core/flow";
 import { HWPX_NUMFMT_IN, MAX_LEVELS, fromHwpxLevelText, hwpxLevelKept, isBulletLevel, levelIndent, levelOf, resolveDef, toHwpxLevelText, type ListFormat, type ListSeed } from "../core/lists";
 import type { ListDef, ListLevel } from "../core/style/types";
 import { TABLE_LINE, coverMap, spanOf } from "../core/table";
-import { graphemes, hwpLinesSig, layoutText, lineHeightOf, measure, runFont } from "../core/text";
+import { graphemes, hwpLinesSig, layoutText, lineHeightOf, measure, rubySize, runFont } from "../core/text";
 import { fontLineRatio, paraLineRatio, wordMultipleOf } from "../core/lineSpacing";
 import { toPx } from "../core/style/len";
 import type { Len } from "../core/style/types";
-import { DEFAULT_RUN, PAGE_PRESETS, type AssetRef, newPage, newParagraph, newText, uid, type Align, type FieldKind, type PageNumFormat, type PageNumPos, type SectionHF, type Page, type PageColumns, type PageMargins, type ParaLineHeight, type ParaList, type TableCell, type TableNode, type TextNode, type TextParagraph, type TextRun, type NoteKindPr, type NoteNumFormat, type NotePr, type NoteRef, type ParaBorderLine, type ParaBorders, type DocComment, type MemoShape } from "../core/types";
+import { eighthsOfPx, pxOfEighths } from "../core/pageBorder";
+import { DEFAULT_RUN, PAGE_PRESETS, type AssetRef, newPage, newParagraph, newText, uid, type Align, type FieldKind, type PageNumFormat, type PageNumPos, type SectionHF, type Page, type PageBorder, type Ruby, type PageColumns, type PageMargins, type ParaLineHeight, type ParaList, type TableCell, type TableNode, type TextNode, type TextParagraph, type TextRun, type NoteKindPr, type NoteNumFormat, type NotePr, type NoteRef, type ParaBorderLine, type ParaBorders, type DocComment, type MemoShape } from "../core/types";
 import { hwpxNotePr, noteMarkText } from "../core/notes";
 import { attr, child, children, descendants, esc, parseXml, textOf } from "./xml";
+import { HWPX_SHAPES, docxShapeXml, hwpxShapeXml, isTextBox, shapeOfHwpx, shapeOfWsp, shapesOf, topShapesHwpx, type DmlReaders, type ReadShape } from "./officeShapes";
 import { HWPX_MEDIA, NS_R, NS_WP, REL_IMAGE, docxDrawingXml, docxPicOf, docxPicPara, hwpxPicOf, hwpxPicXml, itemTops, picFormat, picMedia, picPixels, picTargets, topDrawings, topPics, type OfficePic, type PicMedia } from "./officeDrawing";
 import { getBlob as defaultGetBlob } from "../core/assets";
 import { docComments } from "../core/review";
+import { defaultStyleId, findStyle, lookOf, paragraphInStyle, styleIdOf, styleLook, styleSheet, type DocStyle, type StyleRun } from "../core/docStyles";
+import { HWPX_CAPTION_KIND, seqCode, seqLabel } from "../core/docRefs";
 import { HwpxReview, hwpxReviewRuns } from "./officesurgeon/hwpxReview";
 import { commentNeighbours, COMMENTS_CT, COMMENTS_EX_CT, COMMENTS_EX_REL, COMMENTS_REL, docxCommentMarks, docxCommentXml, docxComments, docxFmtRev, docxParaRevs, docxPPrReview, docxRevXml, docxRunOrder, docxWithRPrChange, docxRunRev, docxSettingsTracking, docxTracking, hwpxFieldEnd, hwpxMemo, hwpxMemoBegin, hwpxMemoShapes, MEMO_SHAPE_KEYS, hwpxTextParts, hwpxTrackChanges, hwpxTracking, MC_NS, newParaId, W14_NS, W15_NS, withInserts, type DocxCommentIds, type HwpxRevState } from "./officeReview";
 
@@ -257,6 +261,10 @@ interface DocxLevel {
 }
 
 export interface DocxCtx {
+  /** drawings read as shapes / text boxes of the paragraph being read (their text is the box's, not the paragraph's) */
+  skipIn?: Set<Element>;
+  /** external hyperlink relationships of the part (id → URL): runs in a w:hyperlink get TextRun.link */
+  links?: Map<string, string>;
   defSize: number;
   defFont: string | null;
   defLine: { line: number; rule: string } | null;
@@ -298,6 +306,10 @@ export interface DocxCtx {
    * in document order over the paragraphs). Absent = the importer before (deleted text left out, moves read twice).
    */
   review?: { open: Set<string> };
+  /** the default paragraph style's id (w:default="1"): a paragraph in it has no TextParagraph.style */
+  defaultStyle?: string;
+  /** read paragraphs without their named style (an Office Surgeon map before model 10) */
+  noParaStyle?: boolean;
 }
 
 /** Style chains of a DOCX (docxContext). Elements are in priority order, the document defaults last. */
@@ -490,6 +502,50 @@ function docxStyles(st: Document): DocxStyles {
 }
 
 /**
+ * The paragraph styles of styles.xml as the document's style sheet (core/docStyles.ts): each style's look read as a
+ * paragraph in it would be (docxParagraph through the style chain and the defaults), the default style first.
+ */
+export function docxStyleSheet(files: Record<string, Uint8Array>, ctx: DocxCtx): DocStyle[] {
+  const raw = files["word/styles.xml"];
+  if (!raw || !ctx.styles) return [];
+  const st = parseXml(strFromU8(raw));
+  const inner: DocxCtx = { ...ctx, review: undefined, notes: undefined, fields: undefined, noParaStyle: true };
+  const out: DocStyle[] = [];
+  for (const s of descendants(st, "style")) {
+    if (attr(s, "type") !== "paragraph") continue;
+    const id = attr(s, "styleId") ?? "";
+    if (!id) continue;
+    const val = (n: string) => {
+      const e = child(s, n);
+      return e ? attr(e, "val") ?? "" : null;
+    };
+    const p = parseXml(`<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:pStyle w:val="${esc(id)}"/></w:pPr><w:r><w:t>가</w:t></w:r></w:p>`).documentElement;
+    const read = docxParagraph(p, inner).para;
+    const look = lookOf(read);
+    const ds: DocStyle = { id, name: val("name") || id, type: "para", run: look.run, para: look.para };
+    const based = val("basedOn");
+    if (based) ds.basedOn = based;
+    const next = val("next");
+    if (next && next !== id) ds.next = next;
+    if (read.role) ds.role = read.role;
+    if (child(s, "qFormat")) ds.quick = true;
+    if (id === ctx.defaultStyle) out.unshift(ds);
+    else out.push(ds);
+  }
+  // Word's built-in headings 1–3 (latent styles): in the gallery even when the file defines none; Word adds the
+  // definition when one is first applied, and so does the Office Surgeon (addHeadingStyles). QA 11-25 real use: a Word
+  // file without them offered no 제목 1–3 and Ctrl+Alt+1 saved no heading style.
+  const base = out[0];
+  if (base)
+    for (const n of [1, 2, 3] as const) {
+      if (out.some((s) => s.role === `h${n}` || s.id === `Heading${n}`)) continue;
+      const k = [1.4, 1.2, 1.1][n - 1];
+      out.push({ id: `Heading${n}`, name: `heading ${n}`, type: "para", basedOn: base.id, next: base.id, role: `h${n}`, quick: true, run: { ...base.run, bold: true, fontSize: Math.round(base.run.fontSize * k * 100) / 100 }, para: { ...base.para } });
+    }
+  return out;
+}
+
+/**
  * Fonts of a run read through the style hierarchy, attribute by attribute (Word): the East Asian font and the Latin
  * one, each from the first w:rFonts that names it (a theme reference wins over the name beside it).
  */
@@ -521,9 +577,13 @@ export function docxContext(files: Record<string, Uint8Array>, legacy = false, o
   const ctx: DocxCtx = { ...(legacy ? { legacy } : {}), defSize: legacy ? 11 : 10, defFont: null, defLine: null, defAfter: null, headings: new Map(), numbering: new Map(), styleNum: new Map() };
   if (!oldStyles) ctx.styles = { chain: () => ({ pPr: [], rPr: [] }), char: () => [], table: () => [], has: () => false, charWrap: false, hangPunct: true, autoSpace: { alpha: true, digit: true } };
   if (!oldStyles) ctx.compat = docxCompatMode(files);
+  // hyperlinks (TextRun.link) — not for maps made before they were read (their runs stay as they were)
+  if (!oldStyles) ctx.links = docxLinkRels(files);
   if (files["word/styles.xml"]) {
     const st = parseXml(strFromU8(files["word/styles.xml"]));
     if (!oldStyles) ctx.styles = docxStyles(st);
+    const defSt = descendants(st, "style").find((s) => attr(s, "type") === "paragraph" && /^(1|true|on)$/.test(attr(s, "default") ?? ""));
+    if (defSt) ctx.defaultStyle = attr(defSt, "styleId") ?? undefined;
     const rd = descendants(st, "rPrDefault")[0];
     const lang = rd && descendants(rd, "lang")[0];
     const theme = legacy ? null : docxThemeFonts(files, (lang && attr(lang, "eastAsia")) || "ko-KR");
@@ -820,7 +880,25 @@ export function docxParagraph(
     for (let i = tagFrom; i < runs.length; i++) Object.assign(runs[i], tag);
     tagFrom = runs.length;
   };
+  // bookmarks (model 10, core/docRefs.ts): the names begun and ended in this paragraph, on the runs they cover
+  const bmAt = S && !ctx.noParaStyle ? docxBookmarksIn(p) : null;
+  let bmFrom = 0;
+  let bmNow: string[] = [];
+  const tagBookmarks = () => {
+    if (bmNow.length) for (let i = bmFrom; i < runs.length; i++) if (runs[i].text) runs[i].bookmarks = [...bmNow];
+    bmFrom = runs.length;
+  };
+  const skipIn = ctx.skipIn;
+  const skipped = (r: Element) => {
+    for (let x = r.parentNode as Element | null; x && x !== p; x = x.parentNode as Element | null) if (skipIn!.has(x)) return true;
+    return false;
+  };
   for (const r of review ? docxRunOrder(p) : descendants(p, "r")) {
+    if (skipIn?.size && skipped(r)) continue;
+    if (bmAt && r.localName === "r") {
+      tagBookmarks();
+      bmNow = bmAt.get(r) ?? [];
+    }
     if (review) {
       tagRuns();
       if (r.localName !== "r") {
@@ -835,6 +913,24 @@ export function docxParagraph(
       if (rev) tag.rev = rev;
       if (fmtRev) tag.fmtRev = fmtRev;
       if (review.open.size) tag.comments = [...review.open];
+    }
+    // 덧말 / 윗주 (w:ruby): the w:r holding it is one run with TextRun.ruby; the runs inside its w:rt / w:rubyBase are
+    // not text of their own (QA 11-24: they were read as body text, "한자漢字")
+    const rbParent = (r.parentNode as Element | null)?.localName;
+    if (rbParent === "rt" || rbParent === "rubyBase") {
+      runFmts?.push(null);
+      continue;
+    }
+    const rubyEl = child(r, "ruby");
+    if (rubyEl) {
+      const run = docxRubyRun(rubyEl, runOf);
+      if (run) {
+        const link = ctx.links ? docxLinkOf(r, p, ctx.links) : undefined;
+        if (link) run.link = link;
+        runs.push(run);
+        runFmts?.push(run);
+      }
+      continue;
     }
     const rPr = child(r, "rPr");
     let text = "";
@@ -907,10 +1003,15 @@ export function docxParagraph(
       runFmts?.push(null);
       continue;
     }
-    runs.push(runOf(rPr, text));
+    const run = runOf(rPr, text);
+    // a hyperlink: w:hyperlink (an external relationship or a bookmark), or a HYPERLINK field around the run
+    const link = ctx.links ? docxLinkOf(r, p, ctx.links) ?? (fld?.result ? hyperlinkTarget(fld.instr) : undefined) : undefined;
+    if (link) run.link = link;
+    runs.push(run);
     runFmts?.push(runs[runs.length - 1]);
   }
   if (review) tagRuns();
+  if (bmAt) tagBookmarks();
   if (!runs.length) {
     const mark = pPr && child(pPr, "rPr");
     runs.push(fmtRun ?? runOf(mark, ""));
@@ -996,6 +1097,8 @@ export function docxParagraph(
   // widow / orphan control: on unless the paragraph or its style chain turns it off (Korean Word's Normal style does)
   if (S && pGet("widowControl") && !onOff("widowControl")) para.widowControl = false;
   if (heading) para.role = `h${heading}` as TextParagraph["role"];
+  // the named style (core/docStyles.ts), but the default one (model 10: a map before it reads the original without)
+  if (S && styleName && S.has(styleName) && !ctx.noParaStyle && styleName !== ctx.defaultStyle) para.style = styleName;
   if (review) Object.assign(para, docxParaRevs(pPr));
   // 단 나누기 (w:br type=column): the next column before / after the paragraph's text
   if (colBr) para.colBreak = colBr;
@@ -1224,6 +1327,8 @@ export interface OfficeLayout {
   notePr?: NotePr;
   /** comments of the document (core/review.ts); on the first page */
   comments?: DocComment[];
+  /** named paragraph styles of the file (core/docStyles.ts); on the first page */
+  docStyles?: DocStyle[];
   /** changes are recorded (DOCX w:trackRevisions, HWPX trackchageConfig); on the first page */
   trackChanges?: true;
   /** sections in order; the first starts at 0. `src`: which settings element of the file holds the setup (DOCX w:sectPr / HWPX hp:secPr in document order) */
@@ -1256,6 +1361,234 @@ const normPath = (p: string) => {
   }
   return out.join("/");
 };
+
+const DOCX_BORDER_STYLE: Record<string, PageBorder["style"]> = { single: "single", thick: "thick", double: "double", dashed: "dashed", dashSmallGap: "dashed", dotted: "dotted", dotDash: "dashed", triple: "double", thinThickSmallGap: "double", thickThinSmallGap: "double" };
+
+/**
+ * Word's page border (w:pgBorders): the top line (Word's dialog sets all four alike; a box of other lines takes the top
+ * one), its width (w:sz eighths of a point), colour, distance (w:space points) and what it is measured from.
+ */
+export function docxPageBorder(el: Element | null | undefined): PageBorder | undefined {
+  if (!el) return undefined;
+  const side = ["top", "left", "bottom", "right"].map((n) => child(el, n)).find((e) => e && attr(e, "val") && attr(e, "val") !== "none" && attr(e, "val") !== "nil");
+  if (!side) return undefined;
+  const val = attr(side, "val") ?? "single";
+  const sz = Number(attr(side, "sz") ?? 4);
+  const c = attr(side, "color");
+  const space = Number(attr(side, "space") ?? 24);
+  return {
+    style: DOCX_BORDER_STYLE[val] ?? "single",
+    width: pxOfEighths(Number.isFinite(sz) && sz > 0 ? (val === "thick" ? sz / 2 : sz) : 4),
+    color: c && /^[0-9a-f]{6}$/i.test(c) ? "#" + c.toUpperCase() : "#000000",
+    space: Math.round(((Number.isFinite(space) ? space : 24) * 96) / 72 * 100) / 100,
+    from: attr(el, "offsetFrom") === "text" ? "text" : "page",
+  };
+}
+
+/** w:pgBorders of a page border (all four sides alike), "" without one. */
+export function docxPageBorderXml(b: PageBorder | undefined): string {
+  if (!b || !(b.width > 0)) return "";
+  const val = b.style === "thick" ? "thick" : b.style;
+  const sz = eighthsOfPx(b.style === "thick" ? b.width * 2 : b.width);
+  const space = Math.max(0, Math.min(31, Math.round((b.space * 72) / 96)));
+  const side = (n: string) => `<w:${n} w:val="${val}" w:sz="${sz}" w:space="${space}" w:color="${b.color.replace("#", "").toUpperCase()}"/>`;
+  return `<w:pgBorders w:offsetFrom="${b.from}">${side("top")}${side("left")}${side("bottom")}${side("right")}</w:pgBorders>`;
+}
+const hwpxHeaderDocs = new WeakMap<Uint8Array, Document>();
+/**
+ * 한글's 쪽 테두리 of a section: its hp:pageBorderFill (BOTH, else the first) → the header's hh:borderFill — the left line
+ * (type, width "0.12 mm", colour); offset (HWPUNIT, left) from the paper (textBorder="PAPER") or the body ("CONTENT").
+ * None when the fill has no line (한글's default page border fill 1).
+ */
+export function hwpxPageBorder(secPr: Element, header: Uint8Array | undefined): PageBorder | undefined {
+  if (!header) return undefined;
+  const pbfs = descendants(secPr, "pageBorderFill");
+  const pbf = pbfs.find((x) => attr(x, "type") === "BOTH") ?? pbfs[0];
+  if (!pbf) return undefined;
+  let doc = hwpxHeaderDocs.get(header);
+  if (!doc) hwpxHeaderDocs.set(header, (doc = parseXml(strFromU8(header))));
+  const bf = descendants(doc, "borderFill").find((b) => attr(b, "id") === attr(pbf, "borderFillIDRef"));
+  const e = bf && (child(bf, "leftBorder") ?? child(bf, "topBorder"));
+  const ty = e ? attr(e, "type") ?? "NONE" : "NONE";
+  if (!e || ty === "NONE") return undefined;
+  const mm = parseFloat(attr(e, "width") ?? "0.12");
+  const c = attr(e, "color") ?? "#000000";
+  const off = child(pbf, "offset");
+  const hu = Number(off && attr(off, "left"));
+  return {
+    style: /DOUBLE/.test(ty) ? "double" : /DASH/.test(ty) ? "dashed" : /DOT/.test(ty) ? "dotted" : "single",
+    width: Math.round(((Number.isFinite(mm) && mm > 0 ? mm : 0.12) * 96 * 100) / 25.4) / 100,
+    color: /^#[0-9a-f]{6}$/i.test(c) ? c.toUpperCase() : "#000000",
+    space: Number.isFinite(hu) ? Math.round((hu / 75) * 100) / 100 : 18.89,
+    from: attr(pbf, "textBorder") === "CONTENT" ? "text" : "page",
+  };
+}
+
+/** HWPX line type and width ("0.4 mm", 한글's list of widths) of a page border. */
+/** The header's hh:borderFill of a 쪽 테두리 (Page.border): its line on all four sides (shared with the Office Surgeon). */
+export function hwpxPageBorderFillXml(id: number | string, b: PageBorder): string {
+  const l = hwpxBorderLine(b);
+  const side = (n: string) => `<hh:${n} type="${l.type}" width="${l.width}" color="#${hex6(b.color)}"/>`;
+  return `<hh:borderFill id="${id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>${side("leftBorder")}${side("rightBorder")}${side("topBorder")}${side("bottomBorder")}<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/></hh:borderFill>`;
+}
+
+/** A section's three hp:pageBorderFill (both / even / odd pages) referring to border fill `id`, at the border's distance. */
+export function hwpxPageBorderFills(id: number | string, b: PageBorder): string {
+  const hu = Math.round(b.space * 75);
+  return ["BOTH", "EVEN", "ODD"].map((t) => `<hp:pageBorderFill type="${t}" borderFillIDRef="${id}" textBorder="${b.from === "text" ? "CONTENT" : "PAPER"}" headerInside="0" footerInside="0" fillArea="PAPER"><hp:offset left="${hu}" right="${hu}" top="${hu}" bottom="${hu}"/></hp:pageBorderFill>`).join("");
+}
+
+export function hwpxBorderLine(b: PageBorder): { type: string; width: string } {
+  const type = b.style === "double" ? "DOUBLE_SLIM" : b.style === "dashed" ? "DASH" : b.style === "dotted" ? "DOT" : "SOLID";
+  const mm = ((b.style === "thick" ? b.width * 2 : b.width) * 25.4) / 96;
+  const widths = [0.1, 0.12, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0];
+  const w = widths.reduce((a, x) => (Math.abs(x - mm) < Math.abs(a - mm) ? x : a), widths[0]);
+  return { type, width: `${w} mm` };
+}
+/** External hyperlink relationships of a part: id → URL (word/_rels/document.xml.rels TargetMode="External"). */
+export function docxLinkRels(files: Record<string, Uint8Array>, part = "word/document.xml"): Map<string, string> {
+  const dir = part.slice(0, part.lastIndexOf("/") + 1);
+  const relsPath = dir + "_rels/" + part.slice(dir.length) + ".rels";
+  const out = new Map<string, string>();
+  if (!files[relsPath]) return out;
+  for (const r of descendants(parseXml(strFromU8(files[relsPath])), "Relationship")) if (attr(r, "TargetMode") === "External" && /hyperlink$/.test(attr(r, "Type") ?? "")) out.set(attr(r, "Id") ?? "", attr(r, "Target") ?? "");
+  return out;
+}
+
+/**
+ * A run with 덧말 / 윗주 from a w:ruby: the text and format of its w:rubyBase runs, the w:rt text as TextRun.ruby
+ * (w:hps the ruby size and w:hpsRaise its raise in half points; rubyAlign, lid and hpsBaseText kept as read).
+ */
+export function docxRubyRun(ruby: Element, runOf: (rPr: Element | undefined, text: string) => TextRun): TextRun | null {
+  const textOfRuns = (el: Element | undefined) => (el ? descendants(el, "r").map((x) => children(x).filter((c) => c.localName === "t").map(textOf).join("")).join("") : "");
+  const baseEl = child(ruby, "rubyBase");
+  const rtEl = child(ruby, "rt");
+  const text = textOfRuns(baseEl);
+  if (!text) return null;
+  const baseR = baseEl ? descendants(baseEl, "r")[0] : undefined;
+  const run = runOf(baseR ? child(baseR, "rPr") : undefined, text);
+  const rt = textOfRuns(rtEl);
+  if (!rt) return run;
+  const pr = child(ruby, "rubyPr");
+  const val = (n: string) => {
+    const e = pr && child(pr, n);
+    return e ? attr(e, "val") ?? undefined : undefined;
+  };
+  const rb: Ruby = { text: rt };
+  const hps = Number(val("hps"));
+  if (hps > 0) rb.size = Math.round((hps / 2) * PT * 100) / 100;
+  const raise = Number(val("hpsRaise"));
+  if (Number.isFinite(raise) && val("hpsRaise") !== undefined) rb.raise = Math.round((raise / 2) * PT * 100) / 100;
+  const rtR = rtEl ? descendants(rtEl, "r")[0] : undefined;
+  if (rtR) {
+    const f = runOf(child(rtR, "rPr"), rt).fontFamily;
+    if (f && f !== run.fontFamily) rb.font = f;
+  }
+  const src: Record<string, string> = {};
+  for (const k of ["rubyAlign", "lid", "hpsBaseText"]) {
+    const v = val(k);
+    if (v !== undefined) src[k] = v;
+  }
+  if (Object.keys(src).length) rb.src = src;
+  run.ruby = rb;
+  return run;
+}
+
+/**
+ * A run with 덧말 from a 한글 hp:dutmal (hp:mainText the text, hp:subText the 덧말): posType BOTTOM puts it under the
+ * text; szRatio (percent of the text's size, 0 = 한글's default) its size; the attributes kept as read.
+ */
+export function hwpxDutmalRun(el: Element, base: TextRun): TextRun | null {
+  const text = descendants(el, "mainText").map(textOf).join("");
+  if (!text) return null;
+  const sub = descendants(el, "subText").map(textOf).join("");
+  if (!sub) return { ...base, text };
+  const rb: Ruby = { text: sub };
+  if (attr(el, "posType") === "BOTTOM") rb.below = true;
+  const ratio = Number(attr(el, "szRatio"));
+  if (ratio > 0) rb.size = Math.round(base.fontSize * ratio) / 100;
+  const src: Record<string, string> = {};
+  for (const k of ["szRatio", "option", "styleIDRef", "align"]) {
+    const v = attr(el, k);
+    if (v != null) src[k] = v;
+  }
+  if (Object.keys(src).length) rb.src = src;
+  return { ...base, text, ruby: rb };
+}
+
+/** A run with 덧말 (TextRun.ruby) as 한글's hp:dutmal (the inside of its hp:run). */
+export function hwpxDutmalXml(r: TextRun): string {
+  const rb = r.ruby!;
+  const src = rb.src ?? {};
+  const ratio = rb.size !== undefined ? String(Math.round((rb.size / r.fontSize) * 100)) : src.szRatio ?? "0";
+  return (
+    `<hp:dutmal posType="${rb.below ? "BOTTOM" : "TOP"}" szRatio="${esc(ratio)}" option="${esc(src.option ?? "0")}" styleIDRef="${esc(src.styleIDRef ?? "0")}" align="${esc(src.align ?? "CENTER")}">` +
+    `<hp:mainText>${esc(r.text)}</hp:mainText><hp:subText>${esc(rb.text)}</hp:subText></hp:dutmal>`
+  );
+}
+
+/** The URL of a HYPERLINK field instruction (` HYPERLINK "https://…" \o "tip" `; `\l "mark"` = a bookmark: "#mark"). */
+export function hyperlinkTarget(instr: string): string | undefined {
+  const mark = /^\s*HYPERLINK\s+\\l\s+"([^"]*)"/i.exec(instr);
+  if (mark) return "#" + mark[1];
+  const m = /^\s*HYPERLINK\s+"([^"]*)"/i.exec(instr) ?? /^\s*HYPERLINK\s+([^\s\\"]+)/i.exec(instr);
+  if (!m) return undefined;
+  const sub = /\\l\s+"([^"]*)"/i.exec(instr);
+  return m[1] + (sub ? "#" + sub[1] : "");
+}
+
+/** The link of a run inside a w:hyperlink or a w:fldSimple HYPERLINK of paragraph `p` (else undefined). */
+function docxLinkOf(r: Element, p: Element, links: Map<string, string>): string | undefined {
+  for (let n = r.parentNode as Element | null; n && n !== p; n = n.parentNode as Element | null) {
+    if (n.localName === "hyperlink") {
+      const url = links.get(attr(n, "id") ?? "");
+      const anchor = attr(n, "anchor");
+      return url ? url + (anchor ? "#" + anchor : "") : anchor ? "#" + anchor : undefined;
+    }
+    if (n.localName === "fldSimple") return hyperlinkTarget(attr(n, "instr") ?? "");
+  }
+  return undefined;
+}
+
+let hwpxFieldSeq = 1700000000;
+/**
+ * Runs as HWPX with their links (TextRun.link) as 한글's hyperlink fields: an hp:fieldBegin type="HYPERLINK" (Command
+ * "address;1;0;0;", Path, as 한글 2024 writes them — omni-hwp-links) before a link's runs, its hp:fieldEnd after.
+ * `run` writes one run, `ctrlRun` a run holding a control.
+ */
+export function hwpxLinked(runs: TextRun[], run: (r: TextRun, k: number) => string, ctrlRun: (ctrl: string) => string): string {
+  let out = "";
+  let open: { url: string; id: number } | null = null;
+  const close = () => {
+    if (!open) return;
+    out += ctrlRun(`<hp:ctrl><hp:fieldEnd beginIDRef="${open.id}" fieldid="627600491"/></hp:ctrl>`);
+    open = null;
+  };
+  for (const [k, r] of runs.entries()) {
+    const url = r.link && !r.field && !r.note && !r.noteMark ? r.link : null;
+    if (open && open.url !== url) close();
+    if (url && !open) {
+      open = { url, id: hwpxFieldSeq++ };
+      const cmd = url;
+      out += ctrlRun(
+        `<hp:ctrl><hp:fieldBegin id="${open.id}" type="HYPERLINK" name="" editable="0" dirty="1" zorder="-1" fieldid="627600491" metaTag=""><hp:parameters cnt="6" name=""><hp:integerParam name="Prop">0</hp:integerParam><hp:stringParam name="Command">${esc(cmd)};1;0;0;</hp:stringParam><hp:stringParam name="Path">${esc(url)}</hp:stringParam><hp:stringParam name="Category">HWPHYPERLINK_TYPE_URL</hp:stringParam><hp:stringParam name="TargetType">HWPHYPERLINK_TARGET_BOOKMARK</hp:stringParam><hp:stringParam name="DocOpenType">HWPHYPERLINK_JUMP_CURRENTTAB</hp:stringParam></hp:parameters></hp:fieldBegin></hp:ctrl>`,
+      );
+    }
+    out += run(r, k);
+  }
+  close();
+  return out;
+}
+/** The address of a 한글 hyperlink field: its Path parameter, else its Command up to the first ";" ("\:" is ":"). */
+export function hwpxLinkOf(fieldBegin: Element): string | undefined {
+  const params = descendants(fieldBegin, "stringParam");
+  const val = (n: string) => params.find((x) => attr(x, "name") === n)?.textContent ?? "";
+  const path = val("Path").trim();
+  if (path) return path;
+  const cmd = val("Command").replace(/\\:/g, ":");
+  const url = cmd.split(";")[0].trim();
+  return url || undefined;
+}
 
 /** Relationship id → package path, from a part's relationships (word/_rels/document.xml.rels). */
 export function docxRels(files: Record<string, Uint8Array>, part = "word/document.xml"): Map<string, string> {
@@ -1387,7 +1720,8 @@ export function docxSetup(sectPr: Element | undefined): PageSetup {
   // keeps a syllable Word moves down (Gulim 10 pt lines end within 0.1 pt of the margin). The paper preset is still
   // recognised (paperOf, within 1.5 px) and written back as its own twips.
   const columns = docxColumns(sectPr && child(sectPr, "cols"));
-  return { width: Math.round((w / 15) * 100) / 100, height: Math.round((h / 15) * 100) / 100, margins, ...(columns ? { columns } : {}) };
+  const border = docxPageBorder(sectPr && child(sectPr, "pgBorders"));
+  return { width: Math.round((w / 15) * 100) / 100, height: Math.round((h / 15) * 100) / 100, margins, ...(columns ? { columns } : {}), ...(border ? { border } : {}) };
 }
 
 /**
@@ -1497,12 +1831,12 @@ function paperUnits(s: PageSetup, unit: "tw" | "hu"): [number, number] {
   return [Math.round(Math.min(s.width, s.height) * k), Math.round(Math.max(s.width, s.height) * k)];
 }
 
-/** w:pgSz + w:pgMar of a page setup (shared with the Office Surgeon). */
+/** w:pgSz + w:pgMar (+ w:pgBorders) of a page setup (shared with the Office Surgeon). */
 export function docxPageXml(s: PageSetup): string {
   const m = s.margins;
   const [a, b] = paperUnits(s, "tw");
   const land = s.width > s.height;
-  return `<w:pgSz w:w="${land ? b : a}" w:h="${land ? a : b}"${land ? ' w:orient="landscape"' : ""}/><w:pgMar w:top="${twip(m.top)}" w:right="${twip(m.right)}" w:bottom="${twip(m.bottom)}" w:left="${twip(m.left)}" w:header="${twip(m.header)}" w:footer="${twip(m.footer)}" w:gutter="0"/>`;
+  return `<w:pgSz w:w="${land ? b : a}" w:h="${land ? a : b}"${land ? ' w:orient="landscape"' : ""}/><w:pgMar w:top="${twip(m.top)}" w:right="${twip(m.right)}" w:bottom="${twip(m.bottom)}" w:left="${twip(m.left)}" w:header="${twip(m.header)}" w:footer="${twip(m.footer)}" w:gutter="0"/>${docxPageBorderXml(s.border)}`;
 }
 
 const HU = 75; // HWPUNIT per px (7200 / in)
@@ -1599,6 +1933,14 @@ export interface OfficeImportReport {
   /** drawings the import leaves in the original (shapes, charts, pictures in table cells / text boxes, linked) */
   picturesKept?: number;
   /**
+   * Shapes and text boxes floating on the page (io/officeShapes.ts), read when this is given (Office Surgeon model 11):
+   * each becomes a VECTOR / TEXT node; a 한글 text box's paragraphs are then no body paragraphs. Without it they stay in
+   * the original only (and 한글 text box paragraphs follow in reading order), as before.
+   */
+  shapes?: OfficePic[];
+  /** DOCX: the DrawingML colour and geometry readers shapes are read with, given the file's theme (io/formats/index.ts) */
+  dml?: (theme: Document | null) => DmlReaders;
+  /**
    * Office Surgeon model 8: an empty paragraph right after a table is an item (an empty line, as Word draws it) unless
    * it ends the body; without it the body is read as before (that paragraph dropped).
    */
@@ -1608,6 +1950,8 @@ export interface OfficeImportReport {
    * text left out, DOCX moves read twice, 한글 memo text read as body paragraphs.
    */
   noReview?: true;
+  /** paragraphs read without their named style (an Office Surgeon map before model 10) */
+  noParaStyle?: true;
 }
 
 /** The next element sibling. */
@@ -1699,6 +2043,53 @@ export function parseDocxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
       pics!.push(pic);
     }
   };
+  // shapes and text boxes floating on the page (report.shapes and report.dml given; io/officeShapes.ts)
+  const shapes = report?.dml ? report.shapes : undefined;
+  const themePart = shapes && (files["word/theme/theme1.xml"] ?? Object.entries(files).find(([k]) => /^word\/theme\/[^/]+\.xml$/.test(k))?.[1]);
+  const dml = shapes ? report!.dml!(themePart ? parseXml(strFromU8(themePart)) : null) : null;
+  const txbxParas = (content: Element): TextParagraph[] | null => {
+    const ps = children(content);
+    if (ps.some((x) => x.localName !== "p") || descendants(content, "drawing").length || descendants(content, "footnoteReference").length || descendants(content, "endnoteReference").length) return null;
+    return ps.map((x) => docxParagraph(x, ctx).para);
+  };
+  /** the paragraph's drawings that are one shape or text box each, with what holds them (Word's mc:AlternateContent) */
+  const readShapes = (p: Element) => {
+    const out: { d: Element; sh: ReadShape; holder: Element }[] = [];
+    for (const d of topDrawings(p)) {
+      if (docxPicOf(d)) continue;
+      const sh = shapeOfWsp(d, dml!, txbxParas);
+      if (!sh) continue;
+      let holder: Element = d;
+      for (let x = d.parentNode as Element | null; x && x !== p; x = x.parentNode as Element | null) if (x.localName === "AlternateContent") holder = x;
+      out.push({ d, sh, holder });
+    }
+    return out;
+  };
+  const addShapes = (p: Element, read: ReturnType<typeof readShapes>, para: TextParagraph | null, tail: boolean) => {
+    top.drawings ??= topDrawings(top.el);
+    const prev = items[items.length - 1];
+    for (const { d, sh } of read) {
+      const k = top.drawings.indexOf(d);
+      if (k < 0) continue;
+      shapes!.push({
+        id: uid(sh.spec.kind === "text" ? "tbox" : "shape"),
+        at: items.length,
+        tail: !!para || tail || !(breaks.has(items.length) || sectionEnds.some((e) => e.end === items.length)),
+        bytes: new Uint8Array(0),
+        mime: "",
+        name: sh.name || tx(sh.spec.kind === "text" ? "engine.default.textBox" : "engine.default.shape"),
+        g: sh.g,
+        float: sh.float,
+        shape: sh.spec,
+        offset: para ? charsBefore(p, d) : 0,
+        own: !para,
+        part: "word/document.xml",
+        b: top.b,
+        k,
+        ...(para ? { para: para.id } : prev?.kind === "p" ? { para: prev.p.id } : {}),
+      });
+    }
+  };
   const visit = (parent: Element) => {
     for (const el of children(parent)) {
       const before = items.length;
@@ -1716,7 +2107,11 @@ export function parseDocxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
         afterTable = false;
         return;
       }
+      // shapes and text boxes read as objects: their text is not the paragraph's (Word's VML fallback copy neither)
+      const shapeRead = shapes ? readShapes(el) : [];
+      if (shapeRead.length) ctx.skipIn = new Set(shapeRead.map((x) => x.holder));
       const { para, list, plist, pageBreak } = docxParagraph(el, ctx);
+      delete ctx.skipIn;
       const pPr = child(el, "pPr");
       const sect = pPr && child(pPr, "sectPr");
       const found = pics ? docxBodyPics(el) : [];
@@ -1730,6 +2125,7 @@ export function parseDocxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
         items.push({ kind: "p", p: para });
       }
       if (found.length) addPics(el, found, kept ? para : null, !!sect || pageBreak === "after", para);
+      if (shapeRead.length) addShapes(el, shapeRead, kept ? para : null, !!sect || pageBreak === "after");
       if (pageBreak === "after") breaks.add(items.length);
       if (sect) sectionEnds.push({ end: items.length, sectPr: sect, ...(kept && !found.length && para.runs.every((r) => !r.text) ? { mark: para } : {}) });
       afterTable = false;
@@ -1752,7 +2148,7 @@ export function parseDocxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
       for (let n = d.parentNode as Element | null; n && n !== body; n = n.parentNode as Element | null) if (n.localName === "drawing") return false;
       return true;
     }).length;
-    const read = pics.filter((x) => x.part === "word/document.xml").length;
+    const read = pics.filter((x) => x.part === "word/document.xml").length + (shapes?.length ?? 0);
     if (all > read) report.picturesKept = (report.picturesKept ?? 0) + all - read;
   }
   // Word's section break mark before a continuous section lays out no line (TextParagraph.sectMark); the next section's
@@ -1809,7 +2205,7 @@ export function parseDocxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
       start = s.end;
     });
     if (evenOdd && sections[0] && !sections[0].hf?.evenOdd) sections[0].hf = { ...(sections[0].hf ?? {}), evenOdd: true };
-    report.layout = { pageBreaks: [...breaks].filter((i) => i > 0 && i < items.length).sort((a, b) => a - b), sections, pageRules: "word", ...(ctx.notes && (ctx.notes.foot.size || ctx.notes.end.size) ? { notePr: ctx.notes.pr } : {}), ...(comments.length ? { comments } : {}), ...(ctx.review && docxTracking(files["word/settings.xml"]) ? { trackChanges: true as const } : {}), ...(ctx.styles?.charWrap ? { wordBreak: "normal" as const } : {}), ...(ctx.styles && docxBalancedSpaces(files) ? { cjkSpace: "half" as const } : {}), ...(ctx.styles?.hangPunct ? { hangPunct: true } : {}), ...(docxLang(files) ? { lang: docxLang(files)! } : {}), ...(ctx.styles && docxCompatMode(files) >= 15 ? { justifyShrink: true } : {}), ...(ctx.styles && (ctx.styles.autoSpace.alpha || ctx.styles.autoSpace.digit) ? { autoSpace: ctx.styles.autoSpace } : {}), ...(ctx.styles ? { wordSpacing: docxParaSpacing(files) } : {}) };
+    report.layout = { pageBreaks: [...breaks].filter((i) => i > 0 && i < items.length).sort((a, b) => a - b), sections, pageRules: "word", ...(ctx.notes && (ctx.notes.foot.size || ctx.notes.end.size) ? { notePr: ctx.notes.pr } : {}), ...(comments.length ? { comments } : {}), ...(ctx.styles && files["word/styles.xml"] ? { docStyles: docxStyleSheet(files, ctx) } : {}), ...(ctx.review && docxTracking(files["word/settings.xml"]) ? { trackChanges: true as const } : {}), ...(ctx.styles?.charWrap ? { wordBreak: "normal" as const } : {}), ...(ctx.styles && docxBalancedSpaces(files) ? { cjkSpace: "half" as const } : {}), ...(ctx.styles?.hangPunct ? { hangPunct: true } : {}), ...(docxLang(files) ? { lang: docxLang(files)! } : {}), ...(ctx.styles && docxCompatMode(files) >= 15 ? { justifyShrink: true } : {}), ...(ctx.styles && (ctx.styles.autoSpace.alpha || ctx.styles.autoSpace.digit) ? { autoSpace: ctx.styles.autoSpace } : {}), ...(ctx.styles ? { wordSpacing: docxParaSpacing(files) } : {}) };
     // table cells are set like the body text (Word's line breaking, half-width spaces …)
     const L = report.layout;
     for (const it of out)
@@ -1887,6 +2283,8 @@ export function hwpxHeaderMaps(header: Uint8Array | undefined) {
   const charPr = new Map<string, Partial<TextRun>>();
   const paraPr = new Map<string, HwpxParaPr>();
   const styleHeading = new Map<string, number>();
+  /** hh:style elements (core/docStyles.ts): name, shapes and the style after it */
+  const styles: { id: string; name: string; engName: string; type: string; pp: string; cp: string; next: string }[] = [];
   const fills = new Map<string, { fill: string | null; border: string | null }>();
   // paragraph shapes with a border / fill (resolved once the border fills are read)
   const paraBorders: { id: string; ref: string; off: Record<"left" | "right" | "top" | "bottom", number> }[] = [];
@@ -2039,6 +2437,7 @@ export function hwpxHeaderMaps(header: Uint8Array | undefined) {
       listDefs.set(`hwpx-b${id}`, { id: `hwpx-b${id}`, src: id, levels: Array.from({ length: MAX_LEVELS }, () => ({ format: "bullet", text, ...hw })) });
     }
     for (const s of descendants(h, "style")) {
+      styles.push({ id: attr(s, "id") ?? "", name: attr(s, "name") ?? "", engName: attr(s, "engName") ?? "", type: attr(s, "type") ?? "PARA", pp: attr(s, "paraPrIDRef") ?? "0", cp: attr(s, "charPrIDRef") ?? "0", next: attr(s, "nextStyleIDRef") ?? "" });
       const m = /^개요\s?(\d)$/.exec(attr(s, "name") ?? "") ?? /^Outline\s?(\d)$/i.exec(attr(s, "engName") ?? ""); // i18n: keep — HWPX style name 개요 n matched in files
       if (m && Number(m[1]) >= 1 && Number(m[1]) <= 6) styleHeading.set(attr(s, "id") ?? "", Number(m[1]));
     }
@@ -2073,7 +2472,27 @@ export function hwpxHeaderMaps(header: Uint8Array | undefined) {
       if (s.fill) pp.shade = s.fill;
     }
   }
-  return { charPr, paraPr, styleHeading, fills, fonts, listDefs, charPrLatin };
+  return { charPr, paraPr, styleHeading, fills, fonts, listDefs, charPrLatin, styles };
+}
+
+/** The paragraph styles of an HWPX header as the document's style sheet (core/docStyles.ts), 바탕글 (id 0) first. */
+export function hwpxStyleSheet(maps: Pick<HwpxHeaderMaps, "styles" | "charPr" | "paraPr" | "styleHeading">): DocStyle[] {
+  const out: DocStyle[] = [];
+  for (const st of maps.styles) {
+    if (st.type !== "PARA" || !st.id) continue;
+    const cp = Object.fromEntries(Object.entries(maps.charPr.get(st.cp) ?? {}).filter(([, v]) => v !== undefined));
+    const { head: _h, ...pp } = maps.paraPr.get(st.pp) ?? { align: "LEFT" as Align, lineSpacing: 1.6, indent: 0, spaceAfter: 4 };
+    const look = lookOf({ id: "", runs: [], ...pp } as TextParagraph, { ...DEFAULT_RUN, fontSize: 10 * PT, ...cp });
+    const ds: DocStyle = { id: st.id, name: st.name || st.engName || st.id, type: "para", run: look.run, para: look.para, quick: true };
+    if (st.engName) ds.engName = st.engName;
+    if (st.next && st.next !== st.id) ds.next = st.next;
+    if (st.id !== "0") ds.basedOn = "0";
+    const lv = maps.styleHeading.get(st.id);
+    if (lv) ds.role = `h${lv}` as DocStyle["role"];
+    if (st.id === "0") out.unshift(ds);
+    else out.push(ds);
+  }
+  return out;
 }
 
 /** Elements `<prefix:name id="…">…</prefix:name>` of an HWPX header by id, exactly as written. */
@@ -2150,7 +2569,9 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
     .sort((a, b) => Number(/(\d+)/.exec(a)![1]) - Number(/(\d+)/.exec(b)![1]));
   if (!sections.length) throw new Error(tx("engine.office.notHwpx"));
 
-  const { charPr, paraPr, styleHeading, fills, listDefs, charPrLatin } = hwpxHeaderMaps(files["Contents/header.xml"]);
+  const headerMaps = hwpxHeaderMaps(files["Contents/header.xml"]);
+  const { charPr, paraPr, styleHeading, fills, listDefs, charPrLatin } = headerMaps;
+  const styleIds = new Set(headerMaps.styles.filter((x) => x.type === "PARA").map((x) => x.id));
   // pictures (report.pictures given): BinData items of the manifest (Contents/content.hpf) by id
   const pics = report?.pictures;
   const binData = new Map<string, string>();
@@ -2160,6 +2581,8 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
       if (href) binData.set(attr(it, "id") ?? "", href.replace(/^\//, ""));
     }
   let picsSeen = 0;
+  // shapes and text boxes (report.shapes given, model 11): read as objects on the page, a text box's paragraphs not body
+  const shapes = report?.shapes;
 
   const items: OfficeItem[] = [];
   const kinds = new Map<TextParagraph, "li" | "oli">();
@@ -2208,6 +2631,9 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
     if (runs.some((r) => r.text.includes("\t"))) para.tabStep = tabStep;
     const level = head?.type === "OUTLINE" ? head.level + 1 : styleHeading.get(attr(p, "styleIDRef") ?? "") ?? 0;
     if (level >= 1 && level <= 6) para.role = `h${level}` as TextParagraph["role"];
+    // the named style but 바탕글 (core/docStyles.ts; model 10 — a map before it reads the original without)
+    const sid = attr(p, "styleIDRef") ?? "0";
+    if (sid !== "0" && !report?.noParaStyle && styleIds.has(sid)) para.style = sid;
     else if (head?.type === "BULLET") kinds.set(para, "li");
     else if (head?.type === "NUMBER") kinds.set(para, "oli");
     // multi-level membership: the numbering / bullet the paragraph shape names, at its level
@@ -2311,6 +2737,8 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
     let objects = 0;
     let chars = 0;
     const found: { pic: NonNullable<ReturnType<typeof hwpxPicOf>>; el: Element; bytes: Uint8Array; mime: string; offset: number }[] = [];
+    // shapes and text boxes floating on the page (report.shapes given; io/officeShapes.ts)
+    const shapeFound: { sh: ReadShape; el: Element; offset: number }[] = [];
     // memos on no text in this paragraph (their place: the text offset in the runs read so far)
     const points: { c: DocComment; offset: number }[] = [];
     const placePoints = (para: TextParagraph) => {
@@ -2324,9 +2752,18 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
     // each character; `plain` = nothing inline but text and controls without a body (section / column / page)
     const u = { n: 0, pos: [] as number[] };
     let plain = true;
+    // a 한글 hyperlink (hp:fieldBegin type="HYPERLINK" … hp:fieldEnd): the text between gets TextRun.link
+    let link: { id: string; url: string } | null = null;
     for (const r of children(p, "run")) {
       const fmt = runFormat(r);
       for (const c of children(r)) {
+        if (c.localName === "ctrl")
+          for (const k of children(c)) {
+            if (k.localName === "fieldBegin" && attr(k, "type") === "HYPERLINK") {
+              const url = hwpxLinkOf(k);
+              if (url) link = { id: attr(k, "id") ?? "", url };
+            } else if (k.localName === "fieldEnd" && link && attr(k, "beginIDRef") === link.id) link = null;
+          }
         // one extended control = 8 units (a hp:ctrl, one per control it holds); hp:t and run-level tab / break below
         if (c.localName === "ctrl") u.n += 8 * Math.max(1, children(c).length);
         else if (c.localName !== "t" && c.localName !== "tab" && c.localName !== "lineBreak") {
@@ -2344,12 +2781,35 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
           for (const sl of outerSubLists(c)) for (const ip of children(sl, "p")) visitP(ip, out, inHF);
           continue;
         }
+        if (top && shapes && !inHF && HWPX_SHAPES.has(c.localName)) {
+          // a shape or text box of a body paragraph: an object on the page (a text box holding a table or picture stays
+          // as before: its paragraphs follow in reading order)
+          const sh = shapeOfHwpx(c, (sl) => {
+            if (descendants(sl, "tbl").length || descendants(sl, "pic").length || descendants(sl, "footNote").length || descendants(sl, "endNote").length) return null;
+            const ps: OfficeItem[] = [];
+            for (const ip of children(sl, "p")) visitP(ip, ps, false, undefined, true);
+            return ps.flatMap((it) => (it.kind === "p" ? [it.p] : []));
+          });
+          if (sh) {
+            shapeFound.push({ sh, el: c, offset: chars });
+            continue;
+          }
+        }
+        if (c.localName === "dutmal") {
+          // 덧말 (hp:dutmal): its main text is a run with TextRun.ruby (one extended control in 한글's units, above)
+          const run = hwpxDutmalRun(c, { ...DEFAULT_RUN, fontSize: 10 * PT, ...fmt, text: "", ...(link ? { link: link.url } : {}) });
+          if (run) {
+            runs.push(run);
+            chars += run.text.length;
+          }
+          continue;
+        }
         if (c.localName === "t") {
           const text = runText(c, u);
           const lat = charPrLatin.get(attr(r, "charPrIDRef") ?? "");
           // (with change marks inside: one run per part, each with its change)
           for (const part of review ? hwpxTextParts(c, revState, changes) : [{ text, rev: null }]) {
-            const run: TextRun = { ...DEFAULT_RUN, fontSize: 10 * PT, ...fmt, text: part.text, ...reviewTag(part.rev) };
+            const run: TextRun = { ...DEFAULT_RUN, fontSize: 10 * PT, ...fmt, text: part.text, ...reviewTag(part.rev), ...(link ? { link: link.url } : {}) };
             if (part.text && lat) runs.push(...byLanguage(run, lat));
             else if (part.text) runs.push(run);
           }
@@ -2392,6 +2852,12 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
             if (pf && pf !== "decimal") col().hf.pageFmt ??= pf;
             if (pf) col().fmtSet = true;
           }
+        } else if (c.localName === "ctrl" && !inHF && !inNote && !report?.noParaStyle && child(c, "autoNum") && HWPX_SEQ_LABEL[attr(child(c, "autoNum")!, "numType") ?? ""]) {
+          // 한글's 그림 / 표 / 수식 number (번호 넣기, a caption's number; model 10): a SEQ field run (core/docRefs.ts)
+          const an = child(c, "autoNum")!;
+          plain = false;
+          const label = HWPX_SEQ_LABEL[attr(an, "numType") ?? ""];
+          runs.push({ ...DEFAULT_RUN, fontSize: 10 * PT, ...fmt, text: attr(an, "num") || "1", field: "seq", fieldCode: seqCode(label) });
         } else if (c.localName === "ctrl" && inNote && child(c, "autoNum")) {
           // the note's own number at the start of its text (shown as its reference shows it)
           plain = false;
@@ -2501,6 +2967,27 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
         pics.push(pic);
       }
     }
+    if (top && shapes && shapeFound.length) {
+      const all = topShapesHwpx(p);
+      for (const f of shapeFound)
+        shapes.push({
+          id: uid(f.sh.spec.kind === "text" ? "tbox" : "shape"),
+          at: out.length,
+          tail: !!own || !(breaks.has(out.length) || secs.some((x) => x.start === out.length)),
+          bytes: new Uint8Array(0),
+          mime: "",
+          name: f.sh.name || tx(f.sh.spec.kind === "text" ? "engine.default.textBox" : "engine.default.shape"),
+          g: f.sh.g,
+          float: f.sh.float,
+          shape: f.sh.spec,
+          offset: own ? f.offset : 0,
+          own: !own,
+          part: top.part,
+          b: top.b,
+          k: all.indexOf(f.el),
+          ...(own ? { para: own.id } : prev?.kind === "p" ? { para: prev.p.id } : {}),
+        });
+    }
   };
 
   const hwpxTable = (tbl: Element): OfficeTable => {
@@ -2591,6 +3078,9 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
         if (secPr) {
           const cols = hwpxColumns(children(p, "run").flatMap((r) => children(r, "ctrl")).flatMap((c) => children(c, "colPr"))[0]);
           if (cols) setup.columns = cols;
+          // 쪽 테두리: the section's page border fill (hp:pageBorderFill BOTH → hh:borderFill)
+          const pb = hwpxPageBorder(secPr, files["Contents/header.xml"]);
+          if (pb) setup.border = pb;
         }
         const src = secPr ? secOrd++ : undefined;
         const last = secs[secs.length - 1];
@@ -2679,6 +3169,7 @@ export function parseHwpxFlow(bytes: Uint8Array, report?: OfficeImportReport): O
       sections: secs.filter((x, i) => i === 0 || (x.start > 0 && x.start < items.length)).map((x, i) => (i === 0 ? { ...x, start: 0 } : x)),
       ...(notes.count.foot || notes.count.end ? { notePr: notes.pr } : {}),
       ...(comments.length ? { comments } : {}),
+      ...(!report?.noParaStyle && headerMaps.styles.length ? { docStyles: hwpxStyleSheet(headerMaps) } : {}),
       ...(review && hwpxTracking(files["Contents/header.xml"]) ? { trackChanges: true as const } : {}),
       pageRules: "hwp" as const,
     };
@@ -2703,6 +3194,17 @@ export function hwpxAutoNum(field: "page" | "pages", fmt: PageNumFormat): string
   const dash = field === "page" && fmt === "dash";
   const type = field === "page" ? HWPX_PGFMT_OUT[fmt] : "DIGIT";
   return `<hp:ctrl><hp:autoNum num="1" numType="${field === "page" ? "PAGE" : "TOTAL_PAGE"}"><hp:autoNumFormat type="${type}" userChar="" prefixChar="${dash ? "- " : ""}" suffixChar="${dash ? " -" : ""}" supscript="0"/></hp:autoNum></hp:ctrl>`;
+}
+
+/** 한글 automatic number kinds read as caption numbers, and the label each is numbered under. */
+const HWPX_SEQ_LABEL: Record<string, string> = { PICTURE: "그림", TABLE: "표", EQUATION: "수식" }; // i18n: keep — 한글's own caption labels
+
+/** A caption number (SEQ field) as 한글's automatic 그림 / 표 / 수식 number; other labels: the number as text. */
+export function hwpxSeqNum(r: Pick<TextRun, "fieldCode" | "text">): string | null {
+  const label = seqLabel(r.fieldCode);
+  const kind = label ? HWPX_CAPTION_KIND[label] : undefined;
+  if (!kind) return null;
+  return `<hp:ctrl><hp:autoNum num="${Number(r.text) || 1}" numType="${kind}"><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="" suffixChar="" supscript="0"/></hp:autoNum></hp:ctrl>`;
 }
 
 /** 한글 쪽 번호 매기기 (hp:pageNum): position, number shape, side character ("- 1 -": DIGIT with "-"). */
@@ -2834,7 +3336,8 @@ export function collectFlow(pages: Page[], starts?: number[]): FlowItem[] {
   pages.forEach((p, pi) => {
     starts?.push(out.length);
     // (the note areas the body flow lays out are not body text: the notes are written from their references)
-    for (const n of [...p.nodes].filter((x) => !x.notes).sort(nodeOrder))
+    // (text boxes drawn on a page of the body flow are written as text boxes, io/officeShapes.ts — not as body text)
+    for (const n of [...p.nodes].filter((x) => !x.notes && !isTextBox(x, p)).sort(nodeOrder))
       if (n.type === "TEXT")
         for (const p of n.paragraphs) {
           // a paragraph cut at a page end by the body flow (core/flow.ts) is written as the one paragraph it is
@@ -3052,6 +3555,105 @@ export const docxRPr = (r: TextRun, shadow = false) => {
   );
 };
 
+// ── named styles (core/docStyles.ts) ──
+
+const onOffXml = (n: string, on: boolean | undefined) => (on ? `<w:${n}/>` : `<w:${n} w:val="0"/>`);
+
+/** One w:style of the sheet: its look written out whole (every attribute its own, so Word shows it as here). */
+export function docxStyleXml(s: DocStyle, sheet: readonly DocStyle[]): string {
+  const p = paragraphInStyle(sheet, s.id);
+  const r = s.run;
+  const ind = `<w:ind w:left="${twip(s.para.indentLeft)}" w:right="${twip(s.para.indentRight)}"${s.para.indent < 0 ? ` w:hanging="${twip(-s.para.indent)}"` : ` w:firstLine="${twip(s.para.indent)}"`}/>`;
+  const level = s.role && /^h([1-6])$/.exec(s.role)?.[1];
+  const pPr =
+    `<w:pPr>${onOffXml("keepNext", s.para.keepNext)}${onOffXml("keepLines", s.para.keepLines)}` +
+    `<w:spacing w:before="${twip(s.para.spaceBefore)}" w:after="${twip(s.para.spaceAfter)}" ${docxLineAttrs(p)}/>${ind}<w:jc w:val="${JC_OUT[s.para.align]}"/>` +
+    `${level ? `<w:outlineLvl w:val="${Number(level) - 1}"/>` : ""}</w:pPr>`;
+  const rPr =
+    `<w:rPr><w:rFonts w:ascii="${esc(r.latinFont ?? r.fontFamily)}" w:hAnsi="${esc(r.latinFont ?? r.fontFamily)}" w:eastAsia="${esc(r.fontFamily)}"/>` +
+    `${onOffXml("b", r.bold)}${onOffXml("bCs", r.bold)}${onOffXml("i", r.italic)}${onOffXml("iCs", r.italic)}${onOffXml("strike", r.strike)}<w:color w:val="${hex6(r.color)}"/>` +
+    `<w:sz w:val="${Math.round((r.fontSize / PT) * 2)}"/><w:szCs w:val="${Math.round((r.fontSize / PT) * 2)}"/><w:u w:val="${r.underline ? "single" : "none"}"/></w:rPr>`;
+  const def = s.id === defaultStyleId(sheet);
+  return (
+    `<w:style w:type="paragraph"${def ? ` w:default="1"` : ""}${BUILTIN_STYLE_IDS.has(s.id) || def || WORD_BUILTIN_NAME.test(s.name.trim()) ? "" : ` w:customStyle="1"`} w:styleId="${esc(s.id)}"><w:name w:val="${esc(s.name)}"/>` +
+    `${s.basedOn && !def ? `<w:basedOn w:val="${esc(s.basedOn)}"/>` : ""}${s.next ? `<w:next w:val="${esc(s.next)}"/>` : ""}${s.quick ? "<w:qFormat/>" : ""}${pPr}${rPr}</w:style>`
+  );
+}
+/**
+ * w:rPr children of a run in a paragraph of style look `look` (a file written with its styles): only what differs from
+ * the style, so changing the style in Word changes the run too (Word: direct formatting wins over the style).
+ */
+export function docxRPrStyled(r: TextRun, look: StyleRun, shadow = false): string {
+  const sp = Math.round((absoluteSpacing(r) / PT) * 20);
+  const font = r.fontFamily !== look.fontFamily || (r.latinFont ?? r.fontFamily) !== (look.latinFont ?? look.fontFamily);
+  const sz = Math.round((r.fontSize / PT) * 2), lsz = Math.round((look.fontSize / PT) * 2);
+  const flag = (n: string, v: boolean, base: boolean) => (v === base ? "" : v ? `<w:${n}/>` : `<w:${n} w:val="0"/>`);
+  return (
+    (font ? `<w:rFonts w:ascii="${esc(r.latinFont ?? r.fontFamily)}" w:hAnsi="${esc(r.latinFont ?? r.fontFamily)}" w:eastAsia="${esc(r.fontFamily)}"/>` : "") +
+    flag("b", !!r.bold, look.bold) + flag("i", !!r.italic, look.italic) + flag("strike", !!r.strike, !!look.strike) + (shadow ? "<w:shadow/>" : "") +
+    (hex6(r.color) !== hex6(look.color) ? `<w:color w:val="${hex6(r.color)}"/>` : "") +
+    (sp ? `<w:spacing w:val="${sp}"/>` : "") +
+    (r.hscale && r.hscale !== 100 ? `<w:w w:val="${Math.round(Math.max(1, Math.min(600, r.hscale)))}"/>` : "") +
+    (sz !== lsz ? `<w:sz w:val="${sz}"/>` : "") +
+    (!!r.underline !== look.underline ? `<w:u w:val="${r.underline ? "single" : "none"}"/>` : "") +
+    (r.highlight ? `<w:shd w:val="clear" w:color="auto" w:fill="${hex6(r.highlight)}"/>` : "") +
+    (r.script ? `<w:vertAlign w:val="${r.script === "super" ? "superscript" : "subscript"}"/>` : "")
+  );
+}
+
+/** w:pPr of a paragraph in a sheet's style (docxPPr): spacing, indents, alignment and keeps only where they differ from the style's. */
+export function docxPPrStyled(p: TextParagraph, sheet: readonly DocStyle[], pStyle: string, numPr: string): string {
+  const id = styleIdOf(p, sheet);
+  const s = findStyle(sheet, id);
+  const gen = docxPPr(p, pStyle, numPr);
+  if (!s) return gen;
+  const sp = paragraphInStyle(sheet, id);
+  const attrsOf = (x: string) => new Map(Array.from(x.matchAll(/(w:\w+)="([^"]*)"/g), (m) => [m[1], m[2]] as [string, string]));
+  let out = gen;
+  // spacing: the attributes that differ
+  const mine = /<w:spacing\b[^>]*\/>/.exec(gen)?.[0];
+  if (mine) {
+    const want = attrsOf(mine), base = attrsOf(`<w:spacing w:before="${twip(s.para.spaceBefore)}" w:after="${twip(s.para.spaceAfter)}" ${docxLineAttrs(sp)}/>`);
+    if (!want.has("w:before")) want.set("w:before", "0");
+    const keep = [...want].filter(([k, v]) => base.get(k) !== v || (k === "w:lineRule" && base.get("w:line") !== want.get("w:line")) || (k === "w:line" && base.get("w:lineRule") !== want.get("w:lineRule")));
+    out = out.replace(mine, keep.length ? `<w:spacing ${keep.map(([k, v]) => `${k}="${v}"`).join(" ")}/>` : "");
+  }
+  // indents: kept for list items (their numbering's), else when they differ
+  if (!numPr) {
+    const ind = /<w:ind\b[^>]*\/>/.exec(out)?.[0];
+    const same = Math.abs((p.indentLeft ?? 0) - s.para.indentLeft) < 0.5 && Math.abs((p.indentRight ?? 0) - s.para.indentRight) < 0.5 && Math.abs(p.indent - s.para.indent) < 0.5;
+    if (ind && same) out = out.replace(ind, "");
+    else if (!ind && !same) out = out.replace(/(<w:jc\b)/, `<w:ind w:left="${twip(p.indentLeft ?? 0)}" w:right="${twip(p.indentRight ?? 0)}"${p.indent < 0 ? ` w:hanging="${twip(-p.indent)}"` : ` w:firstLine="${twip(p.indent)}"`}/>$1`);
+  }
+  if (p.align === s.para.align) out = out.replace(/<w:jc w:val="[^"]*"\/>/, "");
+  // keeps the style gives that the paragraph does not have: switched off
+  const head = (!!p.keepNext === !!s.para.keepNext ? "" : p.keepNext ? "" : `<w:keepNext w:val="0"/>`) + (!!p.keepLines === !!s.para.keepLines ? "" : p.keepLines ? "" : `<w:keepLines w:val="0"/>`);
+  if (!!p.keepNext === !!s.para.keepNext) out = out.replace("<w:keepNext/>", "");
+  if (!!p.keepLines === !!s.para.keepLines) out = out.replace("<w:keepLines/>", "");
+  if (head) out = out.replace(/^<w:pPr>(<w:pStyle\b[^>]*\/>)?/, (m) => m + head);
+  // the outline level is the style's (a heading style)
+  if (s.role && s.role === p.role) out = out.replace(/<w:outlineLvl w:val="\d+"\/>/, "");
+  return out;
+}
+
+/** Word's built-in style names (w:name): such a style is never w:customStyle (Word would rename it "제목 11"). */
+const WORD_BUILTIN_NAME = /^(normal|heading [1-9]|title|subtitle|quote|intense quote|caption|no spacing|list paragraph|toc heading|toc [1-9]|header|footer|footnote text|endnote text|body text|list bullet|list number)$/i;
+const BUILTIN_STYLE_IDS = new Set(["Normal", "Title", "Subtitle", "Quote", "Caption", "Heading1", "Heading2", "Heading3", "Heading4", "Heading5", "Heading6"]);
+
+/** styles.xml with the sheet's edited styles written in: each replaces the w:style of its id, a new one is appended. */
+export function patchDocxStyles(xml: string, sheet: readonly DocStyle[]): string {
+  let out = xml;
+  for (const s of sheet) {
+    if (!s.edited || s.type !== "para") continue;
+    const el = docxStyleXml(s, sheet);
+    const idRe = s.id.replace(/[.*+?^$|()[\]{}\\]/g, (c) => "\\" + c);
+    const re = new RegExp('<w:style\\b[^>]*\\bw:styleId="' + idRe + '"[^>]*?(?:/>|>[\\s\\S]*?</w:style>)');
+    if (re.test(out)) out = out.replace(re, () => el);
+    else out = out.replace("</w:styles>", () => el + "</w:styles>");
+  }
+  return out;
+}
+
 // ── footnotes / endnotes (core/notes.ts) ──
 
 /** While a DOCX is written (exportDocx, the Office Surgeon): the w:id each note is written with. */
@@ -3108,8 +3710,99 @@ export function flowNotes(flow: readonly FlowItem[]): NoteRef[] {
 }
 
 /** One w:r per run; `rPrOf` may return an original w:rPr element to reuse instead of a new one. */
-export const docxRuns = (runs: TextRun[], rPrOf?: (r: TextRun) => string | null | undefined, shadow = false) =>
+export const docxRuns = (runs: TextRun[], rPrOf?: (r: TextRun) => string | null | undefined, shadow = false) => {
+  // bookmarks (core/docRefs.ts) around the runs they cover
+  const marks = runs.some((r) => r.bookmarks?.length) ? docxBookmarkMarks(runs) : null;
+  let at = 0;
+  return linkGroups(runs)
+    .map((g) => {
+      const xml = docxRunsPlain(g.runs, rPrOf, shadow, marks ? { ...marks, from: at } : undefined);
+      at += g.runs.length;
+      // a hyperlink (TextRun.link): Word's HYPERLINK field around its runs — no relationship to add, Word follows it
+      // and shows it as a link (a "#mark" is a bookmark in the document: \l)
+      if (!g.link) return xml;
+      const instr = g.link.startsWith("#") ? ` HYPERLINK \\l "${g.link.slice(1)}" ` : ` HYPERLINK "${g.link}" `;
+      return `<w:fldSimple w:instr="${esc(instr)}">${xml}</w:fldSimple>`;
+    })
+    .join("");
+};
+
+/**
+ * The bookmarks of a paragraph element that begin and end in it, by the w:r elements they cover (Word's _GoBack, the
+ * last edit place, left out).
+ */
+export function docxBookmarksIn(p: Element): Map<Element, string[]> {
+  const open = new Map<string, string>();
+  const closed = new Set<string>();
+  const at = new Map<Element, string[]>();
+  const names = new Map<string, string>();
+  const walk = (el: Element) => {
+    for (const c of children(el)) {
+      const ln = c.localName;
+      if (ln === "bookmarkStart") {
+        const id = attr(c, "id") ?? "";
+        const name = attr(c, "name") ?? "";
+        if (name && name !== "_GoBack") {
+          open.set(id, name);
+          names.set(id, name);
+        }
+      } else if (ln === "bookmarkEnd") {
+        const id = attr(c, "id") ?? "";
+        if (open.delete(id)) closed.add(id);
+      } else if (ln === "r") {
+        if (open.size) at.set(c, [...open.keys()]);
+      } else walk(c);
+    }
+  };
+  walk(p);
+  const out = new Map<Element, string[]>();
+  for (const [r, ids] of at) {
+    const ns = ids.filter((id) => closed.has(id)).map((id) => names.get(id)!);
+    if (ns.length) out.set(r, ns);
+  }
+  return out;
+}
+
+/** w:id of each bookmark written while a DOCX is written (new ones counted from far above any file's own). */
+const bmIds = new Map<string, number>();
+let bmNext = 900001;
+export const docxBookmarkId = (name: string) => {
+  let v = bmIds.get(name);
+  if (v === undefined) bmIds.set(name, (v = bmNext++));
+  return v;
+};
+
+/** The bookmark marks before / after each run: a name begins at the first run of a stretch carrying it, ends after the last. */
+export function docxBookmarkMarks(runs: readonly TextRun[]): { before: string[]; after: string[] } {
+  const before = runs.map(() => ""), after = runs.map(() => "");
+  runs.forEach((r, i) => {
+    for (const name of r.bookmarks ?? []) {
+      if (!runs[i - 1]?.bookmarks?.includes(name)) before[i] += `<w:bookmarkStart w:id="${docxBookmarkId(name)}" w:name="${esc(name)}"/>`;
+      if (!runs[i + 1]?.bookmarks?.includes(name)) after[i] += `<w:bookmarkEnd w:id="${docxBookmarkId(name)}"/>`;
+    }
+  });
+  return { before, after };
+}
+
+/** Runs in groups: consecutive runs of the same link together, the others one group each (fields and notes never in a link). */
+function linkGroups(runs: TextRun[]): { link?: string; runs: TextRun[] }[] {
+  const out: { link?: string; runs: TextRun[] }[] = [];
+  for (const r of runs) {
+    const link = r.link && !r.field && !r.note && !r.noteMark ? r.link : undefined;
+    const last = out[out.length - 1];
+    if (link && last?.link === link) last.runs.push(r);
+    else out.push({ ...(link ? { link } : {}), runs: [r] });
+  }
+  return out;
+}
+
+const docxRunsPlain = (runs: TextRun[], rPrOf?: (r: TextRun) => string | null | undefined, shadow = false, marks?: { before: string[]; after: string[]; from: number }) =>
   runs
+    .map((r, i) => (marks ? marks.before[marks.from + i] : "") + docxRunXml(r, rPrOf, shadow) + (marks ? marks.after[marks.from + i] : ""))
+    .join("");
+
+const docxRunXml = (r: TextRun, rPrOf?: (r: TextRun) => string | null | undefined, shadow = false) =>
+  [r]
     .map((r) => {
       const nx = r.note || r.noteMark ? docxNoteRunXml(r, rPrOf?.(r) ?? `<w:rPr>${docxRPr(r, shadow)}</w:rPr>`) : null;
       if (nx != null) return nx;
@@ -3117,14 +3810,32 @@ export const docxRuns = (runs: TextRun[], rPrOf?: (r: TextRun) => string | null 
       // w:rPrChange with the format before it)
       const former = formerRun(r);
       const rPr = rPrOf?.(r) ?? (former ? docxWithRPrChange(`<w:rPr>${docxRPr(r, shadow)}</w:rPr>`, r.fmtRev!, docxRPr(former, shadow)) : `<w:rPr>${docxRPr(r, shadow)}</w:rPr>`);
+      if (r.ruby) return docxRevXml(r, docxRubyXml(r, rPr, shadow));
       const run = docxRevXml(r, `<w:r>${rPr}${docxText(r.field && !r.text ? "1" : r.text)}</w:r>`);
       // a field (header / footer page number …): Word's simple field with the value shown now as its result
       return r.field ? `<w:fldSimple w:instr="${esc(r.fieldCode ?? DOCX_FIELD_INSTR[r.field])}">${run}</w:fldSimple>` : run;
     })
     .join("");
 
+/**
+ * A run with 덧말 (TextRun.ruby) as Word's w:ruby: the ruby in w:rt at its size, the text in w:rubyBase with the run's
+ * format. (Word has no 덧말 under the text: one under 한글's text is written over it.)
+ */
+export function docxRubyXml(r: TextRun, rPr: string, shadow = false): string {
+  const rb = r.ruby!;
+  const hp = (px: number) => Math.max(1, Math.round((px / PT) * 2));
+  const size = rubySize(r);
+  const src = rb.src ?? {};
+  const pr =
+    `<w:rubyAlign w:val="${esc(src.rubyAlign ?? "center")}"/><w:hps w:val="${hp(size)}"/><w:hpsRaise w:val="${hp(rb.raise ?? r.fontSize * 0.9)}"/>` +
+    `<w:hpsBaseText w:val="${esc(src.hpsBaseText ?? String(hp(r.fontSize)))}"/><w:lid w:val="${esc(src.lid ?? "ko-KR")}"/>`;
+  const { ruby: _r, rev: _v, fmtRev: _f, comments: _c, ...base } = r;
+  const rtRPr = docxRPr({ ...base, fontSize: size, ...(rb.font ? { fontFamily: rb.font, latinFont: undefined } : {}) }, shadow);
+  return `<w:r><w:ruby><w:rubyPr>${pr}</w:rubyPr><w:rt><w:r><w:rPr>${rtRPr}</w:rPr>${docxText(rb.text)}</w:r></w:rt><w:rubyBase><w:r>${rPr}${docxText(r.text)}</w:r></w:rubyBase></w:ruby></w:r>`;
+}
+
 /** Word field instruction of each field (a DATE read from a file keeps its own, fieldCode). */
-export const DOCX_FIELD_INSTR: Record<FieldKind, string> = { page: " PAGE  \\* MERGEFORMAT ", pages: " NUMPAGES  \\* MERGEFORMAT ", secpages: " SECTIONPAGES  \\* MERGEFORMAT ", date: ' DATE \\@ "yyyy-MM-dd" ', file: " FILENAME " };
+export const DOCX_FIELD_INSTR: Record<FieldKind, string> = { page: " PAGE  \\* MERGEFORMAT ", pages: " NUMPAGES  \\* MERGEFORMAT ", secpages: " SECTIONPAGES  \\* MERGEFORMAT ", date: ' DATE \\@ "yyyy-MM-dd" ', file: " FILENAME ", seq: " SEQ Figure \\* ARABIC ", ref: " REF ", pageref: " PAGEREF " };
 
 /** Runs as written: a list paragraph without its marker text (the numbering draws it). */
 export const docxBodyRuns = (p: TextParagraph, list: boolean) => (list ? bodyRuns(p) : p.runs);
@@ -3188,7 +3899,48 @@ export function docxCellParas(t: TableNode, c: TableCell, header: boolean, para:
  * A whole w:tbl, `para` writing each cell paragraph; `tblPr` (an original w:tblPr) replaces the generated one;
  * `inner`: original content (paragraphs and a table nested in the cell) written as is for these cells.
  */
+/**
+ * A 목차 the app made (TableNode.toc) as Word's own table of contents: its title, then a TOC field whose result is the
+ * entries (text, a dotted tab, the page) — Word updates it (F9, 필드 업데이트) and keeps it a 목차.
+ */
+function docxTocXml(t: TableNode, para: (p: TextParagraph) => string): string {
+  const width = twip(t.colWidths.reduce((a, b) => a + b, 0));
+  const title = t.rows[0]?.[0];
+  const head = title?.richText?.[0] ? para(title.richText[0]) : `<w:p><w:r><w:rPr><w:b/></w:rPr>${docxText(title?.text ?? "")}</w:r></w:p>`;
+  const entries = t.rows.slice(1);
+  const fld = (ty: string) => `<w:r><w:fldChar w:fldCharType="${ty}"/></w:r>`;
+  const body = entries
+    .map((row, i) => {
+      const rp = row[0]?.richText?.[0];
+      const ind = Math.round(rp?.indentLeft ?? 0);
+      const bold = !!row[0]?.bold;
+      const rPr = bold ? "<w:rPr><w:b/></w:rPr>" : "";
+      const start = i === 0 ? `${fld("begin")}<w:r><w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u </w:instrText></w:r>${fld("separate")}` : "";
+      const end = i === entries.length - 1 ? fld("end") : "";
+      return `<w:p><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="${width}"/></w:tabs>${ind ? `<w:ind w:left="${twip(ind)}"/>` : ""}</w:pPr>${start}<w:r>${rPr}${docxText(row[0]?.text ?? "")}</w:r><w:r>${rPr}<w:tab/></w:r><w:r>${rPr}${docxText(row[1]?.text ?? "")}</w:r>${end}</w:p>`;
+    })
+    .join("");
+  return `<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Table of Contents"/><w:docPartUnique/></w:docPartObj></w:sdtPr><w:sdtContent>${head}${body || `<w:p>${fld("begin")}<w:r><w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u </w:instrText></w:r>${fld("separate")}${fld("end")}</w:p>`}</w:sdtContent></w:sdt>`;
+}
+
+/**
+ * The table's alignment (TableNode.wordAlign, 표 속성) in its original w:tblPr: w:jc replaced, added after w:tblW (CT_TblPr
+ * order: tblStyle … tblW, jc, …) or taken off for a left table.
+ */
+export function withTableJc(tblPr: string, jc: "center" | "right" | undefined): string {
+  const cur = /<w:jc w:val="(\w+)"\/>/.exec(tblPr)?.[1];
+  const want = jc ?? null;
+  if ((cur === "center" || cur === "right" ? cur : null) === want) return tblPr;
+  const out = tblPr.replace(/<w:jc w:val="\w+"\/>/, "");
+  if (!want) return out;
+  const tag = `<w:jc w:val="${want}"/>`;
+  const w = /<w:tblW [^>]*\/>/.exec(out);
+  return w ? out.slice(0, w.index + w[0].length) + tag + out.slice(w.index + w[0].length) : out.replace(/<w:tblPr>/, `<w:tblPr>${tag}`);
+}
+
 export function docxTableXml(t: TableNode, para: (p: TextParagraph) => string, tblPr?: string, inner?: Map<TableCell, string>): string {
+  // (a 목차: Word's own, which Word can update)
+  if (t.toc) return docxTocXml(t, para);
     const border = `<w:tblBorders>${["top", "left", "bottom", "right", "insideH", "insideV"].map((b) => `<w:${b} w:val="single" w:sz="4" w:space="0" w:color="${hex6(t.borderColor)}"/>`).join("")}</w:tblBorders>`;
     const cover = coverMap(t.rows);
     const tc = (ci: number, inner: string, fill: string | null, cs: number, vMerge: string, va?: TableCell["vAlign"]) => {
@@ -3217,12 +3969,13 @@ export function docxTableXml(t: TableNode, para: (p: TextParagraph) => string, t
           })
           .join("");
         // the row's own height (Word w:trHeight, TableCell.minHeight: at least) — QA 11-23: a Word table written anew lost it
-        const mh = Math.max(0, ...r.map((c) => c.minHeight ?? 0));
+        // (and the height a dragged row edge gave it, TableCell.rowMin)
+        const mh = Math.max(0, ...r.map((c) => Math.max(c.minHeight ?? 0, c.rowMin ?? 0)));
         const trPr = (mh > 0 ? `<w:trHeight w:val="${twip(mh)}"/>` : "") + (header ? "<w:tblHeader/>" : "");
         return `<w:tr>${trPr ? `<w:trPr>${trPr}</w:trPr>` : ""}${cells}</w:tr>`;
       })
       .join("");
-    return `<w:tbl>${tblPr ?? `<w:tblPr><w:tblW w:w="0" w:type="auto"/>${t.wordAlign ? `<w:jc w:val="${t.wordAlign.jc}"/>` : ""}${border}<w:tblLayout w:type="fixed"/>${mar}</w:tblPr>`}<w:tblGrid>${t.colWidths.map((w) => `<w:gridCol w:w="${twip(w)}"/>`).join("")}</w:tblGrid>${rows}</w:tbl>`;
+    return `<w:tbl>${tblPr ? withTableJc(tblPr, t.wordAlign?.jc) : `<w:tblPr><w:tblW w:w="0" w:type="auto"/>${t.wordAlign ? `<w:jc w:val="${t.wordAlign.jc}"/>` : ""}${border}<w:tblLayout w:type="fixed"/>${mar}</w:tblPr>`}<w:tblGrid>${t.colWidths.map((w) => `<w:gridCol w:w="${twip(w)}"/>`).join("")}</w:tblGrid>${rows}</w:tbl>`;
 }
 
 /** A w:sectPr for a section with this page setup. */
@@ -3365,6 +4118,8 @@ export function exportDocx(pages: Page[], opts: OfficeExportOptions = {}): Uint8
 }
 
 function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
+  // named styles (core/docStyles.ts): the sheet is written when the document has one or a paragraph is in one
+  const sheet = pages[0]?.docStyles?.length || pages.some((pg) => pg.nodes.some((n) => n.type === "TEXT" && n.paragraphs.some((q) => q.style))) ? styleSheet(pages) : null;
   const docDefaults = docxDocDefaults(pages);
   const starts: number[] = [];
   const flow = collectFlow(pages, starts);
@@ -3421,16 +4176,32 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
     const m = ml.of(p);
     const level = p.role && /^h([1-6])$/.exec(p.role)?.[1];
     const numPr = m ? docxNumPr(firstMlNum + m.inst, m.level) : list ? docxNumPr(list.kind === "li" ? 1 : list.id + 1) : "";
-    let pPr = docxPPr(p, level ? `<w:pStyle w:val="Heading${level}"/>` : "", numPr);
+    const pStyle = p.style ? `<w:pStyle w:val="${esc(p.style)}"/>` : level ? `<w:pStyle w:val="Heading${level}"/>` : "";
+    // with its styles written (core/docStyles.ts): only what differs from the paragraph's style is its own
+    let pPr = sheet ? docxPPrStyled(p, sheet, pStyle, numPr) : docxPPr(p, pStyle, numPr);
     // the paragraph mark's tracked change (a new file has no move ranges: moves as deletion / insertion)
     if (p.markRev) pPr = docxPPrReview(pPr, p, false);
     if (sect) pPr = pPr.slice(0, -"</w:pPr>".length) + sect + "</w:pPr>"; // CT_PPr: sectPr after rPr
     const runs = docxBodyRuns(p, !!list || !!m);
     const shadow = shadowed.has(p);
     const marks = cmarks ? docxCommentMarks(p, runs, cmarks).filter((x) => !x.xml.includes('w:id=""')) : [];
-    return `<w:p>${pPr}${p.colBreak === "before" ? DOCX_COL_BREAK : ""}${anchorRuns.get(p) ?? ""}${marks.length ? withInserts(runs, marks, (r) => docxRuns([r], undefined, shadow)) : docxRuns(runs, undefined, shadow)}${p.colBreak === "after" ? DOCX_COL_BREAK : ""}</w:p>`;
+    const look = sheet ? styleLook(sheet, styleIdOf(p, sheet)).run : null;
+    const rPrOf = look ? (r: TextRun) => (r.fmtRev ? null : ((x) => (x ? `<w:rPr>${x}</w:rPr>` : ""))(docxRPrStyled(r, look, shadow))) : undefined;
+    return `<w:p>${pPr}${p.colBreak === "before" ? DOCX_COL_BREAK : ""}${anchorRuns.get(p) ?? ""}${marks.length ? withInserts(runs, marks, (r) => docxRuns([r], rPrOf, shadow)) : docxRuns(runs, rPrOf, shadow)}${p.colBreak === "after" ? DOCX_COL_BREAK : ""}</w:p>`;
   };
   const table = (t: TableNode) => docxTableXml(t, para);
+  // shapes and text boxes (io/officeShapes.ts): floating at their page place, anchored like a floating picture
+  const shapes = shapesOf(pages);
+  picTargets(shapes, flow.map((it) => (it.kind === "p" ? it.p.id : it.t.id)), itemTops(pages)).forEach((t) => {
+    const run = `<w:r>${docxShapeXml(t.pic, { id: ++docPr, paras: (ps) => ps.map((q) => para(q)).join("") || "<w:p/>" })}</w:r>`;
+    const it = t.item >= 0 ? flow[t.item] : undefined;
+    if (it?.kind === "p") anchorRuns.set(it.p, (anchorRuns.get(it.p) ?? "") + run);
+    else {
+      const xml = `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${run}</w:p>`;
+      if (t.item < 0) push(picAlone, t.pic.page, xml);
+      else push(t.after ? picAfter : picBefore, t.item, xml);
+    }
+  });
   // page layout: a section ends with a w:sectPr in its last paragraph (an empty paragraph when it ends with a table
   // or has no text); the last section's w:sectPr closes the body; a hard page break is Word's page-break paragraph
   const lay = flowLayout(pages, starts, flow.length);
@@ -3526,9 +4297,12 @@ function exportDocxNotes(pages: Page[], opts: OfficeExportOptions): Uint8Array {
     ),
     // heading styles so paragraphs exported with pStyle HeadingN show up as headings (navigation pane, outline)
     "word/styles.xml": strToU8(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${docDefaults.styles}<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>` +
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${docDefaults.styles}` +
+        // the document's named styles (core/docStyles.ts) when it has a sheet of its own or a paragraph in one
+        (sheet ? sheet.filter((x) => x.type === "para").map((x) => docxStyleXml(x, sheet)).join("") : `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>`) +
         [1, 2, 3, 4, 5, 6]
-          .map((n) => `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:outlineLvl w:val="${n - 1}"/></w:pPr></w:style>`)
+          .filter((n) => !sheet?.some((x) => x.id === `Heading${n}`))
+          .map((n) => `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/><w:basedOn w:val="${sheet ? esc(defaultStyleId(sheet)) : "Normal"}"/><w:next w:val="${sheet ? esc(defaultStyleId(sheet)) : "Normal"}"/><w:qFormat/><w:pPr><w:keepNext/><w:outlineLvl w:val="${n - 1}"/></w:pPr></w:style>`)
           .join("") +
         `</w:styles>`,
     ),
@@ -3870,6 +4644,19 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
   };
   // styles: 0 바탕글, 1..6 개요 1..6 (headings), 7..10 개요 7..10 when an outline item below 개요 6 is written
   const headingStyle: { para: number; char: number }[] = [];
+  // the document's other named styles (core/docStyles.ts) after them: \u0005k\u0005 until their ids are known
+  const sheet = pages[0]?.docStyles?.length || pages.some((pg) => pg.nodes.some((n) => n.type === "TEXT" && n.paragraphs.some((q) => q.style))) ? styleSheet(pages) : null;
+  const named: { s: DocStyle; para: number; char: number }[] = [];
+  const namedStyle = (id: string): number | string => {
+    const s = sheet?.find((x) => x.id === id);
+    if (!s || id === defaultStyleId(sheet!) || s.role) return 0;
+    let k = named.findIndex((x) => x.s.id === id);
+    if (k < 0) {
+      const tpl = paragraphInStyle(sheet!, id);
+      k = named.push({ s, para: paraId(tpl), char: charId({ ...DEFAULT_RUN, ...s.run, text: "" }) }) - 1;
+    }
+    return `\u0005${k}\u0005`;
+  };
   const NS = HWPX_NS;
   let pid = 0, tid = 0;
   const hu = (px: number) => Math.round(px * 75); // px → HWPUNIT (1/7200 inch)
@@ -3884,18 +4671,19 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
     const runList = lists.has(p) || p.list ? bodyRuns(p) : p.runs;
     // header / footer fields: 쪽 번호 / 전체 쪽수 as 한글's automatic numbers, the others as their text; a note
     // reference as 한글's footnote / endnote control holding the note (its number 한글 counts itself)
-    const special = (r: TextRun) => (r.note ? noteXml(r.note) : r.noteMark ? noteNum() : r.field === "page" || r.field === "pages" ? hwpxAutoNum(r.field, fmt) : null);
+    // a 덧말 (hp:dutmal); a caption number (SEQ 그림 / 표 / 수식: core/docRefs.ts) as 한글's own 그림 / 표 / 수식 number
+    const special = (r: TextRun) => (r.ruby ? hwpxDutmalXml(r) : r.note ? noteXml(r.note) : r.noteMark ? noteNum() : r.field === "page" || r.field === "pages" ? hwpxAutoNum(r.field, fmt) : r.field === "seq" ? hwpxSeqNum(r) : null);
     const runs = reviewed(p)
       ? hwpxReviewRuns(p, runList, review, charId, special, hwpxText, DEFAULT_RUN)
-      : runList.map((r) => `<hp:run charPrIDRef="${charId(r)}">${special(r) ?? `<hp:t>${hwpxText(r.text)}</hp:t>`}</hp:run>`).join("");
+      : hwpxLinked(runList, (r) => `<hp:run charPrIDRef="${charId(r)}">${special(r) ?? `<hp:t>${hwpxText(r.text)}</hp:t>`}</hp:run>`, (x) => `<hp:run charPrIDRef="${charId(runList[0] ?? DEFAULT_RUN)}">${x}</hp:run>`);
     const ppr = paraId(p);
-    let style = 0;
+    let style: number | string = 0;
     const deep = level ? null : headOf(p);
     if (level || (deep?.type === "OUTLINE" && deep.level >= 6 && deep.level <= 9)) {
       const n = level ? Number(level) : deep!.level + 1;
       headingStyle[n] ??= { para: ppr, char: charId(p.runs[0] ?? DEFAULT_RUN) };
       style = n;
-    }
+    } else if (p.style && sheet) style = namedStyle(p.style);
     return `<hp:p id="${pid++}" paraPrIDRef="${ppr}" styleIDRef="${style}" pageBreak="${pageBreak ? 1 : 0}" columnBreak="${colBreak ? 1 : 0}" merged="0">${prefix}${runs}</hp:p>`;
   };
   // footnotes / endnotes: 한글's controls, numbered in document order (the note being written: its kind and number)
@@ -3913,45 +4701,7 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
       noteNow = was;
     }
   };
-  const tblXml = (t: TableNode) => {
-    const cover = coverMap(t.rows);
-    const rows = t.rows.length, cols = t.colWidths.length;
-    const width = t.colWidths.reduce((a, b) => a + b, 0);
-    const rowH = Math.max(t.rowHeight, t.fontSize * TABLE_LINE + 8);
-    const trs = t.rows
-      .map((r, ri) => {
-        const header = t.headerRow && ri === 0;
-        const tcs = r
-          .map((c, ci) => {
-            if (cover[ri][ci]) return ""; // covered by a merged cell: not written (OWPML)
-            const { cs, rs } = spanOf(t.rows, ri, ci);
-            const fill = c.fill ?? (header ? t.headerFill : null);
-            const rich = cellRich(c);
-            const ps = rich
-              ? rich.map((p) => pXml(p))
-              : c.text.split("\n").map((line) => {
-                  const run: TextRun = { ...DEFAULT_RUN, text: line, fontFamily: t.fontFamily, fontSize: t.fontSize, bold: !!c.bold || header, italic: !!c.italic, color: c.color ?? t.color };
-                  return pXml({ id: "", runs: [run], align: c.align ?? "LEFT", lineSpacing: TABLE_LINE, indent: 0, spaceAfter: 0 });
-                });
-            const w = t.colWidths.slice(ci, ci + cs).reduce((a, b) => a + b, 0);
-            return (
-              `<hp:tc name="" header="${header ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${bfId(t.borderColor, fill)}">` +
-              `<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps.join("")}</hp:subList>` +
-              `<hp:cellAddr colAddr="${ci}" rowAddr="${ri}"/><hp:cellSpan colSpan="${cs}" rowSpan="${rs}"/><hp:cellSz width="${hu(w)}" height="${hu(rowH * rs)}"/>` +
-              `<hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>`
-            );
-          })
-          .join("");
-        return `<hp:tr>${tcs}</hp:tr>`;
-      })
-      .join("");
-    return (
-      `<hp:tbl id="${1000 + tid++}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="${t.headerRow ? 1 : 0}" rowCnt="${rows}" colCnt="${cols}" cellSpacing="0" borderFillIDRef="${bfId(t.borderColor, null)}" noAdjust="0">` +
-      `<hp:sz width="${hu(width)}" widthRelTo="ABSOLUTE" height="${hu(rowH * rows)}" heightRelTo="ABSOLUTE" protect="0"/>` +
-      `<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>` +
-      `<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>${trs}</hp:tbl>`
-    );
-  };
+  const tblXml = (t: TableNode) => hwpxTblXml(t, { id: 1000 + tid++, para: (p) => pXml(p), bf: bfId });
   // page layout: one section file per section (its hp:secPr in its first paragraph: paper, orientation, margins);
   // a hard page break is pageBreak="1" on the first paragraph of the page (an empty one for a page without text)
   const lay = flowLayout(pages, starts, flow.length);
@@ -3974,10 +4724,20 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
     if (!later && sec.pageNum !== undefined) out.push(`<hp:ctrl>${hwpxPageNumXml(sec.pageNum, sec.fmt)}</hp:ctrl>`);
     return out.join("");
   };
-  const secPrOf = (setup: PageSetup, run: TextRun, k = 0) => {
+  // 쪽 테두리 (Page.border): a border fill of its line, the section's page border fills referring to it
+  const pageBorderFill = (b: PageBorder) => {
+    const k = `pg|${b.style}|${b.width}|${b.color}`;
+    let i = bfKeys.indexOf(k);
+    if (i < 0) {
+      i = bfKeys.push(k) - 1;
+      bfXml.push(hwpxPageBorderFillXml(i + 1, b));
+    }
+    return i + 1;
+  };
+  const pageBorders = (b: PageBorder | undefined) => (!b || !(b.width > 0) ? HWPX_NO_PAGE_BORDER : hwpxPageBorderFills(pageBorderFill(b), b));  const secPrOf = (setup: PageSetup, run: TextRun, k = 0) => {
     const sec = hwSecs[k];
     const on = (b: boolean | undefined) => (b ? 1 : 0);
-    return `<hp:run charPrIDRef="${charId(run)}"><hp:secPr id="" textDirection="HORIZONTAL" spaceColumns="1134" tabStop="8000" tabStopVal="4000" tabStopUnit="HWPUNIT" outlineShapeIDRef="1" memoShapeIDRef="\u0004${k}\u0004" textVerticalWidthHead="0" masterPageCnt="0"><hp:grid lineGrid="0" charGrid="0" wonggojiFormat="0"/><hp:startNum pageStartsOn="BOTH" page="${sec?.start ?? 0}" pic="0" tbl="0" equation="0"/><hp:visibility hideFirstHeader="${on(sec?.hideHeader)}" hideFirstFooter="${on(sec?.hideFooter)}" hideFirstMasterPage="0" border="SHOW_ALL" fill="SHOW_ALL" hideFirstPageNum="${on(sec?.hideNum)}" hideFirstEmptyLine="0" showLineNumber="0"/><hp:lineNumberShape restartType="0" countBy="0" distance="0" startNumber="0"/>${hwpxPagePrXml(setup)}${NOTE_PR}${PAGE_BORDERS}</hp:secPr><hp:ctrl>${hwpxColPrXml(setup.columns)}</hp:ctrl>${hfCtrls(k, setup)}</hp:run>`;
+    return `<hp:run charPrIDRef="${charId(run)}"><hp:secPr id="" textDirection="HORIZONTAL" spaceColumns="1134" tabStop="8000" tabStopVal="4000" tabStopUnit="HWPUNIT" outlineShapeIDRef="1" memoShapeIDRef="\u0004${k}\u0004" textVerticalWidthHead="0" masterPageCnt="0"><hp:grid lineGrid="0" charGrid="0" wonggojiFormat="0"/><hp:startNum pageStartsOn="BOTH" page="${sec?.start ?? 0}" pic="0" tbl="0" equation="0"/><hp:visibility hideFirstHeader="${on(sec?.hideHeader)}" hideFirstFooter="${on(sec?.hideFooter)}" hideFirstMasterPage="0" border="SHOW_ALL" fill="SHOW_ALL" hideFirstPageNum="${on(sec?.hideNum)}" hideFirstEmptyLine="0" showLineNumber="0"/><hp:lineNumberShape restartType="0" countBy="0" distance="0" startNumber="0"/>${hwpxPagePrXml(setup)}${NOTE_PR}${pageBorders(setup.border)}</hp:secPr><hp:ctrl>${hwpxColPrXml(setup.columns)}</hp:ctrl>${hfCtrls(k, setup)}</hp:run>`;
   };
   const itemXml = (it: FlowItem, prefix: string, pageBreak: boolean) => {
     if (it.kind === "p") return pXml(it.p, prefix, pageBreak);
@@ -3999,6 +4759,18 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
       anchorRuns.set(t.item, (anchorRuns.get(t.item) ?? "") + `<hp:run charPrIDRef="${charId(first)}">${xml}<hp:t/></hp:run>`);
     } else if (t.item < 0) push(alone, pic.page, { xml, align: pic.align, indent: pic.indent, before: t.before });
     else push(t.after ? after : before, t.item, { xml, align: pic.align, indent: pic.indent, before: t.before, after: t.below });
+  });
+  // shapes and text boxes (io/officeShapes.ts): floating at their page place, anchored like a floating picture
+  let shapeId = 1950000000;
+  // (a hidden one has no place in 한글, which has no hidden objects: the save says so first, ui/exportGuard.ts)
+  const shapes = shapesOf(pages).filter((x) => x.node.visible);
+  picTargets(shapes, flow.map((it) => (it.kind === "p" ? it.p.id : it.t.id)), itemTops(pages)).forEach((t) => {
+    const xml = hwpxShapeXml(t.pic, { id: () => shapeId++, paras: (ps) => (ps.length ? ps : [newParagraph("", { fontSize: 10 * PT })]).map((q) => pXml(q, "", false)).join("") });
+    const it = t.item >= 0 ? flow[t.item] : undefined;
+    if (it) {
+      const first = it.kind === "p" ? it.p.runs[0] ?? DEFAULT_RUN : DEFAULT_RUN;
+      anchorRuns.set(t.item, (anchorRuns.get(t.item) ?? "") + `<hp:run charPrIDRef="${charId(first)}">${xml}<hp:t/></hp:run>`);
+    } else push(alone, t.pic.page, { xml, align: "LEFT", indent: 0, before: 0 });
   });
   /** a paragraph holding one picture (inline: aligned like it is placed) */
   const picParaXml = (x: HPic, prefix: string, pageBreak: boolean) => {
@@ -4054,7 +4826,8 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
       secBodies[pg.section] += itemXml(flow[k], (carry?.prefix ?? "") + (anchorRuns.get(k) ?? ""), !!carry?.pageBreak);
       for (const x of after.get(k) ?? []) picPara(x);
     }
-    if (pg.from >= pg.to) for (const x of alone.get(lay.pages.indexOf(pg)) ?? []) picPara(x);
+    // (objects of a page no item of which is placed — a page of objects only, its empty paragraph made above: after it)
+    for (const x of alone.get(lay.pages.indexOf(pg)) ?? []) picPara(x);
   });
   flushEmpty();
   const fontsXml = (lang: string) =>
@@ -4104,7 +4877,12 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
         .join("")}</hh:memoProperties>`
     : "";
   // memo fields: each ends after its last text; sections name their memo box (0: 한글's own)
-  const bodies = review.finish(secBodies).map((b) => b.replace(/\u0003memo-style\u0003/g, String(styleCnt)).replace(/\u0004(\d+)\u0004/g, (_, k: string) => secBox.get(Number(k)) ?? "0"));
+  const namedBase = styleCnt + (memoStyle ? 1 : 0);
+  const namedIndex = (id: string | undefined) => named.findIndex((x) => x.s.id === id);
+  const namedXml = named
+    .map((x, k) => `<hh:style id="${namedBase + k}" type="PARA" name="${esc(x.s.name)}" engName="${esc(x.s.engName ?? "")}" paraPrIDRef="${x.para}" charPrIDRef="${x.char}" nextStyleIDRef="${namedIndex(x.s.next) >= 0 ? namedBase + namedIndex(x.s.next) : x.s.next ? 0 : namedBase + k}" langID="1042" lockForm="0"/>`)
+    .join("");
+  const bodies = review.finish(secBodies).map((b) => b.replace(/\u0005(\d+)\u0005/g, (_, k: string) => String(namedBase + Number(k))).replace(/\u0003memo-style\u0003/g, String(styleCnt)).replace(/\u0004(\d+)\u0004/g, (_, k: string) => secBox.get(Number(k)) ?? "0"));
   const header =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><hh:head ${NS} version="1.4" secCnt="${secBodies.length}"><hh:beginNum page="1" footnote="1" endnote="1" pic="1" tbl="1" equation="1"/><hh:refList>` +
     `<hh:fontfaces itemCnt="7">${["HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER"].map(fontsXml).join("")}</hh:fontfaces>` +
@@ -4114,7 +4892,7 @@ export function exportHwpx(pages: Page[], title: string, opts: OfficeExportOptio
     `<hh:numberings itemCnt="${numberedLists + 1 + ml.insts.length}">${numberings}</hh:numberings>` +
     `<hh:bullets itemCnt="${1 + mlBullets.length}">${bullets}</hh:bullets>` +
     `<hh:paraProperties itemCnt="${paraXml.length}">${paraXml.join("")}</hh:paraProperties>` +
-    `<hh:styles itemCnt="${styleCnt + (memoStyle ? 1 : 0)}">${styles}${memoStyle}</hh:styles>` +
+    `<hh:styles itemCnt="${namedBase + named.length}">${styles}${memoStyle}${namedXml}</hh:styles>` +
     memoBoxXml +
     review.madeLists() +
     `</hh:refList><hh:compatibleDocument targetProgram="HWP201X"><hh:layoutCompatibility/></hh:compatibleDocument><hh:docOption><hh:linkinfo path="" pageInherit="0" footnoteInherit="0"/></hh:docOption><hh:trackchageConfig flags="${pages[0]?.trackChanges ? 57 : 56}"/></hh:head>`;
@@ -4154,7 +4932,7 @@ const HWPX_NS =
 const notePr = (tag: string, place: string, length: number, between: number) =>
   `<hp:${tag}><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="" suffixChar=")" supscript="0"/><hp:noteLine length="${length}" type="SOLID" width="0.12 mm" color="#000000"/><hp:noteSpacing betweenNotes="${between}" belowLine="567" aboveLine="850"/><hp:numbering type="CONTINUOUS" newNum="1"/><hp:placement place="${place}" beneathText="0"/></hp:${tag}>`;
 const NOTE_PR = notePr("footNotePr", "EACH_COLUMN", -1, 283) + notePr("endNotePr", "END_OF_DOCUMENT", 14692344, 0);
-const PAGE_BORDERS = ["BOTH", "EVEN", "ODD"]
+export const HWPX_NO_PAGE_BORDER = ["BOTH", "EVEN", "ODD"]
   .map((t) => `<hp:pageBorderFill type="${t}" borderFillIDRef="1" textBorder="PAPER" headerInside="0" footerInside="0" fillArea="PAPER"><hp:offset left="1417" right="1417" top="1417" bottom="1417"/></hp:pageBorderFill>`)
   .join("");
 
@@ -4192,7 +4970,49 @@ function outerSubLists(el: Element): Element[] {
 }
 
 /** hh:borderFill: border colour (null = no borders) and optional cell fill. */
-function borderFill(id: number, border: string | null, fill: string | null): string {
+/** A table as 한글's hp:tbl (cells' paragraphs by `para`, border fills by `bf`): the full writer's and the Office Surgeon's. */
+export function hwpxTblXml(t: TableNode, o: { id: number; para: (p: TextParagraph) => string; bf: (border: string, fill: string | null) => number | string }): string {
+  const hu = (px: number) => Math.round(px * 75); // px → HWPUNIT (1/7200 inch)
+  const cover = coverMap(t.rows);
+  const rows = t.rows.length, cols = t.colWidths.length;
+  const width = t.colWidths.reduce((a, b) => a + b, 0);
+  const rowH = Math.max(t.rowHeight, t.fontSize * TABLE_LINE + 8);
+  const trs = t.rows
+    .map((r, ri) => {
+      const header = t.headerRow && ri === 0;
+      const tcs = r
+        .map((c, ci) => {
+          if (cover[ri][ci]) return ""; // covered by a merged cell: not written (OWPML)
+          const { cs, rs } = spanOf(t.rows, ri, ci);
+          const fill = c.fill ?? (header ? t.headerFill : null);
+          const rich = cellRich(c);
+          const ps = rich
+            ? rich.map((p) => o.para(p))
+            : c.text.split("\n").map((line) => {
+                const run: TextRun = { ...DEFAULT_RUN, text: line, fontFamily: t.fontFamily, fontSize: t.fontSize, bold: !!c.bold || header, italic: !!c.italic, color: c.color ?? t.color };
+                return o.para({ id: "", runs: [run], align: c.align ?? "LEFT", lineSpacing: TABLE_LINE, indent: 0, spaceAfter: 0 });
+              });
+          const w = t.colWidths.slice(ci, ci + cs).reduce((a, b) => a + b, 0);
+          return (
+            `<hp:tc name="" header="${header ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${o.bf(t.borderColor, fill)}">` +
+            `<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">${ps.join("")}</hp:subList>` +
+            `<hp:cellAddr colAddr="${ci}" rowAddr="${ri}"/><hp:cellSpan colSpan="${cs}" rowSpan="${rs}"/><hp:cellSz width="${hu(w)}" height="${hu(rowH * rs)}"/>` +
+            `<hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>`
+          );
+        })
+        .join("");
+      return `<hp:tr>${tcs}</hp:tr>`;
+    })
+    .join("");
+  return (
+    `<hp:tbl id="${o.id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="${t.headerRow ? 1 : 0}" rowCnt="${rows}" colCnt="${cols}" cellSpacing="0" borderFillIDRef="${o.bf(t.borderColor, null)}" noAdjust="0">` +
+    `<hp:sz width="${hu(width)}" widthRelTo="ABSOLUTE" height="${hu(rowH * rows)}" heightRelTo="ABSOLUTE" protect="0"/>` +
+    `<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>` +
+    `<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="510" right="510" top="141" bottom="141"/>${trs}</hp:tbl>`
+  );
+}
+
+export function borderFill(id: number, border: string | null, fill: string | null): string {
   const side = (n: string) => `<hh:${n} type="${border ? "SOLID" : "NONE"}" width="0.12 mm" color="#${border ? hex6(border) : "000000"}"/>`;
   return (
     `<hh:borderFill id="${id}" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>` +

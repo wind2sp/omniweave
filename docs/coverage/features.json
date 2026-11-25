@@ -1765,10 +1765,10 @@
    "category": "패스파인더·패스",
    "name": "패스파인더: 합치기",
    "weight": 3,
-   "status": "부분",
-   "evidence": "src/core/vector.ts:pathfinder (polygon-clipping, 0.35px 평탄화) + actions.ts:runPathfinder",
+   "status": "완료",
+   "evidence": "src/core/vector.ts:pathfinder (polygon-clipping, 꼬리표 붙인 표본) + core/curveKeep.ts(원래 베지어 복원) + actions.ts:runPathfinder",
    "feasibility": "가능-중간",
-   "note": "결과가 다각형으로 근사됨(베지어 손실) — 테스트로 확인",
+   "note": "곡선 가장자리는 원래 도형의 베지어 조각으로 남음(2026-11-25) — 테스트로 확인",
    "testId": "tests/coverage/vector.test.ts#IL-030",
    "verify": "test"
   },

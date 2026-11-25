@@ -141,5 +141,7 @@
   "docmode.status.countTip": "글자 수 세기 (공백 제외 글자 수)",
   "docmode.status.langTip": "본문에 가장 많이 쓰인 언어",
   "docmode.ruler.topTip": "문단 들여쓰기: 위 ▽ 첫 줄 · 아래 ▲ 내어쓰기 · □ 왼쪽 · 오른쪽 ▲ — 끌어서 조정 (Alt: 눈금 무시). 두 번 클릭: 쪽 설정",
-  "docmode.ruler.leftTip": "세로 눈금자 — 위·아래 여백이 음영으로 보입니다. 두 번 클릭: 쪽 설정"
+  "docmode.ruler.leftTip": "세로 눈금자 — 위·아래 여백이 음영으로 보입니다. 두 번 클릭: 쪽 설정",
+  "docmode.status.pageBoxTip": "쪽 번호를 입력하고 Enter로 그 쪽으로 갑니다 (PgUp·PgDn·Home·End로도 넘김)",
+  "docmode.status.pageCount": "{m}쪽"
 }

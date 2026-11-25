@@ -5,15 +5,31 @@
 
 import { currentPage, useStore } from "../../core/store";
 import { nodeBounds } from "../../core/loom";
-import { pickableOn } from "../../core/layerTree";
+import { groupIndex, groupPath, lockedInTree, pickableOn } from "../../core/layerTree";
 import type { CadSourceMeta, Page, SceneNode, TextNode, VectorNode } from "../../core/types";
 import { quantizeZoom } from "../../render/weave";
 import { t } from "../../i18n";
 import { useUI } from "../shell/uiStore";
-import { answer, bridge, cancel, eraseNodes, gripsOf, promptText, say, startGrip, submit, textParts, useCmd, type Shape } from "./engine";
-import { angleOf, ap, constrain, deg, dist, fmt, mul, nearest, nodeSegs, osnap, pageToW, wToPage, type Mat, type Seg, type SnapHit, type W, arcOf, bez } from "./geom";
+import { active, answer, blockEdit, bridge, cancel, eraseNodes, gripsOf, promptText, run, say, startGrip, submit, textParts, transformNodes, useCmd, type Shape } from "./engine";
+import { cad as cadDoor } from "./hooks";
+import { clipCopy, clipPaste } from "./moreEdit";
+import { insertOf } from "./moreBlock";
+import { pointInPoly } from "./hatch";
+import { arrayGrips, arrayOf, startArrayGrip } from "./moreExtra";
+/** The arrays the selection holds (their group ids). */
+function selectedArrays(page: Page): string[] {
+  const out = new Set<string>();
+  for (const id of S().selection.slice(0, 200)) {
+    const g = arrayOf(page, id);
+    if (g) out.add(g.id);
+  }
+  return [...out];
+}
+import type { MenuItem } from "../shell/controls";
+import { angleOf, ap, constrain, deg, dist, fmt, mul, nearest, nodeSegs, osnap, pageToW, translate, wToPage, type Mat, type Seg, type SnapHit, type W, arcOf, bez } from "./geom";
 import type { CadCanvasHooks, CanvasEnv } from "./hooks";
 import { F_KEYS, toggle, useCadUI } from "./state";
+import "./more";
 
 const S = () => useStore.getState();
 export const MODEL_DARK = "#212830";
@@ -116,7 +132,14 @@ function clearGuides() {
 export const guidesNow = () => ({ tracking, snapHit });
 let hoverId: string | null = null;
 let win: { a: W; as: [number, number]; dragged: boolean; pending: boolean } | null = null;
+/**
+ * A press on an object with no command running, which may become a drag that moves the selection (AutoCAD's
+ * drag-and-drop editing; on a phone the one way to move a single line — phone check 2026-11-24: a DXF line could
+ * be picked but not moved). Below 4 px it was a click (selection only).
+ */
+let mv: { from: W; to: W; as: [number, number]; ids: string[]; moving: boolean } | null = null;
 let lastMiddle = 0;
+let lastDown = { t: 0, x: 0, y: 0 };
 const PICKBOX = 5;
 const APERTURE = 10;
 
@@ -153,7 +176,8 @@ function segsNear(cad: CadSourceMeta, p: W, r: number): Seg[] {
   const out: Seg[] = [];
   for (const e of entries(page, cad)) {
     if (e.n.type !== "VECTOR" || p[0] < e.box[0] - r || p[0] > e.box[2] + r || p[1] < e.box[1] - r || p[1] > e.box[3] + r) continue;
-    for (const s of nodeSegs(e.n, cad)) if (nearest(s, p).d <= r) out.push(s);
+    // (a circle / arc whose centre is under the cursor counts too: AutoCAD's 중심 snap at the centre itself)
+    for (const s of nodeSegs(e.n, cad)) if (nearest(s, p).d <= r || (s.c1 && ((c) => !!c && dist(c.c, p) <= r)(arcOf(s)))) out.push(s);
     if (out.length > 400) break;
   }
   return out;
@@ -174,6 +198,8 @@ function pickAt(cad: CadSourceMeta, p: W): SceneNode | null {
       d = Infinity;
       for (const s of nodeSegs(e.n, cad)) d = Math.min(d, nearest(s, p).d);
       if (e.n.fill && d > r && p[0] >= e.box[0] && p[0] <= e.box[2] && p[1] >= e.box[1] && p[1] <= e.box[3]) d = r * 0.99;
+      // a pattern hatch is picked anywhere inside its area, not only on its lines
+      if (e.n.cadHatch && d > r && e.n.cadHatch.loops.filter((l) => pointInPoly(p, l as W[])).length % 2) d = r * 0.99;
     } else d = 0;
     if (d <= r && d < bd) (bd = d), (best = e.n);
   }
@@ -248,8 +274,17 @@ function pushView() {
   viewStack.push({ ...S().view });
   if (viewStack.length > 30) viewStack.shift();
 }
+/** Canvas px the floating command line covers at the bottom (zoom to extents keeps the drawing above it). */
+export function cmdLineCover(): number {
+  const wrap = document.querySelector(".canvas-wrap") as HTMLElement | null;
+  const cmd = document.querySelector(".cad-cmd") as HTMLElement | null;
+  if (!wrap || !cmd) return 0;
+  const a = wrap.getBoundingClientRect(), c = cmd.getBoundingClientRect();
+  return c.height > 0 && c.top < a.bottom && c.bottom > a.top ? Math.max(0, a.bottom - c.top) : 0;
+}
 function fitBox(x0: number, y0: number, x1: number, y1: number, margin = 0.04) {
-  const { w, h } = canvasSize();
+  const { w, h: full } = canvasSize();
+  const h = Math.max(80, full - cmdLineCover());
   const bw = Math.max(1e-6, x1 - x0), bh = Math.max(1e-6, y1 - y0);
   const zoom = Math.min(512, Math.max(0.005, Math.min((w * (1 - 2 * margin)) / bw, (h * (1 - 2 * margin)) / bh)));
   pushView();
@@ -296,20 +331,48 @@ bridge.zoomPrevious = () => {
 };
 bridge.zoomAll = () => {
   const page = currentPage();
+  const lim = page?.source?.cad?.limits;
+  // ZOOM All: the drawing limits (LIMITS) when set, else the sheet
+  if (lim) return bridge.zoomWindow(lim[0], lim[1]);
   if (page) fitBox(0, 0, page.width, page.height);
 };
 bridge.ortho = () => useCadUI.getState().ortho;
 bridge.polar = () => (useCadUI.getState().polar ? useCadUI.getState().polarInc : null);
 bridge.openLayers = () => useUI.getState().set({ leftOpen: true, leftTab: "layers" });
-(bridge as any).selectAll = () => {
+bridge.panBy = (d) => {
+  const cad = cadNow();
+  if (!cad) return;
+  const v = S().view;
+  pushView();
+  S().set({ view: { ...v, panX: v.panX + d[0] * cad.k * v.zoom, panY: v.panY - d[1] * cad.k * v.zoom } });
+};
+bridge.redraw = () => {
+  memo = { page: null, key: "", out: null, nodes: new WeakMap() };
+  index = { nodes: null, groups: null, list: [] };
+  invalidate();
+};
+bridge.editText = (id) => !!cadDoor.editText?.(id);
+/** Ctrl+A: what can be picked; ALL at a command's 객체 선택 (`all`): AutoCAD's ALL also takes what is on layers that
+ *  are off — only frozen layers are left out (locked ones stay out too: no command may change them here) */
+(bridge as any).selectAll = (all = false) => {
   const page = currentPage(), cad = cadNow();
-  if (page && cad) S().set({ selection: entries(page, cad).map((e) => e.n.id) });
+  if (!page || !cad) return;
+  const ids = new Set(entries(page, cad).map((e) => e.n.id));
+  if (all) {
+    const index = groupIndex(page.groups);
+    for (const n of page.nodes) {
+      if (ids.has(n.id) || !n.visible || lockedInTree(n, index)) continue;
+      const path = groupPath(n.groupId, index);
+      if (path.every((g) => g.visible || (g.cad?.layer !== undefined && !g.cad.frozen))) ids.add(n.id);
+    }
+  }
+  S().set({ selection: [...ids] });
 };
 
 // ───────── keyboard (shortcuts.ts and the command line box) ─────────
 
 /** Text the command line box holds; keys typed on the canvas go there (AutoCAD). */
-export const cmdInput: { value: string; set: ((v: string) => void) | null; focus: (() => void) | null } = { value: "", set: null, focus: null };
+export const cmdInput: { value: string; set: ((v: string) => void) | null; focus: (() => void) | null; recall: ((up: boolean) => void) | null } = { value: "", set: null, focus: null, recall: null };
 
 /** A key in the drawing screen; true = handled. `inBox` = it came from the command line box itself. */
 export function cadKey(e: KeyboardEvent, inBox = false): boolean {
@@ -335,6 +398,27 @@ export function cadKey(e: KeyboardEvent, inBox = false): boolean {
     useCadUI.getState().set({ cmdLine: !useCadUI.getState().cmdLine });
     return true;
   }
+  // the drawing's own clipboard (COPYCLIP / CUTCLIP / PASTECLIP; the OS clipboard is not touched)
+  if (mod && !e.altKey && !inBox && (e.code === "KeyC" || e.code === "KeyX") && S().selection.length && !useCmd.getState().name) {
+    clipCopy(S().selection, e.code === "KeyX");
+    return true;
+  }
+  if (mod && !e.shiftKey && !e.altKey && !inBox && e.code === "KeyV") {
+    clipPaste();
+    return true;
+  }
+  // Ctrl+Z / Ctrl+Y: undone and redone, and said on the command line as AutoCAD does ("명령 취소")
+  if (mod && !e.altKey && (e.code === "KeyZ" || e.code === "KeyY") && !useCmd.getState().name && !(inBox && cmdInput.value)) {
+    const redo = e.code === "KeyY" || e.shiftKey;
+    if (redo) S().redo();
+    else S().undo();
+    say(t(redo ? "cadfeat.msg.redone" : "cadui.msg.undone"));
+    return true;
+  }
+  if (mod && !e.shiftKey && !e.altKey && !inBox && e.code === "KeyA" && !useCmd.getState().name) {
+    (bridge as any).selectAll?.();
+    return true;
+  }
   if (mod || e.altKey) return false;
   if (e.key === "Escape") {
     if (useCmd.getState().name) cancel();
@@ -353,6 +437,10 @@ export function cadKey(e: KeyboardEvent, inBox = false): boolean {
     // a text prompt takes spaces as text only from the box
     submit(text);
     invalidate();
+    return true;
+  }
+  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !useCmd.getState().name && cmdInput.recall) {
+    cmdInput.recall(e.key === "ArrowUp");
     return true;
   }
   if ((e.key === "Delete" || e.key === "Backspace") && !useCmd.getState().name && S().selection.length) {
@@ -546,6 +634,22 @@ function overlay(o: CanvasRenderingContext2D, page: Page, env: CanvasEnv) {
     }
     o.stroke();
     o.setLineDash([]);
+    // array grips: triangles in the accent colour (count and spacing)
+    for (const gid of selectedArrays(page)) {
+      o.fillStyle = "#19b3a6";
+      o.strokeStyle = "#ffffff";
+      o.lineWidth = 1;
+      for (const gp of arrayGrips(page, gid)) {
+        const q = ap(m, gp.p);
+        o.beginPath();
+        o.moveTo(q[0] - 6, q[1] + 5);
+        o.lineTo(q[0] + 6, q[1] + 5);
+        o.lineTo(q[0], q[1] - 6);
+        o.closePath();
+        o.fill();
+        o.stroke();
+      }
+    }
     if (nodes.length <= 100) {
       o.fillStyle = GRIP;
       o.strokeStyle = "#ffffff";
@@ -594,6 +698,18 @@ function overlay(o: CanvasRenderingContext2D, page: Page, env: CanvasEnv) {
     }
   }
 
+  // a selection being dragged: its outline where it will go
+  if (mv?.moving) {
+    o.save();
+    o.strokeStyle = u.dark ? "rgba(255,255,255,.85)" : "rgba(0,0,0,.8)";
+    o.lineWidth = 1;
+    const shapes: Shape[] = [{ k: "line", a: mv.from, b: mv.to, dash: true }, { k: "ghost", ids: mv.ids, m: translate(mv.to[0] - mv.from[0], mv.to[1] - mv.from[1]) }];
+    for (const s of shapes) {
+      o.setLineDash(s.k === "line" && s.dash ? [5, 4] : []);
+      strokeShape(o, m, s, cad);
+    }
+    o.restore();
+  }
   // rubber bands of the running command
   if (req?.preview && cursorW) {
     const p = effective(cad, cursorW);
@@ -706,6 +822,9 @@ function overlay(o: CanvasRenderingContext2D, page: Page, env: CanvasEnv) {
 
 // ───────── pointer ─────────
 
+/** a right click answered as Enter: the contextmenu event that follows it opens nothing */
+let enterByRight = false;
+
 function down(e: PointerEvent, sx: number, sy: number): boolean {
   const cad = cadNow();
   if (!cad) return false;
@@ -721,9 +840,14 @@ function down(e: PointerEvent, sx: number, sy: number): boolean {
     return false;
   }
   if (e.button === 2) {
-    // right click = Enter (finish, or repeat the last command)
-    submit(cmdInput.value);
-    cmdInput.set?.("");
+    // right click in a command = Enter (finish, take the default); with no command running the shortcut menu opens
+    // (contextmenu, AutoCAD's default: 반복 · 최근 입력 · 잘라내기 / 복사 / 붙여넣기 · 특성 …)
+    if (active() || cmdInput.value.trim()) {
+      submit(cmdInput.value);
+      cmdInput.set?.("");
+      enterByRight = true;
+      setTimeout(() => (enterByRight = false), 600);
+    }
     return true;
   }
   if (e.button !== 0) return false;
@@ -742,6 +866,33 @@ function down(e: PointerEvent, sx: number, sy: number): boolean {
     if (n) answer({ k: "pick", id: n.id, p: raw });
     invalidate();
     return true;
+  }
+  // a double click with no command running: edit what is there (text in place, hatch, polyline, block attributes)
+  // (counted here: a pointerdown's own click count is 0 in some engines)
+  const dbl = e.timeStamp - lastDown.t < 450 && Math.hypot(sx - lastDown.x, sy - lastDown.y) < 5;
+  lastDown = dbl ? { t: 0, x: 0, y: 0 } : { t: e.timeStamp, x: sx, y: sy };
+  if (!req && (dbl || e.detail >= 2) && !win?.pending) {
+    const hit = pickAt(cad, raw);
+    if (hit && dblEdit(hit)) {
+      invalidate();
+      return true;
+    }
+  }
+  // a selected array's grips (count, spacing): drag to change it (AutoCAD's array grips)
+  if (!req && !win?.pending && S().selection.length) {
+    const sm = screenMat(cad);
+    const page = currentPage()!;
+    for (const gid of selectedArrays(page)) {
+      const gp = arrayGrips(page, gid).find((x) => {
+        const q = ap(sm, x.p);
+        return Math.abs(q[0] - sx) <= 6 && Math.abs(q[1] - sy) <= 6;
+      });
+      if (gp) {
+        startArrayGrip(gid, gp);
+        invalidate();
+        return true;
+      }
+    }
   }
   // a selected object's grip with no command running: stretch it (the next click places it)
   if (!req && !win?.pending && S().selection.length && S().selection.length <= 100) {
@@ -769,6 +920,8 @@ function down(e: PointerEvent, sx: number, sy: number): boolean {
   const hit = pickAt(cad, raw);
   if (hit) {
     addToSelection([hit.id], e.shiftKey);
+    const ids = S().selection;
+    if (!req && !e.shiftKey && ids.includes(hit.id)) mv = { from: raw, to: raw, as: [sx, sy], ids: [...ids], moving: false };
     invalidate();
     return true;
   }
@@ -781,6 +934,7 @@ function finishWindow(cad: CadSourceMeta, b: W, remove: boolean) {
   const bs = ap(screenMat(cad), b);
   const as = ap(screenMat(cad), win.a);
   const ids = windowSelect(cad, win.a, b, bs[0] < as[0]);
+  bridge.lastWin = { a: win.a, b, crossing: bs[0] < as[0] };
   win = null;
   addToSelection(ids, remove);
   invalidate();
@@ -798,12 +952,23 @@ function move(e: PointerEvent, sx: number, sy: number) {
     if (e.buttons === 0 || win) hoverId = win ? null : pickAt(cad, cursorW)?.id ?? null;
   } else hoverId = null;
   if (win && !win.pending && Math.hypot(sx - win.as[0], sy - win.as[1]) > 4) win.dragged = true;
+  if (mv && e.buttons & 1) {
+    if (!mv.moving && Math.hypot(sx - mv.as[0], sy - mv.as[1]) > 4) mv.moving = true;
+    if (mv.moving) mv.to = effective(cad, cursorW);
+  } else if (mv && !(e.buttons & 1)) mv = null;
   invalidate();
 }
 
 function up(e: PointerEvent, sx: number, sy: number): boolean {
   const cad = cadNow();
   if (!cad || e.button !== 0) return false;
+  if (mv) {
+    const d = mv;
+    mv = null;
+    if (d.moving && (d.to[0] !== d.from[0] || d.to[1] !== d.from[1])) transformNodes(t("cadui.cmd.MOVE"), d.ids, translate(d.to[0] - d.from[0], d.to[1] - d.from[1]));
+    invalidate();
+    return true;
+  }
   if (win && !win.pending) {
     if (win.dragged) finishWindow(cad, toW(cad, sx, sy), e.shiftKey);
     else win.pending = true; // click, move, click (AutoCAD's implied window)
@@ -821,7 +986,82 @@ function wheel(e: WheelEvent, sx: number, sy: number): boolean {
   return true;
 }
 
+/** Is a selected object under the canvas point (with no command running)? */
+function selectedAt(sx: number, sy: number): boolean {
+  const cad = cadNow();
+  if (!cad || useCmd.getState().req) return false;
+  const hit = pickAt(cad, toW(cad, sx, sy));
+  return !!hit && S().selection.includes(hit.id);
+}
+
+/** Double click (AutoCAD DBLCLKEDIT): a text is edited in place, a hatch with HATCHEDIT, a polyline with PEDIT, a block with attributes with ATTEDIT, a block with BEDIT; anything else shows its properties. */
+function dblEdit(n: SceneNode): boolean {
+  const page = currentPage();
+  if (!page || n.locked) return false;
+  const blk = insertOf(page, n.id);
+  if (n.type === "TEXT" && (!blk || n.cadAttr || blockEdit.gid === blk.id)) {
+    S().set({ selection: [] });
+    return bridge.editText(n.id);
+  }
+  S().set({ selection: [n.id] });
+  if (arrayOf(page, n.id)) return run("ARRAYEDIT");
+  if (blk && blockEdit.gid !== blk.id) return run(page.nodes.some((x) => x.type === "TEXT" && x.cadAttr && textParts(page, [n.id]).includes(x.id)) ? "ATTEDIT" : "BEDIT");
+  if (n.type === "VECTOR" && n.cadHatch) return run("HATCHEDIT");
+  if (n.type === "VECTOR" && n.name === t("cadui.ent.pline")) return run("PEDIT");
+  useUI.getState().set({ rightOpen: true, rightTab: "props" });
+  return true;
+}
+
+/** The shortcut menu with no command running (AutoCAD's default and edit-mode menus). */
+function menu(): MenuItem[] | null {
+  // the right click that just served as Enter (it ended the command): no menu after it
+  if (enterByRight) {
+    enterByRight = false;
+    return null;
+  }
+  if (active() || !cadNow()) return null;
+  const st = useCmd.getState();
+  const sel = S().selection;
+  const name = (c: string) => t(`cadui.cmd.${c}`);
+  const items: MenuItem[] = [];
+  if (st.last) items.push({ label: t("cadfeat.menu.repeat", { cmd: name(st.last) }), onSelect: () => void run(st.last!) });
+  if (st.recent.length) items.push({ label: t("cadfeat.menu.recent"), sub: st.recent.map((c) => ({ label: `${c} — ${name(c)}`, onSelect: () => void run(c) })) });
+  if (items.length) items.push({ sep: true, label: "" });
+  if (sel.length) {
+    items.push(
+      { label: t("cadfeat.menu.cut"), kbd: "Ctrl+X", onSelect: () => clipCopy(S().selection, true) },
+      { label: t("cadfeat.menu.copy"), kbd: "Ctrl+C", onSelect: () => clipCopy(S().selection, false) },
+    );
+  }
+  items.push({ label: t("cadfeat.menu.paste"), kbd: "Ctrl+V", onSelect: () => clipPaste() });
+  if (sel.length) {
+    items.push(
+      { sep: true, label: "" },
+      { label: t("cadfeat.menu.erase"), kbd: "Del", onSelect: () => eraseNodes(S().selection) },
+      { label: t("cadfeat.menu.move"), kbd: "M", onSelect: () => void run("MOVE") },
+      { label: t("cadfeat.menu.copySel"), kbd: "CO", onSelect: () => void run("COPY") },
+      { label: t("cadfeat.menu.rotate"), kbd: "RO", onSelect: () => void run("ROTATE") },
+      { label: t("cadfeat.menu.scale"), kbd: "SC", onSelect: () => void run("SCALE") },
+      { label: t("cadfeat.menu.isolate"), onSelect: () => void run("LAYISO") },
+    );
+  }
+  if (blockEdit.gid) items.push({ label: t("cadfeat.menu.closeBedit"), onSelect: () => void run("BCLOSE") });
+  items.push(
+    { sep: true, label: "" },
+    { label: t("cadfeat.menu.undo"), kbd: "Ctrl+Z", onSelect: () => void run("U") },
+    { label: t("cadfeat.menu.zoomExt"), kbd: "Z E", onSelect: zoomExtents },
+    { label: t("cadfeat.menu.qselect"), onSelect: () => void run("QSELECT") },
+    sel.length
+      ? { label: t("cadfeat.menu.deselect"), kbd: "Esc", onSelect: () => S().set({ selection: [] }) }
+      : { label: t("cadfeat.menu.selectAll"), kbd: "Ctrl+A", onSelect: () => (bridge as any).selectAll?.() },
+    { label: t("cadfeat.menu.props"), kbd: "Ctrl+1", onSelect: () => useUI.getState().set({ rightOpen: true, rightTab: "props" }) },
+  );
+  return items;
+}
+
 export const hooks: CadCanvasHooks = {
+  menu,
+  selectedAt,
   displayPage,
   background: () => (useCadUI.getState().dark ? MODEL_DARK : "#ffffff"),
   overlay,

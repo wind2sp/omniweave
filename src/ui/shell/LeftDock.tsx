@@ -8,10 +8,16 @@ import { Icon, type IconName } from "./Icons";
 import { Thumb } from "./Thumbs";
 import { uiScaleFactor, useUI } from "./uiStore";
 import { addLayer, deleteLayers, duplicateLayers } from "../layers";
+import { AdjustIcon, LayerFootButtons, LayerMaskThumb } from "../ps/LayerMaskThumb";
+import { targetMask } from "../ps/maskActions";
+import { PathsPanel } from "../ps/PathsPanel";
+import { LayerLockBar, openLayerStyle } from "../ps/LayerStyle";
 import { dropLayers, groupSelection, layerRows, selectGroup, selectedGroup, toggleClipping, toggleFolded, updateGroup, useLayersUI, type LayerRowItem } from "../groups";
-import { deletePages, movePagesTo, openOrganizer } from "../pageActions";
+import { deletePages, duplicatePages, movePagesTo, openOrganizer } from "../pageActions";
+import { PopMenu } from "./DocTabs";
+import type { MenuItem } from "./controls";
 import { sectionsOf } from "../../core/slides";
-import { newSlide, usePagePick, useSlideUI } from "../slideActions";
+import { addSection, newSlide, toggleHidden, usePagePick, useSlideUI } from "../slideActions";
 import { SectionHeader } from "./SlideMode";
 import { t, useT } from "../../i18n";
 import { useEditMode, useProfile } from "../editModes";
@@ -90,9 +96,50 @@ function pickPage(e: React.MouseEvent, id: string) {
 }
 
 // memo: typing in a long document changes one page object, so only that row (and its thumbnail) draws again
+/** Pages copied in the page list (Ctrl+C / Ctrl+X there): pasted with Ctrl+V after the page that has the focus. */
+let copiedPages: { ids: string[]; cut: boolean } | null = null;
+
+/** The picked pages, or this one (the list's commands act on them, PowerPoint's thumbnail pane). */
+const pickedOr = (id: string) => {
+  const ids = usePagePick.getState().ids;
+  return ids.includes(id) ? S().doc.pages.filter((p) => ids.includes(p.id)).map((p) => p.id) : [id];
+};
+
+/** Copies of `ids` put right after the page at `index` (Ctrl+V / Ctrl+D in the list). */
+function pasteAfter(ids: string[], index: number) {
+  const have = ids.filter((id) => S().doc.pages.some((p) => p.id === id));
+  if (!have.length) return void S().notify(t("dock.pages.nothingToPaste"));
+  const made = duplicatePages(have);
+  if (made.length) movePagesTo(made, index + 1);
+}
+
+/** Page list commands (keys and right-click menu): copy / cut / paste / duplicate / delete / new slide / hide. */
+function listCommand(cmd: "copy" | "cut" | "paste" | "duplicate" | "delete" | "new" | "hide", page: Page, index: number) {
+  const ids = pickedOr(page.id);
+  if (cmd === "copy" || cmd === "cut") copiedPages = { ids, cut: cmd === "cut" };
+  if (cmd === "cut") return;
+  if (cmd === "paste" && copiedPages) {
+    const { ids: src, cut } = copiedPages;
+    if (cut) {
+      // a cut moves the pages here (they stay until pasted, as PowerPoint's cut slides do once pasted)
+      const at = index + 1 - S().doc.pages.slice(0, index + 1).filter((p) => src.includes(p.id)).length;
+      movePagesTo(src, Math.max(0, at));
+      copiedPages = null;
+    } else pasteAfter(src, index);
+  }
+  if (cmd === "duplicate") pasteAfter(ids, S().doc.pages.findIndex((p) => p.id === ids[ids.length - 1]));
+  if (cmd === "delete") {
+    deletePages(ids);
+    usePagePick.setState({ ids: [], anchor: null });
+  }
+  if (cmd === "new") newSlide(undefined, index + 1);
+  if (cmd === "hide") toggleHidden(ids);
+}
+
 const PageRow = memo(function PageRow({ page, index, count, active, isMaster, thumbW }: { page: Page; index: number; count: number; active: boolean; isMaster?: boolean; thumbW: number }) {
   const t = useT();
   const [dropAt, setDropAt] = useState<"before" | "after" | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const picked = usePagePick((st) => st.ids.includes(page.id));
   const meta = KIND_META[page.kind];
   // landscape fills the card; portrait pages are capped in height so the list stays scannable
@@ -136,10 +183,26 @@ const PageRow = memo(function PageRow({ page, index, count, active, isMaster, th
         setDropAt(null);
       }}
       onClick={(e) => (isMaster ? selectPage(page.id) : pickPage(e, page.id))}
+      onContextMenu={(e) => {
+        if (isMaster) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!usePagePick.getState().ids.includes(page.id)) selectPage(page.id);
+        setMenu({ x: e.clientX, y: e.clientY });
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           selectPage(page.id);
+        }
+        // PowerPoint's thumbnail pane: Ctrl+C / X / V / D act on slides (pages) there, not on the objects of the slide
+        const mod = e.ctrlKey || e.metaKey;
+        const k = { KeyC: "copy", KeyX: "cut", KeyV: "paste", KeyD: "duplicate" }[e.code] as "copy" | "cut" | "paste" | "duplicate" | undefined;
+        if (!isMaster && mod && !e.altKey && !e.shiftKey && k) {
+          e.preventDefault();
+          e.stopPropagation();
+          listCommand(k, page, index);
+          return;
         }
         // slides: Delete removes the picked slides (PowerPoint's thumbnail pane); Ctrl+D is the global shortcut
         if (!isMaster && page.kind === "SLIDE" && (e.key === "Delete" || e.key === "Backspace")) {
@@ -150,6 +213,27 @@ const PageRow = memo(function PageRow({ page, index, count, active, isMaster, th
         }
       }}
     >
+      {menu && (
+        <PopMenu
+          at={menu}
+          onClose={() => setMenu(null)}
+          items={(
+            [
+              ...(page.kind === "SLIDE" ? [{ label: t("dock.pages.menu.new"), onSelect: () => listCommand("new", page, index) }] : []),
+              { label: t("dock.pages.menu.duplicate"), kbd: "Ctrl+D", onSelect: () => listCommand("duplicate", page, index) },
+              { sep: true },
+              { label: t("dock.pages.menu.cut"), kbd: "Ctrl+X", onSelect: () => listCommand("cut", page, index) },
+              { label: t("dock.pages.menu.copy"), kbd: "Ctrl+C", onSelect: () => listCommand("copy", page, index) },
+              { label: t("dock.pages.menu.paste"), kbd: "Ctrl+V", disabled: !copiedPages, onSelect: () => listCommand("paste", page, index) },
+              { sep: true },
+              ...(page.kind === "SLIDE" ? [{ label: t(page.hidden ? "dock.pages.menu.show" : "dock.pages.menu.hide"), onSelect: () => listCommand("hide", page, index) }] : []),
+              // PowerPoint's 구역 추가 on a slide: a section starts here
+              ...(page.kind === "SLIDE" ? [{ label: t("slide.section.add"), onSelect: () => addSection(page.id) }] : []),
+              { label: t("dock.pages.menu.delete"), kbd: "Del", onSelect: () => listCommand("delete", page, index) },
+            ] as MenuItem[]
+          )}
+        />
+      )}
       <span className="page-num" data-tip={page.hidden ? t("slide.hiddenTip") : undefined}>{isMaster ? "M" : index + 1}</span>
       <div className="page-card">
         <div className="thumb-frame">
@@ -356,9 +440,18 @@ function LayerRow({ item, selected, above }: { item: Extract<LayerRowItem, { kin
       {item.clipped && <Icon name="clipArrow" size={13} className="layer-clip" />}
       {/* a smart object's thumbnail opens its contents (Photoshop: double-click the thumbnail) */}
       {adobe ? (
-        <span onDoubleClick={node.type === "RASTER" && node.psdSmart ? (e) => (e.stopPropagation(), void openSmartObject(node.id)) : undefined}>
-          <LayerThumb node={node} />
-        </span>
+        <>
+          {node.type === "RASTER" && node.adjust ? (
+            <AdjustIcon node={node} />
+          ) : (
+            // the layer thumbnail: its pixels are the paint target again (not its mask: ui/ps/maskActions.ts)
+            <span onClick={node.type === "RASTER" && node.mask ? () => targetMask(node.id, false) : undefined} onDoubleClick={node.type === "RASTER" && node.psdSmart ? (e) => (e.stopPropagation(), void openSmartObject(node.id)) : undefined}>
+              <LayerThumb node={node} />
+            </span>
+          )}
+          {/* layer mask / an adjustment layer's mask (Photoshop: click, Shift+click, Alt+click) */}
+          <LayerMaskThumb node={node} />
+        </>
       ) : (
         <Icon name={NODE_ICON[node.type]} size={14} className="layer-ico" />
       )}
@@ -382,7 +475,7 @@ function LayerRow({ item, selected, above }: { item: Extract<LayerRowItem, { kin
         </span>
       )}
       {!adobe && <span className="layer-kind">{item.clipped ? t("layers.row.clipped") : NODE_KIND_LABEL[node.type]}</span>}
-      {adobe && node.effects?.length ? <span className="layer-fx" title={t("layers.fxTip")}>fx</span> : null}
+      {adobe && node.effects?.length ? <span className="layer-fx" title={t("layers.fxTip")} onDoubleClick={(e) => (e.stopPropagation(), openLayerStyle(node.id))}>fx</span> : null}
       {node.type === "RASTER" && node.psdSmart ? (
         <span className="layer-fx" title={smartTip(node.psdSmart, t)} onDoubleClick={(e) => (e.stopPropagation(), void openSmartObject(node.id))} style={node.psdSmart.kind === "linked" && node.psdSmart.found === false ? { color: "var(--danger, #c42b1c)" } : undefined}>
           {node.psdSmart.kind === "linked" ? "⛓" : "▣"}
@@ -547,6 +640,8 @@ function LayersTab() {
   return (
     <div className={cx("dock-body", (mode === "IMAGE" || mode === "DESIGN") && "layers-adobe")}>
       {(mode === "IMAGE" || mode === "DESIGN") && <LayerBar />}
+      {/* Photoshop's fill and partial locks, a second row (ui/ps/LayerStyle.tsx) */}
+      {mode === "IMAGE" && <LayerLockBar />}
       {page && <CadRefsBar page={page} />}
       <div className="dock-scroll" role="listbox" aria-multiselectable="true" aria-label={t("dock.layers.title")}>
         {rows.map((r, i) => {
@@ -563,10 +658,13 @@ function LayersTab() {
           </div>
         )}
       </div>
+      {/* Photoshop's Paths panel, the basics (ui/ps/PathsPanel.tsx) */}
+      {mode === "IMAGE" && <PathsPanel />}
       <footer className="dock-foot">
         <IconBtn icon="plus" tip={t("dock.layers.new")} kbd="Ctrl+Shift+N" onClick={addLayer} />
         <IconBtn icon="folder" tip={t("layers.foot.group")} kbd="Ctrl+G" disabled={!hasSel} onClick={groupSelection} />
         <IconBtn icon="clipMask" tip={t("layers.foot.clip")} kbd="Ctrl+Alt+G" disabled={!hasSel} onClick={() => toggleClipping()} />
+        {mode === "IMAGE" && <LayerFootButtons />}
         <IconBtn icon="copy" tip={t("dock.layers.duplicate")} kbd="Ctrl+J" disabled={!hasSel} onClick={duplicateLayers} />
         <IconBtn icon="trash" tip={t("dock.layers.delete")} kbd="Delete" className="danger" disabled={!hasSel && !picked} onClick={deleteLayers} />
         <IconBtn icon="up" tip={t("dock.layers.forward")} kbd="Ctrl+]" disabled={!hasSel} onClick={() => reorderSelected("up")} />

@@ -182,6 +182,23 @@ describe("PDF Surgeon — generated PDFs", () => {
     expect(moved.transform[5]).toBeCloseTo(250 - 20 * 0.75, 1);
   });
 
+  it("an added picture is written into the file itself (its image object, not only the reference)", async () => {
+    const bytes = await samplePdf();
+    const doc = await openSurgeonDoc(bytes);
+    // a 2 × 2 red PNG
+    const png = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR42mP8z8DwnwEJMBIAABn6A/0vM9k6AAAAAElFTkSuQmCC", "base64"));
+    const img = { id: "omw-img-1", type: "IMAGE", name: "red", visible: true, locked: false, opacity: 1, blend: "normal", assetId: "a1", width: 40, height: 40, transform: { x: 60, y: 60, rotation: 0, scale: 1 } } as any;
+    const { bytes: out, report } = await saveSurgical(doc, [{ pageIndex: 0, nodes: [img], elevated: false }], { prefix: PREFIX, fallbackFont, imageBytes: (id) => (id === "a1" ? { bytes: png, mime: "image/png" } : undefined) });
+    expect(report.addedNodes).toBe(1);
+    const { PDFDocument, PDFName } = await import("pdf-lib");
+    const d = await PDFDocument.load(out);
+    let images = 0;
+    for (const [, o] of d.context.enumerateIndirectObjects()) if ((o as any).dict?.get?.(PDFName.of("Subtype")) === PDFName.of("Image")) images++;
+    expect(images).toBeGreaterThanOrEqual(1);
+    // pdf.js draws it: the page's operator list paints an image
+    const ops = await opList(await openJs(out), 0);
+    expect(ops.some((o) => /paintImageXObject|paintInlineImageXObject/.test(o))).toBe(true);
+  });
   it("added vector and text nodes are appended without touching the original stream", async () => {
     const bytes = await samplePdf();
     const doc = await openSurgeonDoc(bytes);

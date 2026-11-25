@@ -4,5 +4,8 @@
   "progress.save": "저장하는 중…",
   "progress.export": "{fmt} 파일로 내보내는 중…",
   "progress.ocr": "글자 인식하는 중…",
-  "progress.matte": "배경 지우는 중…"
+  "progress.matte": "배경 지우는 중…",
+  "progress.matte.subject": "주인공을 찾는 중…",
+  "progress.matte.person": "사람 윤곽을 다듬는 중…",
+  "progress.matte.refine": "가장자리를 다듬는 중…"
 }

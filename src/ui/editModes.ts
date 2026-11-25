@@ -22,6 +22,10 @@ import { paperOf } from "../core/pageSetup";
 import { useLang, type Lang } from "../i18n";
 import { useUI } from "./shell/uiStore";
 import { switchShapeDefaults } from "./drawDefaults";
+import { DOCUMENT_TOOLS } from "./modeTools/document";
+import { SLIDE_TOOLS } from "./modeTools/slide";
+import { IMAGE_KEYS, IMAGE_TOOLS } from "./modeTools/image";
+import { DESIGN_KEYS, DESIGN_TOOLS } from "./modeTools/design";
 
 export type EditMode = "DOCUMENT" | "SLIDE" | "IMAGE" | "DESIGN";
 export const EDIT_MODES: EditMode[] = ["DOCUMENT", "SLIDE", "IMAGE", "DESIGN"];
@@ -57,26 +61,15 @@ export interface EditProfile {
   keys: Record<string, Tool>;
 }
 
-/**
- * Photoshop: V move · M marquee · L lasso · W magic wand · I eyedropper · B brush · E eraser · G gradient · T type · P pen ·
- * Shift+P the next pen of the group (curvature; the cycle itself is imageDesignKeys.ts) · A direct selection · U shape ·
- * H hand · Z zoom (C crop: shortcuts.ts)
- */
-const IMAGE_KEYS: Record<string, Tool> = { v: "select", m: "marquee", l: "lasso", w: "wand", i: "eyedropper", b: "brush", e: "eraser", g: "gradient", t: "text", p: "pen", "shift+p": "curvature", a: "direct", u: "rect", h: "hand", z: "zoom" };
-/**
- * Illustrator: V selection · A direct selection · P pen · + − add / delete anchor point · Shift+C convert anchor point ·
- * Shift+` curvature ("~") · M rectangle · L ellipse · \ line · T type · B paintbrush · Shift+E eraser · I eyedropper · H hand · Z zoom
- */
-const DESIGN_KEYS: Record<string, Tool> = { v: "select", a: "direct", p: "pen", "+": "anchorAdd", "=": "anchorAdd", "-": "anchorDel", "shift+c": "anchorConvert", "~": "curvature", m: "rect", l: "ellipse", "\\": "line", t: "text", b: "brush", "shift+e": "eraser", i: "eyedropper", h: "hand", z: "zoom" };
-/** The pen group (tool strip ToolGroup.tsx): pen, curvature, add / delete / convert anchor point. */
-const PEN_GROUP: Tool[] = ["pen", "curvature", "anchorAdd", "anchorDel", "anchorConvert"];
+// The tool lists and tool keys of each mode live in src/ui/modeTools/ (one entry per line, one file per mode) so that
+// departments adding a tool do not collide on these lines.
 
 export const PROFILES: Record<EditMode, EditProfile> = {
-  DOCUMENT: { id: "DOCUMENT", tools: ["select", "text", "rect", "ellipse", "pen", "hand"], defaultTool: "select", toolKeys: false, clickText: "caret", dragEmpty: "text", insert: "inline", fontUnit: "pt", rulerOrigin: "margin", layers: false, masters: false, animations: false, slideshow: false, keys: {} },
+  DOCUMENT: { id: "DOCUMENT", tools: DOCUMENT_TOOLS, defaultTool: "select", toolKeys: false, clickText: "caret", dragEmpty: "text", insert: "inline", fontUnit: "pt", rulerOrigin: "margin", layers: false, masters: false, animations: false, slideshow: false, keys: {} },
   // PowerPoint: shapes with 점 편집 (direct selection), the 그리기 tab's pen / highlighter / eraser — and no tool letters
-  SLIDE: { id: "SLIDE", tools: ["select", "direct", "text", "rect", "ellipse", "line", "pen", "brush", "eraser", "hand"], defaultTool: "select", toolKeys: false, clickText: "select", dragEmpty: "marquee", insert: "float", fontUnit: "pt", rulerOrigin: "page", layers: true, masters: true, animations: true, slideshow: true, keys: {} },
-  IMAGE: { id: "IMAGE", tools: ["select", "marquee", "lasso", "wand", "eyedropper", "brush", "eraser", "gradient", ...PEN_GROUP, "text", "direct", "rect", "ellipse", "line", "hand", "zoom"], defaultTool: "select", toolKeys: true, clickText: "select", dragEmpty: "marquee", insert: "float", fontUnit: "px", rulerOrigin: "page", layers: true, masters: false, animations: false, slideshow: false, keys: IMAGE_KEYS },
-  DESIGN: { id: "DESIGN", tools: ["select", "direct", ...PEN_GROUP, "rect", "ellipse", "line", "text", "brush", "eraser", "eyedropper", "hand", "zoom"], defaultTool: "select", toolKeys: true, clickText: "select", dragEmpty: "marquee", insert: "float", fontUnit: "px", rulerOrigin: "page", layers: true, masters: true, animations: true, slideshow: true, keys: DESIGN_KEYS },
+  SLIDE: { id: "SLIDE", tools: SLIDE_TOOLS, defaultTool: "select", toolKeys: false, clickText: "select", dragEmpty: "marquee", insert: "float", fontUnit: "pt", rulerOrigin: "page", layers: true, masters: true, animations: true, slideshow: true, keys: {} },
+  DESIGN: { id: "DESIGN", tools: DESIGN_TOOLS, defaultTool: "select", toolKeys: true, clickText: "select", dragEmpty: "marquee", insert: "float", fontUnit: "px", rulerOrigin: "page", layers: true, masters: true, animations: true, slideshow: true, keys: DESIGN_KEYS },
+  IMAGE: { id: "IMAGE", tools: IMAGE_TOOLS, defaultTool: "select", toolKeys: true, clickText: "select", dragEmpty: "marquee", insert: "float", fontUnit: "px", rulerOrigin: "page", layers: true, masters: false, animations: false, slideshow: false, keys: IMAGE_KEYS },
 };
 
 /** File formats whose pages edit as pictures (layers, pixels, brush) — page.source.format, lower case. */
@@ -248,7 +241,9 @@ export const docHooks: {
   enter: ((pageId: string) => void) | null;
   /** that page or the 문서 mode left: a body nothing was typed into goes away (docFlow dropUnusedDocBody) */
   leave: (() => void) | null;
-} = { click: null, key: null, insertInline: null, enter: null, leave: null };
+  /** open the cell editor in a table's cell (CanvasView): a table just put into the body takes the caret in its first cell */
+  editCell: ((nodeId: string, row: number, col: number) => void) | null;
+} = { click: null, key: null, insertInline: null, enter: null, leave: null, editCell: null };
 
 /** What a single click on a text box does in the current edit mode. */
 export function clickTextAction(): "edit" | "select" {

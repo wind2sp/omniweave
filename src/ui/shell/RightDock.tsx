@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { HistoryTab } from "./HistoryTab";
 import { ReviewTab } from "./ReviewPanel";
 import { hasReview } from "../../core/review";
+import { hasPdfPages } from "../pdf/PdfCommentList";
 import { ANIM_PRESETS, animDuration, type AnimPreset } from "../../core/anim";
 import { draftPage, findPage, useStore } from "../../core/store";
 import type { AnimTrigger, KeyframeAnimation, Page, PageKind, SceneNode } from "../../core/types";
@@ -14,7 +15,7 @@ import { nodeLive, pageLive } from "./ops";
 import { BLEND_OPTIONS, TRANSITIONS } from "./Ribbon";
 import { useUI } from "./uiStore";
 import { AlignButtons } from "./ArrangeTools";
-import { localBounds } from "../../core/loom";
+import { localBounds, rasterContentBounds } from "../../core/loom";
 import { boxSize } from "../../core/transform";
 import { setSelectedSize } from "../xform";
 import { useT } from "../../i18n";
@@ -24,6 +25,11 @@ import { GroupEffects, NodeEffects } from "../style/EffectsSection";
 import { PROFILES, useCadScreenNow, useEditMode } from "../editModes";
 import { CadProps } from "../cad/lazy";
 import { DocPropsTab } from "./DocProps";
+import { AppearanceSection, DesignStrokeSection, SymbolsSection } from "./DesignAppearance";
+import { TextStylesPanel } from "./TextStylesPanel";
+import { GradientFill } from "./GradientFill";
+import { OpacityMaskRow } from "./DesignMaskBar";
+import { meshPaint, pickedMeshColor, useMeshPick } from "../designMesh";
 
 const S = () => useStore.getState();
 
@@ -148,6 +154,7 @@ export function NodeProps({ nodes }: { nodes: SceneNode[] }) {
   const sameT = (k: "x" | "y" | "rotation" | "scale") => (nodes.every((x) => x.transform[k] === n.transform[k]) ? n.transform[k] : null);
   const kinds = [...new Set(nodes.map((x) => x.type))];
   const t = useT();
+  const design = useEditMode() === "DESIGN";
   return (
     <>
       <Section title={multi ? t("dock.props.selected", { n: nodes.length }) : NODE_KIND_LABEL[n.type]} actions={<Icon name={kinds.length === 1 ? NODE_ICON[n.type] : "layers"} size={14} />}>
@@ -185,16 +192,27 @@ export function NodeProps({ nodes }: { nodes: SceneNode[] }) {
           </label>
           <ClipSwitch nodes={nodes} />
         </div>
+        {/* Illustrator's Transparency panel: Make Mask / Release (an opacity mask) */}
+        {design && <OpacityMaskRow nodes={nodes} />}
       </Section>
       {!multi && <TypeProps node={n} />}
+      {/* design mode (Illustrator): the Stroke panel's more settings and the Appearance panel (design 2) */}
+      {design && n.type === "VECTOR" && nodes.every((x) => x.type === "VECTOR") && (
+        <>
+          <DesignStrokeSection node={n} />
+          <AppearanceSection node={n} />
+        </>
+      )}
       <NodeEffects nodes={nodes} />
+      {design && <SymbolsSection />}
+      {design && <TextStylesPanel />}
     </>
   );
 }
 
 /** On-page width / height of one object (local size × scale); the top-left corner stays put. */
 function SizeFields({ node }: { node: SceneNode }) {
-  const sz = boxSize({ t: node.transform, lb: localBounds(node) });
+  const sz = boxSize({ t: node.transform, lb: node.type === "RASTER" && !node.crop && !node.adjust ? rasterContentBounds(node) : localBounds(node) });
   const plain = (dim: "w" | "h") => ({ set: (v: number) => setSelectedSize(dim, v) });
   const t = useT();
   return (
@@ -207,14 +225,20 @@ function SizeFields({ node }: { node: SceneNode }) {
 
 function TypeProps({ node }: { node: SceneNode }) {
   const assets = useStore((s) => s.doc.assets);
+  // with the Mesh tool and a mesh point picked, the Fill field is that point's colour (Illustrator)
+  useStore((s) => s.tool);
+  useMeshPick();
+  const meshColor = pickedMeshColor(node);
   const t = useT();
   switch (node.type) {
     case "VECTOR":
       return (
         <Section title={t("dock.node.VECTOR")}>
           <Field label={t("dock.props.fill")}>
-            <ColorField value={node.fill} showHex live={nodeLive<string>(t("dock.props.fill"), (x, v) => (x.fill = v))} onNone={() => updateSelected(t("dock.props.noFill"), (x) => (x.fill = null))} />
+            <ColorField value={meshColor ?? node.fill} showHex live={nodeLive<string>(t("dock.props.fill"), (x, v) => void (meshPaint(x, v) || ((x.fill = v), delete x.fills)))} onNone={() => updateSelected(t("dock.props.noFill"), (x) => ((x.fill = null), delete (x as { fills?: unknown }).fills))} />
           </Field>
+          {/* solid / linear / radial and the gradient's stops (Illustrator's Gradient panel) */}
+          {node.fill !== null && <GradientFill node={node} />}
           <Field label={t("dock.props.stroke")}>
             <ColorField value={node.stroke} showHex live={nodeLive<string>(t("dock.props.strokeColor"), (x, v) => (x.stroke = v))} onNone={() => updateSelected(t("dock.props.noStroke"), (x) => (x.stroke = null))} />
           </Field>
@@ -318,6 +342,7 @@ function PropsTab() {
   const selection = useStore((s) => s.selection);
   const picked = usePickedGroup();
   const t = useT();
+  const design = useEditMode() === "DESIGN";
   if (!page) return <div className="empty-state">{t("dock.props.noPage")}</div>;
   const nodes = page.nodes.filter((n) => selection.includes(n.id));
   return (
@@ -325,6 +350,8 @@ function PropsTab() {
       {picked && <GroupProps group={picked.group} count={picked.count} />}
       {picked && <GroupEffects group={picked.group} />}
       {nodes.length ? <NodeProps nodes={nodes} /> : !picked && <PageProps page={page} />}
+      {!nodes.length && design && <SymbolsSection />}
+      {!nodes.length && design && <TextStylesPanel />}
     </div>
   );
 }
@@ -342,6 +369,18 @@ function editAnims(label: string, fn: (list: KeyframeAnimation[]) => KeyframeAni
     const r = fn(pg.animations as KeyframeAnimation[]);
     if (r) pg.animations = r as any;
   });
+}
+
+/**
+ * The rows of the effect row `i` belongs to: one PowerPoint effect is a start row and the with-previous rows on the same
+ * object right after it (a fly-in = its move and its fade) — a trigger or delay set on one row is set on the effect.
+ */
+function effectRows(l: readonly KeyframeAnimation[], i: number): number[] {
+  let a = i;
+  while (a > 0 && l[a].trigger === "WITH_PREVIOUS" && l[a - 1].targetNodeId === l[a].targetNodeId) a--;
+  let b = a + 1;
+  while (b < l.length && l[b].trigger === "WITH_PREVIOUS" && l[b].targetNodeId === l[a].targetNodeId) b++;
+  return Array.from({ length: b - a }, (_, k) => a + k);
 }
 
 function AnimTab() {
@@ -378,11 +417,11 @@ function AnimTab() {
         )}
         <ol className="anim-list">
           {page.animations.map((a, i) => {
-            if (a.trigger === "ON_CLICK") step++;
+            if (a.trigger === "ON_CLICK" && !a.triggerId) step++;
             const sel = selection.includes(a.targetNodeId);
             return (
               <li key={a.id} className={cx("anim-row", sel && "active")} onClick={() => S().set({ selection: [a.targetNodeId] })}>
-                <span className={cx("anim-step", a.trigger !== "ON_CLICK" && "cont")} data-tip={a.trigger === "ON_CLICK" ? t("dock.anim.click", { n: step }) : step ? t("dock.anim.afterClick", { n: step }) : t("dock.anim.auto")}>
+                <span className={cx("anim-step", (a.trigger !== "ON_CLICK" || a.triggerId) && "cont")} data-tip={a.trigger === "ON_CLICK" ? t("dock.anim.click", { n: step }) : step ? t("dock.anim.afterClick", { n: step }) : t("dock.anim.auto")}>
                   {a.trigger === "ON_CLICK" ? step : "·"}
                 </span>
                 <div className="anim-main">
@@ -409,6 +448,27 @@ function AnimTab() {
                         if (old > 0 && v > 0) editAnims(t("slide.anim.duration"), (l) => void (l[i].keyframes = l[i].keyframes.map((k) => ({ ...k, time: (k.time * v * 1000) / old }))));
                       },
                     }}
+                  />
+                  {/* 지연 (seconds after its start) */}
+                  <NumField
+                    tip={t("slideppt.anim.delay")}
+                    icon="clock"
+                    value={(a.delay ?? 0) / 1000}
+                    min={0}
+                    max={60}
+                    step={0.25}
+                    precision={2}
+                    unit="s"
+                    width={70}
+                    live={{ set: (v) => editAnims(t("slideppt.anim.delay"), (l) => void effectRows(l, i).forEach((k) => (k === effectRows(l, i)[0] ? (v > 0 ? (l[k].delay = Math.round(v * 1000)) : delete l[k].delay) : undefined))) }}
+                  />
+                  {/* 트리거: in the click sequence, or when another shape is clicked */}
+                  <Select<string>
+                    tip={t("slideppt.anim.trigger")}
+                    value={a.triggerId ?? "__seq"}
+                    width={96}
+                    options={[{ value: "__seq", label: t("slideppt.anim.inSequence") }, ...page.nodes.filter((n) => n.id !== a.targetNodeId && n.visible).map((n) => ({ value: n.id, label: t("slideppt.anim.onClickOf", { name: n.name }) }))]}
+                    onChange={(v) => editAnims(t("slideppt.anim.trigger"), (l) => void effectRows(l, i).forEach((k) => (v === "__seq" ? delete l[k].triggerId : (l[k].triggerId = v))))}
                   />
                   <IconBtn icon="up" size="sm" tip={t("dock.moveUp")} disabled={i === 0} onClick={() => editAnims(t("dock.anim.reorder"), (l) => void ([l[i - 1], l[i]] = [l[i], l[i - 1]]))} />
                   <IconBtn icon="down" size="sm" tip={t("dock.moveDown")} disabled={i === page.animations.length - 1} onClick={() => editAnims(t("dock.anim.reorder"), (l) => void ([l[i], l[i + 1]] = [l[i + 1], l[i]]))} />
@@ -437,7 +497,8 @@ export function RightDock() {
   // the review pane (메모·변경 내용): documents with comments or tracked changes, and every document page (stage 2:
   // comments are added and changes recorded there)
   const pages = useStore((s) => s.doc.pages);
-  const review = useMemo(() => doc && (hasReview(pages) || pages.some((p) => p.kind === "DOCUMENT")), [doc, pages]);
+  // (a PDF too: its comment list — Acrobat's 주석 목록, ui/pdf/PdfCommentList.tsx)
+  const review = useMemo(() => doc && (hasReview(pages) || pages.some((p) => p.kind === "DOCUMENT") || hasPdfPages(pages)), [doc, pages]);
   const tab = (want === "anim" && !anim) || (want === "review" && !review) ? "props" : want;
   return (
     <aside className="dock dock-right" aria-label={t("dock.right.label")}>

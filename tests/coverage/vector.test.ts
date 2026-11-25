@@ -33,13 +33,14 @@ describe("pathfinder", () => {
   it("[IL-031] minus front", () => expect(area(pathfinder("subtract", [a(), b()]))).toBeCloseTo(5000));
   it("[IL-032] intersect", () => expect(area(pathfinder("intersect", [a(), b()]))).toBeCloseTo(5000));
   it("[IL-033] exclude", () => expect(area(pathfinder("exclude", [a(), b()]))).toBeCloseTo(10000));
-  it("[IL-030] (limit) curved inputs come back as polylines — Bézier curves are not preserved", () => {
+  // (2026-11-25, design 2: the limit is lifted — the sources' Bézier curves are kept, core/curveKeep.ts)
+  it("[IL-030] curved inputs keep their Bézier curves (a few anchors, not a polyline)", () => {
     const c1 = newVector([ellipseContour(50, 50, 50, 50)]);
     const c2 = newVector([ellipseContour(100, 50, 50, 50)]);
     const u = pathfinder("union", [c1, c2])!;
-    expect(area(u)).toBeGreaterThan(Math.PI * 2500);
-    expect(u.contours.flatMap((c) => c.nodes).every((n) => n.isCorner)).toBe(true);
-    expect(u.contours[0].nodes.length).toBeGreaterThan(40);
+    const nodes = u.contours.flatMap((c) => c.nodes);
+    expect(nodes.length).toBeLessThanOrEqual(10);
+    expect(nodes.some((a) => a.handleOut[0] !== a.anchor[0] || a.handleOut[1] !== a.anchor[1])).toBe(true);
   });
 });
 

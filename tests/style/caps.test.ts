@@ -19,7 +19,8 @@ describe("caps table", () => {
     expect(capOf("blend", "psd")).toBe("native");
     expect(capOf("blend", "pptx")).toBe("drop");
     expect(capOf("fill.solid", "docx", "TABLE")).toBe("native");
-    expect(capOf("fill.solid", "docx", "VECTOR")).toBe("drop");
+    expect(capOf("fill.solid", "docx", "VECTOR")).toBe("native"); // shapes since io/officeShapes.ts
+    expect(capOf("fill.solid", "xlsx", "VECTOR")).toBe("drop");
     expect(capOf("no.such.prop", "pdf")).toBe("drop");
     expect(formatsWith("table.formula")).toEqual(["xlsx", "png"].filter((f) => capOf("table.formula", f as any) === "native"));
     expect(capsMatrix()).toHaveLength(CAP_PROPS.length);
@@ -32,7 +33,9 @@ describe("caps table", () => {
     t.blendMode = "MULTIPLY";
     p.nodes = [v, t, newTable([["a"]])];
     const docx = exportIssues([p], "docx");
-    expect(docx.filter((i) => i.nodeId === v.id)).toEqual([{ pageId: p.id, nodeId: v.id, prop: "node.VECTOR", level: "drop" }]);
+    // (a shape is kept since io/officeShapes.ts: only its opacity is lost)
+    expect(docx.filter((i) => i.nodeId === v.id)).toEqual([{ pageId: p.id, nodeId: v.id, prop: "opacity", level: "drop" }]);
+    expect(exportIssues([p], "xlsx").filter((i) => i.nodeId === v.id)).toEqual([{ pageId: p.id, nodeId: v.id, prop: "node.VECTOR", level: "drop" }]);
     const textIssues = docx.filter((i) => i.nodeId === t.id).map((i) => i.prop);
     expect(textIssues).toContain("blend");
     expect(textIssues).not.toContain("node.TEXT");

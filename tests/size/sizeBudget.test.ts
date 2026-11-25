@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs build scripts (no types)
-import { measure, measureGaps, overBudget, readBaseline, ruleViolations, SR_MODEL_FILES, unmeasurable } from "../../scripts/size-budget.mjs";
+import { MATTE_MODEL_FILES, measure, measureGaps, overBudget, readBaseline, ruleViolations, SR_MODEL_FILES, unmeasurable } from "../../scripts/size-budget.mjs";
 // @ts-expect-error — plain .mjs build scripts (no types)
 import { bundlePins, installModels, seedCache } from "../../scripts/ocr-models.mjs";
 
@@ -30,13 +30,16 @@ describe("size budget", () => {
     // the AI upscale models: exactly the three bundled files and their licence
     expect(ruleViolations(SR_MODEL_FILES.map((p) => "models/sr/" + p))).toEqual([]);
     expect(ruleViolations(["models/sr/realesr-general-x4v3.f32.lwt", "models/sr/extra.onnx"]).length).toBe(2);
+    // the person matting model (background removal): the int8 file and its licence only
+    expect(ruleViolations(MATTE_MODEL_FILES.map((p) => "models/matte/" + p))).toEqual([]);
+    expect(ruleViolations(["models/matte/modnet-f32.lwt", "models/matte/birefnet.onnx"]).length).toBe(2);
   });
 
   // 2026-11-16: department QA built with `npx vite build` (no prebuild) or without the OCR model cache — dists of 7.2 MB
   // against a 10.7 MB baseline passed while the code grew 69 KB. A dist without what prebuild adds is not measured.
   it("a dist without the prebuild assets (pdf.js CMaps / standard fonts, OCR models) cannot be measured", () => {
     const pins = ["ppocr-det.lwt", "ppocr-rec-ko.lwt"];
-    const full = ["index.html", "pdfjs/cmaps.pack", "pdfjs/standard_fonts/FoxitSymbol.pfb", "pdfjs/standard_fonts/FoxitDingbats.pfb", "models/ocr/ppocr-det.lwt", "models/ocr/ppocr-rec-ko.lwt", "models/ocr/LICENSE", ...SR_MODEL_FILES.map((p) => "models/sr/" + p)];
+    const full = ["index.html", "pdfjs/cmaps.pack", "pdfjs/standard_fonts/FoxitSymbol.pfb", "pdfjs/standard_fonts/FoxitDingbats.pfb", "models/ocr/ppocr-det.lwt", "models/ocr/ppocr-rec-ko.lwt", "models/ocr/LICENSE", ...SR_MODEL_FILES.map((p) => "models/sr/" + p), ...MATTE_MODEL_FILES.map((p) => "models/matte/" + p)];
     expect(measureGaps(full, pins)).toEqual([]);
     expect(measureGaps(full.filter((p) => !p.startsWith("models/sr/")), pins)).toEqual(SR_MODEL_FILES.map((p) => "models/sr/" + p));
     const noOcr = full.filter((p) => !p.startsWith("models/ocr/"));

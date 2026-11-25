@@ -25,6 +25,7 @@ import { ctx2d, makeCanvas } from "../../src/render/draw";
 import { paintPage } from "../../src/render/weave";
 import { importFile, lastImport } from "../../src/ui/actions";
 import { fitSize, heatmap, resizeGray, ssim, toGray, type Gray } from "./ssim";
+import { SLOW } from "../budget";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 const MAX = 900; // longer side of the compared images
@@ -78,7 +79,7 @@ async function bytesOf(key: string): Promise<Uint8Array> {
 }
 
 const timeout = <T,>(p: Promise<T>, ms: number, what: string) =>
-  Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${what} 시간 초과(${ms / 1000}s)`)), ms))]);
+  Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${what} 시간 초과(${ms / 1000}s)`)), ms * SLOW))]); // OMW_TEST_SLOW (tests/budget.ts)
 
 /** Render a page with the Weave renderer, repainting until every async resource is ready. */
 async function omniRender(doc: OmwDocument, page: Page, scale: number): Promise<{ rgba: Uint8ClampedArray; w: number; h: number; incomplete?: boolean }> {

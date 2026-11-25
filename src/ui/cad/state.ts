@@ -19,6 +19,8 @@ export interface CadUI {
   /** crosshair length, percent of the canvas (AutoCAD CURSORSIZE) */
   cursorSize: number;
   histOpen: boolean;
+  /** the history lines above the command line folded away (only the prompt row shows) */
+  histFold: boolean;
   cmdLine: boolean;
 }
 
@@ -37,6 +39,7 @@ const DEFAULTS: CadUI = {
   dyn: true,
   cursorSize: 5,
   histOpen: false,
+  histFold: false,
   cmdLine: true,
 };
 

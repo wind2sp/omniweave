@@ -9,8 +9,8 @@
 // What the viewer changes in a mode is kept for that mode during the session. Line ends stay round — the one quiet
 // Omniweave touch in the drawing itself (a thread's end), never a brand colour on the shapes.
 import { create } from "zustand";
-import { ellipseContour, rectContour } from "../core/vector";
-import { newVector, type VectorAnchor, type VectorNode } from "../core/types";
+import { corner, ellipseContour, rectContour, smooth } from "../core/vector";
+import { newVector, type Contour, type VectorAnchor, type VectorNode } from "../core/types";
 import { useStore } from "../core/store";
 import { t as tr } from "../i18n";
 
@@ -50,9 +50,91 @@ export const useShapeStroke = create<ShapeStroke>((set) => ({
 const strokeOf = (d: ShapeDefaults) => ((d.strokeNone ?? useShapeStroke.getState().none) ? null : d.stroke);
 const widthOf = (d: ShapeDefaults) => d.strokeWidth ?? useShapeStroke.getState().width;
 
-export function drawnShape(kind: "rect" | "ellipse", r: { x: number; y: number; w: number; h: number }, d: ShapeDefaults): VectorNode {
-  const contour = kind === "rect" ? rectContour(0, 0, r.w, r.h) : ellipseContour(r.w / 2, r.h / 2, r.w / 2, r.h / 2);
-  const v = newVector([contour], kind === "rect" ? tr("cmd.insert.rect") : tr("cmd.insert.ellipse"));
+export type ShapeKind = "rect" | "ellipse" | "roundRect" | "polygon" | "star" | "customShape";
+
+interface ShapeParams {
+  /** the rounded rectangle's corner radius (px; Illustrator starts at 12 pt) */
+  radius: number;
+  /** the polygon's sides (Illustrator 6) */
+  sides: number;
+  /** the star's points (Illustrator 5) and its inner radius as a part of the outer (Illustrator 25 / 50 pt) */
+  points: number;
+  inner: number;
+  /** the custom shape tool's shape (CUSTOM_SHAPES) */
+  custom: CustomShapeId;
+  set: (p: Partial<Omit<ShapeParams, "set">>) => void;
+}
+/** The options of the rounded rectangle / polygon / star tools (the ribbon's fields, ↑ ↓ while drawing). */
+export const useShapeParams = create<ShapeParams>((set) => ({ radius: 12 * PT, sides: 6, points: 5, inner: 0.5, custom: "heart", set }));
+
+const K = 0.5522847498;
+/** A rectangle with round corners of radius `rad` (kept to half the shorter side), clockwise from the top left. */
+export function roundRectContour(w: number, h: number, rad: number): Contour {
+  const r = Math.max(0, Math.min(rad, Math.abs(w) / 2, Math.abs(h) / 2));
+  if (r < 0.01) return rectContour(0, 0, w, h);
+  const k = r * K;
+  return {
+    closed: true,
+    nodes: [
+      smooth(r, 0, r - k, 0, r, 0), smooth(w - r, 0, w - r, 0, w - r + k, 0),
+      smooth(w, r, w, r - k, w, r), smooth(w, h - r, w, h - r, w, h - r + k),
+      smooth(w - r, h, w - r + k, h, w - r, h), smooth(r, h, r, h, r - k, h),
+      smooth(0, h - r, 0, h - r + k, 0, h - r), smooth(0, r, 0, r, 0, r - k),
+    ],
+  };
+}
+
+/**
+ * A regular polygon of `n` sides (or a star of `n` points with the inner radius `inner` × R) inside the circle of
+ * radius R around (R, R); `angle` turns it (0 = a point straight up, Illustrator's upright shape).
+ */
+export function polygonContour(R: number, n: number, star: boolean, inner = 0.5, angle = 0): Contour {
+  const m = star ? n * 2 : n;
+  const nodes: VectorAnchor[] = [];
+  for (let i = 0; i < m; i++) {
+    const a = angle - Math.PI / 2 + (i * Math.PI * 2) / m;
+    const rr = star && i % 2 ? R * inner : R;
+    nodes.push(corner(R + rr * Math.cos(a), R + rr * Math.sin(a)));
+  }
+  return { closed: true, nodes };
+}
+
+/**
+ * 사용자 정의 모양 (Photoshop's Custom Shape tool): a few everyday shapes in a unit square, stretched to the box drawn.
+ * Corners are [x, y]; curved anchors [x, y, inX, inY, outX, outY].
+ */
+export const CUSTOM_SHAPES = {
+  heart: [[0.5, 1, 0.75, 0.75, 0.25, 0.75], [0, 0.32, 0.05, 0.55, 0, 0.15], [0.25, 0.02, 0.1, 0.02, 0.4, 0.02], [0.5, 0.22], [0.75, 0.02, 0.6, 0.02, 0.9, 0.02], [1, 0.32, 1, 0.15, 0.95, 0.55]],
+  arrow: [[0, 0.3], [0.6, 0.3], [0.6, 0], [1, 0.5], [0.6, 1], [0.6, 0.7], [0, 0.7]],
+  bubble: [[0, 0], [1, 0], [1, 0.72], [0.45, 0.72], [0.22, 1], [0.26, 0.72], [0, 0.72]],
+  check: [[0, 0.55], [0.14, 0.41], [0.38, 0.64], [0.86, 0.1], [1, 0.24], [0.38, 0.92]],
+  bolt: [[0.58, 0], [0.12, 0.56], [0.44, 0.56], [0.3, 1], [0.88, 0.4], [0.55, 0.4], [0.78, 0]],
+} as const;
+export type CustomShapeId = keyof typeof CUSTOM_SHAPES;
+
+export function customShapeContour(id: CustomShapeId, w: number, h: number): Contour {
+  const pts = CUSTOM_SHAPES[id] ?? CUSTOM_SHAPES.heart;
+  return { closed: true, nodes: pts.map((q) => (q.length === 2 ? corner(q[0] * w, q[1] * h) : smooth(q[0] * w, q[1] * h, q[2] * w, q[3] * h, q[4] * w, q[5] * h))) };
+}
+
+const SHAPE_NAME: Record<ShapeKind, string> = { rect: "cmd.insert.rect", ellipse: "cmd.insert.ellipse", roundRect: "shell.name.roundRect", polygon: "shell.name.polygon", star: "shell.name.star", customShape: "shell.name.customShape" };
+export const shapeName = (kind: ShapeKind) => (kind === "customShape" ? tr(`shell.name.custom.${useShapeParams.getState().custom}`) : tr(SHAPE_NAME[kind]));
+
+/**
+ * A new shape in the rectangle `r` (for the polygon and the star: the square around its circle, `angle` its turn).
+ */
+export function drawnShape(kind: ShapeKind, r: { x: number; y: number; w: number; h: number }, d: ShapeDefaults, angle = 0): VectorNode {
+  const p = useShapeParams.getState();
+  const contour =
+    kind === "rect" ? rectContour(0, 0, r.w, r.h)
+    // the rounded rectangle is a rectangle with live corners (Illustrator's widgets and Corners field change it later)
+    : kind === "roundRect" ? rectContour(0, 0, r.w, r.h)
+    : kind === "polygon" ? polygonContour(r.w / 2, Math.max(3, p.sides), false, 0, angle)
+    : kind === "star" ? polygonContour(r.w / 2, Math.max(3, p.points), true, p.inner, angle)
+    : kind === "customShape" ? customShapeContour(p.custom, r.w, r.h)
+    : ellipseContour(r.w / 2, r.h / 2, r.w / 2, r.h / 2);
+  const v = newVector([contour], shapeName(kind));
+  if (kind === "roundRect" && p.radius > 0) v.cornerRadius = p.radius;
   v.fill = d.fill;
   v.stroke = strokeOf(d);
   v.strokeWidth = widthOf(d);

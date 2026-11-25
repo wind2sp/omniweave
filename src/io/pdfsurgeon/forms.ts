@@ -24,6 +24,8 @@ export interface FormWidget {
   rect: [number, number, number, number];
   /** check box / radio button: the name of this widget's "on" appearance */
   onState?: string;
+  /** its place in the page's /Annots (Acrobat tabs through a page in this order unless /Tabs says rows / columns) */
+  order?: number;
 }
 
 export interface FormField {
@@ -100,21 +102,26 @@ function terminals(doc: SurgeonDoc): Node[] {
   return out;
 }
 
-function pageOfWidget(doc: SurgeonDoc): (w: { dict: PDFDict; ref: PDFRef | null }) => number {
+function pageOfWidget(doc: SurgeonDoc): ((w: { dict: PDFDict; ref: PDFRef | null }) => number) & { order: (w: { ref: PDFRef | null }) => number | undefined } {
   const byRef = new Map<string, number>();
+  const at = new Map<string, number>();
   doc.pageRefs.forEach((pr, i) => {
     const annots = look(doc.ctx, dictOf(doc.ctx.lookup(pr))?.get(PDFName.of("Annots")));
     if (annots instanceof PDFArray) for (let k = 0; k < annots.size(); k++) {
       const a = annots.get(k);
-      if (a instanceof PDFRef) byRef.set(refKey(a), i);
+      if (a instanceof PDFRef) {
+        byRef.set(refKey(a), i);
+        at.set(refKey(a), k);
+      }
     }
   });
   const pageIdx = new Map(doc.pageRefs.map((r, i) => [refKey(r), i]));
-  return (w) => {
+  const f = (w: { dict: PDFDict; ref: PDFRef | null }) => {
     if (w.ref && byRef.has(refKey(w.ref))) return byRef.get(refKey(w.ref))!;
     const p = w.dict.get(PDFName.of("P"));
     return p instanceof PDFRef ? (pageIdx.get(refKey(p)) ?? -1) : -1;
   };
+  return Object.assign(f, { order: (w: { ref: PDFRef | null }) => (w.ref ? at.get(refKey(w.ref)) : undefined) });
 }
 
 /** the "on" appearance names of a check box / radio widget (everything in /AP /N but /Off) */
@@ -168,6 +175,14 @@ function valueOf(doc: SurgeonDoc, d: PDFDict, kind: FormFieldKind): FormValue {
 }
 
 /** The document's form fields; `xfa` when the form is (also) an XFA form. */
+/** Each page's /Tabs (R rows, C columns, S structure; null: not set — the page's annotation order). */
+export function pageTabs(doc: SurgeonDoc): ("R" | "C" | "S" | null)[] {
+  return doc.pageRefs.map((r) => {
+    const v = nameOf(dget(doc.ctx, dictOf(doc.ctx.lookup(r)), "Tabs"));
+    return v === "R" || v === "C" || v === "S" ? v : null;
+  });
+}
+
 export function formFields(doc: SurgeonDoc): { fields: FormField[]; xfa: boolean } {
   const af = acroForm(doc);
   const xfa = !!af?.has(PDFName.of("XFA"));
@@ -186,7 +201,8 @@ export function formFields(doc: SurgeonDoc): { fields: FormField[]; xfa: boolean
       widgets: n.widgets.map((w) => {
         const r = numArray(doc.ctx, w.dict.get(PDFName.of("Rect"))) ?? [0, 0, 0, 0];
         const on = kind === "check" || kind === "radio" ? onStates(doc, w.dict)[0] : undefined;
-        return { page: pageOf(w), rect: [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])], ...(on ? { onState: on } : {}) };
+        const order = pageOf.order(w);
+        return { page: pageOf(w), rect: [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])], ...(on ? { onState: on } : {}), ...(order !== undefined ? { order } : {}) };
       }),
     };
     const ml = numOf(inh(doc, n.dict, "MaxLen"));

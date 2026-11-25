@@ -449,7 +449,7 @@ describe("dynamic arrays in .xlsx", () => {
     const table = `<?xml version="1.0"?><table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Table1" displayName="Price" ref="A1:B3" totalsRowShown="0"><autoFilter ref="A1:B3"/><tableColumns count="2"><tableColumn id="1" name="Item"/><tableColumn id="2" name="Cost"/></tableColumns></table>`;
     const data = `<row r="1"><c r="A1" t="inlineStr"><is><t>Item</t></is></c><c r="B1" t="inlineStr"><is><t>Cost</t></is></c><c r="D1"><f>SUM(Price[Cost])</f><v>0</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>a</t></is></c><c r="B2"><v>4</v></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>b</t></is></c><c r="B3"><v>6</v></c></row>`;
     const sh = readXlsx(xlsx(data, { table })).sheets[0];
-    expect(sh.tables).toEqual([{ name: "Price", ref: "A1:B3", cols: ["Item", "Cost"] }]);
+    expect(sh.tables).toMatchObject([{ name: "Price", ref: "A1:B3", cols: ["Item", "Cost"] }]);
     recalcAll([sh]);
     expect(sh.cells.D1.v).toBe(10);
   });

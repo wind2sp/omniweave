@@ -300,9 +300,9 @@ describe("the app's chords while typing in a sheet cell / the formula bar / a PD
   });
 });
 describe("저장 (Ctrl+S) keeps the file's format, as Excel / PowerPoint / Acrobat", () => {
-  it("workbooks, CSV, decks and PDFs save back as themselves; ODP is offered as PPTX; others as .omw", () => {
-    for (const f of ["xlsx", "xlsm", "csv", "pptx", "ppsx", "pdf", "docx", "hwpx", "hwp"]) expect(saveTargetFor(f)).toBe("same");
+  it("workbooks, CSV, decks, PDFs, pictures and PSDs save back as themselves; ODP is offered as PPTX; others as .omw", () => {
+    for (const f of ["xlsx", "xlsm", "csv", "pptx", "ppsx", "pdf", "docx", "hwpx", "hwp", "png", "jpg", "webp", "psd"]) expect(saveTargetFor(f)).toBe("same");
     expect(saveTargetFor("odp")).toBe("pptx");
-    expect(saveTargetFor("png")).toBe("omw");
+    expect(saveTargetFor("dxf")).toBe("omw");
   });
 });

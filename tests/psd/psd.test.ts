@@ -9,7 +9,7 @@ import { newDocument, newVector, type OmwDocument, type Page, type RasterNode } 
 import { rectContour } from "../../src/core/vector";
 import { formatForExt, sameTypeExport } from "../../src/io/formats";
 import { decodePsd, importPsdPage, parsePsdLayout, PsdFormatError, unpackBits, withoutCmykManagement, type PsdLayout } from "../../src/io/formats/psd";
-import { buildPsd, checkPsd, encodeChannel, isHalfBackground, rasterPixels, writePsd, type FreshLayer, type LayerPixels } from "../../src/io/formats/psdWrite";
+import { buildPsd, checkPsd, encodeChannel, isHalfBackground, rasterPixels, shownPixels, writePsd, type FreshLayer, type LayerPixels } from "../../src/io/formats/psdWrite";
 import { rasterFromRgba } from "../../src/io/formats/raster";
 
 // ───────── helpers ─────────
@@ -345,17 +345,17 @@ describe("PSD Surgeon: edits on an imported PSD", () => {
     expect(same(recBytes(A, 4), recBytes(B, 4))).toBe(true);
   });
 
-  it("editing a masked layer bakes the mask once (no double masking) and drops the mask channel", async () => {
+  it("editing a masked layer keeps its layer mask apart (2026-11-24: an editable mask, no double masking)", async () => {
     const bytes = grouped();
     const { doc, page } = open(bytes);
     const a = layersOf(page)[0];
+    expect(a.mask).toBeTruthy();
     const edited = editPixels(a, [0, 0, 255, 255]);
     replaceNode(page, a.id, edited);
     const res = await writePsd(doc, page);
-    expect(res.warnings.join()).toContain("마스크");
     const B = parsePsdLayout(res.bytes);
-    expect(B.records[1].channels.map((c) => c.id)).not.toContain(-2);
-    expect(visiblePixels(rasterPixels(layersOf(open(res.bytes).page)[0]))).toBe(visiblePixels(rasterPixels(edited)));
+    expect(B.records[1].channels.map((c) => c.id)).toContain(-2);
+    expect(visiblePixels(shownPixels(layersOf(open(res.bytes).page)[0]))).toBe(visiblePixels(shownPixels(edited)));
   });
 
   it("rotated / scaled layers are resampled into a new pixel layer", async () => {

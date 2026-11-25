@@ -8,5 +8,6 @@
   "tablemenu.deleteTable": "Delete Table",
   "tablemenu.merge": "Merge Cells",
   "tablemenu.split": "Split Cells",
-  "tablemenu.props": "Table Properties (Width, Shading, Borders)…"
+  "tablemenu.props": "Table Properties (Width, Shading, Borders)…",
+  "tablemenu.splitTable": "Split Table"
 }

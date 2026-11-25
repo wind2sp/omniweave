@@ -6,7 +6,7 @@ import type { ApplyCtx } from "./filters";
 import { applyOps, ImageOpError, type ImageOp } from "./ops";
 import type { Img } from "./pixels";
 import { traceImage, type TraceMap, type TraceOptions, type TraceResult } from "./trace";
-import { analyze, removeBackground, type MatteOptions, type MatteResult } from "./matte/pipeline";
+import { analyze, MATTE_STAGES, removeBackground, type MatteOptions, type MatteResult } from "./matte/pipeline";
 import { recognizePage, type OcrLang } from "./ocr/models";
 import type { OcrOptions, OcrPage } from "./ocr/pipeline";
 import { checkUpscale, upscale, type UpImg, type UpscaleOptions } from "./upscale";
@@ -111,9 +111,20 @@ function checkMatteSize(img: Img) {
   if (img.width * img.height > MATTE_MAX_PIXELS) throw new Error(t("engine.image.matteTooLarge", { w: img.width, h: img.height }));
 }
 
+/** the step reporter stays here (a function is not sent to the worker); the worker's progress [step, steps] calls it */
+function stageOpts(opts: MatteOptions): { sent: MatteOptions; progress?: (done: number, total: number) => void } {
+  const { onStage, ...sent } = opts;
+  return { sent, progress: onStage ? (done) => onStage(MATTE_STAGES[done - 1] ?? "refine") : undefined };
+}
+
+/**
+ * Background removal in the image worker (the screen keeps working). `opts.onStage` hears each step (subject model,
+ * person model, edges); cancelImageWork stops it.
+ */
 export async function runMatte(img: Img, opts: MatteOptions = {}): Promise<Timed<MatteResult>> {
   checkMatteSize(img);
-  const p = post<{ matte: MatteResult; ms: number }>({ kind: "matte", img, opts });
+  const so = stageOpts(opts);
+  const p = post<{ matte: MatteResult; ms: number }>({ kind: "matte", img, opts: so.sent, base: typeof document !== "undefined" ? document.baseURI : undefined }, so.progress);
   if (p) {
     try {
       const r = await p;
@@ -223,7 +234,8 @@ export type MatteAnalysis = Awaited<ReturnType<typeof analyze>>;
 /** Detected type + confidence (and the saliency map for photos, so the dialog's previews reuse it). */
 export async function runMatteAnalyze(img: Img, opts: MatteOptions = {}): Promise<Timed<MatteAnalysis>> {
   checkMatteSize(img);
-  const p = post<{ analysis: MatteAnalysis; ms: number }>({ kind: "matteAnalyze", img, opts });
+  const so = stageOpts(opts);
+  const p = post<{ analysis: MatteAnalysis; ms: number }>({ kind: "matteAnalyze", img, opts: so.sent, base: typeof document !== "undefined" ? document.baseURI : undefined }, so.progress);
   if (p) {
     try {
       const r = await p;

@@ -1,5 +1,5 @@
 import { makeAsset } from "../core/assets";
-import { docHooks } from "./editModes";
+import { currentEditMode, docHooks } from "./editModes";
 import { withWordDefaults } from "../core/lineSpacing";
 import { getSecret, rememberSecret, withPassword } from "../io/crypto/session";
 import { decryptOmw, encryptOmw, isEncryptedOmw } from "../io/crypto/omwCrypt";
@@ -7,8 +7,10 @@ import { encryptPdf } from "../io/crypto/pdfEncrypt";
 import { decryptOffice, encryptOffice, isEncryptedOffice } from "../io/crypto/office";
 import { encryptHwpx } from "../io/crypto/hwpx";
 import { askProtection } from "./shell/SecurityDialogs";
+import { askExportLoss, lossDialogMounted } from "./shell/ExportLossDialog";
+import { unwrittenObjects } from "./exportGuard";
 import { askPictureOptions } from "./shell/ImageExportDialog";
-import { forgetRecent, rememberRecent } from "./shell/recent";
+import { forgetRecent, isHandlePath, recentHandle, rememberRecent, rememberRecentHandle } from "./shell/recent";
 import { historyForFile, resetHistory, useHistory } from "../core/history";
 import { ANIM_PRESETS, type AnimPreset } from "../core/anim";
 import { nodeBounds } from "../core/loom";
@@ -26,6 +28,7 @@ import {
   newText,
   uid,
   type AssetRef,
+  type OmwDocument,
   type Page,
   type PageKind,
   type SceneNode,
@@ -33,7 +36,7 @@ import {
 } from "../core/types";
 import { flattenRanges, parsePageRanges } from "../core/pages";
 import { isSvg, svgIntrinsicSize } from "../render/svgSize";
-import { svgToVectors } from "../io/svgVectors";
+import { svgArtPage } from "../io/svgVectors";
 import { bakeAdjustments, exportImage, exportPdf, exportPng, exportSvg, pageRgba, rasterizeNode, webpBytesToPng } from "../io/export";
 import { docFileStem, withExt } from "../io/exportName";
 import { webpToPng } from "../io/webpPolicy";
@@ -42,11 +45,11 @@ import { SAVE_CANCELLED } from "../io/errors";
 import { LARGE_MEDIA, probeMedia } from "../io/formats/media";
 import { imageSize, isHeic } from "../io/formats/sniff";
 import { journalClear } from "../io/journal";
-import { activeSessionId, claimTab, isPristineActive, newSession, registerSessionPart, removeSession, setOpenedPath, setTabBusy, switchTo, tabForPath } from "../core/sessions";
+import { activeSessionId, claimTab, isPristineActive, newSession, openedHandleOf, openedPathOf, registerSessionPart, removeSession, setOpenedFile, setOpenedHandle, setOpenedPath, setTabBusy, switchTo, tabForPath } from "../core/sessions";
 import { packOmw, unpackOmw } from "../io/omw";
 import { reflowPages } from "../core/flow";
-import { FILTERS, isTauri, openFiles, saveFile, type OpenedFile } from "../io/platform";
-import { elevatePdfText } from "../io/pdf";
+import { FILTERS, handleWritable, isTauri, openFiles, saveFile, type FileHandle, type OpenedFile } from "../io/platform";
+import { elevatePdfText, pdfPageWithoutText } from "../io/pdf";
 import { t } from "../i18n";
 import { exportNotes } from "./exportNotes";
 import { isCancelled, withProgress } from "./progress";
@@ -229,6 +232,12 @@ export async function openInTab(f: OpenedFile, opts: { asSource?: boolean } = {}
   if (activeSessionId() === id) {
     claimTab(id);
     if (f.path) setOpenedPath(id, f.path);
+    setOpenedFile(id, { name: f.name, size: f.bytes.length });
+    // the web build's own "path": the browser's handle of the file (Chrome / Edge open picker or drop)
+    if (f.handle) setOpenedHandle(id, f.handle);
+    // an Illustrator file is artwork to edit, as in Illustrator: its shapes and text come up as objects at once
+    // (they were only selectable after 'PDF 텍스트 편집', which the phone's PC screen never shows)
+    await elevateAiOnOpen(pages);
     // a drawing (DXF / DWG) is read by its layers, as in AutoCAD: show the layer panel (folders = drawing layers)
     if (pages.some((p) => p.source?.cad)) useUI.getState().set({ leftTab: "layers" });
     // a file opened into a tab of its own is not an edit (Word, 한글): nothing to undo back to an empty page and no
@@ -247,11 +256,29 @@ export async function openAndRemember(f: OpenedFile) {
   // after first paint of images; the thumbnail is of the first page this file brought in (opening into an open
   // document appends), and none at all for password-protected content (localStorage is plain text)
   if (pages.length && f.path) setTimeout(() => rememberRecent(f.path, f.name, S().doc, { protected: isDocProtected(), page: S().doc.pages.find((p) => p.id === pages[0].id) }), 600);
+  // the web build (Chrome / Edge): the file's handle, kept for the next visit
+  else if (pages.length && f.handle) setTimeout(() => void rememberRecentHandle(f.handle!, f.name, S().doc, { protected: isDocProtected(), page: S().doc.pages.find((p) => p.id === pages[0].id) }), 600);
   return pages;
 }
 
 /** Reopen a recent file by path (desktop); a file that is gone is dropped from the list. */
 export async function openRecentFile(path: string) {
+  if (isHandlePath(path)) {
+    // the web build: the kept handle (the browser may ask once whether the page may read the file again)
+    const h = await recentHandle(path);
+    if (!h) {
+      S().notify(t("start.recent.noAccess"));
+      return;
+    }
+    try {
+      const file = await h.getFile();
+      await openAndRemember({ name: file.name, path: null, bytes: new Uint8Array(await file.arrayBuffer()), handle: h });
+    } catch (e: any) {
+      forgetRecent(path);
+      S().notify(t("start.recent.missing", { message: String(e?.message ?? e) }));
+    }
+    return;
+  }
   if (!isTauri) return;
   const open = tabForPath(path);
   if (open) return void switchTo(open);
@@ -344,14 +371,8 @@ export async function canvasImagePage(bytes: Uint8Array, mime: string, name: str
   const page = newPage("DESIGN", W, H, stem);
   const svg = isSvg(bytes, mime);
   // SVG artwork opens as editable paths (Illustrator); one that needs more than paths stays a picture
-  const art = svg ? svgToVectors(new TextDecoder().decode(bytes)) : null;
-  if (art) {
-    const vp = newPage("DESIGN", Math.max(1, art.width), Math.max(1, art.height), stem);
-    vp.nodes = art.nodes;
-    if (art.groups.length) vp.groups = art.groups;
-    vp.source = { format: "svg", name };
-    return { page: vp, assets: {} };
-  }
+  const vp = svg ? svgArtPage(bytes, name) : null;
+  if (vp) return { page: vp, assets: {} };
   if (!svg && ALPHA_EXTS.has(ext)) page.background = "transparent";
   const node = newImage(asset.id, W, H, name);
   node.transform = { x: 0, y: 0, rotation: 0, scale: 1 };
@@ -694,6 +715,34 @@ export async function protectOutput(ext: string, bytes: Uint8Array, force = fals
   return { bytes: await ENCRYPTORS[ext](bytes, pw), secretId: usedId };
 }
 
+/**
+ * The page whose original file a save writes: the current one, or — a page made here (the new section of a 구역
+ * 나누기, a page added after a break) — the nearest page before it that came from the file. QA 11-25 real use: after a
+ * section break the caret's page had no source, and Ctrl+S on the Word file did not save it as DOCX.
+ */
+function sourcePageNow(): Page | undefined {
+  const cur = currentPage();
+  if (!cur || cur.source) return cur;
+  const pages = S().doc.pages;
+  for (let k = pages.findIndex((p) => p.id === cur.id) - 1; k >= 0; k--) if (pages[k].source && pages[k].kind === cur.kind) return pages[k];
+  return cur;
+}
+
+/**
+ * 암호 걸어 저장: a Word / 한글 / Excel / PowerPoint document opened from its file is written in its own format with that
+ * format's encryption (Word "암호로 문서 보호", 한글 "문서 암호"); anything else as the encrypted work file (.omw).
+ * QA 11-25 real use: a Word file was saved as an encrypted .omw.
+ */
+export async function saveProtected() {
+  const cur = sourcePageNow();
+  const def = cur?.source && WORD_SAVE_SAME.has(cur.source.format) ? sameTypeExport(cur, S().doc.pages) : null;
+  if (def && ENCRYPTORS[def.ext]) {
+    await exportAs("same", true);
+    return;
+  }
+  return saveDoc(true, true);
+}
+
 export async function saveDoc(as = false, forceProtect = false) {
   // a smart object's content tab: saving puts it back into its parent document (Photoshop's Edit Contents)
   if (!as && !forceProtect && smartLinkOf() && (await saveSmartToParent())) return;
@@ -701,9 +750,22 @@ export async function saveDoc(as = false, forceProtect = false) {
   // a Word / 한글 document opened from its file and not yet kept as .omw: 저장 writes its own format, as Word and 한글
   // do (a save that would lose something asks first — the original-format export's confirm); 다른 이름으로 저장 keeps
   // the work file (QA ui-audit #51: Ctrl+S on an HWPX wrote .omw)
-  const cur = currentPage();
+  const cur = sourcePageNow();
   if (!as && !forceProtect && !s.filePath && cur?.source && WORD_SAVE_SAME.has(cur.source.format) && sameTypeExport(cur, s.doc.pages)) {
-    if (await exportAs("same")) S().set({ dirty: false });
+    // the browser asks once for leave to write the opened file: asked now, while the key press is fresh (building the
+    // file may take longer than the browser allows); refused, the save picker comes as before
+    const h = openedHandleOf(activeSessionId());
+    const handle = h && (await handleWritable(h)) ? h : null;
+    // (an .xls stays .xls, as in Excel: the XLS writer — the original file with the values written in, or the workbook
+    // written anew — legacyWrite.ts; the "same" export of an XLS would be its XLSX)
+    const kind = cur.source.format === "xls" ? "xls" : "same";
+    if (await exportAs(kind, false, { to: openedPathOf(activeSessionId()), handle })) S().set({ dirty: false });
+    return;
+  }
+  // a drawing (DXF / DWG, import only): 저장 says it keeps the work as .omw and offers the DXF export instead
+  // (QA bux2 2026-11-24: Ctrl+S wrote .omw without a word)
+  if (!as && !forceProtect && !s.filePath && cur?.source?.cad && !ask(t("cadfeat.saveAsk"))) {
+    await exportAs("dxf");
     return;
   }
   // a format Omniweave opens but cannot write back (ODP): which format 저장 writes instead is said and asked
@@ -753,26 +815,79 @@ export function exportTargets(): ExportDef[] {
   return same ? [same, ...EXPORTS] : EXPORTS;
 }
 
+/**
+ * PDF pages not made editable carry their text only inside the page picture: for a Word / 한글 export each such page
+ * gets its text lines as text boxes (PDF Surgeon elevation, ui: 텍스트 편집) in place of the page picture, so the
+ * file has the words (Acrobat "Export PDF → Word"). Other pages stay as they are; nothing changes in the document.
+ */
+async function pdfPagesAsText<T extends { doc: OmwDocument; pages: Page[]; note: string | null }>(b: T): Promise<T> {
+  let changed = false;
+  const assets: Record<string, AssetRef> = {};
+  const pages = await Promise.all(
+    b.doc.pages.map(async (p) => {
+      const n = p.nodes.find((x) => x.type === "PDF");
+      if (!n || n.type !== "PDF" || n.covers.length || p.nodes.some((x) => x.type === "TEXT")) return p;
+      const a = b.doc.assets[n.assetId];
+      if (!a) return p;
+      try {
+        const r = await elevatePdfText(a.hash, n.pageIndex, p.width);
+        const texts = r.nodes.filter((x) => x.type === "TEXT");
+        if (!texts.length) return p;
+        changed = true;
+        // the page without its text (pictures, lines, table borders, fills) behind the text, where it was on the page
+        const bg = await pdfPageWithoutText(a.hash, n.pageIndex, 2).catch(() => null);
+        if (!bg) return { ...p, nodes: texts } as Page;
+        const asset = makeAsset(bg, "image/png", `${p.name || "page"}-background.png`);
+        assets[asset.id] = asset;
+        const img = newImage(asset.id, p.width, p.height, asset.name);
+        img.transform = { x: 0, y: 0, rotation: 0, scale: 1 };
+        img.place = { mode: "float", wrap: "behind" };
+        return { ...p, nodes: [img, ...texts] } as Page;
+      } catch {
+        return p;
+      }
+    }),
+  );
+  if (!changed) return b;
+  const doc = { ...b.doc, pages, assets: { ...b.doc.assets, ...assets } };
+  return { ...b, doc, pages: b.pages.map((p) => pages.find((q) => q.id === p.id) ?? p) };
+}
+
 /** Export formats with no adjustment layer (PDF bakes inside exportPdf, also for print). */
 const BAKE_ADJUST = new Set(["svg", "docx", "hwpx", "pptx"]);
 
-export async function exportAs(kind: ExportKind, forceProtect = false) {
+export async function exportAs(kind: ExportKind, forceProtect = false, opts: { to?: string | null; handle?: FileHandle | null } = {}) {
   // PDF export warnings (missing glyphs placed as images, dropped objects) are shown to the person
   const pdfWarnings: string[] = [];
   let adjNote: string | null = null;
   let saved = false;
   const s = S();
-  const page = currentPage();
+  const page = kind === "same" ? sourcePageNow() : currentPage();
   if (!page) return;
   const def = kind === "same" ? sameTypeExport(page, s.doc.pages) : exportById(kind);
   if (!def) return S().notify(t("doc.toast.unknownExport", { kind }));
   // "name.ext": the document's name (untitled: the file its page came from) with the extension once; per-page
   // formats (PNG · JPG · WebP · SVG · PSD) add the page name only when it says more (io/exportName.ts)
   const fileName = withExt(def.fileName?.(s.doc, page) ?? docFileStem(s.doc), def.ext);
+  // objects this format cannot hold are named before writing, with a way to keep them (.omw) — never left out unsaid
+  // (DXF writes the page shown; the others write every page)
+  const lost = unwrittenObjects(def.id === "dxf" ? [page] : s.doc.pages, def.id === "same" || def.id === "image" ? def.ext : def.id);
+  // (no screen to ask on — tests, scripts: written as asked; the notice after the save still names it)
+  if (lost.length && (lossDialogMounted() || typeof confirm === "function")) {
+    const choice = lossDialogMounted()
+      ? await askExportLoss({ ext: def.ext, items: lost })
+      : ask([t("exportloss.title"), ...lost.map((i) => "- " + t("exportloss.item", { what: t(`style.prop.${i.prop}`), n: i.count })), "", t("engine.common.saveConfirm")].join("\n"))
+        ? "save"
+        : null;
+    if (choice === "omw") return void (await saveDoc(true));
+    if (choice !== "save") return S().notify(t("doc.toast.exportCancelled"));
+  }
   try {
     const out = await withProgress(t("progress.export", { fmt: def.ext.toUpperCase() }), async () => {
       // formats without adjustment layers: what they touch goes in as a picture (PDF does this itself, exportPdf)
-      const b = BAKE_ADJUST.has(def.id) ? await bakeAdjustments(s.doc, [page]) : { doc: s.doc, pages: [page], note: null };
+      const b0 = BAKE_ADJUST.has(def.id) ? await bakeAdjustments(s.doc, [page]) : { doc: s.doc, pages: [page], note: null };
+      // Word / 한글 from a PDF: the pages' text as text, as Acrobat's export does — not one picture per page
+      const b = def.id === "docx" || def.id === "hwpx" ? await pdfPagesAsText(b0) : b0;
       adjNote = b.note;
       // Word / 한글: a WebP the person put in is saved as a PNG (lossless); the file's own WebP stay (io/webpPolicy.ts)
       const d = def.id === "docx" || def.id === "hwpx" || (def.id === "same" && (def.ext === "docx" || def.ext === "hwpx")) ? await webpToPng(b.doc, webpBytesToPng) : b.doc;
@@ -790,7 +905,11 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
     const raw = typeof out === "string" ? new TextEncoder().encode(out) : out;
     const prot = typeof out === "string" && !forceProtect && !docProtection().wasProtected ? { bytes: out, secretId: null } : await protectOutput(def.ext, raw, forceProtect);
     if (prot == null) return S().notify(t("doc.toast.exportCancelled"));
-    const path = await saveFile(fileName, prot.bytes, [def.filter]);
+    // 저장 (Ctrl+S) of a file opened from disk in its own format: back into that file, as Word does — opened with 열기
+    // or handed over by Windows (연결 프로그램, a double-click: the exe's arguments) alike
+    const to = opts.to && opts.to.toLowerCase().endsWith("." + def.ext.toLowerCase()) ? opts.to : null;
+    const handle = opts.handle && opts.handle.name.toLowerCase().endsWith("." + def.ext.toLowerCase()) ? opts.handle : null;
+    const path = await saveFile(to ? to.split(/[\\/]/).pop()! : handle ? handle.name : fileName, prot.bytes, [def.filter], to, handle);
     // a format with its own notice (DOC / XLS / PPT: "saved as the original file") says it in place of "exported"
     saved = !!path;
     if (path) S().notify((def.doneNote && !prot.secretId ? def.doneNote : t(prot.secretId ? "doc.toast.exportedProtected" : "doc.toast.exported", { fmt: def.ext.toUpperCase() })) + (adjNote ? ` · ${adjNote}` : ""));
@@ -814,9 +933,30 @@ export async function exportAs(kind: ExportKind, forceProtect = false) {
  * Source formats whose 저장 (Ctrl+S) writes the original format: Word / 한글 documents, and the workbooks, decks and PDFs
  * Omniweave saves back the same way (Excel / PowerPoint / Acrobat: Ctrl+S keeps the file's format; 다른 이름으로 저장 = .omw).
  */
-const WORD_SAVE_SAME = new Set(["docx", "hwpx", "hwp", "xlsx", "xlsm", "csv", "pptx", "ppsx", "pdf"]);
+// pictures and PSDs too, as Photoshop and the Photos app save them (a JPG / WebP asks its quality first and says the
+// layers become one; phone check 2026-11-24 #13: a photo fixed in the PC screen was saved as .omw without a word)
+// an Illustrator file (PDF-compatible) as Illustrator saves it, too (design 2 real-use check 2026-11-25: Ctrl+S on an .ai
+// wrote .omw); one drawn from Illustrator's native data has no same-format save and keeps the work as .omw
+// (XLS: Excel saves an .xls as .xls — the cell values written into the original file, legacyWrite.ts stage 2)
+const WORD_SAVE_SAME = new Set(["docx", "hwpx", "hwp", "xlsx", "xlsm", "xls", "csv", "pptx", "ppsx", "pdf", "png", "jpg", "webp", "psd", "ai"]);
 /** Formats opened but not written back: 저장 offers this one instead, saying why (ODP → PPTX). */
 const SAVE_INSTEAD: Record<string, { id: string; from: string; to: string }> = { odp: { id: "pptx", from: "ODP (.odp)", to: "PowerPoint (.pptx)" } };
+/**
+ * The file type 저장 (Ctrl+S) writes now, for its button's name: the opened file's own type (DOCX, HWPX, PDF, JPG…),
+ * the type written instead (ODP → PPTX), or .omw (QA basic-ux-office 5-4: the button said '.omw' while Ctrl+S wrote
+ * the DOCX).
+ */
+export function saveTargetExt(): string {
+  const s = S();
+  const cur = currentPage();
+  if (s.filePath || !cur?.source) return "omw";
+  const fmt = cur.source.format;
+  if (WORD_SAVE_SAME.has(fmt) && sameTypeExport(cur, s.doc.pages)) return (extOfName(cur.source.name) || fmt).toLowerCase();
+  if (SAVE_INSTEAD[fmt]) return SAVE_INSTEAD[fmt].id;
+  return "omw";
+}
+const extOfName = (n: string) => /\.([^.]+)$/.exec(n)?.[1] ?? "";
+
 /** What 저장 (Ctrl+S) writes for a document opened from a file of this format and not yet kept as .omw. */
 export const saveTargetFor = (format: string): "same" | string | "omw" => (WORD_SAVE_SAME.has(format) ? "same" : SAVE_INSTEAD[format]?.id ?? "omw");
 
@@ -979,6 +1119,34 @@ export function runPathfinder(op: BoolOp) {
   S().set({ selection: result ? [result.id] : [] });
 }
 
+/** Elevate the pages of an opened .ai (shapes, gradients, text) that have not been elevated yet. */
+export async function elevateAiOnOpen(pages: readonly Page[]): Promise<number> {
+  let made = 0;
+  for (const p of pages) {
+    if (p.source?.format !== "ai" || p.source.aiNative) continue;
+    const page = S().doc.pages.find((x) => x.id === p.id);
+    const pdfNode = page?.nodes.find((n) => n.type === "PDF");
+    if (!page || !pdfNode || pdfNode.type !== "PDF" || pdfNode.covers.length) continue;
+    const asset = S().doc.assets[pdfNode.assetId];
+    if (!asset) continue;
+    try {
+      const { nodes, covers } = await elevatePdfText(asset.hash, pdfNode.pageIndex, page.width);
+      if (!nodes.length) continue;
+      S().commit(t("doc.history.elevatePdf"), (d) => {
+        const pg = draftPage(d, page.id)!;
+        const n = pg.nodes.find((x) => x.id === pdfNode.id) as any;
+        n.covers = covers;
+        pg.nodes.push(...(nodes as any));
+      });
+      made += nodes.length;
+    } catch (e) {
+      // the page stays as it opened (the 'PDF 텍스트 편집' button can still try)
+      console.warn("AI elevation on open", e);
+    }
+  }
+  return made;
+}
+
 export async function elevatePdf() {
   const s = S();
   const page = currentPage();
@@ -1017,7 +1185,12 @@ export function addAnimation(preset: AnimPreset, trigger: "ON_CLICK" | "WITH_PRE
 
 export function selectAll() {
   const page = currentPage();
-  if (page) S().set({ selection: page.nodes.filter(pickableOn(page)).map((n) => n.id) });
+  if (!page) return;
+  const pick = pickableOn(page);
+  // the design mode (Illustrator): the empty pixel layer a new artboard starts with is not art — Ctrl+A then Ctrl+G
+  // grouped it with the shapes (design 2 real-use check 2026-11-25)
+  const design = currentEditMode() === "DESIGN";
+  S().set({ selection: page.nodes.filter((n) => pick(n) && !(design && n.type === "RASTER" && !Object.keys(n.tiles).length)).map((n) => n.id) });
 }
 
 export function nodesAt(x: number, y: number): SceneNode[] {

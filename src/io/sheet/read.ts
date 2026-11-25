@@ -10,7 +10,9 @@ import { builtinFormat, type SheetLang } from "./numfmt";
 import { addr, parseAddr, shiftFormula } from "./formula";
 import { readExtra } from "./readExtra";
 import { markSpills, readTables } from "./tables";
+import { readSlicers } from "./slicers";
 import { readPrintSetup } from "./printSetup";
+import { pivotCacheParts, readPivots } from "./pivots";
 import { readDrawings } from "./drawings";
 import { screenDigitPx } from "./printFont";
 
@@ -193,7 +195,10 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
   const wbXml = read("xl/workbook.xml");
   if (!wbXml) throw new Error("not a workbook");
   const wb = parseXml(wbXml);
+  const wp = descendants(wb, "workbookProtection")[0];
+  const bookLock = wp && /^(1|true)$/.test(attr(wp, "lockStructure") ?? "") ? (attr(wp, "workbookPassword") ? { hash: attr(wp, "workbookPassword")!.toUpperCase() } : {}) : null;
   const date1904 = descendants(wb, "workbookPr").some((e) => /^(1|true)$/.test(attr(e, "date1904") ?? ""));
+  const calcManual = descendants(wb, "calcPr").some((e) => attr(e, "calcMode") === "manual");
   const rels = new Map<string, string>();
   const relFile = read("xl/_rels/workbook.xml.rels");
   if (relFile)
@@ -272,6 +277,11 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
         const rot = Number(attr(al, "textRotation") ?? 0);
         if (rot) st.rot = rot;
       }
+      const pr = child(xf, "protection");
+      if (pr) {
+        if (/^(0|false)$/.test(attr(pr, "locked") ?? "")) st.unlocked = true;
+        if (/^(1|true)$/.test(attr(pr, "hidden") ?? "")) st.hideFormula = true;
+      }
       xfs.push(strip(st));
     }
     const dxfsEl = descendants(sd, "dxfs")[0];
@@ -289,6 +299,7 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
   const mdw = digitWidth(baseFont, baseSize);
 
   // defined names
+  const caches = pivotCacheParts(wb, rels);
   const sheetEls = descendants(wb, "sheet");
   const names: Record<string, string> = {};
   const localNames = new Map<number, Record<string, string>>();
@@ -344,11 +355,14 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
     };
     if (attr(s, "state") && attr(s, "state") !== "visible") sh.hidden = true;
     if (date1904) sh.date1904 = true;
+    if (calcManual) sh.calcManual = true;
+    if (bookLock) sh.bookProtect = bookLock;
     const nm = { ...names, ...(localNames.get(si) ?? {}) };
     if (Object.keys(nm).length) sh.names = nm;
     const pr = child(root, "sheetPr");
     const tab = pr && color(child(pr, "tabColor"), ctx);
     if (tab) sh.tabColor = tab;
+    let splitRaw: { ys: number; xs: number; tl: { r: number; c: number } } | null = null;
     // view
     const view = descendants(root, "sheetView")[0];
     if (view) {
@@ -358,7 +372,12 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
       const z = Number(attr(view, "zoomScale") ?? 100);
       if (z && z !== 100) sh.zoom = z / 100;
       const pane = child(view, "pane");
-      if (pane && /frozen/.test(attr(pane, "state") ?? "")) {
+      if (pane && !/frozen/.test(attr(pane, "state") ?? "") && (attr(pane, "xSplit") || attr(pane, "ySplit"))) {
+        // 창 나누기: twips to rows / columns of the top / left pane (from the view's first cell)
+        const tl = parseAddr(attr(view, "topLeftCell") ?? "A1") ?? { r: 0, c: 0 };
+        const ys = Number(attr(pane, "ySplit") ?? 0) / 15 - sh.defRowH, xs = Number(attr(pane, "xSplit") ?? 0) / 15 - 29.6;
+        splitRaw = { ys, xs, tl }; // sizes known after the columns and rows are read
+      } else if (pane && /frozen/.test(attr(pane, "state") ?? "")) {
         const rows = Math.round(Number(attr(pane, "ySplit") ?? 0)), cols = Math.round(Number(attr(pane, "xSplit") ?? 0));
         if (rows || cols) sh.freeze = { rows, cols };
       }
@@ -380,6 +399,7 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
     } else sh.defColW = Math.ceil((8 * mdw + 5) / 8) * 8;
     const hiddenCols: number[] = [];
     const colS: Record<number, number> = {};
+    const colLevel: Record<number, number> = {};
     for (const c of descendants(root, "col")) {
       const min = Number(attr(c, "min")) - 1, max = Math.min(Number(attr(c, "max")) - 1, 16383);
       const w = Number(attr(c, "width"));
@@ -388,10 +408,13 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
       for (let i = min; i <= max; i++) {
         if (w >= 0 && attr(c, "width") != null && (i < 1024 || max - min < 64)) sh.colW[i] = widthPx(w, mdw);
         if (hid && (max - min < 4096)) hiddenCols.push(i);
+        const lv = Number(attr(c, "outlineLevel") ?? 0);
+        if (lv > 0 && max - min < 4096) colLevel[i] = Math.min(7, lv);
         if (st && st !== "0" && max - min < 4096) colS[i] = styleOf(st);
       }
     }
     if (hiddenCols.length) sh.hiddenCols = hiddenCols;
+    if (Object.keys(colLevel).length) sh.colLevel = colLevel;
     if (Object.keys(colS).length) sh.colS = colS;
     // cells
     const hiddenRows: number[] = [];
@@ -408,6 +431,8 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
         if (!/^(1|true)$/.test(attr(r, "customHeight") ?? "")) (sh.rowAuto ??= {})[rn] = true;
       }
       if (/^(1|true)$/.test(attr(r, "hidden") ?? "")) hiddenRows.push(rn);
+      const lv = Number(attr(r, "outlineLevel") ?? 0);
+      if (lv > 0) (sh.rowLevel ??= {})[rn] = Math.min(7, lv);
       if (/^(1|true)$/.test(attr(r, "customFormat") ?? "") && attr(r, "s")) rowS[rn] = styleOf(attr(r, "s"));
       let autoCol = 0;
       for (const c of children(r, "c")) {
@@ -451,6 +476,8 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
           // array formula: dynamic (cm = dynamic array metadata) or legacy Ctrl+Shift+Enter
           if (ft === "array" && text) cell.spill = attr(fEl, "ref") ?? addr(rn, col);
           if (ft === "array" && text && attr(c, "cm") == null) cell.cse = true;
+          if (ft === "dataTable" && attr(fEl, "ref"))
+            cell.dt = { ref: attr(fEl, "ref")!, r1: attr(fEl, "r1") ?? "", ...(attr(fEl, "r2") ? { r2: attr(fEl, "r2")! } : {}), ...(/^(1|true)$/.test(attr(fEl, "dt2D") ?? "") ? { dt2D: true } : {}), ...(/^(1|true)$/.test(attr(fEl, "dtr") ?? "") ? { dtr: true } : {}) };
         }
         if (cell.v === undefined && !cell.f && !cell.s) continue;
         sh.cells[addr(rn, col)] = cell;
@@ -460,6 +487,13 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
     if (hiddenRows.length) sh.hiddenRows = hiddenRows;
     if (Object.keys(rowS).length) sh.rowS = rowS;
     markSpills(sh);
+    if (splitRaw) {
+      const { ys, xs, tl } = splitRaw;
+      let rows = 0, cols = 0;
+      for (let h = 0, r = tl.r; ys > 0 && h + (sh.rowH[r] ?? sh.defRowH) / 2 <= ys && rows < 500; r++, rows++) h += sh.rowH[r] ?? sh.defRowH;
+      for (let w = 0, c = tl.c; xs > 0 && w + (sh.colW[c] ?? sh.defColW) / 2 <= xs && cols < 200; c++, cols++) w += sh.colW[c] ?? sh.defColW;
+      if (rows || cols) sh.split = { rows, cols, top: tl.r, left: tl.c, row: tl.r + rows, col: tl.c + cols };
+    }
     const tables = readTables(read, path);
     if (tables.length) sh.tables = tables;
     for (const m of descendants(root, "mergeCell")) {
@@ -485,6 +519,15 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
         if (/^(1|true)$/.test(attr(r, "bottom") ?? "")) rule.bottom = true;
         if (/^(1|true)$/.test(attr(r, "percent") ?? "")) rule.percent = true;
         if (attr(r, "text") != null) rule.text = attr(r, "text")!;
+        if (/^(0|false)$/.test(attr(r, "aboveAverage") ?? "")) rule.below = true;
+        if (attr(r, "timePeriod")) rule.period = attr(r, "timePeriod")!;
+        const is = child(r, "iconSet");
+        if (is) {
+          rule.icons = attr(is, "iconSet") ?? "3TrafficLights1";
+          if (/^(1|true)$/.test(attr(is, "reverse") ?? "")) rule.iconReverse = true;
+          if (/^(0|false)$/.test(attr(is, "showValue") ?? "")) rule.noValue = true;
+          rule.scale = children(is, "cfvo").map((v) => strip({ kind: attr(v, "type") ?? "percent", val: attr(v, "val") ?? undefined, color: "" }));
+        }
         const cs = child(r, "colorScale");
         if (cs) {
           const cfvo = children(cs, "cfvo");
@@ -505,10 +548,12 @@ export function readXlsx(bytes: Uint8Array, lang: SheetLang = "en", book = "book
     readExtra(sh, root, path, read); // notes, data validation, AutoFilter (io/sheet/readExtra.ts)
     readPrintSetup(sh, root, wb, si); // page setup, print area / titles (io/sheet/printSetup.ts)
     readDrawings(sh, root, path, read, (p) => files[p], ctx.theme); // charts, pictures, shapes (io/sheet/drawings.ts)
+    readPivots(sh, path, read, caches); // pivot tables (io/sheet/pivots.ts)
     sh.part = path;
     sh.xf = [0];
     for (const [x, k] of used) sh.xf[k] = x;
     out.push(sh);
   });
+  readSlicers(out, read); // slicers on tables and pivot tables (io/sheet/slicers.ts)
   return { sheets: out, truncated };
 }

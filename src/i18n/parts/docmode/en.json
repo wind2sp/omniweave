@@ -141,5 +141,7 @@
   "docmode.status.countTip": "Word count",
   "docmode.status.langTip": "The language most of the text is written in",
   "docmode.ruler.topTip": "Paragraph indents: top ▽ first line · bottom ▲ hanging · □ left · right ▲ — drag to adjust (Alt: no snapping). Double-click: Page Setup",
-  "docmode.ruler.leftTip": "Vertical ruler — the top and bottom margins are shaded. Double-click: Page Setup"
+  "docmode.ruler.leftTip": "Vertical ruler — the top and bottom margins are shaded. Double-click: Page Setup",
+  "docmode.status.pageBoxTip": "Type a page number and press Enter to go there (PgUp · PgDn · Home · End turn pages too)",
+  "docmode.status.pageCount": "{m}"
 }

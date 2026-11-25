@@ -5,22 +5,25 @@
 // has no network permission.
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LANGS, useLang, useT, t, type Lang } from "../../i18n";
+import { DICTS, LANGS, useLang, useT, t, type Lang } from "../../i18n";
 import { isTauri, openFiles, type OpenedFile } from "../../io/platform";
 import { switchLayout } from "../../web/phone";
 import { setPasswordAsker } from "../../io/crypto/session";
 import { compressPdf, formatBytes, imagesToPdf, mergePdfs } from "../../io/tools/pdfTools";
 import { canvasRecompressor, compressImage, pdfToJpgs, sniffMime, toJpg, zipFiles } from "../../io/tools/imageTools";
 import { addRecent, clearRecent, expireRecent, fingerprint, loadRecent, removeRecent, type RecentItem } from "./recent";
+import { Icon, KindIcon, kindOf, type IconName, type Kind } from "./icons";
 import { MobileViewer } from "./MobileViewer";
 import { persistUri, saveCopy, shareFile } from "./nativeFiles";
-import { PromptHost, offerPassword, phonePasswordAsker } from "./prompt";
+import { PromptHost, ask, offerPassword, phonePasswordAsker } from "./prompt";
 import { IMAGE_EXTS, MEDIA_EXTS, PAGE_EXTS, knownPassword } from "./openDoc";
+import type { EditSession } from "./editor/session";
 import { ScanEditor, renderScanPage, scanPageFrom, type ScanPage } from "./scan";
 import { loadSignatures } from "./markup";
 import { useBackClose } from "./back";
 import { EDITOR_ONLY_EXTS, canEdit } from "./openDoc";
 import "./mobile.css";
+import "./theme.css";
 
 // the editor (and the engine's writers) load when a file is first edited, not with the home screen
 const MobileEditor = lazy(() => import("./editor/MobileEditor").then((m) => ({ default: m.MobileEditor })));
@@ -31,6 +34,8 @@ const PhoneDesk = lazy(() => import("./PhoneDesk").then((m) => ({ default: m.Pho
 export interface DeskRequest {
   file: OpenedFile | null;
   command?: string | null;
+  /** the phone editor's session that went on there (it carries on when the phone screen comes back) */
+  session?: EditSession | null;
 }
 
 export { mimeOf, shareFile } from "./nativeFiles";
@@ -45,20 +50,28 @@ export interface MobileDoc {
   key?: number;
   /** where it was read from (Android content:// URI, desktop path) — for saving over it */
   path?: string | null;
+  /** opened for one job from the home screen: sign it, or make a PDF of it */
+  intent?: "sign" | "toPdf";
 }
 
 let docSeq = 0;
 
+// a phone says "finger", "this phone": the desktop's words that speak of a mouse or a computer get the phone's
+// ("phone:<key>" in i18n/parts/mobile-desk), for the PC feature screen's dialogs too
+for (const d of Object.values(DICTS) as Record<string, string>[]) for (const k of Object.keys(d)) if (k.startsWith("phone:")) d[k.slice(6)] = d[k];
+
 /** desktop commands offered on the tools tab (ui/commands.ts ids): they open in the desktop editor on the phone */
-const DESK_TOOLS: { cmd: string; icon: string; label: string }[] = [
-  { cmd: "tools.commandSearch", icon: "⌕︎", label: "mobile.desk.cmdSearch" },
-  { cmd: "quick.combine", icon: "⧉︎", label: "mobile.desk.combine" },
-  { cmd: "quick.to-jpg", icon: "▣︎", label: "mobile.desk.toJpg" },
-  { cmd: "file.new", icon: "＋", label: "mobile.desk.new" },
-  { cmd: "file.settings", icon: "⚙︎", label: "mobile.desk.settings" },
+const DESK_TOOLS: { cmd: string; icon: IconName; label: string }[] = [
+  { cmd: "tools.commandSearch", icon: "search", label: "mobile.desk.cmdSearch" },
+  { cmd: "quick.combine", icon: "merge", label: "mobile.desk.combine" },
+  { cmd: "quick.to-jpg", icon: "toImage", label: "mobile.desk.toJpg" },
+  { cmd: "file.new", icon: "plus", label: "mobile.desk.new" },
+  { cmd: "file.settings", icon: "settings", label: "mobile.desk.settings" },
 ];
 
 const PDF = [{ name: "PDF", extensions: ["pdf"] }];
+/** documents, sheets and slides (the home screen's "문서 → PDF") */
+const DOCS = [{ name: "Documents", extensions: ["docx", "doc", "hwpx", "hwp", "odt", "rtf", "txt", "md", "xlsx", "xls", "csv", "ods", "pptx", "ppt", "odp"] }];
 const IMAGES = [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }];
 /** every format the desktop opens (io/formats), the phone too */
 const ALL_EXTS = [...new Set(["pdf", ...IMAGE_EXTS, ...PAGE_EXTS, ...MEDIA_EXTS, "psd", "psb", "ai", "dxf", "dwg", "svg", "zip"])];
@@ -114,12 +127,51 @@ export function nameWithExt(name: string, bytes: Uint8Array): string {
   return `${stem}.${ext}`;
 }
 
-function fileKind(name: string): string {
+/** the extension as a short tag (DOCX, HWPX, PDF …) */
+function extLabel(name: string): string {
   const ext = name.toLowerCase().split(".").pop() ?? "";
-  if (ext === "pdf") return "PDF";
-  if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) return "IMG";
-  // three letters: the badge stays readable at the largest system font size
-  return ext.toUpperCase().slice(0, 3) || "DOC";
+  return ext && ext !== name.toLowerCase() ? ext.toUpperCase().slice(0, 4) : "FILE";
+}
+
+/** the eight formats this app opens and edits, under 열기 */
+const FORMATS: { kind: Kind; ext: string; exts: string[] }[] = [
+  { kind: "doc", ext: "DOCX", exts: ["docx", "doc", "odt", "rtf"] },
+  { kind: "doc", ext: "HWPX", exts: ["hwpx", "hwp"] },
+  { kind: "sheet", ext: "XLSX", exts: ["xlsx", "xls", "csv", "ods"] },
+  { kind: "slide", ext: "PPTX", exts: ["pptx", "ppt", "odp"] },
+  { kind: "pdf", ext: "PDF", exts: ["pdf"] },
+  { kind: "photo", ext: "PSD", exts: ["psd", "psb", "png", "jpg", "jpeg", "webp"] },
+  { kind: "design", ext: "AI", exts: ["ai", "svg", "eps"] },
+  { kind: "cad", ext: "DXF", exts: ["dxf", "dwg"] },
+];
+
+/** 열기 → 고치기 → 원래 형식으로: the three threads of the logo, lit as far as the file came (0: how it works) */
+function Thread({ step }: { step: 0 | 1 | 2 | 3 }) {
+  const tr = useT();
+  const steps = [
+    ["open", "mobile.v2.th.open"],
+    ["edit", "mobile.v2.th.edit"],
+    ["save", "mobile.v2.th.save"],
+  ] as const;
+  return (
+    // (spans, not a list: a picture of the way, not items to tap)
+    <div className={"m-thread" + (step === 0 ? " m-thread-intro" : "")} role="img" aria-label={steps.map(([, k]) => tr(k)).join(" → ")}>
+      {steps.map(([icon, k], i) => (
+        <span key={k} className={"m-th m-th-" + (i + 1) + (step === 0 || i < step ? " on" : "")} aria-hidden>
+          <i>
+            <Icon name={icon} />
+          </i>
+          <span>{tr(k)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** today: the time; otherwise the date */
+function whenTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString();
 }
 
 function when(ts: number): string {
@@ -161,11 +213,55 @@ export function MobileApp() {
   const [scanPages, setScanPages] = useState<ScanPage[] | null>(null);
   /** the desktop editor on the phone, while it is shown */
   const [desk, setDesk] = useState<DeskRequest | null>(null);
+  /** the editor session to carry on with when the phone editor comes back from the PC feature screen */
+  const [resume, setResume] = useState<EditSession | null>(null);
+  const docRef = useRef<MobileDoc | null>(null);
+  docRef.current = doc;
   const scanInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => setPasswordAsker(phonePasswordAsker(t)), []);
   const openDesk = useCallback((r: DeskRequest) => {
     setDesk(r);
+  }, []);
+
+  // the app was closed while a document had unsaved edits (Android ends apps in the background): the autosaved copy
+  // (the desktop's journal, written by the phone editor and the PC feature screen) is offered back at the next start
+  useEffect(() => {
+    void (async () => {
+      const j = await import("../../io/journal");
+      const others = await j.otherPagesOpenOnce();
+      const crashed = j.startRunOnce() && !others;
+      if (!crashed) {
+        if (!others) await j.journalClear().catch(() => {});
+        return;
+      }
+      const info = await j.journalPeek().catch(() => null);
+      if (!info) return;
+      const v = await ask({
+        title: t("mobile.recover.title"),
+        message: t("mobile.recover.msg", { name: info.title, when: new Date(info.savedAt).toLocaleString() }),
+        choices: [
+          { label: t("mobile.recover.ok"), value: "yes" },
+          { label: t("mobile.recover.discard"), value: "no", danger: true },
+        ],
+      });
+      if (v !== "yes") {
+        if (v === "no") await j.journalClear().catch(() => {});
+        return;
+      }
+      const [{ useStore }, ss] = await Promise.all([import("../../core/store"), import("../../core/sessions")]);
+      const entries = await j.journalList();
+      const restored = entries.length ? await j.journalRestore(entries[0].key) : null;
+      if (!restored) return;
+      if (!ss.isPristineActive()) ss.newSession(restored.title);
+      useStore.getState().load(restored);
+      useStore.getState().set({ dirty: true });
+      await j.journalClear().catch(() => {});
+      // the PC feature screen shows it; its 저장 writes it in its own format again
+      setDesk({ file: null });
+    })();
+    // once, at start-up
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // back on another tab goes to the home tab first; on the home tab it leaves the app (Android's own behaviour)
   useBackClose(tab !== "home" && !doc && !editing && !scanPages, () => setTab("home"));
@@ -269,6 +365,8 @@ export function MobileApp() {
       },
       tab: (id: Tab) => (setDoc(null), setEditing(null), setTab(id)),
       edit: (name: string, bytes: Uint8Array) => (setDoc(null), setEditing({ name, bytes, origin: "opened", key: ++docSeq })),
+      /** the file the viewer shows now: its name and size (checks of what 공유 would send) */
+      current: () => docRef.current && { name: docRef.current.name, size: docRef.current.bytes.length },
       desk: (name?: string, bytes?: Uint8Array, command?: string) => setDesk({ file: name && bytes ? { name, path: null, bytes } : null, command }),
       editor: () => import("./editor/MobileEditor").then((m) => m.editorHook.current),
     };
@@ -293,8 +391,28 @@ export function MobileApp() {
   };
 
   const actions = {
-    open: () => run(tr("mobile.working"), async () => openPicked(await openFiles(VIEWABLE))),
+    // the system's file picker first, the busy cover only once a file came back (a picker closed without a file leaves
+    // nothing covering the screen)
+    open: async () => {
+      const files = await openFiles(VIEWABLE);
+      if (files.length) await run(tr("mobile.working"), async () => openPicked(files));
+    },
+    /** 열기 for one format (the formats row): its files first in the picker */
+    openAs: async (exts: string[]) => {
+      const files = await openFiles([{ name: exts[0].toUpperCase(), extensions: exts }]);
+      if (files.length) await run(tr("mobile.working"), async () => openPicked(files));
+    },
     scan: takePhoto,
+    /** pick a PDF, the signature sheet over it */
+    sign: async () => {
+      const files = await openFiles(PDF);
+      if (files[0]) show({ name: files[0].name, bytes: files[0].bytes, origin: "opened", intent: "sign" }, files[0].path);
+    },
+    /** pick a document / sheet / deck, its PDF made at once */
+    docToPdf: async () => {
+      const files = await openFiles(DOCS);
+      if (files[0]) show({ name: files[0].name, bytes: files[0].bytes, origin: "opened", intent: "toPdf" }, files[0].path);
+    },
     merge: () =>
       run(tr("mobile.tool.merge"), async () => {
         const files = await openFiles(PDF, true);
@@ -359,12 +477,12 @@ export function MobileApp() {
       show({ name: `scan_${stamp}.pdf`, bytes, origin: "result" });
     });
 
-  const tools: { id: keyof typeof actions; label: string; icon: string }[] = [
-    { id: "merge", label: tr("mobile.tool.merge"), icon: "⧉" },
-    { id: "compress", label: tr("mobile.tool.compress"), icon: "⇲" },
-    { id: "pdfToJpg", label: tr("mobile.tool.pdfToJpg"), icon: "▣" },
-    { id: "imagesToPdf", label: tr("mobile.tool.imagesToPdf"), icon: "⎙\uFE0E" },
-    { id: "shrinkPhotos", label: tr("mobile.tool.shrinkPhotos"), icon: "◱" },
+  const tools: { id: "merge" | "compress" | "pdfToJpg" | "imagesToPdf" | "shrinkPhotos"; label: string; sub: string; icon: IconName }[] = [
+    { id: "merge", label: tr("mobile.tool.merge"), sub: tr("mobile.v2.tool.merge"), icon: "merge" },
+    { id: "compress", label: tr("mobile.tool.compress"), sub: tr("mobile.v2.tool.compress"), icon: "compress" },
+    { id: "pdfToJpg", label: tr("mobile.tool.pdfToJpg"), sub: tr("mobile.v2.tool.pdfToJpg"), icon: "toImage" },
+    { id: "imagesToPdf", label: tr("mobile.tool.imagesToPdf"), sub: tr("mobile.v2.tool.imagesToPdf"), icon: "toPdf" },
+    { id: "shrinkPhotos", label: tr("mobile.tool.shrinkPhotos"), sub: tr("mobile.v2.tool.shrinkPhotos"), icon: "shrink" },
   ];
 
   const shown = useMemo(() => {
@@ -372,56 +490,108 @@ export function MobileApp() {
     return q ? recent.filter((r) => r.name.toLowerCase().includes(q)) : recent;
   }, [recent, query]);
 
-  const reopen = (r: RecentItem) =>
-    run(tr("mobile.working"), async () => {
-      if (isTauri && r.path && !r.expired) {
+  const reopen = async (r: RecentItem) => {
+    if (isTauri && r.path && !r.expired) {
+      let ok = false;
+      await run(tr("mobile.working"), async () => {
         try {
           const { readFile } = await import("@tauri-apps/plugin-fs");
-          return show({ name: r.name, bytes: await readFile(r.path), origin: "opened" }, r.path);
+          show({ name: r.name, bytes: await readFile(r.path!), origin: "opened" }, r.path);
+          ok = true;
         } catch {
           // the grant to that file ended (another session, the file moved or was deleted): pick it again
           setRecent(expireRecent(r));
         }
-      }
-      say(tr("mobile.recentExpired", { name: r.name }));
-      openPicked(await openFiles(VIEWABLE));
-    });
+      });
+      if (ok) return;
+    }
+    say(tr("mobile.recentExpired", { name: r.name }));
+    await actions.open();
+  };
 
-  const recentList = (
+  const renderRecent = (items: RecentItem[]) => (
     <ul className="m-recent">
-      {shown.length === 0 && <li className="m-empty">{tr("mobile.recentEmpty")}</li>}
-      {shown.map((r) => (
+      {items.length === 0 && (
+        <li className="m-empty">
+          <Icon name="files" />
+          <span>{query.trim() ? tr("mobile.searchNone", { q: query.trim() }) : tr("mobile.recentEmpty")}</span>
+        </li>
+      )}
+      {items.map((r) => (
         <li key={r.name + r.at} className="m-recent-row">
           <button className="m-row" onClick={() => void reopen(r)}>
-            <span className={"m-kind m-kind-" + fileKind(r.name).toLowerCase()} aria-hidden>
-              {fileKind(r.name)}
+            <span className={"m-kind-mark m-k-" + kindOf(r.name)} aria-hidden>
+              <KindIcon kind={kindOf(r.name)} />
             </span>
             <span className="m-row-name">{r.name}</span>
             <span className="m-row-meta">
-              {formatBytes(r.size)} · {when(r.at)}
+              <span className="m-ext">{extLabel(r.name)}</span> · {formatBytes(r.size)} · {when(r.at)}
               {r.expired ? " · " + tr("mobile.recentPickAgain") : ""}
             </span>
           </button>
           <button className="m-icon-btn m-row-x" onClick={() => setRecent(removeRecent(r))} aria-label={tr("mobile.recentRemove", { name: r.name })}>
-            ✕
+            <Icon name="close" />
           </button>
         </li>
       ))}
     </ul>
   );
+  const recentList = renderRecent(shown);
 
   const toolGrid = (
-    <div className="m-tools">
+    <div className="m-tools m-tools-list">
       {tools.map((x) => (
         <button key={x.id} className="m-tool" onClick={() => void actions[x.id]()}>
           <span className="m-tool-icon" aria-hidden>
-            {x.icon}
+            <Icon name={x.icon} />
           </span>
-          <span>{x.label}</span>
+          <span className="m-tool-text">
+            <b>{x.label}</b>
+            <small>{x.sub}</small>
+          </span>
         </button>
       ))}
     </div>
   );
+
+  // the first entry of the recent list, with its first page (when the viewer drew it) and whether it was saved back
+  const last = recent[0];
+  const continueCard = last && (
+    <section className="m-continue" aria-label={tr("mobile.v2.continue")}>
+      <h2 className="m-label">{tr("mobile.v2.continue")}</h2>
+      <button className="m-continue-card" onClick={() => void reopen(last)}>
+        <span className={"m-thumb m-k-" + kindOf(last.name)} aria-hidden>
+          {last.thumb ? <img src={last.thumb} alt="" /> : <KindIcon kind={kindOf(last.name)} />}
+        </span>
+        <span className="m-continue-body">
+          <span className={"m-tag m-k-" + kindOf(last.name)}>
+            <i />
+            {extLabel(last.name)}
+          </span>
+          <b>{last.name}</b>
+          <small className={last.saved ? "m-saved" : undefined}>
+            {last.saved && <Icon name="check" />}
+            {last.saved ? tr("mobile.v2.savedSame", { when: whenTime(last.saved) }) : tr("mobile.v2.opened", { when: whenTime(last.at) })}
+          </small>
+        </span>
+        <Icon name="next" className="m-chev" />
+      </button>
+      <Thread step={last.saved ? 3 : 1} />
+    </section>
+  );
+  // nothing opened yet: what this app opens and does, in place of an empty list
+  const firstRun = !last && (
+    <section className="m-firstrun" aria-label={tr("mobile.v2.kinds")}>
+      <Thread step={0} />
+      <p className="m-note">{tr("mobile.v2.kindsNote")}</p>
+    </section>
+  );
+  // three jobs of three kinds (photo → PDF, a document → PDF, a PDF signed); the rest is on the tools tab
+  const homeJobs: { id: string; kind: Kind; icon: IconName; label: string; sub: string; run: () => unknown }[] = [
+    { id: "scan", kind: "photo", icon: "scan", label: tr("mobile.v2.job.scan"), sub: tr("mobile.v2.job.scanSub"), run: actions.scan },
+    { id: "toPdf", kind: "doc", icon: "convert", label: tr("mobile.v2.job.toPdf"), sub: tr("mobile.v2.job.toPdfSub"), run: actions.docToPdf },
+    { id: "sign", kind: "pdf", icon: "sign", label: tr("mobile.v2.job.sign"), sub: tr("mobile.v2.job.signSub"), run: actions.sign },
+  ];
 
   const pickTheme = (v: Theme) => {
     setTheme(v);
@@ -437,10 +607,17 @@ export function MobileApp() {
           key={desk.file?.name ?? "store"}
           file={desk.file}
           command={desk.command}
-          onExit={() => {
+          onExit={(saved) => {
             setDesk(null);
-            // the phone editor's document went on in the desktop editor: the phone shows the file list again
-            if (!desk.file) setEditing(null);
+            // the desktop editor set its own light / dark: the phone's comes back
+            applyTheme(theme);
+            if (desk.session && editing) {
+              // back to the phone editor with the document as it is now (the PC screen's edits kept, nothing asked)
+              setResume(desk.session);
+              setEditing({ ...editing, key: ++docSeq });
+            } else if (!desk.file) setEditing(null);
+            // a file saved there in its own format: the viewer (and its 공유) has the saved file, not the old one
+            if (saved && desk.file && doc) setDoc({ ...doc, name: saved.name, bytes: saved.bytes, key: ++docSeq });
           }}
         />
         <PromptHost />
@@ -463,14 +640,27 @@ export function MobileApp() {
         />
       ) : editing ? (
         <Suspense fallback={<div className="m-spinner" role="progressbar" aria-label={tr("mobile.working")} />}>
-          <MobileEditor key={editing.key} doc={editing} say={say} onClose={() => setEditing(null)} onResult={(d) => show(d)} onDesk={(command) => openDesk({ file: null, command })} />
+          <MobileEditor
+            key={editing.key}
+            doc={editing}
+            say={say}
+            resume={resume}
+            onClose={() => (setEditing(null), setResume(null))}
+            onResult={(d) => show(d)}
+            onDesk={(session, command) => openDesk({ file: null, command, session })}
+            onSavedFile={(d) => {
+              // the viewer under the editor shows (and shares) the saved file; the recent list has it too
+              if (doc) setDoc({ ...d, key: ++docSeq });
+              setRecent(addRecent({ name: d.name, size: d.bytes.length, path: d.path ?? null, at: Date.now(), fp: fingerprint(d.bytes), saved: Date.now() }));
+            }}
+          />
         </Suspense>
       ) : doc ? (
         <MobileViewer
           key={doc.key}
           doc={doc}
           say={say}
-          onBack={() => setDoc(null)}
+          onBack={() => (setDoc(null), setRecent(loadRecent()))}
           onResult={(d) => show(d)}
           onEdit={
             canEdit(doc.name)
@@ -490,57 +680,84 @@ export function MobileApp() {
         />
       ) : (
         <>
-          <header className="m-top">
+          <header className="m-top m-home-top">
             <img className="m-logo" src="./app_small.png" alt="" />
             <h1>Omniweave</h1>
+            <span className="m-status" title={tr("mobile.noUpload")}>
+              <Icon name="device" />
+              {tr("mobile.v2.local")}
+            </span>
           </header>
           <main className="m-main">
             {tab === "home" && (
               <>
-                {/* the first screen without scrolling: open, the PC program's every feature, scan, new PDF (2 × 2) */}
-                <div className="m-actions m-actions-4">
-                  <button className="m-action m-primary" onClick={() => void actions.open()}>
-                    <span className="m-action-icon" aria-hidden>
-                      ▤︎
+                {continueCard}
+                {firstRun}
+                {/* open: the widest button, the accent; under it every kind it opens and edits */}
+                <div className="m-start">
+                  <button className="m-open" onClick={() => void actions.open()}>
+                    <Icon name="open" />
+                    <span>
+                      <b>{tr("mobile.open")}</b>
                     </span>
-                    {tr("mobile.open")}
                   </button>
-                  <button className="m-action m-desk-entry" onClick={() => openDesk({ file: null })} aria-describedby="m-desk-note">
-                    <span className="m-action-icon" aria-hidden>
-                      ▦︎
-                    </span>
-                    {tr("mobile.desk.open")}
-                  </button>
-                  <button className="m-action" onClick={actions.scan}>
-                    <span className="m-action-icon" aria-hidden>
-                      ◎︎
-                    </span>
-                    {tr("mobile.scan")}
-                  </button>
-                  <button className="m-action" onClick={() => void actions.imagesToPdf()}>
-                    <span className="m-action-icon" aria-hidden>
-                      ＋
-                    </span>
-                    {tr("mobile.newPdf")}
-                  </button>
+                  <div className="m-formats" role="group" aria-label={tr("mobile.v2.kinds")}>
+                    {FORMATS.map((f) => (
+                      <button key={f.ext} className={"m-k-" + f.kind} onClick={() => void actions.openAs(f.exts)} aria-label={tr("mobile.v2.openAs", { ext: f.ext })}>
+                        <KindIcon kind={f.kind} />
+                        {f.ext}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className="m-note m-desk-note" id="m-desk-note">
-                  {tr("mobile.desk.openNote")}
-                </p>
-                <h2>{tr("mobile.tools")}</h2>
-                {toolGrid}
-                <h2>{tr("mobile.recent")}</h2>
-                <input className="m-search" type="search" placeholder={tr("mobile.search")} aria-label={tr("mobile.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
-                {recentList}
-                <p className="m-note">{tr("mobile.noUpload")}</p>
+                <h2 className="m-label">{tr("mobile.v2.quick")}</h2>
+                <div className="m-tools m-tools-list">
+                  {homeJobs.map((x) => (
+                    <button key={x.id} className="m-tool" onClick={() => void x.run()}>
+                      <span className={"m-tool-icon m-k-" + x.kind} aria-hidden>
+                        <Icon name={x.icon} />
+                      </span>
+                      <span className="m-tool-text">
+                        <b>{x.label}</b>
+                        <small>{x.sub}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {recent.length > 1 && (
+                  <>
+                    <h2 className="m-label">
+                      {tr("mobile.recent")} <span className="m-count">{recent.length}</span>
+                    </h2>
+                    {recent.length > 6 && <input className="m-search" type="search" placeholder={tr("mobile.search")} aria-label={tr("mobile.search")} value={query} onChange={(e) => setQuery(e.target.value)} />}
+                    {/* the first one is the card above */}
+                    {renderRecent(query.trim() ? shown : shown.slice(1))}
+                  </>
+                )}
+                {/* every menu of the PC program, laid out for the phone: a way on, not one of the main buttons */}
+                <button className="m-desk-row" onClick={() => openDesk({ file: null })}>
+                  <Icon name="desk" />
+                  <span className="m-tool-text">
+                    <b>{tr("mobile.desk.open")}</b>
+                    <small>{tr("mobile.desk.openNote")}</small>
+                  </span>
+                  <Icon name="next" className="m-chev" />
+                </button>
               </>
             )}
             {tab === "files" && (
               <>
-                <button className="m-action m-primary m-wide" onClick={() => void actions.open()}>
-                  {tr("mobile.open")}
+                <button className="m-open" onClick={() => void actions.open()}>
+                  <Icon name="open" />
+                  <span>
+                    <b>{tr("mobile.open")}</b>
+                    <small>{tr("mobile.v2.openSub")}</small>
+                  </span>
                 </button>
-                <h2>{tr("mobile.recent")}</h2>
+                <h2 className="m-label">
+                  {tr("mobile.recent")} {recent.length > 0 && <span className="m-count">{recent.length}</span>}
+                </h2>
+                {recent.length > 6 && <input className="m-search" type="search" placeholder={tr("mobile.search")} aria-label={tr("mobile.search")} value={query} onChange={(e) => setQuery(e.target.value)} />}
                 {recentList}
                 {recent.length > 0 && (
                   <button className="m-btn m-wide-btn" onClick={() => setRecent(clearRecent())}>
@@ -551,23 +768,29 @@ export function MobileApp() {
             )}
             {tab === "tools" && (
               <>
-                <h2>{tr("mobile.tools")}</h2>
+                <h2 className="m-label">{tr("mobile.v2.quick")}</h2>
                 {toolGrid}
-                <h2>{tr("mobile.scan")}</h2>
-                <button className="m-tool m-wide" onClick={actions.scan}>
-                  <span className="m-tool-icon" aria-hidden>
-                    ◎︎
-                  </span>
-                  <span>{tr("mobile.scan.toPdf")}</span>
-                </button>
-                <h2>{tr("mobile.desk.allTools")}</h2>
-                <div className="m-tools">
+                <h2 className="m-label">{tr("mobile.scan")}</h2>
+                <div className="m-tools m-tools-list">
+                  <button className="m-tool" onClick={actions.scan}>
+                    <span className="m-tool-icon" aria-hidden>
+                      <Icon name="scan" />
+                    </span>
+                    <span className="m-tool-text">
+                      <b>{tr("mobile.scan.toPdf")}</b>
+                    </span>
+                  </button>
+                </div>
+                <h2 className="m-label">{tr("mobile.desk.allTools")}</h2>
+                <div className="m-tools m-tools-list">
                   {DESK_TOOLS.map((x) => (
                     <button key={x.cmd} className="m-tool" onClick={() => openDesk({ file: null, command: x.cmd })}>
                       <span className="m-tool-icon" aria-hidden>
-                        {x.icon}
+                        <Icon name={x.icon} />
                       </span>
-                      <span>{tr(x.label)}</span>
+                      <span className="m-tool-text">
+                        <b>{tr(x.label)}</b>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -616,7 +839,7 @@ export function MobileApp() {
                     <div className="m-set-row">
                       <span>{tr("webphone.desktop")}</span>
                       <button className="m-btn" onClick={() => switchLayout("desktop")}>
-                        {tr("webphone.desktop")}
+                        {tr("mobile.v2.switch")}
                       </button>
                     </div>
                   )}
@@ -631,7 +854,7 @@ export function MobileApp() {
           <nav className="m-nav">
             {(["home", "files", "tools", "about"] as Tab[]).map((id) => (
               <button key={id} className={tab === id ? "on" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}>
-                <span aria-hidden>{{ home: "⌂\uFE0E", files: "▤\uFE0E", tools: "⚒\uFE0E", about: "ⓘ\uFE0E" }[id]}</span>
+                <Icon name={({ home: "home", files: "files", tools: "tools", about: "settings" } as const)[id]} />
                 {tr(id === "tools" ? "mobile.tools" : "mobile." + id)}
               </button>
             ))}

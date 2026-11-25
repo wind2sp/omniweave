@@ -151,11 +151,11 @@
   "sheet.filter.search": "검색",
   "sheet.filter.all": "(모두 선택)",
   "sheet.filter.blanks": "(필드 값 없음)",
-  "sheet.note.new": "새 메모",
-  "sheet.note.edit": "메모 편집",
-  "sheet.note.delete": "메모 삭제",
+  "sheet.note.new": "새 노트",
+  "sheet.note.edit": "노트 편집",
+  "sheet.note.delete": "노트 삭제",
   "sheet.note.threaded": "스레드 메모는 오메에서 읽기만 할 수 있습니다(파일을 만든 표 계산 프로그램에서 편집)",
-  "sheet.note.label": "메모",
+  "sheet.note.label": "노트",
   "sheet.valid.title": "오메",
   "sheet.valid.msg": "이 값은 이 셀에 정의된 데이터 유효성 검사 제한과 일치하지 않습니다",
   "sheet.valid.retry": "다시 시도",
@@ -163,5 +163,10 @@
   "sheet.valid.yes": "예",
   "sheet.valid.no": "아니요",
   "sheet.valid.list": "목록",
-  "sheet.menu.clear": "내용 지우기"
+  "sheet.menu.clear": "내용 지우기",
+  "sheet.menu.cut": "잘라내기",
+  "sheet.menu.copy": "복사",
+  "sheet.menu.paste": "붙여넣기",
+  "sheet.menu.pasteValues": "값만 붙여넣기",
+  "sheet.paste.nothingCopied": "값만 붙여 넣으려면 먼저 표에서 칸을 복사하세요(Ctrl+C)"
 }

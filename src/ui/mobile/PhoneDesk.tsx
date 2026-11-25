@@ -5,7 +5,7 @@
 // file, or the document its own editor already holds; "휴대폰 화면" goes back. Nothing here re-implements an editor
 // command: what the desktop does, it does here with the desktop's own code.
 
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t, useT } from "../../i18n";
 import { setPasswordAsker } from "../../io/crypto/session";
 import type { OpenedFile } from "../../io/platform";
@@ -22,7 +22,8 @@ export interface PhoneDeskProps {
   file?: OpenedFile | null;
   /** a desktop command to run once the file is open (ui/commands.ts id, e.g. "edit.find", "file.print") */
   command?: string | null;
-  onExit: () => void;
+  /** back to the phone screen; `saved`: the file as saved there in its own format (the phone's viewer shows that) */
+  onExit: (saved?: { name: string; bytes: Uint8Array }) => void;
 }
 
 /** class on <html> while the desktop editor is shown on the phone (mobile.css) */
@@ -41,13 +42,48 @@ export function PhoneDesk({ file, command, onExit }: PhoneDeskProps) {
     };
   }, []);
 
+  // a slide show (발표) takes the whole phone, held sideways: no bars of ours, the browser's full screen and landscape
+  // (the Android app: the system bars hidden and the screen turned by the activity, SharePlugin.kt present)
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let alive = true;
+    void import("../../core/store").then(({ useStore }) => {
+      if (!alive) return;
+      unsub = useStore.subscribe((s, prev) => {
+        if (!!s.presenting === !!prev.presenting) return;
+        void presentMode(!!s.presenting);
+      });
+    });
+    return () => {
+      alive = false;
+      unsub?.();
+      if (document.documentElement.classList.contains("pd-presenting")) void presentMode(false);
+    };
+  }, []);
+
   // leaving asks about unsaved tabs with the desktop's own dialog (they are kept in memory otherwise: coming back
   // shows them again)
+  /** the file's document as it was opened here (its edits are told apart from it on the way back) */
+  const opened = useRef<object | null>(null);
   const exit = useCallback(async () => {
     const { anyDirty, confirmAllSaved } = await import("../tabs");
     if (anyDirty() && !(await confirmAllSaved())) return;
-    onExit();
-  }, [onExit]);
+    // saved after editing (not dirty, not the document it opened with): the file in its own format goes back to the
+    // phone's viewer, so it shows — and 공유 sends — what was saved, never the file from before the edits
+    let saved: { name: string; bytes: Uint8Array } | undefined;
+    try {
+      const { useStore } = await import("../../core/store");
+      const st = useStore.getState();
+      if (file && opened.current && st.doc !== opened.current && !st.dirty) {
+        const { produce } = await import("./editor/session");
+        const r = await produce("same", { name: file.name, original: file.bytes, loaded: opened.current as never, warnings: [] }, () => true);
+        saved = { name: r.name, bytes: r.bytes };
+      }
+    } catch {
+      /* a format that cannot be written again: the viewer keeps the file as it was */
+    }
+    onExit(saved);
+  }, [onExit, file]);
   // back (Android gesture / button): the newest desktop layer closes first — a dialog, the 파일 screen, a menu — as Esc
   // does on a PC; with none open, back to the phone screen
   const [backTick, setBackTick] = useState(0);
@@ -82,6 +118,7 @@ export function PhoneDesk({ file, command, onExit }: PhoneDeskProps) {
           });
           await openInTab(file);
           setPasswordAsker(askPasswordDialog);
+          opened.current = (await import("../../core/store")).useStore.getState().doc;
         }
         requestAnimationFrame(() => fitCurrent());
         // again once the phone layout has settled (fonts, the ribbon's height)
@@ -90,8 +127,10 @@ export function PhoneDesk({ file, command, onExit }: PhoneDeskProps) {
         // automated checks (scripts/mobile-parity-e2e.mjs): run a desktop command by id, read the editor state
         (window as any).__omwDesk = { run: (id: string) => cmds.command(id)?.run(), exportAs: (id: string) => import("../actions").then((m) => m.exportAs(id)), store: (await import("../../core/store")).useStore };
         // a picture command (글자 인식, 업스케일 …) from the phone's 더보기 works on the page's picture: select it first
-        if (command?.startsWith("image.") && !(window as any).__omwDesk.store.getState().selection.length) cmds.command("edit.selectAll")?.run();
-        if (command) cmds.command(command)?.run();
+        if ((command?.startsWith("image.") || command?.startsWith("op:") || command === "object.rotateCW") && !(window as any).__omwDesk.store.getState().selection.length) cmds.command("edit.selectAll")?.run();
+        // "op:<id>": an adjustment of the image menu (명도/대비 …) in its own dialog
+        if (command?.startsWith("op:")) (await import("../shell/imageMenu")).useImageUI.getState().set({ kind: "op", op: command.slice(3) });
+        else if (command) cmds.command(command)?.run();
         return !command;
       },
       onExit: () => void exit(),
@@ -113,4 +152,25 @@ export function PhoneDesk({ file, command, onExit }: PhoneDeskProps) {
 function BackGuard({ onBack }: { onBack: () => void }) {
   useBackClose(true, onBack);
   return null;
+}
+
+/** Full screen and sideways for a slide show, or back. */
+async function presentMode(on: boolean) {
+  document.documentElement.classList.toggle("pd-presenting", on);
+  const { isTauri } = await import("../../io/platform");
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return void invoke("present_mode", { on }).catch(() => {});
+  }
+  try {
+    if (on) {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.({ navigationUI: "hide" });
+      await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape");
+    } else {
+      (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
+      if (document.fullscreenElement) await document.exitFullscreen();
+    }
+  } catch {
+    /* a browser that does not allow it: the show still fills the page */
+  }
 }

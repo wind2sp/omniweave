@@ -4,5 +4,8 @@
   "progress.save": "Saving…",
   "progress.export": "Exporting {fmt}…",
   "progress.ocr": "Recognizing text…",
-  "progress.matte": "Removing background…"
+  "progress.matte": "Removing background…",
+  "progress.matte.subject": "Finding the subject…",
+  "progress.matte.person": "Refining the person's outline…",
+  "progress.matte.refine": "Refining the edges…"
 }

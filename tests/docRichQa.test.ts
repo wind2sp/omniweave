@@ -19,6 +19,7 @@ import { collectFlow } from "../src/io/office";
 import { deleteRange, insertText, markerLength } from "../src/core/richtext";
 import { DICTS } from "../src/i18n";
 import type { OmwDocument, TextNode } from "../src/core/types";
+import { cpuNow, cpuBudget } from "./budget";
 
 const ROOT = process.cwd();
 const WM = (n: string) => join(ROOT, "qa/interop/word-made", n);
@@ -50,14 +51,14 @@ async function open(bytes: Uint8Array) {
 }
 const save = async (doc: OmwDocument) => (await exportById("doc")!.run(doc, doc.pages[0], { confirm: () => true } as any)) as Uint8Array;
 const timed = (fn: () => unknown) => {
-  const t0 = performance.now();
+  const t0 = cpuNow();
   let threw: unknown = null;
   try {
     fn();
   } catch (e) {
     threw = e;
   }
-  return { ms: performance.now() - t0, threw };
+  return { ms: cpuNow() - t0, threw };
 };
 
 describe.runIf(existsSync(WORD_DOC))("forged counts: no endless open, no unbounded memory", () => {
@@ -85,7 +86,7 @@ describe.runIf(existsSync(WORD_DOC))("forged counts: no endless open, no unbound
   it.each(cases)("%s: read or refused in a moment", (_n, fn) => {
     const f = patched(bytes, fn);
     const r = timed(() => docRichOpen(f, "omw-qa.doc"));
-    expect(r.ms).toBeLessThan(5000);
+    expect(r.ms).toBeLessThan(cpuBudget(5000));
   });
 });
 
@@ -102,7 +103,7 @@ describe.runIf(existsSync(WORD_DOC))("damaged files: opened (with the formatting
         const from = k % 2 ? 0 : 0x20;
         for (let j = 0, n = 1 + Math.floor(rnd() * 8); j < n; j++) target[from + Math.floor(rnd() * (target.length - from))] = Math.floor(rnd() * 256);
       });
-      const t0 = performance.now();
+      const t0 = cpuNow();
       let textOk = true;
       try {
         docText(f);
@@ -119,7 +120,7 @@ describe.runIf(existsSync(WORD_DOC))("damaged files: opened (with the formatting
         expect(textOk, String(e)).toBe(false);
         out.refused++;
       }
-      expect(performance.now() - t0).toBeLessThan(5000);
+      expect(cpuNow() - t0).toBeLessThan(cpuBudget(5000));
     }
     expect(out.rich + out.text + out.refused).toBe(300);
   });

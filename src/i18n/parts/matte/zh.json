@@ -66,5 +66,6 @@
   "image.matte.inner": "内部白色区域",
   "image.matte.inner.keep": "保留",
   "image.matte.inner.remove": "去除",
-  "image.matte.inner.note": "与背景色相同的封闭区域。自动模式去除字母内的孔(O)，保留文档图标的白纸、白字等面。"
+  "image.matte.inner.note": "与背景色相同的封闭区域。自动模式去除字母内的孔(O)，保留文档图标的白纸、白字等面。",
+  "image.matte.personChecking": "正在确认是否为人物…（预览显示初步结果）"
 }

@@ -13,6 +13,7 @@ import type { TableNode } from "../../src/core/types";
 import { collectTables, exportCsv, importCsv, parseCsv } from "../../src/io/formats/csv";
 import { decodeText, encodeText } from "../../src/io/formats/textcodec";
 import { Book } from "../../src/io/sheet/calc";
+import { cpuNow, cpuBudget } from "../budget";
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const dec = (b: Uint8Array) => new TextDecoder().decode(b);
@@ -47,9 +48,9 @@ describe("QA 1 — text length limit (Excel: 32,767 characters)", () => {
 
   it("a CSV whose formula would build a 100-million-character text opens at once and shows #VALUE! as Excel does", () => {
     const src = 'a,b\r\n1,"=SUBSTITUTE(REPT(""x"",30000),""x"",REPT(""y"",30000))"\r\n2,"=REPT(""x"",100000000)"\r\n';
-    const t = performance.now();
+    const t = cpuNow();
     const { pages } = importCsv(enc(src), "x.csv", { year: 2026 });
-    expect(performance.now() - t).toBeLessThan(3000);
+    expect(cpuNow() - t).toBeLessThan(cpuBudget(3000));
     expect(grid(pages).slice(1).map((r) => r[1])).toEqual(["#VALUE!", "#VALUE!"]);
     expect(dec(exportCsv(pages))).toBe(src);
   });
@@ -59,9 +60,9 @@ describe("QA 1 — formulas get a time budget when a CSV opens", () => {
   it("2,000 rows of =SUM(C:C)·SUMPRODUCT: opens within the budget; formulas past it stay the file's text; saved as read", () => {
     let src = "id,name,amount,f\r\n";
     for (let i = 1; i <= 2000; i++) src += `${i},n${i},${i % 100},=SUMPRODUCT((C2:C2001>${i % 50})*C2:C2001)+SUM(C:C)\r\n`;
-    const t = performance.now();
+    const t = cpuNow();
     const { pages } = importCsv(enc(src), "big.csv", { year: 2026 });
-    expect(performance.now() - t).toBeLessThan(8000);
+    expect(cpuNow() - t).toBeLessThan(cpuBudget(8000));
     const g = grid(pages);
     // the first formulas are shown as numbers (calculated within the budget)
     expect(g[1][3]).toMatch(/^\d+$/);
@@ -70,9 +71,9 @@ describe("QA 1 — formulas get a time budget when a CSV opens", () => {
 
   it("array generators (SEQUENCE, RANDARRAY, MMULT) are not calculated to show a CSV", () => {
     const src = 'a,b\r\n1,"=SUM(MMULT(SEQUENCE(3000,3000),SEQUENCE(3000,3000)))"\r\n2,"=SUM(SEQUENCE(4000,4000))"\r\n';
-    const t = performance.now();
+    const t = cpuNow();
     const { pages } = importCsv(enc(src), "x.csv", { year: 2026 });
-    expect(performance.now() - t).toBeLessThan(3000);
+    expect(cpuNow() - t).toBeLessThan(cpuBudget(3000));
     expect(grid(pages)[1][1]).toBe("=SUM(MMULT(SEQUENCE(3000,3000),SEQUENCE(3000,3000)))");
   });
 

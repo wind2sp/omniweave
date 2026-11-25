@@ -233,5 +233,14 @@
   "dock.history.settings": "设置",
   "dock.history.record": "记录历史",
   "dock.history.includeInFile": "保存 .omw 时包含历史记录",
-  "dock.history.fileNote": "要发给他人的文件，请关闭此项再保存，这样只包含结果而不含编辑过程。历史记录保存在文件内的单独区域 (history/)，不会影响文档内容。"
+  "dock.history.fileNote": "要发给他人的文件，请关闭此项再保存，这样只包含结果而不含编辑过程。历史记录保存在文件内的单独区域 (history/)，不会影响文档内容。",
+  "dock.pages.menu.new": "新建幻灯片",
+  "dock.pages.menu.duplicate": "复制幻灯片",
+  "dock.pages.menu.cut": "剪切",
+  "dock.pages.menu.copy": "复制",
+  "dock.pages.menu.paste": "粘贴",
+  "dock.pages.menu.hide": "隐藏幻灯片",
+  "dock.pages.menu.show": "取消隐藏",
+  "dock.pages.menu.delete": "删除",
+  "dock.pages.nothingToPaste": "没有可粘贴的页（复制的页不在此文档中）"
 }

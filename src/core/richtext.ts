@@ -9,7 +9,7 @@
 import { graphemes } from "./text";
 import { isOwnInsertion, isOwnRevision, isRemoved, newRevision, sameMarks, skipHidden, trackingOn } from "./review";
 import { paraLineRatio, withWordMultiple, wordMultipleOf } from "./lineSpacing";
-import { DEFAULT_RUN, uid, type Align, type Page, type ParaLineHeight, type ParaList, type ParaRole, type Revision, type TextNode, type TextParagraph, type TextRun } from "./types";
+import { DEFAULT_RUN, uid, type Align, type Ruby, type Page, type ParaLineHeight, type ParaList, type ParaRole, type Revision, type TextNode, type TextParagraph, type TextRun } from "./types";
 import { LIST_PRESETS, MARKER_SEP, MAX_LEVELS, isBulletLevel, levelIndent, levelOf, listNumbers, markerText, newListId, resolveDef, type ListCtx, type ListSeed } from "./lists";
 
 export type RunFormat = Omit<TextRun, "text">;
@@ -34,15 +34,17 @@ export interface Range {
   end: Pos;
 }
 
-export const RUN_KEYS: (keyof RunFormat)[] = ["fontFamily", "latinFont", "fontSize", "bold", "italic", "underline", "color", "strike", "script", "highlight", "letterSpacing", "hscale", "spacingPct", "field", "fieldCode"];
+export const RUN_KEYS: (keyof RunFormat)[] = ["fontFamily", "latinFont", "fontSize", "bold", "italic", "underline", "color", "strike", "script", "highlight", "letterSpacing", "hscale", "spacingPct", "field", "fieldCode", "link"];
 /** optional fields: removed from the run when they hold their default, so old files and hashes stay unchanged */
-const OPTIONAL_DEFAULT: Partial<Record<keyof RunFormat, unknown>> = { latinFont: undefined, strike: false, script: undefined, highlight: undefined, letterSpacing: 0, hscale: 100, spacingPct: 0, field: undefined, fieldCode: undefined };
+const OPTIONAL_DEFAULT: Partial<Record<keyof RunFormat, unknown>> = { latinFont: undefined, strike: false, script: undefined, highlight: undefined, letterSpacing: 0, hscale: 100, spacingPct: 0, field: undefined, fieldCode: undefined, link: undefined };
 
 /** A format without its field (text typed next to a page number is ordinary text, core/headerFooter.ts). */
 export function plainFormat<T extends Partial<TextRun>>(f: T): T {
   // (new text is not part of the file's tracked changes or comment ranges either: core/review.ts)
-  if (!("field" in f) && !("fieldCode" in f) && !("rev" in f) && !("fmtRev" in f) && !("comments" in f)) return f;
-  const { field: _f, fieldCode: _c, rev: _r, fmtRev: _m, comments: _k, ...rest } = f;
+  // (nor an inline picture's: letters typed right after a picture are letters, not more copies of it — QA 11-24 basic-ux)
+  // (nor a 덧말's: text typed after it is plain text; nor a bookmark's range: core/docRefs.ts)
+  if (!("field" in f) && !("fieldCode" in f) && !("rev" in f) && !("fmtRev" in f) && !("comments" in f) && !("obj" in f) && !("ruby" in f) && !("bookmarks" in f)) return f;
+  const { field: _f, fieldCode: _c, rev: _r, fmtRev: _m, comments: _k, obj: _o, ruby: _y, bookmarks: _b, ...rest } = f as T & { obj?: unknown };
   return rest as T;
 }
 
@@ -116,8 +118,11 @@ const val = (r: Partial<TextRun>, k: keyof RunFormat) => {
 export function sameFormat(a: Partial<TextRun>, b: Partial<TextRun>): boolean {
   // an inline object (core/flow.ts) is a run of its own
   if (a.obj || b.obj) return false;
+  // (as is a 덧말: its text is one unit under it)
+  if (JSON.stringify(a.ruby ?? null) !== JSON.stringify(b.ruby ?? null)) return false;
   // (a tracked change or a comment range is never merged into text without it: core/review.ts)
-  return RUN_KEYS.every((k) => val(a, k) === val(b, k)) && sameMarks(a, b);
+  // (nor a bookmark's text into text outside it: core/docRefs.ts)
+  return RUN_KEYS.every((k) => val(a, k) === val(b, k)) && sameMarks(a, b) && (a.bookmarks ?? []).join("\u0001") === (b.bookmarks ?? []).join("\u0001");
 }
 
 export function applyPatch(r: TextRun, patch: RunPatch): TextRun {
@@ -286,6 +291,52 @@ export function rangeRuns(paras: TextParagraph[], r0: Range): TextRun[] {
     out.push(...sliceRuns(paras[i].runs, a, b));
   }
   return out.length ? out : [{ ...formatAt(paras, r.start), text: "" } as TextRun];
+}
+
+// ───────── 덧말 / 윗주 (TextRun.ruby) ─────────
+
+/**
+ * The text a 덧말 command acts on: the selection within one paragraph, else (at a caret) the 덧말 run the caret is in or
+ * right after; null when there is none.
+ */
+export function rubyRange(paras: TextParagraph[], r0: Range): Range | null {
+  const r = clampRange(paras, r0);
+  if (r.start.p !== r.end.p) return null;
+  if (!collapsed(r)) return r;
+  const p = paras[r.start.p];
+  let acc = 0;
+  for (const run of p?.runs ?? []) {
+    const end = acc + run.text.length;
+    if (run.ruby && r.start.o > acc && r.start.o <= end) return { start: { p: r.start.p, o: acc }, end: { p: r.start.p, o: end } };
+    acc = end;
+  }
+  return null;
+}
+
+/** The 덧말 of the text a 덧말 command acts on (rubyRange), when all of it has the same one. */
+export function rubyAt(paras: TextParagraph[], r0: Range): Ruby | undefined {
+  const r = rubyRange(paras, r0);
+  if (!r) return undefined;
+  const runs = sliceRuns(paras[r.start.p].runs, r.start.o, r.end.o).filter((x) => x.text);
+  const k = JSON.stringify(runs[0]?.ruby ?? null);
+  return runs.length && runs[0].ruby && runs.every((x) => JSON.stringify(x.ruby ?? null) === k) ? runs[0].ruby : undefined;
+}
+
+/**
+ * Put a 덧말 on the text a 덧말 command acts on (rubyRange) — it becomes one run in the format of its first character —
+ * or (null) take it off.
+ */
+export function setRuby(paras: TextParagraph[], r0: Range, ruby: Ruby | null): TextParagraph[] {
+  const r = rubyRange(paras, r0);
+  if (!r || collapsed(r)) return paras;
+  const p = paras[r.start.p];
+  const len = paraText(p).length;
+  const mid = sliceRuns(p.runs, r.start.o, r.end.o).filter((x) => x.text);
+  if (!mid.length) return paras;
+  const { ruby: _old, ...first } = mid[0];
+  const put: TextRun[] = ruby ? [{ ...first, text: mid.map((x) => x.text).join(""), ruby }] : mid.map(({ ruby: _r, ...x }) => x as TextRun);
+  const runs = mergeRuns([...sliceRuns(p.runs, 0, r.start.o), ...put, ...sliceRuns(p.runs, r.end.o, len)]);
+  return paras.map((q, i) => (i === r.start.p ? { ...q, runs } : q));
 }
 
 /** Common format over a range: a key is present only when every character agrees. */
@@ -627,7 +678,8 @@ export function splitParagraph(paras: TextParagraph[], pos0: Pos, opts: { body?:
     if (p.markFmtRev) nextP.markFmtRev = p.markFmtRev;
   } else if (isHeading(p.role) && pos.o === len) {
     // a new paragraph after a heading is body text (and leaves the outline numbering)
-    const { role: _r, list: _l, ...rest } = nextP;
+    // (and its heading style: the default one, core/docStyles.ts)
+    const { role: _r, list: _l, style: _s, ...rest } = nextP;
     nextP = { ...rest, runs: [{ ...(opts.body ?? runFormat(DEFAULT_RUN)), text: "" } as TextRun] } as TextParagraph;
     if (p.list) {
       delete nextP.pageBreakBefore;

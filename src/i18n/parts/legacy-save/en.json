@@ -50,5 +50,19 @@
   "legacysave.pptWhy.reader": "the file now reads differently than when it was opened, or it was saved quickly and keeps old slide records, so its text cannot be matched",
   "legacysave.pptWhy.chars": "it contains control characters a PPT cannot hold as text",
   "legacysave.pptWhy.master": "The text of the slide master (shown on every slide that follows the master) cannot be edited on a slide and written into the PPT",
-  "legacysave.pptWhy.verify": "the written file does not read back as the edited text"
+  "legacysave.pptWhy.verify": "the written file does not read back as the edited text",
+  "legacysave.fresh.notesTitle": "The workbook is written anew as XLS (Excel 97-2003). What this format cannot hold:",
+  "legacysave.fresh.lose.drawings": "Charts and pictures",
+  "legacysave.fresh.lose.cond": "Conditional formatting",
+  "legacysave.fresh.lose.valid": "Data validation",
+  "legacysave.fresh.lose.notes": "Notes",
+  "legacysave.fresh.lose.links": "Hyperlinks",
+  "legacysave.fresh.lose.tables": "Filters and tables",
+  "legacysave.fresh.lose.sparks": "Sparklines and pivot tables",
+  "legacysave.fresh.lose.protect": "Sheet and workbook protection",
+  "legacysave.fresh.lose.print": "Page setup",
+  "legacysave.fresh.lose.names": "Defined names",
+  "legacysave.fresh.lose.size": "Cells beyond IV65536",
+  "legacysave.fresh.lose.formulas": "{n} formulas this format cannot hold (saved as values)",
+  "legacysave.savedFresh.xls": "Saved as XLS (the workbook written anew in the Excel 97-2003 format)"
 }

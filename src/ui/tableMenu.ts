@@ -6,6 +6,7 @@ import { expandRange } from "../core/table";
 import type { TableNode } from "../core/types";
 import { t } from "../i18n";
 import { useCellSel } from "./CellEditor";
+import { splitFlowTable } from "./docFlow";
 import { canMerge, deleteTable, deleteTableLines, insertTableCols, insertTableRows, mergeSelectedCells, splitSelectedCell } from "./pageSetupActions";
 import type { MenuItem } from "./shell/controls";
 import { useUI } from "./shell/uiStore";
@@ -36,8 +37,11 @@ export function tableMenuItems(): MenuItem[] {
     { sep: true },
     { label: t("tablemenu.merge"), disabled: !canMerge(), onSelect: mergeSelectedCells },
     { label: t("tablemenu.split"), onSelect: splitSelectedCell },
+    // 표 나누기 (Word): the picked row and the ones below become a table of their own (a table in a document body)
+    { label: t("tablemenu.splitTable"), kbd: "Ctrl+Shift+Enter", onSelect: () => { const c = useCellSel.getState().target; if (c) splitFlowTable(c.nodeId, c.row); } },
     { sep: true },
-    // width, shading, alignment and the table's border live in the properties panel (shell/NodePanels TablePanel)
-    { label: t("tablemenu.props"), onSelect: () => useUI.getState().set({ rightOpen: true }) },
+    // 표 속성: the table's alignment over its properties panel (shell/TablePropsDialog, shell/NodePanels TablePanel) —
+    // a window, as Word's: in a document the right panel shows the text's format (QA 11-25 real use: nothing opened)
+    { label: t("tablemenu.props"), onSelect: () => useUI.getState().set({ shellDialog: "tableProps" }) },
   ];
 }

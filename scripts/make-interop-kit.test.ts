@@ -1064,8 +1064,10 @@ describe("XLSX · CSV · PPTX", () => {
     save("csv-01-source-cp949.csv", src, SRC);
     const opened = await openVia("csv", "csv-01-source-cp949.csv", src);
     const doc = docFromOpened(opened, "csv-01");
-    const t = doc.pages[0].nodes.find((n) => n.type === "TABLE") as import("../src/core/types").TableNode;
-    t.rows[1][2] = { ...t.rows[1][2], text: "고친 셀 Edited" };
+    // a CSV opens on a sheet (as in Excel): the person types over cell C2
+    const sh = doc.pages[0].sheet!;
+    checkTrue("csv-01-cp949.csv", "시트로 열림", !!sh);
+    sh.cells.C2 = { ...sh.cells.C2, v: "고친 셀 Edited" };
     const want = rows.map((r) => [...r]);
     want[1][2] = "고친 셀 Edited";
     const out = await exportVia("csv", doc, doc.pages[0]);
@@ -1085,6 +1087,10 @@ describe("XLSX · CSV · PPTX", () => {
     const back = importCsv(out, file);
     check(file, "다시 연 값", cellsText((back.pages[0].nodes.find((n) => n.type === "TABLE") as import("../src/core/types").TableNode).rows), want);
     check(file, "인코딩 감지", back.pages[0].source?.encoding, "euc-kr");
+    // every record nobody edited is written back byte for byte
+    const lines = (b: Uint8Array) => Array.from(b).join(",").split(",13,10").map(String);
+    const was = lines(src), now = lines(out);
+    check(file, "고친 줄만 바뀜", now.map((l, i) => l !== was[i]).map((d, i) => (d ? i : -1)).filter((i) => i >= 0), [1]);
 
     // a new table saved as CSV → UTF-8 with BOM (Excel-friendly default)
     const doc2 = newDocument("csv-02");

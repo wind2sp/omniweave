@@ -3,6 +3,7 @@
 // loaded the first time a drawing is shown — nothing of it is in the start-up bundle.
 
 import type { Page } from "../../core/types";
+import type { MenuItem } from "../shell/controls";
 import { cadHooks, cadScreenNow } from "../editModes";
 
 export interface CanvasEnv {
@@ -24,11 +25,21 @@ export interface CadCanvasHooks {
   up(e: PointerEvent, sx: number, sy: number): boolean;
   leave(): void;
   wheel(e: WheelEvent, sx: number, sy: number): boolean;
+  /** a selected object under this canvas point (a finger pressed there drags it instead of moving the view) */
+  selectedAt?(sx: number, sy: number): boolean;
+  /** the shortcut menu at a right click (null: none — a command is running) */
+  menu?(): MenuItem[] | null;
   /** the canvas repaint, lent once */
   attach(invalidate: () => void): void;
 }
 
-export const cad: { hooks: CadCanvasHooks | null; invalidate: (() => void) | null; key: ((e: KeyboardEvent) => boolean) | null } = { hooks: null, invalidate: null, key: null };
+export const cad: {
+  hooks: CadCanvasHooks | null;
+  invalidate: (() => void) | null;
+  key: ((e: KeyboardEvent) => boolean) | null;
+  /** the canvas's in-place text editor, lent by CanvasView (MTEXT, TEXTEDIT, double click) */
+  editText: ((id: string) => boolean) | null;
+} = { hooks: null, invalidate: null, key: null, editText: null };
 
 let loading: Promise<void> | null = null;
 /** Load the drawing screen's code (once). */

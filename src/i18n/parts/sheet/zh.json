@@ -151,11 +151,11 @@
   "sheet.filter.search": "搜索",
   "sheet.filter.all": "（全选）",
   "sheet.filter.blanks": "（空白）",
-  "sheet.note.new": "新建批注",
-  "sheet.note.edit": "编辑批注",
-  "sheet.note.delete": "删除批注",
+  "sheet.note.new": "新建注释",
+  "sheet.note.edit": "编辑注释",
+  "sheet.note.delete": "删除注释",
   "sheet.note.threaded": "线程批注在 Omniweave 中只读（请在创建该文件的电子表格程序中编辑）",
-  "sheet.note.label": "批注",
+  "sheet.note.label": "注释",
   "sheet.valid.title": "Omniweave",
   "sheet.valid.msg": "此值与此单元格定义的数据验证限制不匹配",
   "sheet.valid.retry": "重试",
@@ -163,5 +163,10 @@
   "sheet.valid.yes": "是",
   "sheet.valid.no": "否",
   "sheet.valid.list": "列表",
-  "sheet.menu.clear": "清除内容"
+  "sheet.menu.clear": "清除内容",
+  "sheet.menu.cut": "剪切",
+  "sheet.menu.copy": "复制",
+  "sheet.menu.paste": "粘贴",
+  "sheet.menu.pasteValues": "仅粘贴值",
+  "sheet.paste.nothingCopied": "要粘贴值，请先在工作表中复制单元格 (Ctrl+C)"
 }

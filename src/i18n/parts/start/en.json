@@ -2,6 +2,8 @@
   "start.search": "Search templates and sizes",
   "start.hero.new": "New document",
   "start.hero.newSub": "Blank artboard · 1920 × 1080 px",
+  "start.hero.sheet": "Blank workbook",
+  "start.hero.sheetSub": "Spreadsheet · cell grid",
   "start.hero.open": "Open…",
   "start.hero.openSub": "omw · PDF · DOCX · HWPX · PPTX · images",
   "start.hero.recent": "Recent files",
@@ -87,5 +89,18 @@
   "start.sample.storyTitle": "Omni\nNews",
   "start.sample.storySub": "Swipe up for more",
   "start.sample.thumbTitle": "Design in\n10 minutes",
-  "start.sample.thumbSub": "Omni tutorial #1"
+  "start.sample.thumbSub": "Omni tutorial #1",
+  "start.cat.sheet": "Spreadsheets (Excel)",
+  "start.tpl.sheet-blank": "Blank workbook",
+  "start.recent.pin": "Pin to list",
+  "start.recent.unpin": "Unpin from list",
+  "start.sizeName.letter": "Letter",
+  "start.sizeName.legal": "Legal",
+  "start.sizeName.card": "Business card",
+  "start.sizeName.postcard": "Postcard",
+  "start.sizeName.square": "Square",
+  "start.sizeName.story": "Story",
+  "start.recent.noAccess": "The browser did not allow reading this file again. Click it again to allow, or pick it with Open (Ctrl+O).",
+  "start.recent.emptyWebHandles": "Files opened in Chrome or Edge with Open (Ctrl+O) or a drop appear here. The browser may ask once for permission when you open one again.",
+  "start.recent.webStored": "Kept by the browser"
 }

@@ -8,6 +8,7 @@
 
 import { TILE, type BlendMode, type PixelTile, type RasterNode } from "../types";
 import { imgToTiles, tileBounds, tilesToImg, type TileBounds } from "./pixels";
+import { applyMask } from "./layerMask";
 import { blendMixPixel, dissolveKeep, pixelBlend } from "../style/blend";
 
 /** Raster whose pixels sit 1:1 on the page (no rotation, scale or crop); not an adjustment layer (its tiles are a mask). */
@@ -29,7 +30,9 @@ function union(a: TileBounds | null, b: TileBounds | null): TileBounds | null {
 }
 
 /** Tiles of `lower` with `upper` composited on top (both simple rasters; positions rounded to whole px). */
-export function mergeRasterTiles(lower: RasterNode, upper: RasterNode, clip = false): Record<string, PixelTile> {
+export function mergeRasterTiles(lower0: RasterNode, upper0: RasterNode, clip = false): Record<string, PixelTile> {
+  // layer masks are applied first (Photoshop: Merge Down bakes both masks into the result)
+  const lower = lower0.mask ? { ...lower0, tiles: applyMask(lower0) } : lower0, upper = upper0.mask ? { ...upper0, tiles: applyMask(upper0) } : upper0;
   const dx = Math.round(upper.transform.x - lower.transform.x), dy = Math.round(upper.transform.y - lower.transform.y);
   const ub = tileBounds(upper.tiles);
   // upper bounds in lower-local pixels, grown out to whole tiles

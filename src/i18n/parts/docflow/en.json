@@ -31,5 +31,6 @@
   "docflow.layout.topBottom": "Top and Bottom",
   "docflow.layout.behind": "Behind Text",
   "docflow.layout.front": "In Front of Text",
-  "docflow.hist.makeBody": "Add body text"
+  "docflow.hist.makeBody": "Add body text",
+  "docflow.hist.splitTable": "Split table"
 }

@@ -256,7 +256,7 @@ ai-native(PDF 호환 없는 .ai를 Illustrator 고유 데이터로 그리기, 20
 
 0.2.0 공개 준비(release-prep + update-full, 출시 QA 2026-11-22): 기준 fab3502 15,094,835 B(파일 70개) → **15,176,693 B(파일 76개)**, +81,858 B로 예산(+51,200)을 30,658 B 넘음. 같은 조건(`npm run build`, OCR 포함)으로 fab3502를 다시 빌드해 파일별 brotli를 비교: **`legalTexts` +57,327 B(새 지연 청크)** — 앱 안 법적 고지 전문(LICENSE GPL-3.0 35,823 B · NOTICE · THIRD_PARTY_NOTICES.md 740,059 B · TRADEMARKS.md, 원본 786 KB). GPL §4·§6과 BSD·Apache·MIT·OFL·zlib이 바이너리 배포에 고지를 요구하고 Store 판에도 들어가야 해서 넣음, 정보 창에서 열 때만 불러옴(시작 묶음 아님). 의존성마다 같은 라이선스 본문이 반복되지만 brotli가 반복을 거의 다 접어(원본의 7.3 %) 중복 제거로 줄 몫은 작고, 고지 문서 형식을 바꾸지 않으려 둠. 나머지 +24.5 KB: `i18n` +5,891(업데이트 창·중요 업데이트·Store 문구·상표 표기 4개 언어), `index` +5,207(업데이트 흐름·포터블 바꿔치기 UI·Store 판 감지), `cmykComposite` +4,382·`psdLinks` +937(PSD 고급 개체), `strokeFont` +3,329·`shxLoad` +819(CAD SHX 글꼴), `sniff` +1,692(시작 화면 멈춤 고침으로 따로 청크가 된 형식 판별), 그 밖 ±1 KB. 같은 것을 두 번 싣지 않음(규칙 1·2 ✔), 법적 의무·기능 증가라 크기 원칙(필요한 증가 허용)대로 올림.
 
-<!-- size-budget: {"distBrotli":15176693,"tolerance":51200,"files":76,"ocr":true,"date":"2026-11-21"} -->
+<!-- size-budget: {"distBrotli":22425590,"tolerance":51200,"files":180,"ocr":true,"date":"2026-11-25"} -->
 
 | 기준 | 값 |
 |---|---|

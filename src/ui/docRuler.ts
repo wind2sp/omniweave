@@ -63,7 +63,9 @@ export function indentMarks(): IndentMarks | null {
   if (!page) return null;
   const id = s.editingTextId ?? (s.selection.length === 1 ? s.selection[0] : null);
   if (!id) return null;
-  const node = parseHfId(id) ? hfEditNode(s.doc, id) : page.nodes.find((n) => n.id === id);
+  // (the document body being typed in: its frame on this page — the id names the flow, not a node; QA 11-25 real use:
+  // the ruler showed no indent markers for the body)
+  const node = parseHfId(id) ? hfEditNode(s.doc, id) : id.startsWith("flow:") ? page.nodes.find((n) => n.type === "TEXT" && n.flow) : page.nodes.find((n) => n.id === id);
   if (!node || node.type !== "TEXT") return null;
   const tg = textTargetNow();
   if (!tg) return null;

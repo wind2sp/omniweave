@@ -30,6 +30,7 @@ import * as C from "./compare";
 import { ssim, toGray } from "./ssim";
 import { publicSamples } from "./samples";
 import { measureSheetEdit, pickSheetEdits } from "./sheetEdit";
+import { SLOW } from "../budget";
 
 const ROOT = process.cwd();
 const CORPUS = join(ROOT, "test-corpus");
@@ -182,7 +183,7 @@ function editCell(nodeId: string, r: number, c: number, fn: (t: string) => strin
 }
 
 /** A step that never settles (e.g. a dialog waiting for a person) must not stop the whole run. */
-const limit = <T,>(p: Promise<T>, ms: number, what: string) => Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${what} 시간 초과(${ms / 1000}초) — 멈춤`)), ms))]);
+const limit = <T,>(p: Promise<T>, ms: number, what: string) => Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${what} 시간 초과(${ms / 1000}초) — 멈춤`)), ms * SLOW))]); // OMW_TEST_SLOW (tests/budget.ts)
 /** progress lines (ids only) so a stuck file can be found: <raw dir>/FIDELITY-progress.log */
 const progress = (m: string) => {
   try {
@@ -286,11 +287,24 @@ async function editTest(inp: Input, fmt: string): Promise<Row["edit"]> {
     if (fmt === "pdf" || fmt === "ai") return await editPdf(orig, save);
     if (fmt === "psd") return await editPsd(orig, save);
     if (fmt === "csv" || fmt === "srt") {
-      const t = readingOrder(S().doc.pages).find((n) => n.type === "TABLE");
-      if (!t || t.type !== "TABLE") return { status: "해당 없음", what: "표 없음", diffs: [] };
-      const r = Math.min(1, t.rows.length - 1), c = fmt === "srt" ? 3 : 0;
-      if (!t.rows[r]?.[c]) return { status: "해당 없음", what: "셀 없음", diffs: [] };
-      editCell(t.id, r, c, (x) => x + MARK);
+      // a CSV opens on a sheet page (as in Excel): the cell A2 is typed over there
+      const sp = fmt === "csv" ? S().doc.pages.find((p) => p.sheet) : undefined;
+      const t = sp ? undefined : readingOrder(S().doc.pages).find((n) => n.type === "TABLE");
+      if (sp) {
+        const { sheetCells } = await import("../../src/io/sheet/pages");
+        const a2 = sheetCells(sp.sheet!).rows[1]?.[0]?.text;
+        if (a2 === undefined) return { status: "해당 없음", what: "셀 없음", diffs: [] };
+        S().commit("fidelity cell", (d) => {
+          const sh = d.pages.find((p) => p.id === sp.id)!.sheet!;
+          sh.cells.A2 = { ...sh.cells.A2, v: a2 + MARK };
+        });
+      }
+      if (!sp && (!t || t.type !== "TABLE")) return { status: "해당 없음", what: "표 없음", diffs: [] };
+      const rr = sp ? 1 : Math.min(1, (t as { rows: unknown[] }).rows.length - 1), c = fmt === "srt" ? 3 : 0;
+      if (!sp && t && t.type === "TABLE") {
+        if (!t.rows[rr]?.[c]) return { status: "해당 없음", what: "셀 없음", diffs: [] };
+        editCell(t.id, rr, c, (x) => x + MARK);
+      }
       const out = await save();
       const diffs = C.compareTextBytes(orig, out).diffs.filter((x) => !x.startsWith("줄 "));
       if (fmt === "csv") {
@@ -301,9 +315,9 @@ async function editTest(inp: Input, fmt: string): Promise<Row["edit"]> {
         if (!hit) return { status: "편집 반영 안 됨", what: "셀 하나", diffs };
       } else {
         const ca = C.srtCues(orig), cb = C.srtCues(out);
-        const other = ca.filter((x, i) => i !== r - 1 && (!cb[i] || cb[i].text !== x.text || cb[i].start !== x.start || cb[i].end !== x.end)).length;
+        const other = ca.filter((x, i) => i !== rr - 1 && (!cb[i] || cb[i].text !== x.text || cb[i].start !== x.start || cb[i].end !== x.end)).length;
         if (other) diffs.push(`다른 자막 ${other}개 바뀜`);
-        if (!cb[r - 1] || !cb[r - 1].text.endsWith(MARK)) return { status: "편집 반영 안 됨", what: "자막 하나", diffs };
+        if (!cb[rr - 1] || !cb[rr - 1].text.endsWith(MARK)) return { status: "편집 반영 안 됨", what: "자막 하나", diffs };
       }
       const lines = C.compareTextBytes(orig, out).lineDiffs.length;
       if (lines > 1) diffs.push(`편집 외 ${lines - 1}줄 표기 바뀜`);

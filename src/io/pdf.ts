@@ -6,9 +6,20 @@
 // The old cover-rectangle elevation remains as the fallback when the engine cannot read a page.
 
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { readOmwPiece } from "./pdfsurgeon/omwPiece";
+
+/** Does `bytes` contain the ASCII text `s`? */
+function hasBytes(bytes: Uint8Array, s: string): boolean {
+  const k = [...s].map((c) => c.charCodeAt(0));
+  outer: for (let i = bytes.indexOf(k[0]); i >= 0 && i <= bytes.length - k.length; i = bytes.indexOf(k[0], i + 1)) {
+    for (let j = 1; j < k.length; j++) if (bytes[i + j] !== k[j]) continue outer;
+    return true;
+  }
+  return false;
+}
 import { pdfjsLib } from "./pdfjsLoader";
 import { getBlob, makeAsset } from "../core/assets";
-import { fillForm, formFields, type FormField, type FormValue } from "./pdfsurgeon/forms";
+import { fillForm, formFields, pageTabs, type FormField, type FormValue } from "./pdfsurgeon/forms";
 import { addAnnots, type PdfAnnot } from "./pdfsurgeon/annots";
 import { pageView } from "./pdfsurgeon/document";
 import { useStore } from "../core/store";
@@ -156,6 +167,102 @@ export function pdfBitmap(hash: string, pageIndex: number, scale: number, onRead
   for (const [k, b] of bitmaps) if (b !== "loading" && k.startsWith(prefix)) if (!any || !k.slice(prefix.length).startsWith("x")) any = b;
   return any;
   return null;
+}
+
+// ───────── on-screen renders (docs/design/RENDER_CRISPNESS.md 5) ─────────
+// The page on screen is rendered by pdf.js at the exact device scale it is shown at (zoom × devicePixelRatio ×
+// the node's scale) and put down 1:1 on whole device pixels, as Acrobat / Illustrator show vectors and text. Before,
+// it was a power-of-two bucket (0.5×–4×) stretched to the zoom — 1.4× soft at 141 %, and at fit zoom the first paint
+// could keep a small thumbnail render for good (2026-11-24: "AI·PDF가 뿌옇고 깨진 것처럼").
+// A page up to SCREEN_PAGE_PX is one bitmap; a bigger one (high zoom) is rendered in PDF_CELL-px cells, only those on
+// screen. Bitmaps are kept within SCREEN_BUDGET_PX, least recently used first out.
+const SCREEN_PAGE_PX = 16_000_000;
+export const PDF_CELL = 2048;
+const SCREEN_BUDGET_PX = 96_000_000;
+const SCREEN_JOBS = 2;
+const screenMaps = new Map<string, HTMLCanvasElement | "loading">();
+const screenQueue: (() => Promise<void>)[] = [];
+let screenRunning = 0;
+/** The scale a screen render is made at (1e-4 steps: a settled zoom always asks for the same one). */
+export const pdfScreenScale = (s: number) => Math.max(1 / 64, Math.round(s * 1e4) / 1e4);
+/** Is the page (`w`×`h` page px) at `scale` rendered in cells? */
+export const pdfScreenCells = (w: number, h: number, scale: number) => w * scale * h * scale > SCREEN_PAGE_PX;
+
+function pumpScreen() {
+  while (screenRunning < SCREEN_JOBS && screenQueue.length) {
+    // newest first: what was asked last is what is on screen now
+    const job = screenQueue.pop()!;
+    screenRunning++;
+    job().finally(() => {
+      screenRunning--;
+      pumpScreen();
+    });
+  }
+}
+
+function keepScreenBudget(keep: string) {
+  let px = 0;
+  for (const v of screenMaps.values()) if (v !== "loading") px += v.width * v.height;
+  for (const [k, v] of screenMaps) {
+    if (px <= SCREEN_BUDGET_PX) break;
+    if (v === "loading" || k === keep) continue;
+    px -= v.width * v.height;
+    screenMaps.delete(k);
+  }
+}
+
+/**
+ * The page (or, with `cell`, one PDF_CELL-px cell of it) rendered at `scale` device px per page px for the screen,
+ * or null while it renders (onReady follows). Its pixel (0, 0) is the page's (0, 0) (the cell's top-left corner).
+ */
+export function pdfScreenBitmap(hash: string, pageIndex: number, scale: number, cell: [number, number] | null, onReady: () => void): HTMLCanvasElement | null {
+  const stripped = isElevatedInStore(originOf(hash), pageIndex);
+  const key = `${hash}:${pageIndex}:${stripped ? "s" : "o"}:v${scale}${cell ? `c${cell[0]},${cell[1]}` : ""}`;
+  const v = screenMaps.get(key);
+  if (v) {
+    screenMaps.delete(key);
+    screenMaps.set(key, v);
+    return v === "loading" ? null : v;
+  }
+  screenMaps.set(key, "loading");
+  screenQueue.push(async () => {
+    try {
+      if (screenMaps.get(key) !== "loading") return;
+      const pdf = stripped ? await openStripped(hash, pageIndex) : await openPdf(hash);
+      const page = await pdf.getPage(pageIndex + 1);
+      const vp = page.getViewport({ scale: PDF_UNIT * scale });
+      const W = Math.ceil(vp.width), H = Math.ceil(vp.height);
+      const x0 = cell ? cell[0] * PDF_CELL : 0, y0 = cell ? cell[1] * PDF_CELL : 0;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, cell ? Math.min(PDF_CELL, W - x0) : W);
+      canvas.height = Math.max(1, cell ? Math.min(PDF_CELL, H - y0) : H);
+      await page.render({ canvasContext: canvas.getContext("2d")!, viewport: vp, ...(cell ? { transform: [1, 0, 0, 1, -x0, -y0] } : {}) }).promise;
+      bitmapScale.set(canvas, scale);
+      screenMaps.set(key, canvas);
+      keepScreenBudget(key);
+      onReady();
+    } catch (e) {
+      console.error("PDF render failed", e);
+      screenMaps.delete(key);
+    }
+  });
+  pumpScreen();
+  return null;
+}
+
+/** The sharpest whole-page render of the page already made (screen or bucket), to show while the right one renders. */
+export function pdfAnyBitmap(hash: string, pageIndex: number): ImageBitmap | HTMLCanvasElement | null {
+  const prefix = `${hash}:${pageIndex}:${isElevatedInStore(originOf(hash), pageIndex) ? "s" : "o"}:`;
+  let best: ImageBitmap | HTMLCanvasElement | null = null;
+  for (const m of [screenMaps, bitmaps] as Map<string, ImageBitmap | HTMLCanvasElement | "loading">[])
+    for (const [k, b] of m) if (b !== "loading" && k.startsWith(prefix) && !/c\d+,\d+$/.test(k) && (!best || b.width > best.width)) best = b;
+  return best;
+}
+
+/** Forget the screen renders (tests). */
+export function clearPdfScreenBitmaps() {
+  screenMaps.clear();
+  screenQueue.length = 0;
 }
 
 // ───────── PDF Surgeon integration ─────────
@@ -399,6 +506,8 @@ export interface PdfFormInfo {
   xfa: boolean;
   /** per page: the PDF box shown and its rotation, to place widget rectangles on the page node */
   pages: { view: number[]; rotate: number; userUnit: number }[];
+  /** per page: its /Tabs (R rows, C columns, S structure; null: annotation order) — the order Tab follows */
+  tabs?: ("R" | "C" | "S" | null)[];
 }
 const formInfos = new Map<string, Promise<PdfFormInfo | null>>();
 
@@ -410,7 +519,7 @@ export function pdfFormInfo(hash: string): Promise<PdfFormInfo | null> {
       .then((sd) => {
         const { fields, xfa } = formFields(sd);
         if (!fields.length) return null;
-        return { fields, xfa, pages: sd.pageRefs.map((_, i) => pageView(sd, i)) };
+        return { fields, xfa, pages: sd.pageRefs.map((_, i) => pageView(sd, i)), tabs: pageTabs(sd) };
       })
       .catch(() => null);
     formInfos.set(hash, p);
@@ -521,6 +630,60 @@ export async function pdfPagePixels(hash: string, pageIndex: number, scale: numb
 
 const textItems = new Map<string, Promise<PdfTextItem[]>>();
 /** The page's text runs from pdf.js (for marking text: highlight / underline / strike-out). */
+/**
+ * The page without its text, as a PNG (`scale` × page px): its pictures, lines, table borders and fills where they are —
+ * the background a Word / 한글 export puts behind the page's text (ui/actions.ts pdfPagesAsText).
+ */
+export async function pdfPageWithoutText(hash: string, pageIndex: number, scale = 2): Promise<Uint8Array | null> {
+  if (typeof document === "undefined") return null;
+  const doc = await openStripped(hash, pageIndex);
+  const page = await doc.getPage(pageIndex + 1);
+  const vp = page.getViewport({ scale: PDF_UNIT * scale });
+  const c = document.createElement("canvas");
+  c.width = Math.ceil(vp.width);
+  c.height = Math.ceil(vp.height);
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  // nothing but white: no background to put in
+  const px = ctx.getImageData(0, 0, c.width, c.height).data;
+  let ink = false;
+  for (let i = 0; i < px.length && !ink; i += 4 * 7) if (px[i] < 245 || px[i + 1] < 245 || px[i + 2] < 245) ink = true;
+  if (!ink) return null;
+  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+  return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+}
+
+/** A comment the file itself carries (as Acrobat's comment list shows it). */
+export interface PdfFileAnnot {
+  subtype: string;
+  contents: string;
+  author: string;
+  /** [x0, y0, x1, y1] in PDF user space */
+  rect: number[];
+}
+const PDF_COMMENT_TYPES = new Set(["Text", "FreeText", "Highlight", "Underline", "StrikeOut", "Squiggly", "Square", "Circle", "Line", "Polygon", "PolyLine", "Ink", "Stamp", "Caret", "FileAttachment"]);
+const fileAnnots = new Map<string, Promise<PdfFileAnnot[]>>();
+/** The comments of one page of the file (links, form fields and popups left out). */
+export function pdfFileAnnots(hash: string, pageIndex: number): Promise<PdfFileAnnot[]> {
+  const key = `${hash}:${pageIndex}`;
+  let p = fileAnnots.get(key);
+  if (!p) {
+    p = (async () => {
+      const page = await (await openPdf(hash)).getPage(pageIndex + 1);
+      const list = (await page.getAnnotations()) as { subtype?: string; contentsObj?: { str?: string }; titleObj?: { str?: string }; rect?: number[]; inReplyTo?: string }[];
+      return list
+        // (replies and review states belong to their comment, not a row of their own)
+        .filter((a) => a.subtype && PDF_COMMENT_TYPES.has(a.subtype) && !a.inReplyTo)
+        .map((a) => ({ subtype: a.subtype!, contents: a.contentsObj?.str ?? "", author: a.titleObj?.str ?? "", rect: a.rect ?? [0, 0, 0, 0] }));
+    })();
+    p.catch(() => fileAnnots.delete(key));
+    fileAnnots.set(key, p);
+  }
+  return p;
+}
+
 export function pdfTextItems(hash: string, pageIndex: number): Promise<PdfTextItem[]> {
   const key = `${hash}:${pageIndex}`;
   let p = textItems.get(key);
@@ -550,6 +713,17 @@ export async function importPdf(bytes: Uint8Array, name: string, format: "pdf" |
     page.source = secretId ? { format, name, protection: { scheme: "pdf", secretId } } : { format, name };
     pages.push(page);
   }
+  // Omniweave's own page data saved in the file before (the perspective grid): only looked for when the file has it
+  if (hasBytes(bytes, "/Omniweave"))
+    try {
+      const sd = await surgeonDoc(asset.hash);
+      pages.forEach((pg, i) => {
+        const d = readOmwPiece(sd, i);
+        if (d?.perspGrid && typeof d.perspGrid === "object") pg.perspGrid = d.perspGrid as Page["perspGrid"];
+      });
+    } catch (e) {
+      console.warn("Omniweave page data", e);
+    }
   return { asset, pages };
 }
 
@@ -662,7 +836,7 @@ async function sampleBackground(page: any, w: number, h: number): Promise<string
 // ───────── save in the original format (PDF / AI) ─────────
 
 let fallbackFontBytes: Promise<Uint8Array> | null = null;
-function loadFallbackFont(): Promise<Uint8Array> {
+export function loadFallbackFont(): Promise<Uint8Array> {
   if (!fallbackFontBytes) {
     fallbackFontBytes = (async () => {
       try {
@@ -796,6 +970,8 @@ async function saveFileUpdate(doc: OmwDocument, page: Page, pages: Page[], extra
       elevated: n.covers.some(isSurgeonMark),
       covers: n.covers.filter((c) => !isSurgeonMark(c)),
       pdfNode: { transform: n.transform, width: n.width, crop: n.crop },
+      // the design mode's perspective grid, kept in the page-piece data (io/pdfsurgeon/omwPiece.ts)
+      omw: { perspGrid: p.perspGrid ?? null },
     });
   }
   const { bytes, report } = await saveSurgical(sd, inputs, {

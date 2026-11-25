@@ -2,6 +2,7 @@
 // vector-effect: non-scaling-stroke (see styles.css), so lines stay 1.5px at any size.
 
 import type { ReactNode } from "react";
+import { PS_ICONS } from "../ps/psIcons";
 
 const P: Record<string, ReactNode> = {
   // ── tools ──
@@ -47,6 +48,13 @@ const P: Record<string, ReactNode> = {
       <path d="M8.9 13.5c-1.5.1-2.6.8-2.6 1.8 0 .9 1 1.4 1.8 1.2" strokeLinecap="round" />
     </>
   ),
+  customShape: <path d="M10 16.2 4.3 10.6C2.6 8.9 2.7 6.3 4.5 4.9c1.6-1.2 3.9-.9 5.5.8 1.6-1.7 3.9-2 5.5-.8 1.8 1.4 1.9 4 .2 5.7z" strokeLinejoin="round" />,
+  polyLasso: (
+    <>
+      <path d="M3.5 9.5 8 4l8.5 2.5-2 6.5-6.5 1z" strokeLinejoin="round" strokeDasharray="2.2 1.6" />
+      <path d="M8 14c-1.5.1-2.6.8-2.6 1.8 0 .9 1 1.4 1.8 1.2" strokeLinecap="round" />
+    </>
+  ),
   wand: (
     <>
       <path d="m3.5 16.5 8.6-8.6" strokeLinecap="round" strokeWidth="2" />
@@ -66,6 +74,14 @@ const P: Record<string, ReactNode> = {
       <path d="M13.2 4.5v11" strokeOpacity=".4" />
     </>
   ),
+  // paint bucket: a tipped pail pouring a drop
+  bucket: (
+    <>
+      <path d="m8.2 3.2 6.6 6.6-5.6 5.6a1.6 1.6 0 0 1-2.3 0l-4-4a1.6 1.6 0 0 1 0-2.3Z" strokeLinejoin="round" />
+      <path d="M2.9 9.1h11.9M8.2 3.2 6.6 1.6" strokeLinecap="round" />
+      <path d="M16.6 12.4s1.6 2 1.6 3.1a1.6 1.6 0 0 1-3.2 0c0-1.1 1.6-3.1 1.6-3.1Z" fill="currentColor" stroke="none" />
+    </>
+  ),
   zoom: (
     <>
       <circle cx="8.6" cy="8.6" r="5.1" />
@@ -74,6 +90,70 @@ const P: Record<string, ReactNode> = {
   ),
   // design mode
   line: <path d="M4 16 16 4" strokeLinecap="round" />,
+  roundRect: <rect x="3.5" y="4.5" width="13" height="11" rx="3.6" />,
+  polygon: <path d="M10 3.2 16.2 7.7 13.8 15.6H6.2L3.8 7.7Z" strokeLinejoin="round" />,
+  star: <path d="m10 3 2.1 4.4 4.8.6-3.5 3.3.9 4.8L10 13.8l-4.3 2.3.9-4.8L3.1 8l4.8-.6Z" strokeLinejoin="round" />,
+  pin: <path d="M7.5 3h5l-.8 4.6 2.8 3.1h-9l2.8-3.1Z M10 10.7V17" strokeLinejoin="round" strokeLinecap="round" />,
+  // design 2: pencil, scissors, knife
+  pencil: (
+    <>
+      <path d="m4 16 1-4 8.5-8.5 3 3L8 15Z" strokeLinejoin="round" />
+      <path d="m11.5 5.5 3 3M4 16l4-1" strokeLinecap="round" />
+    </>
+  ),
+  scissors: (
+    <>
+      <circle cx="5.5" cy="14" r="2.3" />
+      <circle cx="14.5" cy="14" r="2.3" />
+      <path d="M7.2 12.4 15 3.5M12.8 12.4 5 3.5" strokeLinecap="round" />
+    </>
+  ),
+  knife: <path d="M3.5 16.5 13 7l3.5-3.5-1 5L7 17Z" strokeLinejoin="round" />,
+  // design 2: shear, flare, shape builder, blend
+  shear: <path d="M7 4.5h9.5L13 15.5H3.5Z" strokeLinejoin="round" />,
+  flare: (
+    <>
+      <circle cx="7.5" cy="8" r="2.6" />
+      <path d="M7.5 2.8v1.6M7.5 11.6v1.6M2.3 8h1.6M11.1 8h1.6M3.9 4.4l1.1 1.1M10 10.5l1.1 1.1M3.9 11.6 5 10.5M10 5.5l1.1-1.1" strokeLinecap="round" />
+      <circle cx="15" cy="15" r="1.6" />
+    </>
+  ),
+  shapeBuilder: (
+    <>
+      <path d="M3.5 13.5V6h7.5v7.5Z" strokeLinejoin="round" />
+      <path d="M8 9.5h7.5V17H8Z" strokeLinejoin="round" />
+      <path d="m12.5 3.5 1 2.2 2.2 1-2.2 1-1 2.2-1-2.2-2.2-1 2.2-1Z" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // the Mesh tool: a patch with curved mesh lines and a point
+  mesh: (
+    <>
+      <path d="M3.5 3.5h13v13h-13Z" strokeLinejoin="round" />
+      <path d="M3.5 10c4-2.2 9-2.2 13 0M10 3.5c-2.2 4-2.2 9 0 13" />
+      <rect x="8.4" y="7.6" width="3.2" height="3.2" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // the Perspective Selection tool: a selection arrow on a plane running to the horizon
+  perspSelect: (
+    <>
+      <path d="M1.5 15.5 9 12.5l7.5 3M1.5 15.5V18M16.5 15.5V18" strokeLinejoin="round" strokeDasharray="1.6 1.2" />
+      <path d="M6 2.5v10.2l2.6-2.4 1.8 3.9 1.7-.8-1.8-3.8 3.5-.2Z" fill="currentColor" strokeLinejoin="round" />
+    </>
+  ),
+  // the Perspective Grid tool: two walls running to a horizon
+  perspective: (
+    <>
+      <path d="M2 7.5h16" strokeDasharray="1.6 1.4" />
+      <path d="M10 5.5v11M10 16.5 2.5 12.5V8.6M10 5.5 2.5 7.9M10 16.5l7.5-4V8.6M10 5.5l7.5 2.4" strokeLinejoin="round" />
+    </>
+  ),
+  blendTool: (
+    <>
+      <circle cx="4.8" cy="10" r="2.3" />
+      <circle cx="10" cy="10" r="2.9" strokeDasharray="1.4 1.4" />
+      <rect x="13.2" y="6.6" width="4.6" height="6.8" rx=".6" />
+    </>
+  ),
   anchorAdd: (
     <>
       <path d="M8.5 3.5 13.5 9l-2 5.5H5.5L3.5 9Z" strokeLinejoin="round" />
@@ -625,6 +705,55 @@ const P: Record<string, ReactNode> = {
       <circle cx="10" cy="6.6" r=".8" fill="currentColor" stroke="none" />
     </>
   ),
+  chart: (
+    <>
+      <path d="M3.5 16.5h13" />
+      <rect x="4.5" y="9" width="2.6" height="7.5" rx=".5" />
+      <rect x="8.7" y="5" width="2.6" height="11.5" rx=".5" />
+      <rect x="12.9" y="11" width="2.6" height="5.5" rx=".5" />
+    </>
+  ),
+  smartart: (
+    <>
+      <rect x="7.5" y="3" width="5" height="4" rx="1" />
+      <rect x="2.5" y="13" width="5" height="4" rx="1" />
+      <rect x="12.5" y="13" width="5" height="4" rx="1" />
+      <path d="M10 7v3M5 13v-3h10v3" />
+    </>
+  ),
+  presenter: (
+    <>
+      <rect x="2.5" y="3.5" width="9" height="7" rx="1" />
+      <rect x="13" y="3.5" width="4.5" height="3.5" rx=".8" />
+      <path d="M2.5 13.5h15M2.5 16h10" />
+    </>
+  ),
+  chartCol: <path d="M4 16V9.5M8 16V5.5M12 16V8M16 16V11.5M2.8 16.5h14.4" strokeLinecap="round" strokeWidth="2" />,
+  chartBar: <path d="M4 4.5h7M4 8.2h11M4 11.9h5M4 15.6h9M3.5 3v14" strokeLinecap="round" strokeWidth="2" />,
+  chartLine: <path d="M3 15.5 7 10l3.5 2.5L16.5 5M3 3v14h14" strokeLinecap="round" strokeLinejoin="round" />,
+  chartPie: (
+    <>
+      <circle cx="10" cy="10" r="6.5" />
+      <path d="M10 3.5V10l5.6 3.2" strokeLinejoin="round" />
+    </>
+  ),
+  chartScatter: <path d="M5.5 13.5h.01M8.5 10h.01M11.5 11.5h.01M14 6.5h.01M7 7h.01M3 3v14h14" strokeLinecap="round" strokeWidth="2.2" />,
+  chartArea: <path d="M3 16.5 7 9l4 3.5 6-7v11z" strokeLinejoin="round" />,
+  funnel: <path d="M3.5 4.5h13l-5 6v5l-3 1.5v-6.5z" strokeLinejoin="round" />,
+  pivot: (
+    <>
+      <rect x="3.5" y="3.5" width="13" height="13" rx="1.5" />
+      <path d="M3.5 7.5h13M7.5 3.5v13M10.5 10.5h3.5M10.5 13.5h3.5" />
+    </>
+  ),
+  fx: <path d="M9.5 4.5c-1.5-.6-2.6.2-2.8 1.7L5.6 15c-.2 1.5-1.3 2.2-2.6 1.6M4.2 8.5h5M11 8.5l4.5 6.5M15.5 8.5 11 15" strokeLinecap="round" />,
+  condFmt: (
+    <>
+      <rect x="3.5" y="3.5" width="13" height="13" rx="1.5" />
+      <path d="M3.5 8h13M3.5 12h13M8 3.5v13" />
+      <path d="M8.6 8.6h7.4v2.8H8.6z" fill="currentColor" stroke="none" />
+    </>
+  ),
   table: (
     <>
       <rect x="3.5" y="4.5" width="13" height="11" rx="1.5" />
@@ -827,6 +956,13 @@ const P: Record<string, ReactNode> = {
       <path d="M9 13.2l1.4-1v4" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
+  // 덧말: small marks over a base line of text
+  ruby: (
+    <>
+      <path d="M7 4.5h6" strokeLinecap="round" strokeWidth="1.2" />
+      <path d="M4 10h12M10 10v7M6.5 13.5h7" strokeLinecap="round" />
+    </>
+  ),
   symbol: <path d="M4 16.5h3.8v-1.6A5.3 5.3 0 0 1 10 4a5.3 5.3 0 0 1 2.2 10.9v1.6H16" strokeLinecap="round" strokeLinejoin="round" />,
   textBox: (
     <>
@@ -868,6 +1004,8 @@ const P: Record<string, ReactNode> = {
     </>
   ),
 };
+// the image mode's Photoshop tools and layer buttons (ui/ps/psIcons.tsx)
+Object.assign(P, PS_ICONS);
 
 export type IconName = keyof typeof P;
 

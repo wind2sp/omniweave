@@ -1,8 +1,9 @@
 import { drawFormatMarks } from "./docExtrasUi";
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { create } from "zustand";
 import { applyTransform, invertTransform, rectFromPoints, type Rect } from "../core/geom";
-import { localBounds, nodeBounds } from "../core/loom";
+import { localBounds, nodeBounds, rasterContentBounds } from "../core/loom";
 import { pickableOn } from "../core/layerTree";
 import { currentPage, draftPage, masterOf, toolDone, useStore } from "../core/store";
 import { HF_EDIT_EVENT, hfAreaAt, hfEditNode, hfNodeId, parseHfId, renderMasterOf } from "../core/headerFooter";
@@ -16,18 +17,21 @@ import { PopMenu } from "./shell/DocTabs";
 import type { MenuItem } from "./shell/controls";
 import { importFile, nodesAt, openAndRemember, setViewportSize, fitCurrent, placeImage, viewIsFitted, viewportNow, keepCentre } from "./actions";
 import { claimDrop, droppedFiles, placesOnPage } from "./fileDrop";
+import { command, commandLabel, enabled } from "./commands";
 import { followCanvasSize, followsCanvas } from "./viewFollow";
 import { TouchNav, applyStep, doubleTapView, isDoubleTap } from "./touchNav";
 import { CellEditor, useCellSel, type CellTarget } from "./CellEditor";
 import { pickForMenu, tableMenuItems } from "./tableMenu";
+import { cellClipboardMenu, emptyMenu, joinMenus, objectMenu, textMenu } from "./contextMenu";
 import { useImageUI } from "./shell/imageMenu";
-import { drawnShape } from "./drawDefaults";
+import { PT, drawnShape, shapeName, useShapeParams, type ShapeKind } from "./drawDefaults";
 import { RichTextEditor } from "./RichTextEditor";
 import { FlowEditor, PicLayoutButton } from "./FlowEditor";
 import { NOTE_EDIT_EVENT, endTyping, flowActive, flowContextPress, focusInput,flowPointerDown, flowPointerMove, flowPointerUp, isFlowPage, useDocView } from "./docFlow";
 import { pasteClipboard, pasteIsOurs, writeClipboardMarker } from "./menuActions";
 import { isTyping } from "./shell/ops";
-import { cellAt, cellRect, dragEnd, expandRange, layoutTable } from "../core/table";
+import { cellAt, cellRect, dragEnd, expandRange, layoutTable, resizedColumns } from "../core/table";
+import { reflowPages } from "../core/flow";
 import { bodyBox } from "../core/pageSetup";
 import { hitGuide, type GuideAxis } from "../core/pages";
 import { snapAxis, snapPoint, snapRect, smartGuideSegments, type SnapIndex, type SnapLine } from "../core/snap";
@@ -39,25 +43,38 @@ import { Rulers } from "./Rulers";
 import { uiScaleFactor, useUI } from "./shell/uiStore";
 import { CORNERS, EDGES, boxCenter, boxSize, handleCursor, handlePoint, insideBox, pickHandle, pointerTarget, type Handle } from "../core/transform";
 import { liveResize, liveRotate, selectionBox, useXform, type SelBox } from "./xform";
-import { cropFrame, cropRatioValue, dragCropRect, isCanvasCrop, setCropAngle, useCrop } from "./cropTool";
+import { quickMaskBrush, quickMaskLayer } from "./ps/quickMask";
+import { cropFrame, cropRatioValue, dragCropRect, isCanvasCrop, setCropAngle, straightenBy, useCrop } from "./cropTool";
 import { moveCrop, resizeCrop } from "../core/crop";
 import { t as tr } from "../i18n";
 import { caretAtPoint, clickTextAction, docHooks } from "./editModes";
+import { disarmTextBox, textBoxArmed } from "./textBoxArm";
 import { docModeNow, docWheel, drawNeighbours, pickPageAt } from "./docView";
 import { crisp, hairCss, snapSquare, snapStroke } from "../render/crisp";
 import { sessionHooks } from "../core/sessions";
-import { currentEditMode } from "./editModes";
+import { currentEditMode, isPdfFormatPage } from "./editModes";
 import { isEmptyPh, phBox, promptKey } from "../core/slides";
-import { attachCanvas, cadCanvas } from "./cad/hooks";
+import { attachCanvas, cad as cadDoor, cadCanvas } from "./cad/hooks";
 import { useCadScreenNow } from "./editModes";
 import { isOpaqueColor } from "../render/weave";
 import { vectorPath } from "../render/draw";
 import { revealTransparencyInPlace } from "./transparency";
-import { applyGradient, clipToSelection, deselect, paintTarget, lassoSelect, marqueeSelect, opFromMods, pickColorAt, usePixelSel, wandSelect, activeMask } from "./pixelSelect";
+import { applyGradient, bucketFill, clipToSelection, deselect, paintTarget, lassoSelect, marqueeSelect, opFromMods, pickColorAt, usePixelSel, wandSelect, activeMask } from "./pixelSelect";
 import { addAnchorAt, constrain45, deleteAnchorAt, drawnLine, enterIsolation, exitIsolation, isolationFilter, useDesign } from "./designTools";
 import { brushPath, eraseVectorsOnPage, hasErasablePaths } from "./designPaint";
+import { extCursor, extDown, extOverlay, type ExtDrag } from "./ps/canvasExt";
+import { transformMenu } from "./ps/psTransform";
 import { countPress, type PressCount } from "../core/clickCount";
 import { zoomAt } from "./shell/ops";
+import { copiesOf, groupPick, moveSelection, placeCopies, recordMove } from "./transformAgain";
+import { designContextItems } from "./menus";
+import { useViewModes } from "./viewModes";
+import { selectionCentre, transformSelection, xformGesture, type TransformKind, type XformValues } from "./designPathOps";
+import { openDesignXform } from "./shell/DesignXformDialog";
+import { d2Down, d2Draw, d2Hover, d2Key, d2Move, d2Up, type D2Env } from "./design2Canvas";
+import { liveParts } from "../core/liveVector";
+import { addBoard, drawBoards, moveBoard, pickBoardAt } from "./artboards";
+import { isTypePath, typeOnPath } from "./designPathText";
 import { isPathTool, nudgeAnchors, pathHitAt, selectedAnchors, setInsideTest, shownPaths, useAnchors } from "./pathTools";
 import {
   CURSORS, cancelDrawing, drawingHooks, drawPathEdit, drawPathHover, drawPathTool, effectiveTool, finishDrawing, hoverPath, isDrawing, mods, pathCursor, pathDown, pathMove, pathUp, type PathDrag, type PathEnv,
@@ -65,7 +82,9 @@ import {
 import type { SelOp } from "../core/image/pixelSelection";
 import { PdfFormLayer } from "./pdf/PdfFormLayer"; // PDF form fields
 import { PdfAnnotLayer } from "./pdf/PdfAnnotLayer"; // PDF comments
+import { PdfToolLayer } from "./pdf/PdfTools"; // Acrobat tools: redaction marks, links, fields, dialogs
 import { PdfFindLayer } from "./pdf/PdfFind"; // PDF find matches
+import { PdfTextSelectLayer, usePdfTextSel } from "./pdf/PdfTextSelect"; // PDF text select / copy
 import { PsdTextEditor, startPsdTextEdit } from "./psdText/PsdTextEditor"; // PSD text layers
 import { psdTextAt } from "./psdText/psdTextRender";
 import { changeHere, commentsHere, deleteComment, resolveHere, startComment } from "./reviewActions";
@@ -103,9 +122,13 @@ const EYEDROPPER_CURSOR =
 type Drag =
   | { kind: "flow" }
   | { kind: "cells"; nodeId: string; anchor: { row: number; col: number } }
+  /** a table column edge dragged (Word): col is the column left of it, widths as the drag began */
+  | { kind: "colResize"; nodeId: string; col: number; x0: number; widths: number[]; moved: boolean }
+  /** a table row's bottom edge dragged (Word): the row's least height (TableCell.rowMin) */
+  | { kind: "rowResize"; nodeId: string; row: number; y0: number; h0: number; moved: boolean }
   // the drawing screen (ui/cad/view.ts) handles the press
   | { kind: "cad" }
-  | { kind: "move"; start: Vec2; moved: boolean; ix?: SnapIndex; base?: Rect | null }
+  | { kind: "move"; start: Vec2; moved: boolean; ix?: SnapIndex; base?: Rect | null; copies?: Record<string, string>; made?: SceneNode[]; dx?: number; dy?: number }
   | { kind: "pan"; sx: number; sy: number; panX: number; panY: number }
   | { kind: "marquee"; start: Vec2; cur: Vec2 }
   | { kind: "xform"; sb: SelBox; handle: Handle | null; startAngle: number; ix?: SnapIndex }
@@ -113,8 +136,10 @@ type Drag =
   | { kind: "cropRotate"; angle0: number; a0: number; c: Vec2 }
   | { kind: "vecPaint"; erase: boolean; pts: Vec2[] }
   | { kind: "cropNew"; rect0: Rect; q0: Vec2 }
+  // 똑바로 펴기: the line along what should be level (ui/cropTool.ts straightenBy)
+  | { kind: "straighten"; a: Vec2; b: Vec2 }
   | { kind: "stroke"; stroke: Stroke }
-  | { kind: "shape"; shape: "rect" | "ellipse"; start: Vec2; cur: Vec2; ix?: SnapIndex }
+  | { kind: "shape"; shape: ShapeKind; start: Vec2; cur: Vec2; ix?: SnapIndex }
   // pen family and direct selection (ui/pathCanvas.ts)
   | { kind: "path"; d: PathDrag }
   | { kind: "guide"; axis: GuideAxis; from: number; cur: number; remove: boolean; lines: SnapLine[]; ix: SnapIndex }
@@ -122,7 +147,16 @@ type Drag =
   | { kind: "pixmarquee"; start: Vec2; cur: Vec2; op: SelOp }
   | { kind: "lasso"; pts: Vec2[]; op: SelOp }
   | { kind: "gradient"; a: Vec2; b: Vec2 }
-  | { kind: "line"; a: Vec2; b: Vec2; ix?: SnapIndex };
+  | { kind: "line"; a: Vec2; b: Vec2; ix?: SnapIndex }
+  // design mode: the rotate / reflect / scale tools' drag about the reference point `o`
+  | { kind: "xfTool"; tool: TransformKind; o: Vec2; start: Vec2; moved: boolean; ids: string[]; v?: XformValues }
+  // design mode, second set (ui/design2Canvas.ts): shear, flare, shape builder, live corners
+  | { kind: "d2" }
+  // design mode: the artboard tool moving the current artboard (screen px from the press) or drawing a new one
+  | { kind: "board"; pageId: string; sx: number; sy: number; panX: number; panY: number; moved: boolean }
+  | { kind: "boardNew"; start: Vec2; cur: Vec2 }
+  // image mode retouching, quick / object selection, layer-mask painting (ui/ps/canvasExt.ts)
+  | { kind: "ext"; ext: ExtDrag };
 
 function screenToPage(sx: number, sy: number): Vec2 {
   const { zoom, panX, panY } = S().view;
@@ -134,7 +168,8 @@ function pageToScreen(p: Vec2): Vec2 {
 }
 
 function cornersOf(n: SceneNode): Vec2[] {
-  const b = localBounds(n);
+  // a pixel layer: its painted part (xform.ts selectionBox)
+  const b = n.type === "RASTER" && !n.crop && !n.adjust ? rasterContentBounds(n) : localBounds(n);
   return ([[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]] as Vec2[]).map((p) => applyTransform(n.transform, p));
 }
 
@@ -247,10 +282,17 @@ export function CanvasView() {
   const main = useRef<HTMLCanvasElement>(null);
   const over = useRef<HTMLCanvasElement>(null);
   const drag = useRef<Drag | null>(null);
+  /** 다각형 올가미 (Shift+L): the corners clicked so far and the pointer (the line to it follows the mouse between clicks) */
+  const poly = useRef<{ pts: Vec2[]; cur: Vec2; op: SelOp } | null>(null);
   /** the path under the pointer with a path tool (outlined, Illustrator) */
   const hoverId = useRef<string | null>(null);
   const cursor = useRef<Vec2>([0, 0]);
   const spaceDown = useRef(false);
+  /** the tool Ctrl took over for the selection tool (Illustrator), and one to go back to when a drag ends */
+  const springTool = useRef<string | null>(null);
+  const pendingTool = useRef<string | null>(null);
+  /** Alt was down at the press (an Alt+drag copies even when Alt is let go or not reported while dragging) */
+  const pressAlt = useRef(false);
   const frame = useRef(0);
   const size = useRef({ w: 1, h: 1, dpr: 1 });
   const [editing, setEditing] = useState<TextNode | null>(null);
@@ -350,6 +392,8 @@ export function CanvasView() {
       drawSpelling(c, pg, v, dpr, invalidate);
       drawFormatMarks(c, s.doc, pg, v, dpr);
     });
+    // the design mode: the document's other artboards around this one, on one canvas (Illustrator; ui/artboards.ts)
+    if (mode === "DESIGN") drawBoards(c, s.doc, page, s.view, dpr, w, h, (pg, v) => void weave.render(c, s.doc, pg, renderMasterOf(s.doc, pg), v, w, h, dpr, null, invalidate));
     drawFidelity(c, page, masterOf(s.doc, page), s.view, dpr, invalidate);
     // spelling: red wavy lines under misspelled words (screen only; ui/spell.ts)
     drawSpelling(c, page, s.view, dpr, invalidate, editingRef.current?.id);
@@ -526,6 +570,43 @@ export function CanvasView() {
       const r = rectFromPoints([d.start, d.cur]);
       tag(o, `${Math.round(r.w)} × ${Math.round(r.h)} px`, Math.max(a[0], b[0]) + 10, Math.max(a[1], b[1]) + 18);
     }
+    if (d?.kind === "straighten") {
+      const a = pageToScreen(d.a), b = pageToScreen(d.b);
+      o.save();
+      o.lineWidth = 1.5;
+      o.strokeStyle = "#fff";
+      o.beginPath();
+      o.moveTo(a[0], a[1]);
+      o.lineTo(b[0], b[1]);
+      o.stroke();
+      o.setLineDash([4, 4]);
+      o.strokeStyle = "#000";
+      o.stroke();
+      o.restore();
+    }
+    const pl = poly.current;
+    if (pl && S().tool === "polyLasso") {
+      o.save();
+      o.lineWidth = hair();
+      o.beginPath();
+      [...pl.pts, pl.cur].forEach((q, i) => {
+        const sq = pageToScreen(q);
+        if (i) o.lineTo(sq[0], sq[1]);
+        else o.moveTo(sq[0], sq[1]);
+      });
+      o.strokeStyle = "#fff";
+      o.stroke();
+      o.setLineDash([4, 4]);
+      o.strokeStyle = "#000";
+      o.stroke();
+      // the first corner: a small circle where a click closes the shape (Photoshop's cursor shows a circle there)
+      const f = pageToScreen(pl.pts[0]);
+      o.setLineDash([]);
+      o.beginPath();
+      o.arc(f[0], f[1], 4, 0, Math.PI * 2);
+      o.stroke();
+      o.restore();
+    }
     if (d?.kind === "lasso" && d.pts.length > 1) {
       o.save();
       o.lineWidth = hair();
@@ -589,8 +670,28 @@ export function CanvasView() {
       o.fillRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
       o.strokeRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
     }
-    // shape preview
-    if (d?.kind === "shape") {
+    // shape preview (the rounded rectangle, polygon and star: the shape itself, as it will be drawn)
+    if (d?.kind === "shape" && (d.shape === "roundRect" || d.shape === "polygon" || d.shape === "star" || d.shape === "customShape")) {
+      const { r, angle } = shapeBox(d);
+      const dn = drawnShape(d.shape, r, s, angle);
+      const c = (liveParts(dn)?.[0] ?? dn).contours[0].nodes;
+      const at = (q: Vec2) => pageToScreen([q[0] + r.x, q[1] + r.y]);
+      o.strokeStyle = ACCENT;
+      o.lineWidth = hair();
+      o.fillStyle = s.fill + "55";
+      o.beginPath();
+      c.forEach((n, i) => {
+        const a = at(n.anchor);
+        if (!i) return o.moveTo(a[0], a[1]);
+        const h1 = at(c[i - 1].handleOut), h2 = at(n.handleIn);
+        o.bezierCurveTo(h1[0], h1[1], h2[0], h2[1], a[0], a[1]);
+      });
+      const a0 = at(c[0].anchor), h1 = at(c[c.length - 1].handleOut), h2 = at(c[0].handleIn);
+      o.bezierCurveTo(h1[0], h1[1], h2[0], h2[1], a0[0], a0[1]);
+      o.closePath();
+      o.fill();
+      o.stroke();
+    } else if (d?.kind === "shape") {
       const r = shapeRect(d.start, d.cur);
       const a = pageToScreen([r.x, r.y]);
       o.strokeStyle = ACCENT;
@@ -611,7 +712,42 @@ export function CanvasView() {
       if (hp?.type === "VECTOR" && !s.selection.includes(hp.id)) drawPathHover(o, hp, penv());
       drawPathTool(o, d?.kind === "path" ? d.d : null, cursor.current, penv());
     }
+    // the artboard tool: the current artboard's frame, and the new artboard being drawn
+    if (s.tool === "artboard") {
+      const a = pageToScreen([0, 0]), b = pageToScreen([page.width, page.height]);
+      o.save();
+      o.strokeStyle = ACCENT;
+      o.lineWidth = 2;
+      o.setLineDash([6, 4]);
+      o.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
+      if (d?.kind === "boardNew") {
+        const p0 = pageToScreen(d.start), p1 = pageToScreen(d.cur);
+        o.setLineDash([]);
+        o.lineWidth = hair();
+        o.strokeRect(Math.min(p0[0], p1[0]), Math.min(p0[1], p1[1]), Math.abs(p1[0] - p0[0]), Math.abs(p1[1] - p0[1]));
+      }
+      o.restore();
+    }
+    // the rotate / reflect / scale tools: their reference point (Illustrator's target mark)
+    if ((s.tool === "rotateTool" || s.tool === "reflectTool" || s.tool === "scaleTool") && s.selection.length) {
+      const c = xfOrigin();
+      if (c) {
+        const a = pageToScreen(d?.kind === "xfTool" ? d.o : c);
+        o.strokeStyle = ACCENT;
+        o.lineWidth = hair();
+        o.beginPath();
+        o.arc(a[0], a[1], 5, 0, Math.PI * 2);
+        o.moveTo(a[0] - 10, a[1]);
+        o.lineTo(a[0] + 10, a[1]);
+        o.moveTo(a[0], a[1] - 10);
+        o.lineTo(a[0], a[1] + 10);
+        o.stroke();
+      }
+    }
+    d2Draw(o, d2env());
     drawSmart(o);
+    // image mode extras: the mask shown alone, the drag in progress, their brush circle (ui/ps/canvasExt.ts)
+    extOverlay(o, page, cursor.current, d?.kind === "ext" ? d.ext : null, spaceDown.current);
     // brush cursor
     if ((s.tool === "brush" || s.tool === "eraser") && !spaceDown.current) {
       const c = pageToScreen(cursor.current);
@@ -892,6 +1028,21 @@ export function CanvasView() {
 
 
 
+  /** A column edge of an unlocked, unturned table under p (within a few screen px): the table and the column left of it. */
+  function tableEdgeAt(page: Page, p: Vec2): { node: TableNode; col?: number; row?: number } | null {
+    const tol = 4 / Math.max(0.05, S().view.zoom);
+    for (const n of page.nodes) {
+      if (n.type !== "TABLE" || n.locked || !n.visible || n.transform.rotation) continue;
+      const lp = invertTransform(n.transform, p);
+      const l = layoutTable(n);
+      if (lp[1] < -tol || lp[1] > l.height + tol) continue;
+      for (let i = 1; i < l.colX.length; i++) if (Math.abs(lp[0] - l.colX[i]) <= tol) return { node: n, col: i - 1 };
+      // a row's bottom edge (inside the table's width)
+      if (lp[0] >= 0 && lp[0] <= l.width) for (let i = 1; i < l.rowY.length; i++) if (Math.abs(lp[1] - l.rowY[i]) <= tol) return { node: n, row: i - 1 };
+    }
+    return null;
+  }
+
   /** Cursor over transform handles (resize along the object's axes / rotate) and movable guides. */
   function hoverCursor(p: Vec2) {
     const el = wrap.current;
@@ -916,6 +1067,8 @@ export function CanvasView() {
       const g = canEditGuides() && page.guides ? hitGuide(page.guides, p[0], p[1], GUIDE_HIT_PX / s.view.zoom) : null;
       if (g) want = g.axis === "x" ? "col-resize" : "row-resize";
     }
+    const te = !want && page.kind === "DOCUMENT" ? tableEdgeAt(page, p) : null;
+    if (te) want = te.row !== undefined ? "row-resize" : "col-resize";
     if (!want && bodyAt(page, p)) want = "text";
     if (!want) want = toolCursor(s.tool);
     if (el.style.cursor !== want) el.style.cursor = want;
@@ -947,9 +1100,47 @@ export function CanvasView() {
       w = Math.sign(w || 1) * m;
       h = Math.sign(h || 1) * m;
     }
+    // Alt (design mode): drawn from the centre out (Illustrator)
+    if (mods.alt && currentEditMode() === "DESIGN") return rectFromPoints([[a[0] - w, a[1] - h], [a[0] + w, a[1] + h]]);
     return rectFromPoints([a, [a[0] + w, a[1] + h]]);
   }
+  /**
+   * The box a shape drag draws: the polygon and the star grow from the press point (their centre) and turn with the
+   * drag, Shift keeps them upright (Illustrator); the others take shapeRect.
+   */
+  function shapeBox(d: { shape: ShapeKind; start: Vec2; cur: Vec2 }): { r: Rect; angle: number } {
+    if (d.shape !== "polygon" && d.shape !== "star") return { r: shapeRect(d.start, d.cur), angle: 0 };
+    const dx = d.cur[0] - d.start[0], dy = d.cur[1] - d.start[1];
+    const R = Math.hypot(dx, dy);
+    const angle = shiftDown.current || R < 1e-6 ? 0 : Math.atan2(dy, dx) + Math.PI / 2;
+    return { r: { x: d.start[0] - R, y: d.start[1] - R, w: R * 2, h: R * 2 }, angle };
+  }
   const shiftDown = useRef(false);
+  // the R / O / S tools' reference point, for the selection it was set on (the selection's centre otherwise)
+  const xfRef = useRef<{ key: string; p: Vec2 } | null>(null);
+  function xfOrigin(): Vec2 | null {
+    const key = S().selection.join(",");
+    if (xfRef.current?.key === key) return xfRef.current.p;
+    return selectionCentre();
+  }
+  const d2env = (): D2Env => ({ toScreen: pageToScreen, hit: topHit, invalidate, hair, xfOrigin, editText: (n) => startTextEdit(n) });
+  /** The values of an R / O / S drag from `start` to `p` about `o` (Shift: 45° steps, a uniform scale). */
+  function xfValues(kind: TransformKind, o: Vec2, start: Vec2, p: Vec2, shift: boolean): XformValues {
+    const deg = (r: number) => (r * 180) / Math.PI;
+    const snap = (a: number) => (shift ? Math.round(a / 45) * 45 : a);
+    if (kind === "rotate") return { angle: snap(-deg(Math.atan2(p[1] - o[1], p[0] - o[0]) - Math.atan2(start[1] - o[1], start[0] - o[0]))) };
+    if (kind === "reflect") return { angle: snap(-deg(Math.atan2(p[1] - o[1], p[0] - o[0]))) };
+    const k = (a: number, b: number) => {
+      const r = Math.abs(b) > 1 ? a / b : 1;
+      return (Math.abs(r) < 0.01 ? 0.01 * Math.sign(r || 1) : r) * 100;
+    };
+    if (shift) {
+      const r = Math.hypot(start[0] - o[0], start[1] - o[1]);
+      const u = r > 1 ? (Math.hypot(p[0] - o[0], p[1] - o[1]) / r) * 100 : 100;
+      return { sx: Math.max(1, u), sy: Math.max(1, u) };
+    }
+    return { sx: k(p[0] - o[0], start[0] - o[0]), sy: k(p[1] - o[1], start[1] - o[1]) };
+  }
   // click count of a press: Chromium (Edge, WebView2) gives pointerdown a detail of 0, so a double-click is counted
   // here from the press time and place (core/clickCount.ts) for what only the press decides (isolation, guides)
   const presses = useRef<PressCount>({ t: -1e9, x: 0, y: 0, n: 0 });
@@ -981,8 +1172,8 @@ export function CanvasView() {
       const before = viewportNow();
       setViewportSize(w, h);
       if (viewIsFitted()) fitCurrent();
-      // zoomed in by hand: the window's centre stays put (image / design; the document mode scrolls its own way)
-      else if (seen && before.w > 1 && before.h > 1 && w > 1 && h > 1 && (before.w !== w || before.h !== h) && followsCanvas(currentEditMode()))
+      // zoomed in by hand: the window's centre stays put (image / design / CAD; the document mode scrolls its own way)
+      else if (seen && before.w > 1 && before.h > 1 && w > 1 && h > 1 && (before.w !== w || before.h !== h) && (followsCanvas(currentEditMode()) || !!cadCanvas()))
         S().set({ view: keepCentre(S().view, w - before.w, h - before.h) });
       seen = w > 1 && h > 1;
       invalidate();
@@ -1057,6 +1248,35 @@ export function CanvasView() {
     return () => window.removeEventListener(NOTE_EDIT_EVENT, on);
   }, []);
 
+  /** 다각형 올가미: the corners as the selection (combined as at the first click) */
+  function finishPoly() {
+    const pl = poly.current;
+    poly.current = null;
+    if (pl && pl.pts.length > 2) lassoSelect(pl.pts, pl.op);
+    invalidate();
+  }
+  // 다각형 올가미 keys (before the app's own): Enter closes, Esc drops, Backspace / Delete takes the last corner back;
+  // another tool drops the shape
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!poly.current || S().tool !== "polyLasso") return;
+      if (e.key === "Enter") finishPoly();
+      else if (e.key === "Escape") (poly.current = null), invalidate();
+      else if (e.key === "Backspace" || e.key === "Delete") {
+        poly.current.pts.pop();
+        if (!poly.current.pts.length) poly.current = null;
+        invalidate();
+      } else return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    window.addEventListener("keydown", key, true);
+    const off = useStore.subscribe((st, pr) => {
+      if (st.tool !== pr.tool && poly.current) (poly.current = null), invalidate();
+    });
+    return () => (window.removeEventListener("keydown", key, true), off());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // keyboard (space-pan, pen finish, nudge)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -1071,8 +1291,14 @@ export function CanvasView() {
       if (e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
         mods.ctrl = e.ctrlKey || e.metaKey;
         mods.alt = e.altKey;
+        // Illustrator: Ctrl held with another tool is the selection tool until it is let go
+        const tl = S().tool;
+        if ((e.key === "Control" || e.key === "Meta") && !e.repeat && !springTool.current && !drag.current && currentEditMode() === "DESIGN" && tl !== "select" && tl !== "hand" && !isPathTool(tl)) {
+          springTool.current = tl;
+          S().set({ tool: "select" });
+        }
+        if (e.key === "Alt") e.preventDefault(); // the window menu bar would take the focus (Alt+drag copies)
         if (isPathTool(S().tool)) {
-          if (e.key === "Alt") e.preventDefault();
           pathHover(cursor.current);
           invalidate();
         }
@@ -1119,6 +1345,12 @@ export function CanvasView() {
         e.stopImmediatePropagation();
         return;
       }
+      // Enter with the rotate / reflect / scale / shear tool: its dialog (Illustrator)
+      if (d2Key(e, d2env())) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       const arrows: Record<string, Vec2> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (arrows[e.key] && isPathTool(S().tool) && selectedAnchors().length && !S().gestureBase) {
         const k = e.shiftKey ? 10 : 1;
@@ -1126,18 +1358,29 @@ export function CanvasView() {
         e.preventDefault();
         return;
       }
-      if (arrows[e.key] && S().selection.length && !S().gestureBase) {
+      // the artboard tool: Delete removes the current artboard (Illustrator)
+      if (S().tool === "artboard" && (e.key === "Delete" || e.key === "Backspace") && !S().selection.length) {
+        void import("./artboards").then((m) => m.deleteBoard());
+        e.preventDefault();
+        return;
+      }
+      // drawing a rounded rectangle / polygon / star: ↑ ↓ change its radius, sides or points (Illustrator)
+      const dr = drag.current;
+      if (dr?.kind === "shape" && (e.key === "ArrowUp" || e.key === "ArrowDown") && (dr.shape === "roundRect" || dr.shape === "polygon" || dr.shape === "star")) {
+        const k = e.key === "ArrowUp" ? 1 : -1, sp = useShapeParams.getState();
+        if (dr.shape === "roundRect") sp.set({ radius: Math.max(0, sp.radius + k * PT) });
+        else if (dr.shape === "polygon") sp.set({ sides: Math.min(100, Math.max(3, sp.sides + k)) });
+        else sp.set({ points: Math.min(100, Math.max(3, sp.points + k)) });
+        invalidate();
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (arrows[e.key] && S().selection.length && !S().gestureBase && !e.ctrlKey && !e.metaKey) {
         const k = e.shiftKey ? 10 : 1;
         const [dx, dy] = arrows[e.key];
-        const ids = S().selection;
-        S().commit(tr("shell.hist.move"), (d) => {
-          draftPage(d, S().pageId)?.nodes.forEach((n) => {
-            if (ids.includes(n.id) && !n.locked) {
-              n.transform.x += dx * k;
-              n.transform.y += dy * k;
-            }
-          });
-        });
+        // Alt+arrow: a copy moves, the original stays (Illustrator, Photoshop's move tool)
+        moveSelection(dx * k, dy * k, e.altKey && (currentEditMode() === "DESIGN" || currentEditMode() === "IMAGE"));
         e.preventDefault();
       }
     };
@@ -1146,6 +1389,12 @@ export function CanvasView() {
       if (e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
         mods.ctrl = e.ctrlKey || e.metaKey;
         mods.alt = e.altKey;
+        if ((e.key === "Control" || e.key === "Meta") && springTool.current) {
+          const back = springTool.current;
+          springTool.current = null;
+          if (!drag.current) S().set({ tool: back as any });
+          else pendingTool.current = back;
+        }
         if (isPathTool(S().tool)) {
           pathHover(cursor.current);
           invalidate();
@@ -1247,8 +1496,21 @@ export function CanvasView() {
 
   function startTextEdit(n: TextNode) {
     S().set({ selection: parseHfId(n.id) ? [] : [n.id], editingTextId: n.id });
-    setEditing(n);
+    // the editor mounts and takes the focus now, inside the press: a key (or the first syllable of a Korean IME
+    // composition) typed right after the click lands in it, not on the page where it was lost or switched tools
+    try {
+      flushSync(() => setEditing(n));
+    } catch {
+      setEditing(n);
+    }
   }
+  // the drawing screen edits its texts here too (MTEXT, TEXTEDIT, double click)
+  cadDoor.editText = (id: string) => {
+    const n = currentPage()?.nodes.find((x) => x.id === id);
+    if (n?.type !== "TEXT") return false;
+    startTextEdit(n);
+    return true;
+  };
 
   /** Edit the header (y in the top margin) or footer (bottom margin) of a document page in place; false elsewhere. */
   function startHfEdit(page: Page, y: number | "header" | "footer"): boolean {
@@ -1280,6 +1542,17 @@ export function CanvasView() {
       }, 30);
   };
 
+  // a table just put into the document body: the caret goes into its first cell (Word, 한글)
+  useEffect(() => {
+    docHooks.editCell = (nodeId, row, col) => {
+      S().set({ selection: [nodeId] });
+      setCellEdit({ nodeId, row, col });
+    };
+    return () => {
+      docHooks.editCell = null;
+    };
+  }, []);
+
   function startCellEdit(n: SceneNode, p: Vec2) {
     if (n.type !== "TABLE") return;
     const lp = invertTransform(n.transform, p);
@@ -1302,6 +1575,11 @@ export function CanvasView() {
     tn.down(e.pointerId, ...local(e));
     const tool = S().tool;
     if (tn.count === 1 && tool !== "select" && tool !== "hand" && !editingRef.current) return false; // the tool draws
+    // one finger on a selected object drags it (tap to select first, as on a phone); elsewhere it moves the view
+    if (tn.count === 1 && tool === "select" && !editingRef.current && fingerOnSelection(e)) {
+      tn.up(e.pointerId);
+      return false;
+    }
     if (tn.count >= 2 && drag.current) {
       // a second finger: the stroke / drag the first one began is dropped, the fingers zoom instead
       drag.current = null;
@@ -1312,6 +1590,17 @@ export function CanvasView() {
     tapDown.current = tn.count === 1 ? e : null;
     wrap.current!.setPointerCapture(e.pointerId);
     return true;
+  }
+
+  /** Is a selected object under the finger (the drawing screen asks its own pick box)? */
+  function fingerOnSelection(e: React.PointerEvent): boolean {
+    const [sx, sy] = local(e);
+    const ch = cadCanvas();
+    if (ch) return !!ch.selectedAt?.(sx, sy);
+    const sel = S().selection;
+    if (!sel.length) return false;
+    const hit = topHit(screenToPage(sx, sy));
+    return !!hit && sel.includes(hit.id);
   }
 
   function touchMove(e: React.PointerEvent): boolean {
@@ -1361,6 +1650,15 @@ export function CanvasView() {
   }
 
   function onPointerDown(e: React.PointerEvent) {
+    const before = S().editingTextId;
+    pointerDown(e);
+    // a press that opened a text editor keeps the focus in it: the press's own mousedown would move the focus to the
+    // page for a moment (until the editor took it back), and keys typed then were lost (QA 2026-11-24, T tool)
+    const now = S().editingTextId;
+    if (now && now !== before && e.pointerType !== "touch") e.preventDefault();
+  }
+
+  function pointerDown(e: React.PointerEvent) {
     if (touchDown(e)) return;
     if (editingRef.current) {
       // slides: a press on another text box while typing ends this one and types there (one click, not two)
@@ -1389,18 +1687,26 @@ export function CanvasView() {
     }
     // docView: a press on a page above / below the current one (document mode) makes it current first
     if (e.button === 0) pickPageAt(...local(e), el.clientHeight);
+    // the design mode: a press on another artboard makes it current (nothing moves on screen; ui/artboards.ts)
+    if (e.button === 0 && currentEditMode() === "DESIGN" && S().tool !== "hand" && !spaceDown.current) pickBoardAt(...local(e));
     const s = S();
     const page = currentPage();
     if (!page) return;
     const [sx, sy] = local(e);
     const p = screenToPage(sx, sy);
     shiftDown.current = e.shiftKey;
+    pressAlt.current = e.altKey;
     const ch = cadCanvas();
     if (ch && !spaceDown.current && s.tool !== "hand" && ch.down(e.nativeEvent, sx, sy)) {
       drag.current = { kind: "cad" };
       return;
     }
 
+    // Ctrl+Space (Alt+Ctrl+Space): the zoom tool for a while — a click zooms in (out) there (Illustrator, Photoshop)
+    if (e.button === 0 && spaceDown.current && (e.ctrlKey || e.metaKey)) {
+      zoomAt(e.altKey ? -1 : 1, sx, sy);
+      return;
+    }
     if (e.button === 1 || spaceDown.current || s.tool === "hand") {
       drag.current = { kind: "pan", sx, sy, panX: s.view.panX, panY: s.view.panY };
       el.style.cursor = "grabbing";
@@ -1414,6 +1720,10 @@ export function CanvasView() {
       const tf = cropFrame();
       const rect = useCrop.getState().rect;
       if (!tf || !rect) return;
+      if (useCrop.getState().straighten && isCanvasCrop()) {
+        drag.current = { kind: "straighten", a: p, b: p };
+        return;
+      }
       const box = { t: tf, lb: rect };
       const pick = pickHandle(box, p, HANDLE_PX / s.view.zoom, isCanvasCrop() ? { rotateReach: ROTATE_PX / s.view.zoom } : { rotate: false });
       const q0 = invertTransform(tf, p);
@@ -1429,14 +1739,35 @@ export function CanvasView() {
       return;
     }
 
+    // design mode, second set: live-corner widgets, shear / flare / shape builder / blend tools, the eyedropper
+    // (a pointer event has no click count of its own: the press count CanvasView keeps)
+    const d2 = d2Down({ altKey: e.altKey, shiftKey: e.shiftKey, detail: clicks }, p, d2env());
+    if (d2 === "drag") {
+      drag.current = { kind: "d2" };
+      return;
+    }
+    if (d2 === "done") return;
+
     // a document page whose body flows: a press puts the caret there (Word), no object handles
-    if ((s.tool === "select" || s.tool === "text") && page.kind === "DOCUMENT" && currentEditMode() === "DOCUMENT") {
+    // (삽입 ▸ 글상자 armed: the press makes a text box, ui/textBoxArm.ts)
+    if ((s.tool === "select" || (s.tool === "text" && !textBoxArmed())) && page.kind === "DOCUMENT" && currentEditMode() === "DOCUMENT") {
       // …except on a handle of the selected picture / shape: its corner lies on the text around it, and the press went
       // to the text (a selection drag) instead of resizing it (QA ui-audit #16)
       const sel = s.tool === "select" && s.selection.length ? page.nodes.filter((n) => s.selection.includes(n.id)) : [];
       const sbh = sel.length && sel.every((n) => !(n.type === "TEXT" && n.flow)) ? selectionBox(page, s.selection) : null;
       const onHandle = !!sbh && pickHandle(sbh.box, p, HANDLE_PX / s.view.zoom, { edges: !sbh.multi, rotate: false })?.kind === "handle";
-      if (!onHandle && bodyAt(page, p) && flowPointerDown(page, p[0], p[1], { detail: e.detail, shift: e.shiftKey })) {
+      // a table's column edge: drag it to change the column widths (Word; QA 11-24 basic-ux)
+      const edge = !onHandle ? tableEdgeAt(page, p) : null;
+      if (edge) {
+        if (flowActive()) endTyping();
+        s.beginGesture();
+        if (edge.row !== undefined) {
+          const l = layoutTable(edge.node);
+          drag.current = { kind: "rowResize", nodeId: edge.node.id, row: edge.row, y0: p[1], h0: l.rowY[edge.row + 1] - l.rowY[edge.row], moved: false };
+        } else drag.current = { kind: "colResize", nodeId: edge.node.id, col: edge.col!, x0: p[0], widths: [...edge.node.colWidths], moved: false };
+        return;
+      }
+      if (!onHandle && bodyAt(page, p) && flowPointerDown(page, p[0], p[1], { detail: e.detail, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey })) {
         drag.current = { kind: "flow" };
         return;
       }
@@ -1479,6 +1810,13 @@ export function CanvasView() {
       return;
     }
 
+    // image mode extras (ui/ps/canvasExt.ts): retouching tools, quick / object selection, painting on a layer mask
+    const ext = extDown(p, e.nativeEvent as PointerEvent, page);
+    if (ext) {
+      drag.current = { kind: "ext", ext };
+      invalidate();
+      return;
+    }
     switch (s.tool) {
       case "select": {
         // free-transform handles win only on the handle itself (core/transform pointerTarget)
@@ -1574,8 +1912,10 @@ export function CanvasView() {
             // (the table alone: with other objects selected too, the drag still moves them all)
             if (c && !e.shiftKey && currentEditMode() === "DOCUMENT" && s.selection.length === 1) return void (drag.current = { kind: "cells", nodeId: hit.id, anchor: c });
           }
-          if (e.shiftKey) s.set({ selection: s.selection.includes(hit.id) ? s.selection.filter((i) => i !== hit.id) : [...s.selection, hit.id] });
-          else if (!s.selection.includes(hit.id)) s.set({ selection: [hit.id] });
+          // the design mode's selection tool picks the whole group (Illustrator); the direct selection tool one object
+          const pick = currentEditMode() === "DESIGN" ? groupPick(page, hit) : [hit.id];
+          if (e.shiftKey) s.set({ selection: s.selection.includes(hit.id) ? s.selection.filter((i) => !pick.includes(i)) : [...new Set([...s.selection, ...pick])] });
+          else if (!s.selection.includes(hit.id)) s.set({ selection: pick });
           s.beginGesture();
           drag.current = { kind: "move", start: p, moved: false };
         } else if (target === "move-selection") {
@@ -1597,6 +1937,18 @@ export function CanvasView() {
       case "lasso":
         drag.current = { kind: "lasso", pts: [p], op: opFromMods(e) };
         return;
+      case "polyLasso": {
+        // 다각형 올가미: each click a corner; a click on the first corner or a double-click closes it (Enter too)
+        const pl = poly.current;
+        if (!pl) poly.current = { pts: [p], cur: p, op: opFromMods(e) };
+        else {
+          const f = pageToScreen(pl.pts[0]), q = pageToScreen(p);
+          if (pl.pts.length > 2 && (Math.hypot(f[0] - q[0], f[1] - q[1]) <= 8 || e.detail >= 2)) finishPoly();
+          else if (e.detail < 2) pl.pts.push(p);
+        }
+        invalidate();
+        return;
+      }
       case "wand":
         wandSelect(p, opFromMods(e));
         return;
@@ -1605,6 +1957,9 @@ export function CanvasView() {
         return;
       case "gradient":
         drag.current = { kind: "gradient", a: p, b: p };
+        return;
+      case "bucket":
+        bucketFill(p);
         return;
       case "zoom":
         zoomAt(e.altKey ? -1 : 1, sx, sy);
@@ -1626,34 +1981,94 @@ export function CanvasView() {
           invalidate();
           return;
         }
+        // 빠른 마스크 (Q): the brush paints the red film (a light colour takes it away), whatever layer is picked
+        const qm = currentEditMode() === "IMAGE" ? quickMaskLayer() : null;
+        const qb = qm ? quickMaskBrush(s.brush.color) : null;
+        const erase = s.tool === "eraser" || !!qb?.erase;
         // the active layer (pictures are rasterized first); none for the eraser: nothing happens (a notice says why)
-        const raster = paintTarget(currentPage()!, s.tool === "eraser", currentEditMode() === "IMAGE");
+        const raster = qm ?? paintTarget(currentPage()!, s.tool === "eraser", currentEditMode() === "IMAGE");
         if (!raster) return;
         // the brush size is in canvas pixels: a layer with more pixels than its place (a scaled photo) gets a larger dab
         const k = Math.abs(raster.transform.scale) || 1;
-        const stroke = new Stroke(raster, page.width, page.height, k === 1 ? s.brush : { ...s.brush, size: s.brush.size / k }, s.tool === "eraser");
+        const br = qb ? { ...s.brush, color: qb.color } : s.brush;
+        const stroke = new Stroke(raster, page.width, page.height, k === 1 ? br : { ...br, size: br.size / k }, erase);
         stroke.add({ x: p[0], y: p[1], p: e.pointerType === "pen" ? e.pressure || 0.5 : 1 });
         drag.current = { kind: "stroke", stroke };
         invalidate();
         return;
       }
+      case "typePath": {
+        // a click on a path: it becomes the line the text runs along, typed at once (Illustrator)
+        const hit = topHit(p);
+        if (isTypePath(hit)) {
+          const tx = typeOnPath(hit.id, undefined, p);
+          if (tx) {
+            startTextEdit(tx);
+            // the placeholder is selected: typing replaces it (Illustrator's Lorem ipsum)
+            // (after the click's own caret placement, once the editor holds the focus)
+            let tries = 0;
+            const pick = () => {
+              const el = document.activeElement as HTMLElement | null;
+              if (el?.isContentEditable) document.getSelection()?.selectAllChildren(el);
+              else if (tries++ < 20) setTimeout(pick, 30);
+            };
+            setTimeout(pick, 120);
+          }
+        } else S().notify(tr("design.pathText.needPath"));
+        return;
+      }
+      case "artboard": {
+        // inside the current artboard: drag it (its content goes with it); outside: draw a new artboard
+        if (p[0] >= 0 && p[1] >= 0 && p[0] <= page.width && p[1] <= page.height) {
+          drag.current = { kind: "board", pageId: page.id, sx, sy, panX: s.view.panX, panY: s.view.panY, moved: false };
+          return;
+        }
+        drag.current = { kind: "boardNew", start: p, cur: p };
+        return;
+      }
+      case "rotateTool":
+      case "reflectTool":
+      case "scaleTool": {
+        // Illustrator: a click sets the reference point (Alt+click: the tool's dialog about it), a drag transforms
+        // the selection about it (Alt: a copy); with nothing selected a click selects the object under the pointer
+        if (!s.selection.length) {
+          const hit = topHit(p);
+          if (hit && !hit.locked) s.set({ selection: groupPick(page, hit) });
+          return;
+        }
+        const o = xfOrigin();
+        if (!o) return;
+        const kind: TransformKind = s.tool === "rotateTool" ? "rotate" : s.tool === "reflectTool" ? "reflect" : "scale";
+        drag.current = { kind: "xfTool", tool: kind, o, start: p, moved: false, ids: [...s.selection] };
+        return;
+      }
       case "rect":
-      case "ellipse": {
+      case "ellipse":
+      case "roundRect":
+      case "polygon":
+      case "star":
+      case "customShape": {
         const ix = snapOn(e) ? snapIndexFor() : undefined;
         const q = ix ? snapPt(p, e, ix) : p;
         drag.current = { kind: "shape", shape: s.tool, start: q, cur: q, ix };
         return;
       }
+      // the vertical type tool (Photoshop T group): the same text box, set in columns (core/textVertical.ts)
+      case "vtext":
       case "text": {
         const hit = topHit(p);
-        if (hit?.type === "TEXT") return startTextEdit(hit);
-        if (hit?.type === "TABLE") return startCellEdit(hit, p);
+        // (a text box drawn over the document body: the body's text and tables are not what was pressed)
+        const box = textBoxArmed();
+        if (hit?.type === "TEXT" && !(box && hit.flow)) return startTextEdit(hit);
+        if (hit?.type === "TABLE" && !(box && hit.flow)) return startCellEdit(hit, p);
+        disarmTextBox();
         // the type tool on a PSD text layer edits that text instead of starting a new one
         const pt = psdTextAt(page, p);
         if (pt) return startPsdTextEdit(page.id, pt);
         const q = snapPt(p, e);
         const t = newText("", Math.min(480, Math.max(40, page.width - q[0])), { fontSize: 24 });
         t.transform = { x: q[0], y: q[1], rotation: 0, scale: 1 };
+        if (s.tool === "vtext") t.vertical = true;
         s.commit(tr("shell.hist.addText"), (d) => void draftPage(d, s.pageId)?.nodes.push(t as any));
         startTextEdit(t);
         return;
@@ -1675,21 +2090,54 @@ export function CanvasView() {
       ch.move(e.nativeEvent, sx, sy);
       if (!d || d.kind === "cad") return;
     }
+    if (!d && poly.current) {
+      poly.current.cur = p;
+      invalidate();
+    }
     if (!d) {
       mods.ctrl = e.ctrlKey || e.metaKey;
       mods.alt = e.altKey;
       if (s.tool === "brush" || s.tool === "eraser" || isDrawing()) invalidate();
       if (s.tool === "select" || useCrop.getState().id) hoverCursor(p);
       else if (isPathTool(s.tool)) pathHover(p);
+      if (d2Hover(p)) invalidate();
       return;
     }
     switch (d.kind) {
+      case "d2":
+        d2Move(e, p, d2env());
+        break;
       case "path":
         pathMove(d.d, e, p, penv());
         break;
       case "flow": {
         const pg = currentPage();
         if (pg) flowPointerMove(pg, p[0], p[1]);
+        break;
+      }
+      case "colResize": {
+        const pg = currentPage();
+        const n = pg?.nodes.find((x) => x.id === d.nodeId);
+        if (n?.type !== "TABLE" || !pg) break;
+        const widths = resizedColumns(d.widths, d.col, (p[0] - d.x0) / (n.transform.scale || 1));
+        d.moved = true;
+        // every piece of a table the body flow cut over pages (TableNode.flowCont): the flow joins them by the first
+        const head = n.flowCont ?? n.id;
+        s.updateGesture((doc) => {
+          for (const dp of doc.pages) for (const t of dp.nodes) if (t.type === "TABLE" && (t.id === head || t.flowCont === head)) t.colWidths = [...widths];
+        });
+        break;
+      }
+      case "rowResize": {
+        const pg = currentPage();
+        const n = pg?.nodes.find((x) => x.id === d.nodeId);
+        if (n?.type !== "TABLE" || !pg) break;
+        const h = Math.max(8, Math.round((d.h0 + (p[1] - d.y0) / (n.transform.scale || 1)) * 100) / 100);
+        d.moved = true;
+        s.updateGesture((doc) => {
+          const t = draftPage(doc, pg.id)?.nodes.find((x) => x.id === d.nodeId);
+          if (t?.type === "TABLE") for (const cell of t.rows[d.row] ?? []) cell.rowMin = h;
+        });
         break;
       }
       case "cells": {
@@ -1715,13 +2163,33 @@ export function CanvasView() {
         break;
       case "move": {
         let dx = p[0] - d.start[0], dy = p[1] - d.start[1];
-        let lock: "x" | "y" | null = null;
+        let lock: "x" | "y" | "xy" | null = null;
         if (e.shiftKey) {
-          if (Math.abs(dx) > Math.abs(dy)) (dy = 0), (lock = "y");
-          else (dx = 0), (lock = "x");
+          // Shift: along 0° / 45° / 90° … (Illustrator, Photoshop's move tool)
+          const step = Math.PI / 4;
+          const a = Math.round(Math.atan2(dy, dx) / step) * step;
+          const len = dx * Math.cos(a) + dy * Math.sin(a);
+          dx = Math.abs(Math.cos(a)) < 1e-9 ? 0 : len * Math.cos(a);
+          dy = Math.abs(Math.sin(a)) < 1e-9 ? 0 : len * Math.sin(a);
+          lock = dy === 0 ? "y" : dx === 0 ? "x" : "xy";
+        }
+        // Alt (pressed at the start or during the drag): the originals stay, copies right above them move
+        // (Illustrator's Alt+drag, Photoshop's Alt+drag with the move tool)
+        // (slides: PowerPoint's Ctrl+drag and Alt+drag copy the same way — QA 2026-11-24: only the original moved)
+        const em = currentEditMode();
+        const copyKey = ((e.altKey || pressAlt.current) && (em === "DESIGN" || em === "IMAGE" || em === "SLIDE")) || (e.ctrlKey && em === "SLIDE");
+        if (copyKey && !d.copies && s.gestureBase) {
+          // the copies are made from the press's state once; every step of the drag puts them back above their
+          // originals (a gesture step is always worked out from the press's state)
+          const made = copiesOf(s.gestureBase, s.pageId, s.selection);
+          d.made = made.map((m) => m.node);
+          d.copies = Object.fromEntries(made.map((m) => [m.node.id, m.orig]));
+          s.set({ selection: made.map((m) => m.node.id) });
         }
         d.moved = true;
-        const ids = s.selection;
+        d.dx = dx;
+        d.dy = dy;
+        const ids = S().selection;
         if (snapOn(e)) {
           if (!d.ix) {
             const moving = (currentNodesIn(s.gestureBase ?? s.doc, ids) ?? []).filter((n) => !n.locked);
@@ -1730,7 +2198,7 @@ export function CanvasView() {
           }
           if (d.base) {
             const r = { ...d.base, x: d.base.x + dx, y: d.base.y + dy };
-            const sr = snapRect(d.ix, r, snapTol(), { x: lock !== "x", y: lock !== "y", equal: useUI.getState().snapTo.spacing });
+            const sr = snapRect(d.ix, r, snapTol(), { x: lock !== "x" && lock !== "xy", y: lock !== "y" && lock !== "xy", equal: useUI.getState().snapTo.spacing });
             dx += sr.dx;
             dy += sr.dy;
             const segs = smartGuideSegments({ ...r, x: r.x + sr.dx, y: r.y + sr.dy }, sr);
@@ -1738,9 +2206,11 @@ export function CanvasView() {
           }
         } else if (A().smart) A().set({ smart: null });
         s.updateGesture((doc) => {
-          draftPage(doc, s.pageId)?.nodes.forEach((n) => {
-            if (ids.includes(n.id) && !n.locked) {
-              const base = s.gestureBase && currentNodeIn(s.gestureBase, n.id);
+          const dp = draftPage(doc, s.pageId);
+          if (dp && d.made) placeCopies(dp.nodes as SceneNode[], d.made, d.copies!);
+          dp?.nodes.forEach((n) => {
+            if (ids.includes(n.id) && !n.locked && !n.lockPosition) {
+              const base = s.gestureBase && currentNodeIn(s.gestureBase, d.copies?.[n.id] ?? n.id);
               if (base) {
                 n.transform.x = base.transform.x + dx;
                 n.transform.y = base.transform.y + dy;
@@ -1761,6 +2231,10 @@ export function CanvasView() {
         useCrop.getState().set({ rect, drawn: true });
         break;
       }
+      case "straighten":
+        d.b = p;
+        invalidate();
+        break;
       case "cropNew": {
         const tf = cropFrame();
         const full = useCrop.getState().full;
@@ -1830,6 +2304,12 @@ export function CanvasView() {
         invalidate();
         break;
       }
+      case "ext": {
+        const evs = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [e.nativeEvent];
+        for (const ev of evs) d.ext.move(screenToPage(...local(ev)), ev as PointerEvent);
+        invalidate();
+        break;
+      }
       case "stroke": {
         const evs = (e.nativeEvent as PointerEvent).getCoalescedEvents?.() ?? [e.nativeEvent];
         for (const ev of evs) {
@@ -1843,6 +2323,36 @@ export function CanvasView() {
         d.cur = d.ix && snapOn(e) ? snapPt(p, e, d.ix) : p;
         invalidate();
         break;
+      case "board": {
+        const [lx, ly] = local(e);
+        const z = S().view.zoom;
+        if (!d.moved && Math.hypot(lx - d.sx, ly - d.sy) < 3) break;
+        if (!d.moved) {
+          d.moved = true;
+          S().beginGesture();
+        }
+        // the artboard follows the pointer: its canvas place moves and the view with it (the others stay)
+        moveBoard(d.pageId, (lx - d.sx) / z, (ly - d.sy) / z, true);
+        S().set({ view: { ...S().view, panX: d.panX + (lx - d.sx), panY: d.panY + (ly - d.sy) } });
+        invalidate();
+        break;
+      }
+      case "boardNew":
+        d.cur = p;
+        invalidate();
+        break;
+      case "xfTool": {
+        if (!d.moved) {
+          const z = S().view.zoom;
+          if (Math.hypot(p[0] - d.start[0], p[1] - d.start[1]) * z < 3) break;
+          d.moved = true;
+          S().beginGesture();
+        }
+        d.v = xfValues(d.tool, d.o, d.start, p, e.shiftKey);
+        xformGesture(d.ids, d.tool, d.v, d.o);
+        invalidate();
+        break;
+      }
       case "guide": {
         let v = d.axis === "x" ? p[0] : p[1];
         if (snapOn(e)) {
@@ -1866,6 +2376,11 @@ export function CanvasView() {
     const d = drag.current;
     drag.current = null;
     const s = S();
+    // Ctrl was let go during the drag: back to the tool it stood in for
+    if (pendingTool.current) {
+      s.set({ tool: pendingTool.current as any });
+      pendingTool.current = null;
+    }
     wrap.current!.style.cursor = spaceDown.current ? "grab" : toolCursor(S().tool);
     if (A().smart) A().set({ smart: null });
     if (!d) return;
@@ -1874,12 +2389,33 @@ export function CanvasView() {
       return;
     }
     switch (d.kind) {
+      case "d2":
+        d2Up(e, screenToPage(...local(e)), d2env());
+        break;
+      case "rowResize":
+      case "colResize":
+        if (!d.moved) s.cancelGesture();
+        else {
+          // the body flows again around the table's new size: in the same undo step
+          // (each gesture update starts again from the document before the drag: the pages now, flowed again)
+          const pages = reflowPages(S().doc.pages);
+          s.updateGesture((doc) => {
+            doc.pages = pages as typeof doc.pages;
+          });
+          s.endGesture(tr(d.kind === "rowResize" ? "docux.hist.rowHeight" : "docux.hist.colWidth"));
+        }
+        break;
       case "flow":
-        flowPointerUp();
+        // (Ctrl held on release: a dragged selection is copied, Word)
+        flowPointerUp(e.ctrlKey || e.metaKey);
         break;
       case "crop":
       case "cropNew":
       case "cropRotate":
+        break;
+      case "straighten":
+        straightenBy(d.a, d.b);
+        invalidate();
         break;
       case "guide":
         A().set({ guideDrag: null });
@@ -1887,13 +2423,18 @@ export function CanvasView() {
         else s.endGesture(d.remove ? tr("shell.hist.deleteGuide") : tr("shell.hist.moveGuide"));
         break;
       case "move":
-        if (d.moved) s.endGesture(tr("shell.hist.move"));
-        else {
+        if (d.moved) {
+          s.endGesture(tr(d.copies ? "doc.history.duplicate" : "shell.hist.move"));
+          // what Ctrl+D (Transform Again) repeats
+          recordMove(d.dx ?? 0, d.dy ?? 0, !!d.copies);
+        } else {
           s.cancelGesture();
           // click on a selected item in a multi-selection selects just that one
           if (!e.shiftKey) {
             const hit = topHit(screenToPage(...local(e)));
-            if (hit) s.set({ selection: [hit.id] });
+            const pg = currentPage();
+            // (the design mode: its whole group, as the press picked it)
+            if (hit) s.set({ selection: currentEditMode() === "DESIGN" && pg ? groupPick(pg, hit) : [hit.id] });
           }
         }
         break;
@@ -1961,6 +2502,10 @@ export function CanvasView() {
         invalidate();
         break;
       }
+      case "ext":
+        d.ext.up(screenToPage(...local(e)), e.nativeEvent as PointerEvent);
+        invalidate();
+        break;
       case "stroke": {
         // image mode: a stroke paints only inside the pixel selection
         clipToSelection(d.stroke.full, d.stroke.node.transform, d.stroke.ox, d.stroke.oy);
@@ -1976,13 +2521,44 @@ export function CanvasView() {
         invalidate();
         break;
       }
+      case "board":
+        if (d.moved) s.endGesture(tr("design.board.hist.move"));
+        break;
+      case "boardNew": {
+        const x0 = Math.min(d.start[0], d.cur[0]), y0 = Math.min(d.start[1], d.cur[1]);
+        const bw = Math.abs(d.cur[0] - d.start[0]), bh = Math.abs(d.cur[1] - d.start[1]);
+        if (bw * s.view.zoom > 4 && bh * s.view.zoom > 4) addBoard(x0, y0, bw, bh);
+        invalidate();
+        break;
+      }
+      case "xfTool": {
+        if (!d.moved) {
+          // a click: the reference point there; Alt+click: the tool's dialog about that point
+          if (e.altKey) openDesignXform(d.tool, [d.start[0], d.start[1]]);
+          else xfRef.current = { key: s.selection.join(","), p: d.start };
+          invalidate();
+          break;
+        }
+        if (e.altKey && d.v) {
+          // Alt held at the release: the originals stay, a transformed copy lands above them
+          s.cancelGesture();
+          transformSelection(d.tool, { ...d.v, origin: d.o }, true);
+        } else s.endGesture(tr(`design.xf.hist.${d.tool}`));
+        // the reference point stays where it was for the (same) selection
+        xfRef.current = { key: S().selection.join(","), p: d.o };
+        invalidate();
+        break;
+      }
       case "shape": {
-        const r = shapeRect(d.start, d.cur);
+        const { r, angle } = shapeBox(d);
         if (r.w < 2 && r.h < 2) {
+          // a click: the default size (the polygon and the star centred on the click)
+          if (d.shape === "polygon" || d.shape === "star") Object.assign(r, { x: d.start[0] - 60, y: d.start[1] - 60 });
           r.w = r.h = 120;
         }
-        const v = drawnShape(d.shape, r, s);
-        s.commit(d.shape === "rect" ? tr("shell.hist.drawRect") : tr("shell.hist.drawEllipse"), (doc) => void draftPage(doc, s.pageId)?.nodes.push(v as any));
+        const v = drawnShape(d.shape, r, s, angle);
+        const label = d.shape === "rect" ? tr("shell.hist.drawRect") : d.shape === "ellipse" ? tr("shell.hist.drawEllipse") : tr("shell.hist.drawShape", { name: shapeName(d.shape) });
+        s.commit(label, (doc) => void draftPage(doc, s.pageId)?.nodes.push(v as any));
         S().set({ selection: [v.id] });
         toolDone(d.shape);
         break;
@@ -2004,6 +2580,8 @@ export function CanvasView() {
 
   const tool = useStore((s) => s.tool);
   const rulers = useUI((s) => s.rulers);
+  // reading mode (Word's 읽기 모드): no rulers over the pages
+  const reading = useViewModes((s) => s.reading);
   // the drawing screen draws its own crosshair
   const cadOn = useCadScreenNow();
   const cursorStyle = cadOn ? "none" : toolCursor(tool);
@@ -2037,21 +2615,34 @@ export function CanvasView() {
       onDrop={onDrop}
       onContextMenu={(e) => {
         e.preventDefault();
+        // the drawing screen: its shortcut menu (none while a command runs: the right click was its Enter)
+        const cm = cadCanvas();
+        if (cm) {
+          const items = cm.menu?.();
+          if (items?.length) setSpellMenu({ x: e.clientX, y: e.clientY, items });
+          return;
+        }
         // a misspelled word: Word's spelling menu (suggestions, ignore all, add to dictionary)
         const page = currentPage();
-        if (!page || editingRef.current) return;
+        // (the drawing screen: right-click is Enter there, cad/view.ts)
+        if (!page || cadCanvas()) return;
+        // typing in a text box (slides, designs): the text's own rows (clipboard, 서식 복사, 문단 모양)
+        if (editingRef.current) return setSpellMenu({ x: e.clientX, y: e.clientY, items: textMenu() });
         const r = wrap.current!.getBoundingClientRect();
         const pt = screenToPage(e.clientX - r.left, e.clientY - r.top);
         // the body text: the caret goes where it was pressed first (Word), unless that is inside the selection — the
         // menu's commands act there (QA doc-review2)
         const s = S();
+        // free transform in the image mode: Photoshop's transform menu (ui/ps/psTransform.ts)
+        const xm = transformMenu();
+        if (xm) return setSpellMenu({ x: e.clientX, y: e.clientY, items: xm });
         // a table (select / text tool): Word's table menu — rows, columns, delete, merge / split, properties
-        const th = s.tool === "select" || s.tool === "text" ? topHit(pt) : undefined;
+        const th = s.tool === "select" || s.tool === "text" || s.tool === "direct" ? topHit(pt) : undefined;
         if (th?.type === "TABLE" && !th.locked) {
           const lp = invertTransform(th.transform, pt), c = cellAt(th, lp[0], lp[1]);
           if (c) {
             pickForMenu(th, c);
-            return setSpellMenu({ x: e.clientX, y: e.clientY, items: tableMenuItems() });
+            return setSpellMenu({ x: e.clientX, y: e.clientY, items: joinMenus(cellClipboardMenu(), tableMenuItems()) });
           }
         }
         // a picture or a raster layer (image / design modes): its image commands — 이미지 크기 키우기, 배경 지우기
@@ -2063,8 +2654,52 @@ export function CanvasView() {
             items: [
               { label: `${tr("cmd.image.upscale")}…`, onSelect: () => useImageUI.getState().set({ kind: "upscale" }) },
               { label: `${tr("cmd.image.removeBackgroundDialog")}…`, onSelect: () => useImageUI.getState().set({ kind: "matte" }) },
+              { sep: true, label: "" },
+              ...objectMenu(),
             ],
           });
+        }
+        // the design mode (selection / direct selection tool): Illustrator's context menu — the object under the
+        // pointer is selected first (its group with the selection tool), an empty spot keeps the selection
+        if ((s.tool === "select" || s.tool === "direct") && currentEditMode() === "DESIGN" && !spellAt(page, pt)) {
+          if (th && !th.locked && !s.selection.includes(th.id)) s.set({ selection: s.tool === "select" ? groupPick(page, th) : [th.id] });
+          const items = designContextItems();
+          if (items.length) setSpellMenu({ x: e.clientX, y: e.clientY, items });
+          return;
+        }
+        // a PDF page (selection tool): Acrobat's page menu — copy the words selected on it, the comment tools, find,
+        // turn the page, print, document properties (기본 작업 점검 2026-11-24 PDF #20: only paste / select all)
+        if (s.tool === "select" && isPdfFormatPage(page) && !(th && th.type !== "PDF")) {
+          const item = (id: string): MenuItem | null => {
+            const c = command(id);
+            return c ? { label: commandLabel(c), kbd: c.kbd, disabled: !enabled(c), onSelect: () => c.run() } : null;
+          };
+          const items: MenuItem[] = [];
+          const copy = command("edit.copy");
+          if (usePdfTextSel.getState().sel && copy)
+            // the selection layer copies on its own Ctrl+C (ui/pdf/PdfTextSelect.tsx): the same key, sent to it
+            items.push({ label: commandLabel(copy), kbd: "Ctrl+C", onSelect: () => void window.dispatchEvent(new KeyboardEvent("keydown", { key: "c", code: "KeyC", ctrlKey: true, bubbles: true })) }, { sep: true } as MenuItem);
+          const ids = ["text.pdfHighlight", "text.pdfUnderline", "text.pdfStrike", "text.pdfNote", "text.pdfSign", "-", "edit.find", "page.rotateRight", "-", "file.print", "pdf.docProps"];
+          items.push(...ids.map((id) => (id === "-" ? ({ sep: true } as MenuItem) : item(id))).filter((x): x is MenuItem => !!x));
+          return setSpellMenu({ x: e.clientX, y: e.clientY, items });
+        }
+        // slides / designs: PowerPoint's object menu on a shape, text box or picture — cut, copy, paste, duplicate,
+        // delete, group, order (QA 2026-11-24: no menu at all)
+        const em = currentEditMode();
+        if (s.tool === "select" && (em === "SLIDE" || em === "DESIGN")) {
+          if (th && !th.locked && !s.selection.includes(th.id)) s.set({ selection: [th.id] });
+          const item = (id: string): MenuItem | null => {
+            const c = command(id);
+            return c ? { label: commandLabel(c), kbd: c.kbd, disabled: !enabled(c), onSelect: () => c.run() } : null;
+          };
+          const ids = th
+            ? ["edit.cut", "edit.copy", "edit.paste", "edit.duplicate", "edit.delete", "-", "image.groupLayers", "image.ungroupLayers", "-", "object.toFront", "object.forward", "object.backward", "object.toBack"]
+            : em === "SLIDE"
+              ? // an empty spot of a slide: PowerPoint's slide menu (QA bux-office-1-17: only paste / select all)
+                ["edit.paste", "edit.selectAll", "-", "slide.new", "page.duplicate", "-", "page.properties", "-", "view.rulers", "view.grid", "view.guides"]
+              : ["edit.paste", "edit.selectAll"];
+          const items = ids.map((id) => (id === "-" ? ({ sep: true } as MenuItem) : item(id))).filter((x): x is MenuItem => !!x);
+          return setSpellMenu({ x: e.clientX, y: e.clientY, items });
         }
         if ((s.tool === "select" || s.tool === "text") && page.kind === "DOCUMENT" && currentEditMode() === "DOCUMENT" && bodyAt(page, pt)) flowContextPress(page, pt[0], pt[1]);
         const hit = spellAt(page, pt);
@@ -2083,8 +2718,20 @@ export function CanvasView() {
             { label: tr("review.menu.reject"), disabled: !change, onSelect: () => (resolveHere(false), focusInput()) },
           );
         }
+        // the common rows (ui/contextMenu.ts): text being edited, else the object under the pointer, else an empty spot
+        const base = (): MenuItem[] => {
+          if (flowActive() || editingRef.current) return textMenu();
+          const s2 = S();
+          const under = s2.tool === "select" ? topHit(pt) : undefined;
+          if (under && !under.locked) {
+            if (!s2.selection.includes(under.id)) s2.set({ selection: [under.id] });
+            return objectMenu();
+          }
+          return s2.selection.length ? objectMenu() : emptyMenu();
+        };
         if (!hit) {
-          if (review.length) setSpellMenu({ ...at, items: review });
+          const items = joinMenus(base(), review);
+          if (items.length) setSpellMenu({ ...at, items });
           return;
         }
         void suggestionsFor(hit.mark).then((sug) => {
@@ -2092,14 +2739,14 @@ export function CanvasView() {
             ? sug.map((w) => ({ label: w, onSelect: () => replaceWord(hit, w) }))
             : [{ label: tr("spell.noSuggestions"), disabled: true }];
           items.push({ sep: true, label: "" }, { label: tr("spell.ignoreAll"), onSelect: () => ignoreAll(hit.mark) }, { label: tr("spell.addToDictionary"), onSelect: () => addToDictionary(hit.mark) });
-          if (review.length) items.push({ sep: true, label: "" }, ...review);
+          items.push({ sep: true, label: "" }, ...joinMenus(textMenu(), review));
           setSpellMenu({ ...at, items });
         });
       }}
     >
       <canvas ref={main} className="layer" style={{ width: "100%", height: "100%" }} />
       <canvas ref={over} className="layer" style={{ width: "100%", height: "100%" }} />
-      {rulers && !cadOn && <Rulers />}
+      {rulers && !cadOn && !reading && <Rulers />}
       <GuideEditor />
       {cellEdit && <CellEditor key={`${cellEdit.nodeId}:${cellEdit.row}:${cellEdit.col}`} target={cellEdit} onMove={setCellEdit} onDone={() => setCellEdit(null)} />}
       <FlowEditor />
@@ -2107,7 +2754,9 @@ export function CanvasView() {
       {spellMenu && <PopMenu at={spellMenu} items={spellMenu.items} onClose={() => setSpellMenu(null)} />}
       <PdfFormLayer />
       <PdfFindLayer />
+      <PdfTextSelectLayer />
       <PdfAnnotLayer />
+      <PdfToolLayer />
       <PsdTextEditor />
       {editing && <TextEditor node={editing} onDone={() => { setEditing(null); S().set({ editingTextId: null }); toolDone("text"); }} />}
     </div>
@@ -2132,6 +2781,8 @@ function toolCursor(tool: string): string {
   if (tool === "anchorDel") return CURSORS.penDel;
   if (tool === "anchorConvert") return CURSORS.convert;
   if (tool === "direct") return CURSORS.direct;
+  const ec = extCursor(tool);
+  if (ec) return ec;
   return tool === "hand" ? "grab" : tool === "text" ? "text" : tool === "brush" || tool === "eraser" ? "none" : tool === "select" ? "default" : "crosshair";
 }
 

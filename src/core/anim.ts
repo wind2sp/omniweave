@@ -86,9 +86,27 @@ export interface Step {
 
 /** Group animations into click steps. Step 0 holds animations that run automatically on slide entry. */
 export function buildSteps(page: Page): Step[] {
+  return stepsOf(page.animations.filter((a) => !a.triggerId));
+}
+
+/** The animations played by a click on a shape (PowerPoint triggers): trigger shape id → its effects as one step. */
+export function triggerSteps(page: Page): Map<string, Step> {
+  const by = new Map<string, KeyframeAnimation[]>();
+  for (const a of page.animations) if (a.triggerId) by.set(a.triggerId, [...(by.get(a.triggerId) ?? []), a]);
+  const out = new Map<string, Step>();
+  for (const [id, list] of by) {
+    // the first effect starts on the click itself
+    const steps = stepsOf(list.map((a, i) => (i === 0 ? { ...a, trigger: "WITH_PREVIOUS" as const } : a)));
+    out.set(id, { anims: steps.flatMap((s) => s.anims), duration: Math.max(0, ...steps.map((s) => s.duration)) });
+  }
+  return out;
+}
+
+function stepsOf(list: readonly KeyframeAnimation[]): Step[] {
   const steps: Step[] = [{ anims: [], duration: 0 }];
   let prevStart = 0, prevEnd = 0;
-  for (const a of page.animations) {
+  for (const a0 of list) {
+    const a = a0;
     let step = steps[steps.length - 1];
     let start: number;
     if (a.trigger === "ON_CLICK") {
@@ -97,6 +115,8 @@ export function buildSteps(page: Page): Step[] {
       start = 0;
     } else if (a.trigger === "WITH_PREVIOUS") start = prevStart;
     else start = prevEnd;
+    // 지연: the effect waits this long after its start condition
+    start += Math.max(0, a.delay ?? 0);
     step.anims.push({ anim: a, start });
     prevStart = start;
     prevEnd = start + animDuration(a);
@@ -116,7 +136,7 @@ export interface NodeOverride {
 export const NO_OVERRIDE: NodeOverride = { opacity: 1, dx: 0, dy: 0, scale: 1, rotation: 0 };
 
 /** Overrides for all animated nodes at (stepIndex, time within that step). */
-export function sampleOverrides(steps: Step[], stepIndex: number, t: number): Map<string, NodeOverride> {
+export function sampleOverrides(steps: Step[], stepIndex: number, t: number, triggers: { step: Step; t: number | null }[] = []): Map<string, NodeOverride> {
   const out = new Map<string, NodeOverride>();
   const get = (id: string) => {
     let o = out.get(id);
@@ -142,11 +162,51 @@ export function sampleOverrides(steps: Step[], stepIndex: number, t: number): Ma
       }
     }
   });
+  // trigger effects: played since their shape was clicked (t), else waiting at their first value unless the sequence set it
+  for (const tr of triggers)
+    for (const { anim, start } of tr.step.anims) {
+      const key = anim.targetNodeId + "|" + anim.property;
+      if (tr.t === null && touched.has(key)) continue;
+      touched.add(key);
+      const v = sampleAnim(anim, tr.t === null ? -Infinity : tr.t - start);
+      const o = get(anim.targetNodeId);
+      switch (anim.property) {
+        case "OPACITY": o.opacity = v as number; break;
+        case "SCALE": o.scale = v as number; break;
+        case "ROTATION": o.rotation = v as number; break;
+        case "TRANSLATION": o.dx = (v as Vec2)[0]; o.dy = (v as Vec2)[1]; break;
+      }
+    }
   return out;
 }
 
-export type AnimPreset = "fade-in" | "fly-left" | "fly-up" | "zoom-in" | "spin-in" | "fade-out" | "pulse";
+export type AnimPreset = "appear" | "fade-in" | "fly-left" | "fly-right" | "fly-up" | "fly-down" | "float-in" | "zoom-in" | "spin-in" | "pulse" | "spin" | "grow" | "fade-out" | "fly-out" | "zoom-out";
+/** Which part of PowerPoint's gallery a preset is in. */
+export const PRESET_CLASS: Record<AnimPreset, "entr" | "emph" | "exit"> = { appear: "entr", "fade-in": "entr", "fly-left": "entr", "fly-right": "entr", "fly-up": "entr", "fly-down": "entr", "float-in": "entr", "zoom-in": "entr", "spin-in": "entr", pulse: "emph", spin: "emph", grow: "emph", "fade-out": "exit", "fly-out": "exit", "zoom-out": "exit" };
 export const ANIM_PRESETS: Record<AnimPreset, { label: string; make: () => Pick<KeyframeAnimation, "property" | "keyframes">[] }> = {
+  appear: { label: "나타내기", make: () => [{ property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 1, value: 1, easing: "linear" }] }] }, // i18n: ui
+  "fly-right": { label: "오른쪽에서 날아오기", make: () => [ // i18n: ui
+    { property: "TRANSLATION", keyframes: [{ time: 0, value: [400, 0], easing: "linear" }, { time: 600, value: [0, 0], easing: "ease-out" }] },
+    { property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 300, value: 1, easing: "linear" }] },
+  ] },
+  "fly-down": { label: "위에서 날아오기", make: () => [ // i18n: ui
+    { property: "TRANSLATION", keyframes: [{ time: 0, value: [0, -120], easing: "linear" }, { time: 600, value: [0, 0], easing: "ease-out" }] },
+    { property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 300, value: 1, easing: "linear" }] },
+  ] },
+  "float-in": { label: "떠오르기", make: () => [ // i18n: ui
+    { property: "TRANSLATION", keyframes: [{ time: 0, value: [0, 40], easing: "linear" }, { time: 1000, value: [0, 0], easing: "ease-out" }] },
+    { property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 1000, value: 1, easing: "ease-out" }] },
+  ] },
+  spin: { label: "회전", make: () => [{ property: "ROTATION", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 2000, value: 360, easing: "ease-in-out" }] }] }, // i18n: ui
+  grow: { label: "크게/작게", make: () => [{ property: "SCALE", keyframes: [{ time: 0, value: 1, easing: "linear" }, { time: 2000, value: 1.5, easing: "ease-in-out" }] }] }, // i18n: ui
+  "fly-out": { label: "날아가기", make: () => [ // i18n: ui
+    { property: "TRANSLATION", keyframes: [{ time: 0, value: [0, 0], easing: "linear" }, { time: 500, value: [0, 400], easing: "ease-in" }] },
+    { property: "OPACITY", keyframes: [{ time: 0, value: 1, easing: "linear" }, { time: 250, value: 1, easing: "linear" }, { time: 500, value: 0, easing: "linear" }] },
+  ] },
+  "zoom-out": { label: "축소하며 사라지기", make: () => [ // i18n: ui
+    { property: "SCALE", keyframes: [{ time: 0, value: 1, easing: "linear" }, { time: 500, value: 0.3, easing: "ease-in" }] },
+    { property: "OPACITY", keyframes: [{ time: 0, value: 1, easing: "linear" }, { time: 500, value: 0, easing: "ease-in" }] },
+  ] },
   "fade-in": { label: "나타나기", make: () => [{ property: "OPACITY", keyframes: [{ time: 0, value: 0, easing: "linear" }, { time: 500, value: 1, easing: "ease-out" }] }] }, // i18n: ui
   "fly-left": { label: "왼쪽에서 날아오기", make: () => [ // i18n: ui
     { property: "TRANSLATION", keyframes: [{ time: 0, value: [-400, 0], easing: "linear" }, { time: 600, value: [0, 0], easing: "ease-out" }] },

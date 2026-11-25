@@ -4,6 +4,7 @@
 // over every command's name. The commands are the desktop's (ui/commands.ts): nothing is re-implemented here.
 
 import { useEffect, useMemo, useState } from "react";
+import { Icon, type IconName } from "./icons";
 import { useT } from "../../i18n";
 import { useStore } from "../../core/store";
 import { allCommands, command, commandLabel, enabled } from "../commands";
@@ -33,19 +34,19 @@ export function DeskBar({ onExit }: { onExit: () => void }) {
 
   const run = (id: string) => command(id)?.run();
   const items: { id: string; icon: string; label: string; on?: boolean; disabled?: boolean; act: () => void }[] = [
-    { id: "phone", icon: "←", label: tr("mobile.desk.bar.phone"), act: onExit },
-    { id: "menu", icon: "☰︎", label: tr("mobile.desk.bar.menu"), on: menu, act: () => setMenu(true) },
-    { id: "undo", icon: "↶", label: tr("mobile.desk.bar.undo"), disabled: !canUndo, act: () => run("edit.undo") },
-    { id: "ribbon", icon: "A", label: tr("mobile.desk.bar.ribbon"), on: ribbon, act: () => setRibbon(!ribbon) },
-    { id: "panel", icon: "⚙︎", label: tr("mobile.desk.bar.panel"), on: rightOpen, act: () => useUI.getState().set({ rightOpen: !rightOpen, leftOpen: false }) },
-    { id: "save", icon: "⤓︎", label: tr("mobile.desk.bar.save"), act: () => run("file.save") },
+    { id: "phone", icon: "back", label: tr("mobile.desk.bar.phone"), act: onExit },
+    { id: "menu", icon: "menu", label: tr("mobile.desk.bar.menu"), on: menu, act: () => setMenu(true) },
+    { id: "undo", icon: "undo", label: tr("mobile.desk.bar.undo"), disabled: !canUndo, act: () => run("edit.undo") },
+    { id: "ribbon", icon: "text", label: tr("mobile.desk.bar.ribbon"), on: ribbon, act: () => setRibbon(!ribbon) },
+    { id: "panel", icon: "props", label: tr("mobile.desk.bar.panel"), on: rightOpen, act: () => useUI.getState().set({ rightOpen: !rightOpen, leftOpen: false }) },
+    { id: "save", icon: "save", label: tr("mobile.desk.bar.save"), act: () => run("file.save") },
   ];
   return (
     <>
       <nav className="pd-bar" aria-label={tr("mobile.desk.bar.label")}>
         {items.map((x) => (
           <button key={x.id} type="button" data-id={x.id} className={x.on ? "on" : ""} aria-pressed={x.on} disabled={x.disabled} onClick={x.act}>
-            <span aria-hidden>{x.icon}</span>
+            <Icon name={x.icon as IconName} />
             {x.label}
           </button>
         ))}
@@ -70,7 +71,8 @@ function MenuSheet({ onClose }: { onClose: () => void }) {
     if (!s) return null;
     return allCommands()
       .map((c) => ({ c, label: commandLabel(c) }))
-      .filter((x) => x.label.toLowerCase().includes(s) || x.c.id.toLowerCase().includes(s))
+      // the name, the id, or a word the command is known by (밝기 finds 명도/대비, 노출, 레벨 … as the PC search does)
+      .filter((x) => x.label.toLowerCase().includes(s) || x.c.id.toLowerCase().includes(s) || (x.c.keywords?.() ?? "").toLowerCase().split(/\s+/).some((k) => k && (k.includes(s) || s.includes(k))))
       .slice(0, 60);
   }, [q]);
   return (

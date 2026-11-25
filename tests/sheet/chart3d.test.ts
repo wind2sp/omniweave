@@ -9,6 +9,7 @@ import { paintChart, type View3D } from "../../src/render/sheetChart";
 import { camera, MAX_3D_POINTS, shade } from "../../src/render/sheetChart3D";
 import { histBins, squarify } from "../../src/render/sheetChartEx";
 import { liveRef } from "../../src/render/sheetDrawings";
+import { cpuNow, cpuBudget } from "../budget";
 
 (globalThis as any).DOMParser ??= DOMParser;
 
@@ -266,11 +267,11 @@ describe("other views, other chartex settings (omni-xlsx-chart-var)", () => {
 describe("hostile 3-D charts never hang the painter", () => {
   const paintMs = (x: string) => {
     const { ctx, rec } = recorder();
-    const t0 = performance.now();
+    const t0 = cpuNow();
     paintChart(ctx, x, [], 0, 0, 480, 288, 1, { lang: "ko", font: "Calibri" });
     expect(rec.pts.every(Number.isFinite)).toBe(true);
     expect(rec.save).toBe(rec.restore);
-    return { ms: performance.now() - t0, rec };
+    return { ms: cpuNow() - t0, rec };
   };
   it("a major unit of 1e-6, 0 or −5, reversed or ±1e300 bounds: drawn at once", () => {
     for (const kind of ["surface3D", "surface", "bar3D", "line3D"])
@@ -278,7 +279,7 @@ describe("hostile 3-D charts never hang the painter", () => {
         // (before: a surface with major unit 1e-6 cut every triangle into 10⁸ bands — the UI froze)
         const x = part(kind, "", [[1, 50, 100], [3, 60, 20]]).replace("<c:valAx><c:axId val=\"2\"/>", `<c:valAx><c:axId val="2"/>${vax}`);
         expect(x).toContain(vax);
-        expect(paintMs(x).ms, `${kind} ${vax}`).toBeLessThan(2000);
+        expect(paintMs(x).ms, `${kind} ${vax}`).toBeLessThan(cpuBudget(2000));
       }
   });
   it("NaN, ±Infinity, 1e308 and 1e-300 values; rotY 360, perspective 240, depth 2000 %", () => {

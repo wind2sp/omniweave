@@ -283,7 +283,17 @@ export interface Compositor<S> {
   under?(dst: S, n: SceneNode, opacity: number): void;
   /** knockout: clear `dst` under node `n`'s shape by `opacity` (a group's own surface — what is under the group shows) */
   knock?(dst: S, n: SceneNode, opacity: number): void;
+  /** keep `dst` only inside path `n`'s shape (an Illustrator clipping path: geometry, no paint of its own) */
+  maskIn?(dst: S, n: SceneNode): void;
+  /** keep `dst` by node `n`'s brightness (an Illustrator opacity mask: white shows, black and nothing hide) */
+  lumMaskIn?(dst: S, n: SceneNode): void;
 }
+
+/**
+ * An Illustrator clipping path as a clip-stack base: a path with neither fill nor stroke (Ctrl+7 in the design mode
+ * takes them away). Its layers are clipped by its geometry; it draws nothing itself.
+ */
+export const isClipPath = (n: SceneNode) => n.type === "VECTOR" && !n.fill && !(n.stroke && n.strokeWidth > 0) && n.contours.some((c) => c.nodes.length > 2);
 
 /** Effects of a group the compositor draws. */
 const groupFx = <S>(g: LayerGroup, C: Compositor<S>) => (C.applyFx ? activeEffects(g.effects) : []);
@@ -309,8 +319,28 @@ export function composeItems<S>(items: TreeItem[], dst: S, C: Compositor<S>, inc
     if (!hasContent(it, include, (n) => C.alpha(n))) continue;
     const clips = it.clips.filter((c) => c.visible && C.alpha(c) > 0 && (!include || include(c)));
     if (!clips.length) {
+      // an opacity mask with nothing (shown) under it draws nothing
+      if (it.kind === "node" && it.node.lumMask) continue;
       if (own && it.kind === "node" && it.node.knockout && C.knock) C.knock(dst, it.node, C.alpha(it.node));
       paintItem(it, dst, C, include);
+      continue;
+    }
+    // an Illustrator opacity mask: the masked objects drawn as they are, then kept by the mask's brightness
+    if (it.kind === "node" && it.node.lumMask) {
+      const O = C.alloc(dst);
+      for (const c of clips) C.leaf(O, c, "normal");
+      C.lumMaskIn?.(O, it.node);
+      C.blit(dst, O, 1, "NORMAL");
+      C.free(O);
+      continue;
+    }
+    // an Illustrator clipping path: the clipped layers drawn as they are, then kept inside the path's shape
+    if (it.kind === "node" && C.maskIn && isClipPath(it.node)) {
+      const O = C.alloc(dst);
+      for (const c of clips) C.leaf(O, c, "normal");
+      C.maskIn(O, it.node);
+      C.blit(dst, O, C.alpha(it.node), it.node.blendMode);
+      C.free(O);
       continue;
     }
     // clip stack: base bare + clipped layers atop, on their own; then blended with the base's opacity / mode.

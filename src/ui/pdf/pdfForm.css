@@ -263,3 +263,61 @@ select.pdf-field-edit[multiple] {
   background: rgba(255, 110, 0, 0.55);
   outline: 2px solid rgba(255, 110, 0, 0.9);
 }
+/* the page box of a PDF in the status bar (ui/shell/DocStatus.tsx PageBox) */
+.sb-pagebox {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sb-pagebox input {
+  width: auto;
+  min-width: 2.2em;
+  padding: 0 4px;
+  height: 18px;
+  text-align: center;
+  font: inherit;
+  color: inherit;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+}
+/* text selected on a PDF page (PdfTextSelect.tsx): Acrobat's blue */
+.pdf-text-sel {
+  position: absolute;
+  inset: 0;
+  z-index: 13;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pdf-text-sel-box {
+  position: absolute;
+  background: rgba(51, 136, 255, 0.32);
+  mix-blend-mode: multiply;
+}
+/* phone: the phone app's saved signatures, one tap to use */
+.pdf-sign-saved { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 8px; }
+.pdf-sign-saved .btn { flex: 0 0 auto; min-height: 44px; padding: 4px 8px; background: #fff; }
+.pdf-sign-saved img { height: 40px; width: auto; max-width: 160px; display: block; }
+/* phone (PC feature screen): no hover — the box and a finger-size corner handle always show, and a finger drag
+   moves / resizes instead of scrolling the page */
+.phone-desk .pdf-annot-hit.sign {
+  touch-action: none;
+  outline: 1px dashed var(--accent);
+}
+.phone-desk .pdf-sign-handle {
+  opacity: 1;
+  width: 28px;
+  height: 28px;
+  right: -14px;
+  bottom: -14px;
+  border-width: 2px;
+  border-radius: 50%;
+}
+
+/* comment replies and review state (Acrobat) */
+.pdf-annot-reply { margin: 4px 0 0; font-size: 12px; color: var(--text-2); }
+.pdf-annot-reply-mark { color: var(--text-3); }
+.pdf-annot-reply-row { display: flex; gap: 4px; margin-top: 6px; }
+.pdf-annot-reply-row input { flex: 1; min-width: 0; height: 26px; padding: 0 6px; border: 1px solid var(--line-2); border-radius: 4px; background: var(--bg-2); color: var(--text); font: inherit; }
+.pdf-annot-state { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 12px; color: var(--text-2); }
+.pdf-annot-state select { height: 24px; background: var(--bg-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 4px; }

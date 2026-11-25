@@ -13,6 +13,7 @@ import { docZoom } from "./DocRibbon";
 import { toggleRulers } from "../aids";
 import { FidelityBadge } from "../fidelityBadge";
 import { ProgressIndicator } from "./ProgressIndicator";
+import { selectPage } from "../pageActions";
 import { LANGS, t as tr, useLang, useT } from "../../i18n";
 
 const LO = Math.log2(0.1), HI = Math.log2(5);
@@ -22,6 +23,38 @@ function ago(at: number, now: number) {
   if (s < 10) return tr("shell.ago.now");
   if (s < 60) return tr("shell.ago.seconds", { n: s });
   return tr("shell.ago.minutes", { n: Math.round(s / 60) });
+}
+
+/** Page n of m where n can be typed (Enter goes there; a number out of range goes to the nearest page). */
+function PageBox({ n, ids }: { n: number; ids: string[] }) {
+  const t = useT();
+  const [text, setText] = useState<string | null>(null);
+  const go = () => {
+    const k = Math.round(Number(text));
+    setText(null);
+    if (!Number.isFinite(k)) return;
+    const id = ids[Math.max(0, Math.min(ids.length - 1, k - 1))];
+    if (id) selectPage(id);
+  };
+  return (
+    <span className="sb-item sb-pagebox" data-tip={t("docmode.status.pageBoxTip")}>
+      <input
+        aria-label={t("docmode.status.pageBoxTip")}
+        inputMode="numeric"
+        value={text ?? String(n)}
+        size={Math.max(2, String(ids.length).length)}
+        onFocus={(e) => (setText(String(n)), requestAnimationFrame(() => e.target.select()))}
+        onChange={(e) => setText(e.target.value.replace(/[^\d]/g, ""))}
+        onBlur={() => setText(null)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") (e.preventDefault(), go(), (e.target as HTMLInputElement).blur());
+          if (e.key === "Escape") (setText(null), (e.target as HTMLInputElement).blur());
+        }}
+      />
+      <span>/ {t("docmode.status.pageCount", { m: ids.length })}</span>
+    </span>
+  );
 }
 
 export function DocStatusBar() {
@@ -50,9 +83,14 @@ export function DocStatusBar() {
   const slider = Math.round(((Math.log2(Math.max(0.1, Math.min(5, zoom))) - LO) / (HI - LO)) * 1000);
   return (
     <footer className="statusbar doc-status">
-      <button type="button" className="sb-item sb-btn" data-tip={t("docmode.status.pageTip")} onClick={() => useUI.getState().set({ leftOpen: true })}>
-        {t("docmode.status.page", { n: Math.max(1, n), m: pages.length })}
-      </button>
+      {page?.nodes.some((x) => x.type === "PDF") ? (
+        // a PDF: the page number can be typed to go there (Acrobat's page box)
+        <PageBox n={Math.max(1, n)} ids={pages.map((p) => p.id)} />
+      ) : (
+        <button type="button" className="sb-item sb-btn" data-tip={t("docmode.status.pageTip")} onClick={() => useUI.getState().set({ leftOpen: true })}>
+          {t("docmode.status.page", { n: Math.max(1, n), m: pages.length })}
+        </button>
+      )}
       <span className="sb-div" />
       <button type="button" className="sb-item sb-btn" data-tip={t("docmode.status.countTip")} onClick={() => useUI.getState().set({ shellDialog: "wordCount" })}>
         {t("docmode.status.words", { n: st.words.toLocaleString() })}

@@ -15,6 +15,9 @@ import { openPages, viewKind, knownPassword } from "../src/ui/mobile/openDoc";
 import { offerPassword, phonePasswordAsker } from "../src/ui/mobile/prompt";
 import { sniffExt } from "../src/ui/mobile/MobileApp";
 import { MOBILE_DROP } from "../vite.config";
+import { pickAt } from "../src/ui/mobile/editor/ops";
+import { newVector } from "../src/core/types";
+import { corner, rectContour } from "../src/core/vector";
 
 const PW = "omw-test-1234";
 (globalThis as { DOMParser?: unknown }).DOMParser ??= DOMParser;
@@ -119,5 +122,21 @@ describe("phone: every format the PC program opens", () => {
     expect(readFileSync("src-tauri/gen/android/app/src/main/java/app/omniweave/studio/SharePlugin.kt", "utf8")).toContain("PrintManager");
     const assoc = JSON.parse(readFileSync("src-tauri/tauri.android.conf.json", "utf8")).bundle.fileAssociations.flatMap((a: { ext: string[] }) => a.ext);
     for (const e of ["hwp", "doc", "xls", "ppt", "csv", "epub"]) expect(assoc).toContain(e);
+  });
+});
+
+describe("phone editor: picking with a finger", () => {
+  it("a tap on a drawing picks the line under the finger, not the outline round the whole plan", () => {
+    const page = newDocument("omni-cad").pages[0];
+    const frame = newVector([rectContour(0, 0, 1000, 800)], "frame");
+    frame.fill = null as never;
+    frame.stroke = "#000" as never;
+    const line = newVector([{ closed: false, nodes: [corner(100, 100), corner(300, 100)] }], "wall");
+    line.fill = null as never;
+    page.nodes = [line, frame];
+    expect(pickAt(page, [200, 103], 6)?.id).toBe(line.id);
+    // on the frame's own line it is the frame; far from both, nothing (the page moves)
+    expect(pickAt(page, [1000, 400], 6)?.id).toBe(frame.id);
+    expect(pickAt(page, [600, 500], 6)).toBeNull();
   });
 });

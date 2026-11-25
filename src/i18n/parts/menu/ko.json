@@ -79,5 +79,12 @@
   "menu.export.kind.show": "발표",
   "menu.export.kind.table": "표",
   "cmd.help.storeUpdates": "업데이트: Microsoft Store",
-  "menu.toast.mergedAsPixels": "그림·도형 레이어를 픽셀로 그려 아래 레이어와 합쳤어요 (Ctrl+Z로 되돌리기)"
+  "menu.toast.mergedAsPixels": "그림·도형 레이어를 픽셀로 그려 아래 레이어와 합쳤어요 (Ctrl+Z로 되돌리기)",
+  "cmd.edit.pasteInFront": "앞에 붙이기",
+  "cmd.edit.pasteInBack": "뒤에 붙이기",
+  "cmd.edit.pasteOnAllArtboards": "모든 아트보드에 붙이기",
+  "cmd.edit.transformAgain": "변형 반복",
+  "menu.hist.pasteFront": "앞에 붙이기",
+  "menu.hist.pasteBack": "뒤에 붙이기",
+  "design.hist.again": "변형 반복"
 }

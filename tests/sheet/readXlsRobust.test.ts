@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { readCfbTree, writeCfb } from "../../src/io/formats/cfb";
 import { xlsPages } from "../../src/io/formats/legacyWrite";
 import { workbookOf } from "../../src/io/formats/xlsWrite";
-import { readXls, XlsUnreadable } from "../../src/io/sheet/readXls";
+import { lastXlsWork, readXls, XlsUnreadable } from "../../src/io/sheet/readXls";
 
 const FILES = ["qa/interop/adobe-made/xls-fidelity/omni-xls-rich.xls", "qa/interop/excel-made/omni-xls-formulas.xls", "qa/interop/excel-made/omni-legacy-xls-cells.xls"];
 
@@ -60,16 +60,23 @@ function withWb(orig: Uint8Array, wb: Uint8Array): Uint8Array {
   tree.root.kids!.find((k) => k.kind === "stream" && k.name === "Workbook")!.data = wb;
   return writeCfb(tree);
 }
-/** opens as the app does: the formatted reader or the values-only fallback, never an exception; how long it took */
+/**
+ * Opens as the app does: the formatted reader or the values-only fallback, never an exception. Returns the reader's
+ * loop steps per byte of the file (io/sheet/readXls.ts lastXlsWork): a reader that stays linear takes fewer steps than
+ * the file has bytes. Measured in work, not milliseconds — wall-clock limits failed whenever the test machine was busy
+ * (5.4 s for a 0.5 s case in a full parallel run, QA 2026-11-24).
+ */
 function opens(file: Uint8Array): number {
-  const t0 = performance.now();
+  let work = 0;
   try {
     readXls(file, "en");
+    work = lastXlsWork();
   } catch (e) {
+    work = lastXlsWork();
     if (!(e instanceof XlsUnreadable) && !/BIFF8/.test((e as Error).message)) throw e;
   }
   expect(() => xlsPages(file, "omni-fuzz.xls")).not.toThrow();
-  return performance.now() - t0;
+  return work / file.length;
 }
 
 describe("damaged .xls files", () => {
@@ -106,7 +113,7 @@ describe("damaged .xls files", () => {
             const x = rnd(), d = wb.subarray(r.off - 4, r.off + r.len);
             return x < 0.03 ? [] : x > 0.98 ? [d, d] : [d];
           }));
-        expect(opens(withWb(orig, out))).toBeLessThan(5000);
+        expect(opens(withWb(orig, out))).toBeLessThan(1);
       }
     }, 120000);
 
@@ -123,7 +130,7 @@ describe("damaged .xls files", () => {
       return [rec(0x0006, cat([d.slice(0, 20), body]))];
     });
     const file = withWb(ORIG, fixBound(wb));
-    expect(opens(file)).toBeLessThan(2000);
+    expect(opens(file)).toBeLessThan(1);
     const n = readXls(file).notices.find((x) => x.kind === "formulaValues")?.n ?? 0;
     expect(n).toBeGreaterThan(30);
   });
@@ -132,7 +139,7 @@ describe("damaged .xls files", () => {
     let first = true;
     const wb = rebuild(WB, (r, d) => (r.type !== 0x0085 ? null : first ? ((first = false), Array.from({ length: 3000 }, () => rec(0x0085, d))) : []));
     const file = withWb(ORIG, fixBound(wb, true));
-    expect(opens(file)).toBeLessThan(2000);
+    expect(opens(file)).toBeLessThan(1);
     expect(readXls(file).sheets.length).toBe(1);
   });
 
@@ -154,7 +161,7 @@ describe("damaged .xls files", () => {
       return [...out, rec(r.type, d)];
     });
     const file = withWb(ORIG, fixBound(wb));
-    expect(opens(file)).toBeLessThan(3000);
+    expect(opens(file)).toBeLessThan(1);
     expect(readXls(file).notices.find((x) => x.kind === "pattern")?.n).toBeGreaterThan(50);
   });
 
@@ -165,6 +172,6 @@ describe("damaged .xls files", () => {
       head.set([0xff, 0xff, 0xff, 0xff], 4);
       return [rec(0x00fc, head), ...Array.from({ length: 2000 }, () => rec(0x003c, new Uint8Array(8000)))];
     });
-    expect(opens(withWb(ORIG, fixBound(wb)))).toBeLessThan(3000);
+    expect(opens(withWb(ORIG, fixBound(wb)))).toBeLessThan(1);
   });
 });

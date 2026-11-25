@@ -7,7 +7,8 @@
 import { t } from "../../../i18n";
 import { cssFont, layoutText, measure } from "../../../core/text";
 import { PX_PER } from "../../../core/units";
-import { DEFAULT_RUN, newImage, newPage, newVector, uid, type AssetRef, type CadGroupMeta, type CadRefMeta, type CadSourceMeta, type Contour, type ImageNode, type LayerGroup, type Page, type SceneNode, type TextNode, type TextParagraph, type TextRun, type VectorNode } from "../../../core/types";
+import { cadTextAt, cadTextSig, insLocal } from "../../../core/cadText";
+import { DEFAULT_RUN, newImage, newPage, newVector, uid, type AssetRef, type CadGroupMeta, type CadRefMeta, type CadSourceMeta, type CadStyleSource, type CadHatch, type Contour, type ImageNode, type LayerGroup, type Page, type SceneNode, type TextNode, type TextParagraph, type TextRun, type VectorNode } from "../../../core/types";
 import { cadHex } from "./aci";
 import { IDENT, PathBuilder, ap, arcEnd, arcTo, av, fitPath, mul, ocs, polyPath, rings, rotateM, scaleM, scaleOf, splinePath, translate, type Mat } from "./geom";
 import { mmPerUnit, scaleLabel, unitSymbol, type CadColor, type CadDrawing, type CadEntity, type CadGeom, type CadLayer, type HatchLine, type HatchLoop, type P2, type PolyVertex } from "./model";
@@ -69,6 +70,10 @@ interface PathItem {
   invisible?: boolean;
   /** construction line / ray: clipped to the drawing extents once they are known */
   xline?: { p: P2; dir: P2; ray: boolean };
+  /** a hatch: its definition for the drawing screen (HATCHEDIT) and the DXF export (VectorNode.cadHatch) */
+  hatch?: CadHatch;
+  /** a layout viewport's frame: the viewport's centre on the sheet (VectorNode.cadVpFrame) */
+  vpFrame?: P2;
 }
 
 interface TextItem {
@@ -92,6 +97,12 @@ interface TextItem {
   hAlign: 0 | 1 | 2;
   vAlign: "baseline" | "bottom" | "middle" | "top";
   mtext: boolean;
+  /** the source entity's group codes (TEXT / MTEXT): written back as they were while the text is unchanged */
+  raw?: [number, string | number][];
+  /** one column of a column MTEXT: the entity's key (its first column carries `raw`, the text's codes for them all) */
+  col?: string;
+  /** a block's text: the insert it came in with (its codes are in the block's coordinates) */
+  ins?: { p: [number, number]; rot: number; sx: number; sy: number };
   /** MTEXT reference width (drawing units), 0 = no wrapping */
   boxW: number;
   /** MTEXT line spacing factor */
@@ -633,6 +644,8 @@ class Walker {
   owner = new Map<Item, string>();
   counts: Record<string, number> = {};
   blocks: Record<string, number> = {};
+  /** top-level dimension handle → its group (associativity, DIMASSOC) */
+  dimGrp = new Map<string, Grp>();
   unsupported: Record<string, number> = {};
   xrefs = new Set<string>();
   shx = new Set<string>();
@@ -845,16 +858,19 @@ class Walker {
         const boundary = local.done();
         if (!boundary.length) break;
         const toW = (cs: Contour[]) => mapContours(cs, mo);
+        const hatch: CadHatch & { srcH?: string[] } = { ...(g.src && !ctx.inBlock ? { srcH: g.src } : {}), pattern: (g.solid ? "SOLID" : g.pattern || "SOLID").toUpperCase(), scale: 1, angle: 0, loops: rings(boundary).map((r) => r.map((q) => { const w = ap(mo, q[0], q[1]); return [w[0], w[1]] as [number, number]; })) };
         if (g.gradient && g.grad && g.grad.colors.length) {
           // gradient: bands of the interpolated colour, each the boundary cut to a slab across the gradient direction
-          for (const band of gradientBands(rings(boundary), g.grad, (c) => (c.rgb !== undefined ? cadHex(0, c.rgb) : c.aci === 256 ? cadHex(L.color, L.rgb) : c.aci === 0 ? ctx.color : cadHex(c.aci))))
-            path(toW(band.contours), { stroke: null, fill: band.color, evenodd: true, name: hatchName(g.grad.name || g.pattern) });
+          const hexOf = (c: CadColor) => (c.rgb !== undefined ? cadHex(0, c.rgb) : c.aci === 256 ? cadHex(L.color, L.rgb) : c.aci === 0 ? ctx.color : cadHex(c.aci));
+          const gh: CadHatch = { ...hatch, pattern: "GRADIENT", angle: (g.grad.angle * 180) / Math.PI, color1: hexOf(g.grad.colors[0]), color2: g.grad.colors[1] ? hexOf(g.grad.colors[1]) : "#ffffff", gname: g.grad.name || "LINEAR", gshift: g.grad.shift ?? 0, gsingle: !!g.grad.single };
+          for (const band of gradientBands(rings(boundary), g.grad, hexOf))
+            path(toW(band.contours), { stroke: null, fill: band.color, evenodd: true, name: hatchName(g.grad.name || g.pattern), hatch: gh });
           break;
         }
         if (g.gradient) this.gradients++;
         if (g.solid || g.gradient || !g.lines.length) {
           if (!g.solid && !g.gradient) this.patterns++;
-          path(toW(boundary), { stroke: null, fill: color, evenodd: true, name: hatchName(g.pattern) });
+          path(toW(boundary), { stroke: null, fill: color, evenodd: true, name: hatchName(g.pattern), hatch });
           break;
         }
         const segs = patternSegments(rings(boundary), g.lines);
@@ -868,7 +884,7 @@ class Walker {
           b.move(p[0], p[1]);
           b.line(q[0], q[1]);
         }
-        path(b.done(), { name: hatchName(g.pattern) });
+        path(b.done(), { name: hatchName(g.pattern), hatch });
         break;
       }
       case "leader": {
@@ -1021,7 +1037,7 @@ class Walker {
         // layer leaves it out of the plot and the PDF with that layer. A clipped viewport (polygon, circle) has no
         // rectangle: its boundary entity is drawn as itself (omni-cad-21) — unless that entity is missing (damaged or
         // purged boundary): then the view is cut to the rectangle and the rectangle is its frame
-        if (!g.clipBy || !clipOutline(this.d, g.clipBy)) path(b.done());
+        if (!g.clipBy || !clipOutline(this.d, g.clipBy)) path(b.done(), { vpFrame: [cx, cy] });
         if (this.model && !g.off && g.vh && g.vh > 0 && !ctx.inBlock) viewportView.call(this, g, ctx, L.name);
         break;
       }
@@ -1055,6 +1071,18 @@ class Walker {
         const grp: Grp = { id: uid("g"), name, parent: ctx.grp, top: ctx.grp ? ctx.grp.top : L.name, cad: { block: blk.name } };
         const inner: Ctx = { m: ctx.m, inBlock: true, layer: L.name, color, lwRaw, ltype: ltName, byLayer: isByLayer(e, ctx), grp, depth: ctx.depth + 1, stack: [...ctx.stack, blk.name.toUpperCase()] };
         if (g.k === "dimension") {
+          if (e.handle && !ctx.inBlock) this.dimGrp.set(e.handle.toUpperCase(), grp);
+          // a dimension the export can write as DIMENSION again: its kind, points (drawing coordinates) and value
+          // (an arc length dimension is kind 7 here: AutoCAD's ARC_DIMENSION)
+          const t = g.arc ? 7 : g.large ? 9 : g.dimtype;
+          if (g.p?.["10"] && [0, 1, 2, 3, 4, 5, 6, 7, 9].includes(t) && g.measure !== undefined) {
+            const p: Record<string, [number, number]> = {};
+            for (const [c, q] of Object.entries(g.p)) {
+              const w = ap(mo, q[0], q[1]);
+              p[c] = [w[0], w[1]];
+            }
+            grp.cad.dim = { type: t, p, measure: g.measure, ...(g.angle !== undefined ? { angle: g.angle } : {}), ...(g.text ? { text: g.text } : {}), ...(g.flags !== undefined ? { flags: g.flags } : {}), ...(g.arc ? { arc: g.arc } : {}) };
+          }
           this.walk(blk.entities, inner);
         } else {
           this.blocks[blk.name] = (this.blocks[blk.name] ?? 0) + 1;
@@ -1062,6 +1090,13 @@ class Walker {
           const n = Math.min(MAX_ARRAY, g.cols * g.rows);
           // an xref in other units is scaled by the unit ratio, as AutoCAD inserts it
           const us = blk.unitScale ?? 1;
+          if (n === 1 && !(blk.flags & 4)) {
+            // the placement, so the drawing screen can insert the block again and the DXF export writes it as a block
+            const p0 = ap(at, 0, 0), px = ap(at, 1, 0), py = ap(at, 0, 1);
+            const ux = [px[0] - p0[0], px[1] - p0[1]], uy = [py[0] - p0[0], py[1] - p0[1]];
+            const det = ux[0] * uy[1] - ux[1] * uy[0];
+            grp.cad!.ins = { p: [p0[0], p0[1]], rot: Math.atan2(ux[1], ux[0]), sx: g.sx * us * Math.hypot(ux[0], ux[1]), sy: g.sy * us * Math.hypot(uy[0], uy[1]) * (det < 0 ? -1 : 1) };
+          }
           const start = this.items.length;
           for (let k = 0; k < n; k++) {
             const i = k % g.cols, j = Math.floor(k / g.cols);
@@ -1161,11 +1196,18 @@ class Walker {
       if (g.cols && g.cols.n > 1) {
         // columns: the text flows down a column of the defined height, then on to the next one
         const chunks = flowColumns(paras, g.cols.n, g.cols.w, g.cols.h, g.h, g.spacing ?? 1, font.family);
+        // (one MTEXT entity: its columns share a key, the first one keeps its codes — written back once, not per column)
+        const col = uid("mt");
+        let head = true;
         chunks.forEach((ps, i) => {
           if (!ps.length) return;
           const off = (g.cols!.w + g.cols!.gutter) * i;
           const at = ap(m, g.p[0] + ux * off, g.p[1] + uy * off);
           this.pushText(e, g, ctx, L, color, at, xdir, up, hAlign, vAlign, ps, g.cols!.w * scaleOf(m), font);
+          const it = this.items[this.items.length - 1] as TextItem;
+          it.col = col;
+          if (!head) delete it.raw;
+          head = false;
         });
         return;
       }
@@ -1227,6 +1269,8 @@ class Walker {
       hAlign,
       vAlign,
       mtext: g.k === "mtext",
+      // (model space, paper space, and a block's own texts — through a plain insert, not an array / xref / a nested one)
+      ...(g.raw && (!ctx.grp || (ctx.grp.cad.ins && !ctx.grp.parent)) ? { raw: g.raw, ...(ctx.grp?.cad.ins ? { ins: ctx.grp.cad.ins as TextItem["ins"] } : {}) } : {}),
       boxW,
       spacing: g.k === "mtext" ? g.spacing ?? 1 : 1,
       invisible: e.invisible,
@@ -1244,7 +1288,8 @@ function viewportView(this: Walker, g: Extract<CadGeom, { k: "viewport" }>, ctx:
   const tg = g.target ?? [0, 0, 0];
   const vc = g.vc ?? [0, 0];
   const m = mul(translate(g.c[0], g.c[1]), mul(scaleM(s, s), mul(translate(-vc[0], -vc[1]), mul(rotateM(g.twist ?? 0), translate(-tg[0], -tg[1])))));
-  const grp: Grp = { id: uid("g"), name: t("engine.cad.group.viewport", { scale: scaleLabel(1 / s) }), parent: ctx.grp, top: ctx.grp ? ctx.grp.top : layer, cad: { block: "*VIEWPORT " + g.id } };
+  // (its frame and view kept, so the DXF export writes the layout's VIEWPORT again)
+  const grp: Grp = { id: uid("g"), name: t("engine.cad.group.viewport", { scale: scaleLabel(1 / s) }), parent: ctx.grp, top: ctx.grp ? ctx.grp.top : layer, cad: { block: "*VIEWPORT " + g.id, vp: { model: "", c: [g.c[0], g.c[1]], w: g.w, h: g.h, mc: [vc[0] + tg[0], vc[1] + tg[1]], scale: 1 / s } } };
   const frozen = new Set<string>();
   for (const h of g.frozen ?? []) for (const L of this.d.layers.values()) if (L.handle === h) frozen.add(L.name.toUpperCase());
   const start = this.items.length;
@@ -1644,6 +1689,8 @@ function mapContours(cs: Contour[], m: Mat): Contour[] {
 interface PageOpts {
   name: string;
   layout?: string;
+  layoutOrder?: number;
+  layoutActive?: boolean;
   /** paper space: drawn 1:1 in paper units */
   paper?: boolean;
   /** layout sheet (paper units) and millimetres per paper unit */
@@ -1867,6 +1914,13 @@ function isByLayer(e: CadEntity, ctx: Ctx): boolean {
 }
 
 /** The drawing's LTYPE table for the page source (linetypes loaded in the drawing, by upper-case name). */
+/** The drawing's STYLE table for the page source (the DXF export writes it back: texts keep their fonts). */
+function styleTable(d: CadDrawing): Record<string, CadStyleSource> {
+  const out: Record<string, CadStyleSource> = {};
+  for (const [key, s] of d.styles) out[key] = { name: s.name, file: s.file ?? s.font, ...(s.bigFont ? { bigFont: s.bigFont } : {}), height: s.height, width: s.widthFactor, oblique: s.oblique, gen: s.gen ?? 0, ...(s.family ? { family: s.family, familyFlags: s.familyFlags ?? 0 } : {}) };
+  return out;
+}
+
 function ltypeTable(d: CadDrawing): Record<string, { name: string; pattern: number[] }> {
   const out: Record<string, { name: string; pattern: number[] }> = {};
   for (const [key, lt] of d.ltypes) if (!/^(BYLAYER|BYBLOCK)$/i.test(key)) out[key.toUpperCase()] = { name: lt.name, pattern: [...lt.pattern] };
@@ -1890,6 +1944,10 @@ function pathNode(it: PathItem, m: Mat, k: number): VectorNode {
   }
   if (it.lt && it.stroke) n.cadLt = it.lt.segs ? { s: it.lt.s * k, segs: it.lt.segs.map((v) => v * k) } : { s: it.lt.s * k };
   if (it.invisible) n.visible = false;
+  if (it.hatch) n.cadHatch = it.hatch;
+  // a POINT stays a point (written back as POINT, not as a zero-length line)
+  if (it.type === "POINT") n.cadPoint = true;
+  if (it.vpFrame) n.cadVpFrame = [it.vpFrame[0], it.vpFrame[1]];
   return n;
 }
 
@@ -1900,7 +1958,7 @@ function mergeItems(items: Item[]): { items: Item[]; merged: number } {
   for (const it of items) {
     const prev = out[out.length - 1];
     if (
-      it.kind === "path" && prev?.kind === "path" && !it.xline && !prev.xline && !it.fill && !prev.fill && prev.grp === it.grp && prev.layer === it.layer && prev.stroke === it.stroke && prev.lw === it.lw && prev.width === it.width && String(prev.dash) === String(it.dash) && prev.lt?.s === it.lt?.s && !prev.invisible && !it.invisible && prev.contours.length < 500
+      it.kind === "path" && prev?.kind === "path" && it.type !== "POINT" && prev.type !== "POINT" && !it.xline && !prev.xline && !it.hatch && !prev.hatch && !it.fill && !prev.fill && prev.grp === it.grp && prev.layer === it.layer && prev.stroke === it.stroke && prev.lw === it.lw && prev.width === it.width && String(prev.dash) === String(it.dash) && prev.lt?.s === it.lt?.s && !prev.invisible && !it.invisible && prev.contours.length < 500
     ) {
       // merged pieces keep one pattern scale (no per-piece layout when the layer linetype changes)
       if (prev.type !== "MERGED") out[out.length - 1] = { ...prev, type: "MERGED", contours: [...prev.contours, ...it.contours], name: undefined, ...(prev.lt ? { lt: { s: prev.lt.s } } : {}) };
@@ -1987,6 +2045,8 @@ function buildPage(d: CadDrawing, w: Walker, items: Item[], opts: PageOpts, warn
     if (L.frozen) cad.frozen = true;
     if (!L.plot) cad.noPlot = true;
     groups.push({ id, name: L.name, parentId: null, visible: L.on && !L.frozen, locked: L.locked, opacity: 1, blendMode: "PASS_THROUGH", collapsed: true, cad });
+    /** column MTEXTs of this layer: the first column's node, all their nodes, where the codes are (finished below) */
+    const cols = new Map<string, { head: TextNode; ts: TextNode[]; own: (q: [number, number]) => [number, number]; raw: [number, string | number][]; type: "TEXT" | "MTEXT" }>();
     for (const it of used.get(key)!) {
     const made = it.kind === "text" ? textNodes(it, pageM, k) : [it.kind === "path" ? pathNode(it, pageM, k) : imageNode(it, pageM)];
     // a text drawn as several nodes (stack tops) stays one object: a text group of its own in its layer / block
@@ -1996,6 +2056,20 @@ function buildPage(d: CadDrawing, w: Walker, items: Item[], opts: PageOpts, warn
       textG = uid("g");
       groups.push({ id: textG, name: made[0]!.name, parentId: it.grp ? it.grp.id : id, visible: true, locked: false, opacity: 1, blendMode: "PASS_THROUGH", collapsed: true, cad: { text: true } });
     }
+    // an imported TEXT / MTEXT: its group codes and the look of its nodes now, so the DXF export writes it back exactly
+    // while it is unchanged (dxfWrite2000.ts; the nodes' own geometry gave a slightly other insertion point and height)
+    if (it.kind === "text" && it.raw && made[0] && made[0].type === "TEXT") {
+      const ts = made.filter((x): x is TextNode => !!x && x.type === "TEXT");
+      // (page → the text's own coordinates: the drawing / sheet, then its block's through its insert)
+      const inv: Mat = [1 / pageM[0], 0, 0, 1 / pageM[3], -pageM[4] / pageM[0], -pageM[5] / pageM[3]];
+      const ins = it.ins;
+      const own = (q: [number, number]): [number, number] => {
+        const w = ap(inv, q[0], q[1]) as [number, number];
+        return ins ? insLocal(ins, w) : w;
+      };
+      if (it.col) cols.set(it.col, { head: made[0], ts, own, raw: it.raw, type: it.type === "MTEXT" ? "MTEXT" : "TEXT" });
+      else made[0].cadText = { type: it.type === "MTEXT" ? "MTEXT" : "TEXT", raw: it.raw, sig: cadTextSig(ts), at: cadTextAt(ts, own), parts: ts.length };
+    } else if (it.kind === "text" && it.col && cols.has(it.col)) cols.get(it.col)!.ts.push(...made.filter((x): x is TextNode => !!x && x.type === "TEXT"));
     const src = w.owner.get(it);
     for (const n of made) {
       if (!n) continue;
@@ -2048,6 +2122,45 @@ function buildPage(d: CadDrawing, w: Walker, items: Item[], opts: PageOpts, warn
       nodes.push(n);
     }
     }
+    // a column MTEXT: its codes on its first node, for the nodes of all its columns (the others marked as its parts)
+    for (const [k2, c] of cols) {
+      c.head.cadText = { type: c.type, raw: c.raw, sig: cadTextSig(c.ts), at: cadTextAt(c.ts, c.own), parts: c.ts.length, key: k2 };
+      for (const x of c.ts) if (x !== c.head) x.cadPart = k2;
+    }
+  }
+
+  // associativity as AutoCAD keeps it: a hatch's boundary objects and a dimension's measured object points
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  for (const n of nodes) {
+    const h = n.type === "VECTOR" ? (n.cadHatch as (CadHatch & { srcH?: string[] }) | undefined) : undefined;
+    if (!h?.srcH) continue;
+    const ids = h.srcH.flatMap((x) => nodesOf.get(x)?.slice(0, 1) ?? []);
+    const { srcH: _drop, ...rest } = h;
+    void _drop;
+    (n as VectorNode).cadHatch = ids.length ? { ...rest, src: ids } : rest;
+  }
+  for (const [dh, da] of d.dimAssoc ?? []) {
+    const g = w.dimGrp.get(dh);
+    const dm = g?.cad.dim;
+    if (!dm || (dm.type !== 0 && dm.type !== 1) || !dm.p["13"] || !dm.p["14"] || !dm.p["10"]) continue;
+    const assoc: NonNullable<typeof dm.assoc> = {};
+    let r = 0;
+    for (const [bit, key] of [[1, "13"], [2, "14"]] as const) {
+      if (!(da.flags & bit)) continue;
+      const ref = da.refs[r++];
+      const id = ref && nodesOf.get(ref.obj)?.[0];
+      const n = id ? byId.get(id) : undefined;
+      if (n?.type !== "VECTOR" || !n.contours[0]) continue;
+      assoc[key] = { id: n.id, ci: 0, i: ref.param > 0.5 ? n.contours[0].nodes.length - 1 : 0 };
+    }
+    if (!Object.keys(assoc).length) continue;
+    const a = dm.p["13"], b = dm.p["14"], p10 = dm.p["10"];
+    const ang = dm.type === 0 ? ((dm.angle ?? 0) * Math.PI) / 180 : Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const u: [number, number] = [Math.cos(ang), Math.sin(ang)];
+    const nrm = [-u[1], u[0]];
+    dm.assoc = assoc;
+    dm.u = u;
+    dm.off = (p10[0] - a[0]) * nrm[0] + (p10[1] - a[1]) * nrm[1];
   }
 
   const width = Math.max(1, Math.round(wDu * k + 2 * pad));
@@ -2055,8 +2168,10 @@ function buildPage(d: CadDrawing, w: Walker, items: Item[], opts: PageOpts, warn
   const page = newPage("DESIGN", width, height, opts.name);
   page.nodes = nodes;
   page.groups = groups;
-  const cad: CadSourceMeta = { format: opts.format, version: d.version, assetId: opts.asset.id, hash: opts.asset.hash, insunits: d.insunits, unit: unitSymbol(d.insunits), mmPerUnit: mpu, scale, k, ox, oy, ltypes: ltypeTable(d) };
+  const cad: CadSourceMeta = { format: opts.format, version: d.version, assetId: opts.asset.id, hash: opts.asset.hash, insunits: d.insunits, unit: unitSymbol(d.insunits), mmPerUnit: mpu, scale, k, ox, oy, ltypes: ltypeTable(d), styles: styleTable(d) };
   if (opts.layout) cad.layout = opts.layout;
+  if (opts.layout && opts.layoutOrder) cad.layoutOrder = opts.layoutOrder;
+  if (opts.layout && opts.layoutActive) cad.layoutActive = true;
   if (opts.refs?.length) cad.refs = opts.refs.map((r) => ({ ...r }));
   if (Object.keys(w.blocks).length) cad.blocks = { ...w.blocks };
   // AutoCAD GROUPs with members on this page: their entities' nodes (a clipping base node stays out, as it is not an entity)
@@ -2115,13 +2230,13 @@ export function buildCadPages(d: CadDrawing, opts: { name: string; format: "dxf"
     const ents = key === "*PAPER_SPACE" || !key ? paperEnts : d.blocks.get(key)?.entities ?? [];
     if (!ents.some((e) => e.geom && !(e.geom.k === "viewport" && e.geom.id === 1))) continue;
     const frame: [number, number, number, number] | undefined = l.limits ? [l.limits[0][0], l.limits[0][1], l.limits[1][0], l.limits[1][1]] : undefined;
-    run(ents, { name: t("engine.cad.page.layout", { name: opts.name, layout: l.name }), layout: l.name, paper: true, frame, paperMm: l.paperMm });
+    run(ents, { name: t("engine.cad.page.layout", { name: opts.name, layout: l.name }), layout: l.name, layoutOrder: l.order, layoutActive: key === "*PAPER_SPACE", paper: true, frame, paperMm: l.paperMm });
   }
   if (!layouts.length && paperEnts.some((e) => e.geom && !(e.geom.k === "viewport" && e.geom.id === 1))) run(paperEnts, { name: t("engine.cad.page.layout", { name: opts.name, layout: "Layout1" }), layout: "Layout1", paper: true });
 
   if (!pages.length) {
     const p = newPage("DESIGN", 1123, 794, t("engine.cad.page.model", { name: opts.name }));
-    p.source = { format: opts.format, name: opts.asset.name, cad: { format: opts.format, version: d.version, assetId: opts.asset.id, hash: opts.asset.hash, insunits: d.insunits, unit: unitSymbol(d.insunits), mmPerUnit: mmPerUnit(d.insunits), scale: 1, k: PX_MM, ox: 0, oy: 794 / PX_MM, ltypes: ltypeTable(d) } };
+    p.source = { format: opts.format, name: opts.asset.name, cad: { format: opts.format, version: d.version, assetId: opts.asset.id, hash: opts.asset.hash, insunits: d.insunits, unit: unitSymbol(d.insunits), mmPerUnit: mmPerUnit(d.insunits), scale: 1, k: PX_MM, ox: 0, oy: 794 / PX_MM, ltypes: ltypeTable(d), styles: styleTable(d) } };
     pages.push(p);
     warnings.push(t("engine.cad.warn.empty"));
   }

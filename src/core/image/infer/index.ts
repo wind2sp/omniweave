@@ -5,7 +5,8 @@
 // `saliency(img)` → 320×320 map in 0..1 (1 = subject). Refinement to full resolution is in ../matte/refine.ts.
 
 import { parseModel, type Model } from "./model";
-import { cpuUsesWasm, runCpu } from "./cpu";
+import { cpuUsesWasm, runCpu, runCpuAsync } from "./cpu";
+import { convPool } from "./convPool";
 import { GpuRunner, gpuAvailable } from "./webgpu";
 import type { Img } from "../pixels";
 
@@ -14,6 +15,8 @@ export type Backend = "webgpu" | "wasm-simd" | "cpu";
 export const SAL = 320;
 
 let model: Model | null = null;
+/** the model file (the conv pool's workers parse their own copy) */
+let modelBytes: ArrayBuffer | null = null;
 let loading: Promise<Model> | null = null;
 let gpu: Promise<GpuRunner | null> | null = null;
 let gpuBroken = false;
@@ -21,6 +24,7 @@ let gpuBroken = false;
 /** Provide the model bytes directly (tests, or a caller that already has them). */
 export function setModelBytes(bytes: Uint8Array) {
   model = parseModel(bytes);
+  modelBytes = bytes.slice().buffer as ArrayBuffer;
   loading = Promise.resolve(model);
   gpu = null;
 }
@@ -33,7 +37,8 @@ export function loadModel(): Promise<Model> {
       const url = new URL("../../../assets/models/u2netp.lwt", import.meta.url);
       const res = await fetch(url);
       if (!res.ok) throw new Error(`model ${res.status}`);
-      model = parseModel(new Uint8Array(await res.arrayBuffer()));
+      modelBytes = await res.arrayBuffer();
+      model = parseModel(new Uint8Array(modelBytes));
       return model;
     })();
   loading.catch(() => (loading = null));
@@ -88,10 +93,12 @@ export interface SaliencyResult {
   hi: number;
   backend: Backend;
   ms: number;
+  /** CPU: the conv pool workers the run was split across (none: one thread) */
+  workers?: number;
 }
 
 /** Run U²-Netp on an image. `backend: "cpu"` skips WebGPU (tests, or the user turned GPU off). */
-export async function saliency(img: Img, opts: { backend?: "auto" | "cpu" } = {}): Promise<SaliencyResult> {
+export async function saliency(img: Img, opts: { backend?: "auto" | "cpu"; pool?: boolean } = {}): Promise<SaliencyResult> {
   const m = await loadModel();
   const x = preprocess(img, m.meta.mean, m.meta.std);
   const t0 = performance.now();
@@ -106,6 +113,15 @@ export async function saliency(img: Img, opts: { backend?: "auto" | "cpu" } = {}
       gpu = null;
     }
   }
+  // the CPU: the convs split across the conv pool's workers where there is one (convPool.ts), else on this thread
+  const pool = opts.pool === false ? null : convPool("u2netp", "u2", () => modelBytes);
+  if (pool)
+    try {
+      const out = await runCpuAsync(m, x, (i, L, t) => pool.u2Conv(i, L, t));
+      return { ...normalize(out), backend: cpuUsesWasm() ? "wasm-simd" : "cpu", ms: performance.now() - t0, workers: pool.size };
+    } catch {
+      pool.terminate();
+    }
   return { ...normalize(runCpu(m, x)), backend: cpuUsesWasm() ? "wasm-simd" : "cpu", ms: performance.now() - t0 };
 }
 

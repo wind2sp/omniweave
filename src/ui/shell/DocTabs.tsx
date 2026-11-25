@@ -8,7 +8,7 @@ import { moveTab, setPinned, switchTo, tabTitle, useSessions, type TabMeta } fro
 import { DEFAULT_TITLE } from "../../core/types";
 import { docTitle, useT } from "../../i18n";
 import { openAndRemember } from "../actions";
-import { claimDrop } from "../fileDrop";
+import { claimDrop, droppedFiles } from "../fileDrop";
 import { useTabWorking } from "../progress";
 import { closeOtherTabs, closeTab, closeTabsToRight, closeAllTabs } from "../tabs";
 import { Icon, type IconName } from "./Icons";
@@ -79,10 +79,18 @@ function RenameField({ meta, onDone }: { meta: TabMeta; onDone: () => void }) {
   );
 }
 
-/** Small menu at a pointer position (tab right click). */
-export function PopMenu({ at, items, onClose }: { at: { x: number; y: number }; items: MenuItem[]; onClose: () => void }) {
+/**
+ * Small menu at a pointer position (tab right click, the canvas's context menus). An item with `sub` opens its
+ * submenu beside it (hover, click, →; ← closes it), like Illustrator's Transform ▸ / Arrange ▸.
+ */
+export function PopMenu({ at, items, onClose, nested }: { at: { x: number; y: number }; items: MenuItem[]; onClose: () => void; nested?: { onBack: () => void } }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [sub, setSub] = useState<{ i: number; x: number; y: number } | null>(null);
+  const openSub = (i: number, el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    setSub({ i, x: r.right - 2, y: r.top - 4 });
+  };
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -90,7 +98,9 @@ export function PopMenu({ at, items, onClose }: { at: { x: number; y: number }; 
     el.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
   }, [at.x, at.y]);
   useEffect(() => {
-    const down = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && onClose();
+    // a nested list: its parent's listeners close the whole menu
+    if (nested) return;
+    const down = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && !(e.target as HTMLElement)?.closest?.(".menu-pop") && onClose();
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -105,11 +115,26 @@ export function PopMenu({ at, items, onClose }: { at: { x: number; y: number }; 
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("blur", onClose);
     };
-  }, [onClose]);
+  }, [onClose, nested]);
   return createPortal(
+    <>
     // (a portal: React would bubble a press on the menu to the parent's handlers — the canvas, which moved the body's
     // caret under the menu before the item ran, so the review items acted on the wrong place; QA doc-review2)
-    <div ref={ref} className="menu-pop" role="menu" style={pos ?? { visibility: "hidden", left: 0, top: 0 }} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+    <div
+      ref={ref}
+      className="menu-pop"
+      role="menu"
+      style={pos ?? { visibility: "hidden", left: 0, top: 0 }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft" && nested) {
+          e.stopPropagation();
+          nested.onBack();
+        }
+      }}
+    >
       {items.map((it, i) =>
         it.sep ? (
           <div key={i} className="menu-sep" role="separator" />
@@ -120,7 +145,17 @@ export function PopMenu({ at, items, onClose }: { at: { x: number; y: number }; 
             role="menuitem"
             className="menu-item"
             disabled={it.disabled}
-            onClick={() => {
+            aria-haspopup={it.sub ? "menu" : undefined}
+            aria-expanded={it.sub ? sub?.i === i : undefined}
+            onMouseEnter={(e) => (it.sub ? openSub(i, e.currentTarget) : setSub(null))}
+            onKeyDown={(e) => {
+              if (it.sub && (e.key === "ArrowRight" || e.key === "Enter")) {
+                e.preventDefault();
+                openSub(i, e.currentTarget);
+              }
+            }}
+            onClick={(e) => {
+              if (it.sub) return openSub(i, e.currentTarget);
               onClose();
               it.onSelect?.();
             }}
@@ -128,10 +163,13 @@ export function PopMenu({ at, items, onClose }: { at: { x: number; y: number }; 
             <span className="menu-ico">{it.icon ? <Icon name={it.icon} size={14} /> : null}</span>
             <span className="menu-label">{it.label}</span>
             {it.kbd && <kbd>{it.kbd}</kbd>}
+            {it.sub && <Icon name="chevronRight" size={12} />}
           </button>
         ),
       )}
-    </div>,
+    </div>
+      {sub && items[sub.i]?.sub && <PopMenu key={sub.i} at={{ x: sub.x, y: sub.y }} items={items[sub.i].sub!} onClose={onClose} nested={{ onBack: () => setSub(null) }} />}
+    </>,
     document.body,
   );
 }
@@ -302,7 +340,7 @@ export function DocTabs() {
           if (from.current || !e.dataTransfer.files.length) return;
           e.preventDefault();
           claimDrop(e);
-          for (const f of Array.from(e.dataTransfer.files)) await openAndRemember({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) });
+          for (const f of await droppedFiles(e.dataTransfer)) await openAndRemember(f);
         }}
       >
         {tabs.map((m, i) => (

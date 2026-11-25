@@ -23,6 +23,7 @@ fn act(v: f32, k: u32, a0: f32, a1: f32) -> f32 {
     case 3u: { return v / (1.0 + exp(-v)); }
     case 4u: { return 1.0 / (1.0 + exp(-v)); }
     case 5u: { return clamp(v * a0 + a1, 0.0, 1.0); }
+    case 7u: { return clamp(v, 0.0, 6.0); }
     default: { return v; }
   }
 }
@@ -284,6 +285,47 @@ var<workgroup> red: array<f32, 64>;
   for (var k = t; k < L; k += 64u) { O[oo + k] = O[oo + k] * inv; }
 }`,
   // P: C HW xOff — global average, one workgroup per channel
+  // per-channel k·x + s (batch norm, folded on the CPU): B holds k[C] then s[C]. P: n C HW xOff
+  affine: `${IO2}${FLAT}
+  let c = (i / P[2]) % P[1];
+  O[i] = A[P[3] + i] * B[c] + B[P[1] + c];
+}`,
+  // instance norm: one workgroup per channel (mean and variance over H × W), then the affine scale / shift (weights in B).
+  // P: C HW xOff scOff biOff eps
+  inorm: `${IO2}
+var<workgroup> r1: array<f32, 64>;
+var<workgroup> r2: array<f32, 64>;
+@compute @workgroup_size(64) fn main(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>) {
+  let c = wg.x; let n = P[1]; let xo = P[2] + c * n; let t = l.x;
+  var s = 0.0;
+  for (var k = t; k < n; k += 64u) { s += A[xo + k]; }
+  r1[t] = s;
+  workgroupBarrier();
+  for (var q = 32u; q > 0u; q = q >> 1u) { if (t < q) { r1[t] = r1[t] + r1[t + q]; } workgroupBarrier(); }
+  let mean = r1[0] / f32(n);
+  var v = 0.0;
+  for (var k = t; k < n; k += 64u) { let d = A[xo + k] - mean; v += d * d; }
+  r2[t] = v;
+  workgroupBarrier();
+  for (var q = 32u; q > 0u; q = q >> 1u) { if (t < q) { r2[t] = r2[t] + r2[t + q]; } workgroupBarrier(); }
+  let kk = B[P[3] + c] / sqrt(r2[0] / f32(n) + pf(5)); let sh = B[P[4] + c] - mean * kk;
+  for (var k = t; k < n; k += 64u) { O[c * n + k] = A[xo + k] * kk + sh; }
+}`,
+  // bilinear resize, PyTorch align_corners = false (graph.ts bilinear). P: n C H W oh ow xOff
+  bilinear: `${IO1}${FLAT}
+  let ow = P[5]; let oh = P[4]; let H = P[2]; let W = P[3];
+  let x = i % ow; let t = i / ow; let y = t % oh; let c = t / oh;
+  var fy = 0.0; var fx = 0.0;
+  if (oh > 1u) { fy = max(0.0, (f32(y) + 0.5) * f32(H) / f32(oh) - 0.5); }
+  if (ow > 1u) { fx = max(0.0, (f32(x) + 0.5) * f32(W) / f32(ow) - 0.5); }
+  fy = min(fy, f32(H - 1u)); fx = min(fx, f32(W - 1u));
+  let y0 = u32(floor(fy)); let x0 = u32(floor(fx));
+  let y1 = min(H - 1u, y0 + 1u); let x1 = min(W - 1u, x0 + 1u);
+  let wy = fy - f32(y0); let wx = fx - f32(x0);
+  let b = P[6] + c * H * W;
+  let a0 = A[b + y0 * W + x0]; let a1 = A[b + y0 * W + x1]; let b0 = A[b + y1 * W + x0]; let b1 = A[b + y1 * W + x1];
+  O[i] = (a0 + (a1 - a0) * wx) * (1.0 - wy) + (b0 + (b1 - b0) * wx) * wy;
+}`,
   gpool: `${IO1}
 var<workgroup> red: array<f32, 64>;
 @compute @workgroup_size(64) fn main(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>) {
@@ -297,7 +339,7 @@ var<workgroup> red: array<f32, 64>;
 }`,
 };
 
-const ACT: Record<string, number> = { relu: 1, hardswish: 2, swish: 3, sigmoid: 4, hardsigmoid: 5, prelu: 6 };
+const ACT: Record<string, number> = { relu: 1, hardswish: 2, swish: 3, sigmoid: 4, hardsigmoid: 5, prelu: 6, relu6: 7 };
 
 /** The tiled 3×3 kernel (conv3t) applies: dense 3×3, stride 1, padding 1, wide enough to fill its 8-channel blocks. */
 let conv3tOn = true;
@@ -541,7 +583,42 @@ export class GraphGpu {
             r = o;
             break;
           }
+          case "bn": {
+            // folded on the CPU into k·x + s per channel
+            const x = g(n.in[0]);
+            const [mean, vr, sc, bi] = n.in.slice(1).map((v) => (getCpu(v) as Tensor).d);
+            const C = x.s[1], ks = new Float32Array(2 * C);
+            for (let c = 0; c < C; c++) {
+              ks[c] = sc[c] / Math.sqrt(vr[c] + (a.eps ?? 1e-5));
+              ks[C + c] = bi[c] - mean[c] * ks[c];
+            }
+            const kb = upload({ s: [2 * C], d: ks });
+            const o = newT(x.s.slice());
+            dispatch("affine", [x.buf, kb.buf, o.buf], [size(x.s), C, size(x.s) / C, x.off], size(x.s));
+            r = o;
+            break;
+          }
+          case "inorm": {
+            const x = g(n.in[0]);
+            if (typeof n.in[1] !== "string" || typeof n.in[2] !== "string") throw new Error("inorm weights");
+            const C = x.s[1], HW = size(x.s) / C;
+            const o = newT(x.s.slice());
+            recs.push({ pipe: "inorm", bufs: [x.buf, this.wbuf, o.buf], p: [C, HW, x.off, this.woff.get(n.in[1].slice(1))!, this.woff.get(n.in[2].slice(1))!, f2u(a.eps ?? 1e-5)], groups: [C, 1] });
+            r = o;
+            break;
+          }
+          case "bilinear_interp": {
+            const x = g(n.in[0]);
+            const sc = a.scale as number[];
+            const [, C, H, W] = x.s;
+            const oh = Math.floor(H * sc[0]), ow = Math.floor(W * sc[1]);
+            const o = newT([1, C, oh, ow]);
+            dispatch("bilinear", [x.buf, o.buf], [size(o.s), C, H, W, oh, ow, x.off], size(o.s));
+            r = o;
+            break;
+          }
           case "relu":
+          case "relu6":
           case "hardswish":
           case "swish":
           case "sigmoid":

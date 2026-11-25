@@ -1,5 +1,5 @@
 // In-place table cell editor: double-click a cell; Tab / Shift+Tab move across, Enter moves down,
-// Shift+Enter inserts a line break, Esc cancels. Every committed cell is one undoable step.
+// Shift+Enter inserts a line break, Esc leaves the cell (keeping the text, as Word does). Every committed cell is one undoable step.
 
 import { isAppChord } from "./appKeys";
 import { useEffect, useRef, useState } from "react";
@@ -114,9 +114,18 @@ export function CellEditor({ target, onMove, onDone }: { target: CellTarget; onM
         if (isAppChord(e.nativeEvent)) return;
         e.stopPropagation();
         if (e.key === "Escape") {
+          // Word / 한글: Esc leaves the cell and keeps what was typed (QA 11-24 basic-ux: it used to be lost)
           e.preventDefault();
+          commit();
           cancelled.current = true;
           onDone();
+        } else if (e.key === "Enter" && e.ctrlKey && e.shiftKey && node.flow) {
+          // 표 나누기 (Word Ctrl+Shift+Enter): this row and the ones below become a table of their own
+          e.preventDefault();
+          commit();
+          cancelled.current = true;
+          onDone();
+          void import("./docFlow").then((m) => m.splitFlowTable(target.nodeId, target.row));
         } else if (e.key === "Tab") {
           e.preventDefault();
           go(0, e.shiftKey ? -1 : 1);

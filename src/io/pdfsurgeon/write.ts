@@ -16,9 +16,13 @@ import { apply, inv, mul, rotate, scaleOf, translate, type M } from "./matrix";
 import { t } from "../../i18n";
 import { dropXmpThumbnail, isIllustratorPdf, stripIllustratorData } from "./ai";
 import { mirrorIllustratorEdits, type AiMirror } from "./aiPrivate";
+import { writeOmwPiece, type OmwPageData } from "./omwPiece";
 import { padTtfSubsetGlyphs } from "../fontkitPatch";
 import type { ColorState } from "./interpret";
 import { paintBox } from "../../core/vector";
+import { arrowContours } from "../../core/arrowheads";
+import { liveParts } from "../../core/liveVector";
+import { pathTextGlyphs } from "../../core/pathText";
 import type { Paint } from "../../core/style/types";
 import { drawableGradient, gradientFades, shadingDict, type GradientPaint } from "../pdfGradient";
 
@@ -33,6 +37,8 @@ export interface PageEditInput {
   covers?: PdfCover[];
   /** placement of the PdfNode on the Omniweave page (default: identity at page size) */
   pdfNode?: { transform: Transform; width: number; crop?: { x: number; y: number; w: number; h: number } };
+  /** Omniweave's own page data to keep in the page (the perspective grid; io/pdfsurgeon/omwPiece.ts); omitted = left as it is */
+  omw?: OmwPageData | null;
 }
 
 export interface SaveOptions extends ElevateOptions {
@@ -102,6 +108,12 @@ export function vectorChanged(orig: VectorNode, cur: VectorNode): boolean {
 }
 
 // ───────── colours ─────────
+
+/** A colour with no paint at all (alpha 0, "transparent"): text in it is written invisible. */
+export function isTransparentCss(c: string | null | undefined): boolean {
+  const s = (c ?? "").trim().toLowerCase();
+  return s === "transparent" || /^#[0-9a-f]{6}00$/.test(s) || /^#[0-9a-f]{3}0$/.test(s) || /^rgba\([^)]*[,\s/]\s*0(\.0+)?\s*\)$/.test(s);
+}
 
 export function parseCss(c: string | null | undefined): [number, number, number] | null {
   if (!c) return null;
@@ -238,6 +250,9 @@ class Session {
       if (src) {
         try {
           const img = /png/.test(src.mime) ? await this.doc.pdf.embedPng(src.bytes) : /jpe?g/.test(src.mime) ? await this.doc.pdf.embedJpg(src.bytes) : null;
+          // the picture object is written now (pdf-lib embeds lazily at its own save, which the incremental update does
+          // not call: the page drew a reference to nothing — QA PDF 이미지 추가 lost on save)
+          if (img) await img.embed();
           if (img) e = { ref: img.ref, w: img.width, h: img.height };
         } catch (err) {
           this.report.skipped.push(t("engine.pdf.edit.imageFailed", { error: (err as Error).message }));
@@ -556,6 +571,51 @@ function shadedShape(se: Session, model: PageModel, v: VectorItem, cur: VectorNo
   return `\nq\n${path}${cur.fillRule === "evenodd" ? "W*" : "W"} n\nq\n/Perceptual ri\n${gs}BX\n/${name} sh\nEX\nQ\nQ\n`;
 }
 
+/**
+ * A path of the file given a live appearance (core/liveVector.ts): the plain paths it draws, written where the original
+ * path was drawn (its place in the stacking order), in the user space the original path was built in. Gradient fills
+ * go in as shadings through the part as a clip.
+ */
+function liveInPlace(se: Session, model: PageModel, v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) => [number, number], atPaint: boolean): string | null {
+  const parts = liveParts(cur);
+  const back = inv(v.path.base);
+  if (!parts || !back) return null;
+  const ctx = se.doc.ctx;
+  const owner = ownerOf(se, model, v.path.unit);
+  const user = (px: [number, number]): [number, number] => apply(back, px[0], px[1]);
+  const k = scaleOf(v.path.base) || 1;
+  // at the paint operator the CTM is the paint's: back to the space the path was built in (emitVector)
+  const toBase = mul(v.path.base, inv(v.path.paintBase) ?? [1, 0, 0, 1, 0, 0]);
+  let out = "\nq\n" + (atPaint && toBase.some((x, i) => !close(x, [1, 0, 0, 1, 0, 0][i], 1e-9)) ? `${mStr(toBase)} cm\n` : "");
+  for (const q of parts) {
+    const L = localToPx(q, toPx);
+    const path = pathOps(q.contours, (pt) => user(L(pt)));
+    if (!path.trim()) continue;
+    const gs = q.opacity < 1 ? `/${se.gsName(owner, q.opacity)} gs ` : "";
+    const g = paintsOf(q, "fills");
+    let fill = parseCss(q.fill);
+    const stroke = q.stroke && q.strokeWidth > 0 ? parseCss(q.stroke) : null;
+    let s = `q ${gs}\n`;
+    if (fill && drawableGradient(g) && !gradientFades(g)) {
+      const name = addResource(se, owner, "Shading", ctx.register(shadingDict(ctx, g, gradientAt(q, toPx, user))), "OmwSh");
+      s += `q ${path}${q.fillRule === "evenodd" ? "W*" : "W"} n /${name} sh Q\n`;
+      fill = null;
+    }
+    if (!fill && !stroke) {
+      out += s + "Q\n";
+      continue;
+    }
+    if (fill) s += rgbOp(fill, "rg") + "\n";
+    if (stroke) {
+      const cap = { butt: 0, round: 1, square: 2 }[q.strokeCap ?? "round"], join = { miter: 0, round: 1, bevel: 2 }[q.strokeJoin ?? "round"];
+      const w = (q.strokeWidth * (Math.abs(q.transform.scale) || 1)) / k;
+      s += `${rgbOp(stroke, "RG")} ${num(w)} w ${cap} J ${join} j${q.strokeDash?.length ? ` [${q.strokeDash.map((d) => num(d / k)).join(" ")}] 0 d` : ""}\n`;
+    }
+    out += s + path + paintOp(!!fill, !!stroke, q.fillRule === "evenodd") + "\nQ\n";
+  }
+  return out + "Q\n";
+}
+
 /** The colour operators of a changed gradient fill / stroke of a pattern-painted path: new shading patterns. */
 function patternState(se: Session, model: PageModel, v: VectorItem, cur: VectorNode, toPx: (p: [number, number]) => [number, number]): string | null {
   const u = model.analysis.units.get(v.path.unit);
@@ -591,16 +651,42 @@ const ITALIC_SLANT = 0.2;
 const BOLD_STROKE = 0.03;
 
 async function emitAdded(se: Session, n: SceneNode, owner: ResOwner, toPdfM: M): Promise<string | null> {
+  // a live appearance: its plain parts (core/liveVector.ts), one after another
+  const parts = n.type === "VECTOR" ? liveParts(n) : null;
+  if (parts) {
+    let all = "";
+    for (const q of parts) all += (await emitAdded(se, q, owner, toPdfM)) ?? "";
+    return all || null;
+  }
   const m = mul(nodeMatrix(n.transform), toPdfM);
   // node opacity → ExtGState ca/CA (applied per painting operation: where a node's own fill, stroke or
   // glyphs overlap they compound, unlike the screen's whole-node opacity)
   const gs = n.opacity < 1 && (n.type === "VECTOR" || n.type === "IMAGE" || n.type === "TEXT") ? `/${se.gsName(owner, n.opacity)} gs ` : "";
   if (n.type === "VECTOR") {
-    const fill = parseCss(n.fill), stroke = parseCss(n.stroke);
+    let fill = parseCss(n.fill);
+    const stroke = parseCss(n.stroke);
     let s = `q ${mStr(m)} cm ${gs}\n`;
+    // a gradient fill (an outlined gradient stroke, a shape drawn with one): its shading through the path as a clip,
+    // then the stroke (if any) on top
+    const g = (n as VectorNode & { fills?: Paint[] }).fills?.[0];
+    if (fill && drawableGradient(g) && !gradientFades(g)) {
+      const b = paintBox(n);
+      const sh = addResource(se, owner, "Shading", se.doc.ctx.register(shadingDict(se.doc.ctx, g, (u) => [b.x + u[0] * b.w, b.y + u[1] * b.h])), "OmwSh");
+      s += `q ${pathOps(n.contours, (p) => p)}${n.fillRule === "evenodd" ? "W*" : "W"} n /${sh} sh Q\n`;
+      fill = null;
+      if (!stroke) return s + "Q\n";
+    }
     if (fill) s += rgbOp(fill, "rg") + "\n";
-    if (stroke) s += `${rgbOp(stroke, "RG")} ${num(n.strokeWidth)} w\n`;
-    return s + pathOps(n.contours, (p) => p) + paintOp(!!fill, !!stroke, n.fillRule === "evenodd") + "\nQ\n";
+    // caps, corners and dashes as drawn (Illustrator's Stroke panel; round when the path has none)
+    if (stroke) {
+      const cap = { butt: 0, round: 1, square: 2 }[n.strokeCap ?? "round"], join = { miter: 0, round: 1, bevel: 2 }[n.strokeJoin ?? "round"];
+      s += `${rgbOp(stroke, "RG")} ${num(n.strokeWidth)} w ${cap} J ${join} j${n.strokeDash?.length ? ` [${n.strokeDash.map(num).join(" ")}] 0 d` : ""}\n`;
+    }
+    s += pathOps(n.contours, (p) => p) + paintOp(!!fill, !!stroke, n.fillRule === "evenodd") + "\n";
+    // arrowheads: filled in the stroke colour (core/arrowheads.ts)
+    const heads = stroke ? arrowContours(n) : [];
+    if (heads.length) s += `${rgbOp(stroke!, "rg")}\n${pathOps(heads, (p) => p)} f\n`;
+    return s + "Q\n";
   }
   if (n.type === "IMAGE") {
     const img = await se.imageName(owner, n.assetId);
@@ -616,6 +702,17 @@ async function emitAdded(se: Session, n: SceneNode, owner: ResOwner, toPdfM: M):
     // One fallback font (no bold/italic faces), so bold and italic are synthetic: bold strokes the glyph
     // outlines in the text colour (Tr 2), italic slants the text matrix; underline is a filled bar.
     let s = `q ${mStr(m)} cm ${gs}BT\n`;
+    // type on a path: each character with its own text matrix, turned with the path (core/pathText.ts)
+    if (n.onPath) {
+      for (const g of pathTextGlyphs(n)) {
+        const drawable = await se.fallbackDrawable(g.ch);
+        if (!drawable?.trim()) continue;
+        const c = Math.cos(g.angle), sn = Math.sin(g.angle);
+        const rgb = parseCss(g.run.color) ?? [0, 0, 0];
+        s += `${num(c)} ${num(sn)} ${num(sn)} ${num(-c)} ${num(g.x)} ${num(g.y)} Tm ${rgbOp(rgb, "rg")} 0 Tr /${fb} ${num(g.run.fontSize)} Tf ${font.encodeText(drawable).toString()} Tj\n`;
+      }
+      return s + "ET\nQ\n";
+    }
     const bars: string[] = [];
     let y = 0;
     for (const p of n.paragraphs) {
@@ -626,12 +723,16 @@ async function emitAdded(se: Session, n: SceneNode, owner: ResOwner, toPdfM: M):
       for (const r of p.runs) {
         const drawable = r.text ? await se.fallbackDrawable(r.text) : "";
         if (!drawable) continue;
+        // a fully transparent run (OCR's searchable text layer over a scan) is written invisible (Tr 3): selectable and
+        // searchable, never painted. It was written black — the hidden text showed over the page once saved (mobile
+        // ux-audit #8); the PDF export already did this (io/pdfVector.ts textOps)
+        const invisible = isTransparentCss(r.color);
         const rgb = parseCss(r.color) ?? [0, 0, 0];
         const w = font.widthOfTextAtSize(drawable, r.fontSize);
         s += `1 0 ${r.italic ? ITALIC_SLANT : 0} -1 ${num(x)} ${num(base)} Tm ${rgbOp(rgb, "rg")} `;
-        s += r.bold ? `${rgbOp(rgb, "RG")} ${num(r.fontSize * BOLD_STROKE)} w 2 Tr ` : "0 Tr ";
+        s += invisible ? "3 Tr " : r.bold ? `${rgbOp(rgb, "RG")} ${num(r.fontSize * BOLD_STROKE)} w 2 Tr ` : "0 Tr ";
         s += `/${fb} ${num(r.fontSize)} Tf ${font.encodeText(drawable).toString()} Tj\n`;
-        if (r.underline) bars.push(`${rgbOp(rgb, "rg")} ${num(x)} ${num(base + r.fontSize * 0.1)} ${num(w)} ${num(Math.max(0.5, r.fontSize * 0.06))} re f\n`);
+        if (r.underline && !invisible) bars.push(`${rgbOp(rgb, "rg")} ${num(x)} ${num(base + r.fontSize * 0.1)} ${num(w)} ${num(Math.max(0.5, r.fontSize * 0.06))} re f\n`);
         x += w;
       }
       y += h + p.spaceAfter;
@@ -806,6 +907,8 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
     const byId = new Map(inp.nodes.map((n) => [n.id, n]));
     const toPx = makeToPdfPx(inp, model);
     const edited: { id: string; name: string; cur: VectorNode }[] = [];
+    // the file's own paths with a live appearance, written again as added objects (their plain parts)
+    const liveOriginals: SceneNode[] = [];
     if (ai) mirror.pagePaths.set(inp.pageIndex, model.analysis.items.flatMap((it) => (it.kind === "path" ? [pdfPoints(it, model)] : [])));
     if (inp.elevated) {
       for (const line of model.lines) {
@@ -838,6 +941,16 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
         if (v.shade) {
           const cur = byId.get(v.id);
           const su = model.analysis.units.get(v.shade.unit)!;
+          // a live appearance on a gradient shape: its parts where it was drawn, the original shading out
+          const live = cur?.type === "VECTOR" && cur.visible && liveParts(cur) ? liveInPlace(se, model, v, cur, toPx, false) : null;
+          if (live != null) {
+            const cu = model.analysis.units.get(v.path.unit)!;
+            se.splice(v.path.unit, { s: cu.ops[v.path.first].s, e: cu.ops[v.path.first].s, text: live });
+            se.splice(v.shade.unit, { s: su.ops[v.shade.op].s, e: su.ops[v.shade.op].e, text: " " });
+            se.report.editedVectors++;
+            block("engine.ai.why.shape");
+            continue;
+          }
           if (!cur || cur.type !== "VECTOR" || !cur.visible) {
             se.splice(v.shade.unit, { s: su.ops[v.shade.op].s, e: su.ops[v.shade.op].e, text: " " });
             se.report.deletedVectors++;
@@ -869,6 +982,21 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
           se.splice(v.path.unit, { ...range, text: plain ? " " : "n" });
           se.report.deletedVectors++;
           block("engine.ai.why.delete");
+          continue;
+        }
+        // a live appearance on the file's own path (live corners, aligned stroke, live effects…; core/liveVector.ts):
+        // the original path comes out and the plain paths it draws are appended with the added objects
+        if (liveParts(cur)) {
+          const live = liveInPlace(se, model, v, cur, toPx, true);
+          // (written in the original's place: a path object replaced as a whole, else after its ended paint)
+          if (live != null) {
+            se.splice(v.path.unit, { ...range, text: plain ? live : "n" + live });
+            se.report.editedVectors++;
+          } else {
+            se.splice(v.path.unit, { ...range, text: plain ? " " : "n" });
+            liveOriginals.push(cur);
+          }
+          block("engine.ai.why.shape");
           continue;
         }
         const gradEdit = v.pattern && (paintsChanged(v.node, cur, "fills") || paintsChanged(v.node, cur, "strokes"));
@@ -907,7 +1035,7 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
     }
     // nodes that did not come from this PDF page are appended on top
     let appended = "";
-    const added = inp.nodes.filter((n) => n.type !== "PDF" && n.visible && !isSurgeonId(n.id, opts.prefix, inp.pageIndex));
+    const added = [...liveOriginals, ...inp.nodes.filter((n) => n.type !== "PDF" && n.visible && !isSurgeonId(n.id, opts.prefix, inp.pageIndex))];
     const covers = (inp.covers ?? []).filter((c) => c.w > 0 && c.h > 0 && parseCss(c.color));
     if (inp.pdfNode?.crop)
       se.report.skipped.push(t("engine.pdf.edit.cropIgnored"));
@@ -929,13 +1057,17 @@ export async function applyEdits(doc: SurgeonDoc, inputs: PageEditInput[], opts:
     if (edited.length) verifyVectors(se, inp.pageIndex, opts, edited);
   }
 
+  // Omniweave's page data (page-piece dictionary): not an edit of the artwork, so Illustrator's data is not touched for it
+  let pieces = 0;
+  for (const inp of inputs) if (inp.omw !== undefined && writeOmwPiece(doc, inp.pageIndex, inp.omw)) se.mark(doc.pageRefs[inp.pageIndex]), pieces++;
+
   const order = opts.pageOrder;
   if (order && (order.length !== doc.pageRefs.length || order.some((p, i) => p !== i))) {
     reorderPages(se, order);
     block("engine.ai.why.pages");
   }
 
-  if (se.dirty.length && ai) {
+  if (se.dirty.length > pieces && ai) {
     // Illustrator reads its private data first: mirror the edits there, or remove it so Illustrator reads the
     // edited PDF content (layers then merge into one in Illustrator — the caller tells the person why)
     let why = aiWhy;

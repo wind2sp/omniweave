@@ -260,6 +260,11 @@ export interface Piece {
   spacing?: number;
   /** text the view leaves out (deleted text in the final view, core/review.ts): no width, not drawn */
   hidden?: true;
+  /**
+   * the run's 덧말 as laid out (TextRun.ruby, rubyMetrics): drawn from x + dx on the line's baseline + dy, in its own
+   * font, narrowed by hscale (한글: a 덧말 wider than its text)
+   */
+  ruby?: { text: string; dx: number; dy: number; font: string; size: number; hscale?: number };
 }
 
 /** Superscript/subscript glyphs are drawn at this fraction of the run size. */
@@ -268,6 +273,63 @@ export const SCRIPT_SCALE = 0.65;
 /** Font actually used to draw a run (smaller for superscript/subscript). */
 export function runFont(r: TextRun): string {
   return r.script ? cssFont({ ...r, fontSize: Math.round(r.fontSize * SCRIPT_SCALE * 100) / 100 }) : cssFont(r);
+}
+
+/**
+ * A run's 덧말 / 윗주 (TextRun.ruby): its font and size, where its baseline sits from the run's baseline (`dy`, negative
+ * = above), and the room it needs above (`up`) / below (`down`) the baseline.
+ *  - Word (w:ruby): w:hps 10 · w:hpsRaise 18 over 10 pt text by default — half the size, raised 0.9 × the size; the
+ *    line grows until it holds the ruby (measured on Word 2021's PDF of omni-word-ruby: baselines within 1 px).
+ *  - 한글 (`hwp`, a paragraph laid out as 한글 does, TextParagraph.lineTop): set right against the text (measured on
+ *    한글 2024's PDF of omni-hwp-ruby, 10 pt text at 160 %: the 덧말's baseline 0.885 × the size + 0.12 × its own size
+ *    above, 0.12 × the size + 0.88 × its own below; layoutText makes the line taller).
+ */
+export function rubyMetrics(r: TextRun, hwp = false): { font: string; size: number; dy: number; up: number; down: number } {
+  const rb = r.ruby!;
+  const size = rubySize(r);
+  const font = cssFont({ ...r, fontSize: size, fontFamily: rb.font ?? r.fontFamily, latinFont: rb.font ? undefined : r.latinFont });
+  if (hwp) {
+    const dy = rb.below ? r.fontSize * 0.12 + size * 0.88 : -(r.fontSize * 0.885 + size * 0.12);
+    return { font, size, dy, up: rb.below ? 0 : size, down: rb.below ? size : 0 };
+  }
+  if (rb.below) {
+    const dy = r.fontSize * 0.25 + size * 0.85;
+    return { font, size, dy, up: 0, down: dy + size * 0.25 };
+  }
+  const raise = rb.raise ?? r.fontSize * 0.9;
+  // (the line holds the ruby's raise and 1.3 × its size above the baseline: Word 2021's PDF of omni-word-ruby)
+  return { font, size, dy: -raise, up: raise + size * 1.3, down: 0 };
+}
+
+/**
+ * A line with 덧말 (rubyMetrics up / down of its tallest): its height and baseline. 한글 (TextParagraph.lineTop,
+ * measured): one above moves the text down by its size and the line grows by its size at the paragraph's line spacing;
+ * one below makes the line 1.28 × its size taller. Word: the line grows until it holds them.
+ * (layoutcheck/simulate.ts mirrors layoutText with it)
+ */
+export function rubyLine(para: Pick<TextParagraph, "lineTop" | "lineHeight" | "lineSpacing">, lh: number, baseline: number, up: number, down: number): [number, number] {
+  if (para.lineTop) return [lh + up * (para.lineHeight ? 1 : para.lineSpacing || 1) + down * 1.28, baseline + up];
+  if (up > baseline) {
+    lh += up - baseline;
+    baseline = up;
+  }
+  if (down > lh - baseline) lh = baseline + down;
+  return [lh, baseline];
+}
+
+/**
+ * Room a 덧말 run takes on its line: its text's width plus, in Word, room on both sides of a 덧말 wider than it
+ * (한글 narrows the 덧말 instead).
+ */
+export function rubyPad(r: TextRun, baseW: number, hwp: boolean): number {
+  return hwp ? 0 : Math.max(0, (advance(r.ruby!.text, rubyMetrics(r, hwp).font) - baseW) / 2);
+}
+
+/** Glyph size of a run's 덧말, px: its own, else a 한글 size ratio (szRatio %), else half the run's size. */
+export function rubySize(r: TextRun): number {
+  const rb = r.ruby!;
+  const pct = Number(rb.src?.szRatio);
+  return rb.size ?? r.fontSize * (pct > 0 ? pct / 100 : 0.5);
 }
 
 /** Baseline shift of a run: superscript up, subscript down. */
@@ -607,6 +669,9 @@ export function layoutText(node: TextNode): TextLayout {
     let lastOfPara = false;
     // tallest inline object (그림 글자처럼) on the current line: its bottom sits on the baseline
     let objH = 0;
+    // room the 덧말 of the current line need above / below the baseline (rubyMetrics)
+    let rubyUp = 0;
+    let rubyDown = 0;
     const grow = (run: TextRun) => {
       maxSize = Math.max(maxSize, run.fontSize);
       if (perLine) lineRuns.push(run);
@@ -685,12 +750,14 @@ export function layoutText(node: TextNode): TextLayout {
         lh = height + objH - baseline;
         baseline = objH;
       }
+      if (rubyUp || rubyDown) [lh, baseline] = rubyLine(para, lh, baseline, rubyUp, rubyDown);
       lines.push({ y, height: lh, baseline, width, pieces: cur, paragraph: pi });
       y += lh;
       cur = [];
       x = left;
       maxSize = 0;
       objH = 0;
+      rubyUp = rubyDown = 0;
       lineRuns = [];
       spaceW = 0;
     };
@@ -723,6 +790,33 @@ export function layoutText(node: TextNode): TextLayout {
       const font = runFont(run);
       const ls = run.letterSpacing || 0;
       const k = runScale(run);
+      if (run.ruby) {
+        // 덧말 / 윗주: the run's text is one unbreakable piece; a 덧말 wider than it leaves room on both sides (Word) or
+        // is narrowed to the text's width (한글)
+        const hwp = !!para.lineTop;
+        const rb = rubyMetrics(run, hwp);
+        const baseW = advance(run.text, font, ls, k);
+        const rw = advance(run.ruby.text, rb.font);
+        const pad = hwp ? 0 : Math.max(0, (rw - baseW) / 2);
+        if (x + baseW + pad * 2 > lineMax && cur.length) flush(false);
+        x += pad;
+        const rx: Pick<Piece, "letterSpacing" | "hscale" | "spacing"> = {};
+        if (ls) rx.letterSpacing = ls;
+        if (run.hscale && run.hscale !== 100) rx.hscale = run.hscale / 100;
+        if (run.spacingPct) rx.spacing = run.spacingPct / 100;
+        const squeeze = rw > baseW && hwp ? baseW / rw : 1;
+        const ruby: NonNullable<Piece["ruby"]> = { text: run.ruby.text, dx: (baseW - rw * squeeze) / 2, dy: rb.dy, font: rb.font, size: rb.size };
+        if (squeeze < 1) ruby.hscale = squeeze;
+        cur.push({ text: run.text, x, width: baseW, run, font, ...rx, ruby });
+        grow(run);
+        rubyUp = Math.max(rubyUp, rb.up);
+        rubyDown = Math.max(rubyDown, rb.down);
+        x += baseW + pad;
+        consumed += run.text.length;
+        runAt += run.text.length;
+        glueFrom = cur.length;
+        return;
+      }
       const extra: Pick<Piece, "dy" | "letterSpacing" | "hscale" | "spacing"> = {};
       const dy = runBaselineShift(run);
       if (dy) extra.dy = dy;

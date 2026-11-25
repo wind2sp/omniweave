@@ -8,10 +8,12 @@
 //  Shuttle  : persistence writes only threads it has not written before (journal/.omw).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { verticalLayout } from "./textVertical";
 import { hashBytes, hashString } from "./hash";
 import { inverseTransformRect, intersects, transformRect, type Rect } from "./geom";
 import { layoutTable } from "./table";
 import { layoutText, textMetricsEpoch } from "./text";
+import { pathTextBounds } from "./pathText";
 import { vectorLocalBounds } from "./vector";
 import { TILE } from "./tile";
 import type { OmwDocument, Page, PixelTile, RasterNode, SceneNode } from "./types";
@@ -46,7 +48,8 @@ function rasterPropsHash(n: RasterNode): string {
   let h = propHashes.get(n);
   if (!h) {
     const { tiles: _t, ...rest } = n;
-    h = hashString(JSON.stringify(rest));
+    // (a layer mask's tiles by their hashes, not their bytes)
+    h = hashString(JSON.stringify(rest, stripPixels));
     propHashes.set(n, h);
   }
   return h;
@@ -107,6 +110,14 @@ export function localBounds(n: SceneNode): Rect {
     case "VECTOR":
       return vectorLocalBounds(n);
     case "TEXT": {
+      // type on a path: the path's box grown by the text size
+      const pb = n.onPath ? pathTextBounds(n) : null;
+      if (pb) return pb;
+      // vertical type: its columns (core/textVertical.ts)
+      if (n.vertical) {
+        const v = verticalLayout(n);
+        return { x: 0, y: 0, w: v.w, h: v.h };
+      }
       const h = layoutText(n).height;
       if (!n.ph) return { x: 0, y: 0, w: n.width, h };
       // a slide placeholder: its whole box (the text may overflow it)
@@ -244,7 +255,17 @@ export function dehydrate(doc: OmwDocument): { graph: unknown; tiles: Map<string
         t[k] = tile.hash;
         tiles.set(tile.hash, tile.data);
       }
-      return { ...n, tiles: t };
+      const out: any = { ...n, tiles: t };
+      // a layer mask's tiles likewise (core/image/layerMask.ts)
+      if (n.mask) {
+        const mt: Record<string, string> = {};
+        for (const [k, tile] of Object.entries(n.mask.tiles)) {
+          mt[k] = tile.hash;
+          tiles.set(tile.hash, tile.data);
+        }
+        out.mask = { ...n.mask, tiles: mt };
+      }
+      return out;
     }),
   });
   const graph = { ...doc, pages: doc.pages.map(mapPage), masters: doc.masters.map(mapPage) };
@@ -278,6 +299,15 @@ export function hydrate(graph: any, getTile: (hash: string) => Uint8ClampedArray
           verified.set(h, tile);
         }
         if (tile) tiles[k] = tile;
+      }
+      if (n.mask?.tiles) {
+        const mt: Record<string, PixelTile> = {};
+        for (const [k, h] of Object.entries(n.mask.tiles as Record<string, string>)) {
+          const data = getTile(h);
+          if (data && data.length === TILE * TILE * 4) mt[k] = { hash: h, data };
+          else report.missingTiles++;
+        }
+        return { ...n, tiles, mask: { ...n.mask, tiles: mt } };
       }
       return { ...n, tiles };
     }),

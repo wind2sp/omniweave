@@ -66,13 +66,16 @@ import { paintBox } from "../core/vector";
 import type { Paint } from "../core/style/types";
 import { drawableGradient, gradientFades, shadingDict, type GradientPaint } from "./pdfGradient";
 import { renderMasterOf } from "../core/headerFooter";
-import { buildTree, hasStructure, type TreeItem } from "../core/layerTree";
+import { buildTree, hasStructure, isClipPath, type TreeItem } from "../core/layerTree";
 import { intersects, transformRect } from "../core/geom";
 import { CELL_PAD_Y, TABLE_LINE, hasMerges, layoutTable, lineX, tableCells } from "../core/table";
 import { graphemes, layoutText, measure, shadeWidth } from "../core/text";
 import { reviewLook } from "../core/review";
 import { boxLines, paraBoxes } from "../core/paraBox";
 import { segments } from "../core/vector";
+import { arrowNode } from "../core/arrowheads";
+import { liveParts } from "../core/liveVector";
+import { pathTextGlyphs } from "../core/pathText";
 import {
   TILE,
   type BlendMode,
@@ -96,6 +99,8 @@ import { tidyBeforeSave } from "./pdfOptimize";
 import { filterRows } from "./tileCodec";
 import { PDF_BLEND, loadDissolveField, pageDissolves } from "../core/style/blend";
 import { pdfEffectImages, type PdfFxImage } from "./pdfEffects";
+import { meshRaster } from "../core/mesh";
+import { setOmwData } from "./pdfsurgeon/omwPiece";
 import { MAX_FX_PIXELS } from "../core/image/effects";
 import { pristinePsdView } from "../core/fidelity/overlay";
 import { cmykFlatPage } from "../core/image/cmykComposite";
@@ -591,7 +596,24 @@ function drawXObject(ex: Exporter, ops: Ops, ref: PDFRef, x: number, y: number, 
 
 // ───────── node painters ─────────
 
+
+const PDF_CAP = { butt: LineCapStyle.Butt, round: LineCapStyle.Round, square: LineCapStyle.Projecting } as const;
+const PDF_JOIN = { miter: LineJoinStyle.Miter, round: LineJoinStyle.Round, bevel: LineJoinStyle.Bevel } as const;
+
 function vectorOps(ex: Exporter, ops: Ops, n: VectorNode, opacity: number) {
+  // a live appearance: its plain parts, each as a path of its own (core/liveVector.ts)
+  const parts = liveParts(n);
+  if (parts) {
+    for (const q of parts) vectorOps(ex, ops, q, opacity);
+    return;
+  }
+  vectorOpsOne(ex, ops, n, opacity);
+  // arrowheads: a filled path in the stroke colour on top (core/arrowheads.ts)
+  const heads = arrowNode(n);
+  if (heads) vectorOpsOne(ex, ops, heads, opacity);
+}
+
+function vectorOpsOne(ex: Exporter, ops: Ops, n: VectorNode, opacity: number) {
   const path: Ops = [];
   for (const c of n.contours) {
     if (!c.nodes.length) continue;
@@ -604,6 +626,17 @@ function vectorOps(ex: Exporter, ops: Ops, n: VectorNode, opacity: number) {
     if (c.closed) path.push(closePath());
   }
   if (!path.length) return;
+  // a gradient mesh: its pixels (2 px per unit) through the path as a clip, under the stroke (core/mesh.ts)
+  if (n.meshFill?.pts.length) {
+    const r = meshRaster(n.meshFill, 2);
+    ops.push(pushGraphicsState());
+    const g = ex.gs(opacity, opacity, n.blendMode);
+    if (g) ops.push(g);
+    ops.push(...path, n.fillRule === "evenodd" ? clipEvenOdd() : clip(), endPath());
+    drawXObject(ex, ops, ex.rgbaImage(r.data, r.pw, r.ph), r.x, r.y, r.w, r.h);
+    ops.push(popGraphicsState());
+    n = { ...n, fill: null, fills: undefined } as VectorNode;
+  }
   const fc = parseColor(n.fill);
   const sc = n.stroke && n.strokeWidth > 0 ? parseColor(n.stroke) : null;
   let doFill = !!fc && fc.a > 0;
@@ -625,7 +658,8 @@ function vectorOps(ex: Exporter, ops: Ops, n: VectorNode, opacity: number) {
   const g = ex.gs(opacity * (fc?.a ?? 1), opacity * (sc?.a ?? 1), n.blendMode);
   if (g) ops.push(g);
   if (doFill) ops.push(rgb(fc!));
-  if (doStroke) ops.push(rgb(sc!, true), setLineWidth(n.strokeWidth), setLineCap(LineCapStyle.Round), setLineJoin(LineJoinStyle.Round));
+  // caps and corners as drawn (Illustrator's Stroke panel; round when the path has none)
+  if (doStroke) ops.push(rgb(sc!, true), setLineWidth(n.strokeWidth), setLineCap(PDF_CAP[n.strokeCap ?? "round"]), setLineJoin(PDF_JOIN[n.strokeJoin ?? "round"]));
   // dashes (drawing linetypes, dashed outlines) as the canvas draws them
   if (doStroke && n.strokeDash?.length) ops.push(setDashPattern(n.strokeDash, 0));
   ops.push(...path);
@@ -683,6 +717,18 @@ function pieceSize(font: string, fallback: number): number {
 }
 
 async function textNodeOps(ex: Exporter, ops: Ops, n: TextNode, opacity: number, invisible = false) {
+  // type on a path: each character placed and turned on the path (core/pathText.ts)
+  if (n.onPath) {
+    for (const g of pathTextGlyphs(n)) {
+      const run = reviewLook(g.run);
+      const font = await ex.runFont(run);
+      const c = Math.cos(g.angle), s = Math.sin(g.angle);
+      ops.push(pushGraphicsState(), concatTransformationMatrix(c, s, -s, c, g.x, g.y));
+      textOps(ex, ops, font, g.ch, 0, 0, pieceSize(g.font, run.fontSize), !!run.italic, run.color, opacity, n.blendMode, 0, invisible);
+      ops.push(popGraphicsState());
+    }
+    return;
+  }
   const lay = layoutText(n);
   if (n.background && !invisible) fillRect(ex, ops, 0, 0, n.width, lay.height, n.background, opacity, n.blendMode);
   // paragraph shading and borders (core/paraBox.ts; lines as filled bars, a double line as two thin ones)
@@ -729,6 +775,11 @@ async function textNodeOps(ex: Exporter, ops: Ops, n: TextNode, opacity: number,
       const thick = Math.max(1, size / 16);
       if (run.underline) fillRect(ex, ops, p.x, y + size * 0.12, p.width, thick, run.color, opacity, n.blendMode);
       if ((run as RunExtras).strike) fillRect(ex, ops, p.x, y - size * 0.3, p.width, thick, run.color, opacity, n.blendMode);
+      if (p.ruby) {
+        // 덧말 / 윗주 where layoutText put it, as the canvas draws it
+        const rr = { ...run, fontSize: p.ruby.size, fontFamily: p.run.ruby?.font ?? run.fontFamily };
+        textOps(ex, ops, await ex.runFont(rr), p.ruby.text, p.x + p.ruby.dx, line.y + line.baseline + p.ruby.dy, p.ruby.size, !!run.italic, run.color, opacity, n.blendMode, 0, false, p.ruby.hscale ?? 1);
+      }
     }
   }
 }
@@ -1015,7 +1066,8 @@ function drawForm(ex: Exporter, ops: Ops, ref: PDFRef, opacity: number, blend: B
 
 /** Page-space clipping path of a plain filled vector shape (no stroke, no animation); null for anything else. */
 function vectorClip(n: SceneNode): Ops | null {
-  if (n.type !== "VECTOR" || !n.fill || (n.stroke && n.strokeWidth > 0) || !n.contours.length) return null;
+  // (an Illustrator clipping path has no paint at all: its geometry is the clip)
+  if (n.type !== "VECTOR" || (!n.fill && !isClipPath(n)) || (n.stroke && n.strokeWidth > 0) || !n.contours.length || liveParts(n)) return null;
   const c = parseColor(n.fill);
   if (!c || c.a < 1) return null;
   const t = n.transform;
@@ -1048,7 +1100,19 @@ async function itemsOps(ex: Exporter, page: Page, items: TreeItem[]): Promise<Op
     if (it.kind === "node" ? !it.node.visible || it.node.opacity <= 0 || (!!it.node.cadLayer && noPlotLayers.has(it.node.cadLayer.toUpperCase())) : !it.group.visible || it.group.opacity <= 0 || noPlot(it.group)) continue;
     const clips = it.clips.filter((c) => c.visible && c.opacity > 0);
     if (!clips.length) {
+      if (it.kind === "node" && it.node.lumMask) continue;
       ops.push(...(await itemOps(ex, page, it)));
+      continue;
+    }
+    // an opacity mask (Illustrator): the masked objects under a luminosity soft mask drawn by the mask art
+    if (it.kind === "node" && it.node.lumMask) {
+      const maskOps = await nodeOps(ex, page, bare(it.node));
+      const inner: Ops = [];
+      for (const c of clips) inner.push(...(await nodeOps(ex, page, c)));
+      const mask = formOf(ex, page, maskOps, true);
+      const ctx = ex.pdf.context;
+      const gsRef = ctx.register(ctx.obj({ Type: "ExtGState", SMask: ctx.obj({ Type: "Mask", S: "Luminosity", G: mask }) }));
+      ops.push(pushGraphicsState(), setGraphicsState(ex.page.node.newExtGState("GS", gsRef)), ...inner, popGraphicsState());
       continue;
     }
     // clip stack
@@ -1141,6 +1205,8 @@ export async function exportPdfVector(doc: OmwDocument, pages: Page[], opts: Pdf
   for (const page of pages) {
     const W = page.width, H = page.height;
     const pp = pdf.addPage([W * PX_TO_PT, H * PX_TO_PT]);
+    // the design mode's perspective grid, kept in the page-piece data (io/pdfsurgeon/omwPiece.ts)
+    if (page.perspGrid) setOmwData(pdf.context, pp.node, { perspGrid: page.perspGrid });
     ex.beginPage(pp);
     const ops: Ops = [
       pushGraphicsState(),

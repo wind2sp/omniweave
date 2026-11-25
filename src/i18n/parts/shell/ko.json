@@ -165,5 +165,6 @@
   "shell.hist.bullets": "글머리표",
   "shell.hist.numbering": "번호 매기기",
   "shell.hist.heading": "제목 {level}",
-  "shell.hist.body": "본문"
+  "shell.hist.body": "본문",
+  "shell.saveAsType": "저장 ({ext})"
 }

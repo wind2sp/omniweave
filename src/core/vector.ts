@@ -1,6 +1,8 @@
 import polygonClipping, { type MultiPolygon, type Polygon } from "polygon-clipping";
-import { applyTransform, rectFromPoints, type Rect } from "./geom";
+import { rectFromPoints, type Rect } from "./geom";
 import { IDENTITY, newVector, type Contour, type VectorAnchor, type VectorNode, type Vec2 } from "./types";
+import { liveBounds } from "./liveVector";
+import { curvedContours, pageContours, sampleShapes } from "./curveKeep";
 
 export function corner(x: number, y: number): VectorAnchor {
   return { anchor: [x, y], handleIn: [x, y], handleOut: [x, y], isCorner: true };
@@ -79,6 +81,9 @@ export function paintBox(n: Pick<VectorNode, "contours">): Rect {
 }
 
 export function vectorLocalBounds(n: VectorNode): Rect {
+  // a live appearance (offset, transform copies, an outside stroke…) reaches beyond the path
+  const live = liveBounds(n);
+  if (live) return live;
   const pts: Vec2[] = [];
   for (const c of n.contours) pts.push(...flatten(c, 2));
   const r = rectFromPoints(pts);
@@ -108,23 +113,15 @@ export function vectorToSvgD(n: VectorNode): string {
 
 export type BoolOp = "union" | "subtract" | "intersect" | "exclude";
 
-function toMultiPolygon(n: VectorNode): MultiPolygon {
-  const rings = n.contours
-    .filter((c) => c.closed && c.nodes.length > 2)
-    .map((c) => {
-      const ring = flatten(c, 0.35).map((p) => applyTransform(n.transform, p)) as [number, number][];
-      ring.push(ring[0]);
-      return ring;
-    });
-  // treat every ring as its own polygon and union them (handles holes from evenodd poorly, but stays robust)
-  if (!rings.length) return [];
-  const polys: Polygon[] = rings.map((r) => [r]);
-  return polys.length === 1 ? [polys[0]] : polygonClipping.xor(polys[0], ...polys.slice(1));
-}
-
 export function pathfinder(op: BoolOp, nodes: VectorNode[]): VectorNode | null {
   if (nodes.length < 2) return null;
-  const geoms = nodes.map(toMultiPolygon);
+  // sampled with every point tagged by the curve it came from, so the result keeps the curves (Illustrator)
+  const sm = sampleShapes(nodes.map(pageContours));
+  const geoms: MultiPolygon[] = sm.rings.map((rs) => {
+    if (!rs.length) return [];
+    const polys: Polygon[] = rs.map((r) => [r]);
+    return polys.length === 1 ? [polys[0]] : polygonClipping.xor(polys[0], ...polys.slice(1));
+  });
   let result: MultiPolygon;
   switch (op) {
     case "union":
@@ -140,12 +137,7 @@ export function pathfinder(op: BoolOp, nodes: VectorNode[]): VectorNode | null {
       result = polygonClipping.xor(geoms[0], ...geoms.slice(1));
       break;
   }
-  const contours: Contour[] = [];
-  for (const poly of result)
-    for (const ring of poly) {
-      const pts = ring.slice(0, -1);
-      if (pts.length > 2) contours.push({ closed: true, nodes: pts.map(([x, y]) => corner(x, y)) });
-    }
+  const contours = curvedContours(result, sm);
   if (!contours.length) return null;
   const base = nodes[0];
   const out = newVector(contours, `${base.name} (${op})`);
@@ -167,11 +159,16 @@ export function distanceToContour(c: Contour, p: Vec2): number {
   return best;
 }
 
+/**
+ * Is a point inside the filled area? An open contour is filled as if closed, as the canvas (and PDF) fill it — an
+ * Illustrator clip path or a PDF fill without `h` opened as open contours and could not be clicked (phone check
+ * 2026-11-24: AI shapes could not be picked one by one).
+ */
 export function pointInContours(n: VectorNode, p: Vec2): boolean {
   let inside = false;
   let winding = 0;
   for (const c of n.contours) {
-    if (!c.closed) continue;
+    if (c.nodes.length < 3 && !c.closed) continue;
     const pts = flatten(c, 1);
     for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
       const [xi, yi] = pts[i], [xj, yj] = pts[j];

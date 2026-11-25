@@ -252,6 +252,8 @@
   "ribbon.cropRatio.custom": "사용자 지정",
   "ribbon.crop.customW": "비율 너비",
   "ribbon.crop.customH": "비율 높이",
+  "ribbon.crop.level": "똑바로 펴기",
+  "ribbon.crop.levelTip": "똑바로 펴기 — 수평(또는 수직)이어야 할 선을 따라 그림 위에 선을 그으면 그만큼 돌려 바로 세웁니다",
   "ribbon.crop.straighten": "기울기",
   "ribbon.crop.straightenTip": "기울기 바로잡기 — 자르기 상자 각도 (적용하면 내용이 돌아가 상자가 수평이 됨)"
 }

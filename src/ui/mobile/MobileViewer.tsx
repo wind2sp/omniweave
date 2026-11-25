@@ -10,10 +10,14 @@ import { t, useT } from "../../i18n";
 import { formatBytes } from "../../io/tools/pdfTools";
 import type { OmwDocument, Page } from "../../core/types";
 import type { MobileDoc } from "./MobileApp";
-import { extOf, openPages, openPdf, releaseEngineMemory, viewKind, type PagesView } from "./openDoc";
+import { extOf, openPages, openPdf, releaseEngineMemory, rememberPassword, viewKind, type PagesView } from "./openDoc";
 import { ask } from "./prompt";
 import { MarkupEditor } from "./markup";
 import { useBackClose } from "./back";
+import { Icon, kindOf, type IconName } from "./icons";
+import { updateRecent } from "./recent";
+import { PhotoCrop } from "./photoCrop";
+import { PhotoMatte } from "./photoMatte";
 
 interface Props {
   doc: MobileDoc;
@@ -163,22 +167,71 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<number[] | null>(null);
+  /** the pages hold no text at all (a scan): nothing can be found until 글자 인식 (QA ux-audit 3 — 안내 없음) */
+  const [noText, setNoText] = useState(false);
   const [matchAt, setMatchAt] = useState(0);
   const [marks, setMarks] = useState<{ page: number; rects: { x: number; y: number; w: number; h: number }[] }[]>([]);
   const [markup, setMarkup] = useState(false);
+  /** the job the file was opened for (doc.intent) was started once */
+  const markupUsed = useRef(false);
+  const intentDone = useRef(false);
   const [sizeTick, setSizeTick] = useState(0);
   const [more, setMore] = useState(false);
+  const [cropping, setCropping] = useState(false);
+  const [matting, setMatting] = useState(false);
+  /** 글자만 크게 보기: a document's text as one column of large type (no zooming on a printed page) */
+  const [reading, setReading] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
 
   useBackClose(true, onBack);
+  // the browser tab (and the app switcher) says which file this is
+  useEffect(() => {
+    const before = document.title;
+    document.title = `${doc.name} — Omniweave`;
+    return () => void (document.title = before);
+  }, [doc.name]);
   useBackClose(more, () => setMore(false));
   useBackClose(searching, () => {
     setSearching(false);
     setMatches(null);
     setMarks([]);
   });
+
+  // the first page, small, for the home screen's "이어서 하기" card (files opened here, this device only)
+  useEffect(() => {
+    if (doc.origin === "result" || !(source || kind === "image")) return;
+    const timer = window.setTimeout(() => {
+      const el = scroller.current?.querySelector<HTMLCanvasElement | HTMLImageElement>(".m-page canvas, img.m-image");
+      const w0 = el instanceof HTMLCanvasElement ? el.width : (el?.naturalWidth ?? 0);
+      const h0 = el instanceof HTMLCanvasElement ? el.height : (el?.naturalHeight ?? 0);
+      if (!el || !w0 || !h0) return;
+      const c = document.createElement("canvas");
+      c.width = 96;
+      c.height = Math.max(1, Math.min(160, Math.round((96 * h0) / w0)));
+      const g = c.getContext("2d");
+      if (!g) return;
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, c.width, c.height);
+      // the top of the page when it is taller than the card (a long page shows its start)
+      const sh = Math.min(h0, (w0 * c.height) / 96);
+      try {
+        g.drawImage(el, 0, 0, w0, sh, 0, 0, c.width, c.height);
+        updateRecent(doc.name, { thumb: c.toDataURL("image/jpeg", 0.72) });
+      } catch {
+        /* a picture the canvas may not read: no card picture */
+      }
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [source, kind, doc]);
+
+  useEffect(() => {
+    if (intentDone.current) return;
+    if (doc.intent === "sign" && source?.pdf) (intentDone.current = true), setMarkup(true);
+    if (doc.intent === "toPdf" && pagesView) (intentDone.current = true), void toPdf();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source, pagesView]);
 
   // open
   useEffect(() => {
@@ -278,10 +331,13 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
     if (!source || !q.trim()) return;
     const found: number[] = [];
     const needle = q.trim().toLowerCase();
+    let any = false;
     for (let i = 0; i < source.count; i++) {
       const text = (await source.text(i).catch(() => "")).toLowerCase();
+      if (text.trim()) any = true;
       if (text.includes(needle)) found.push(i + 1);
     }
+    setNoText(!any);
     setMatches(found);
     const first = found.findIndex((p) => p >= current);
     const at = first >= 0 ? first : 0;
@@ -319,20 +375,52 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
         doc={doc}
         pdf={source.pdf}
         startPage={current}
-        onCancel={() => setMarkup(false)}
-        onDone={(bytes) => {
+        startSigning={doc.intent === "sign" && !markupUsed.current}
+        onCancel={() => ((markupUsed.current = true), setMarkup(false))}
+        onDone={(bytes, signed, password) => {
           setMarkup(false);
-          onResult({ name: doc.name.replace(/\.pdf$/i, "") + tr("mobile.markedSuffix") + ".pdf", bytes, origin: "result" });
+          // "_서명" only with a signature on it ("_표시" for highlights and notes), never stacked ("a_서명_서명.pdf")
+          const suffixes = [tr("mobile.markedSuffix"), tr("mobile.signedSuffix")];
+          let stem = doc.name.replace(/\.pdf$/i, "");
+          for (let again = true; again; ) {
+            again = false;
+            for (const x of suffixes) if (x && stem.endsWith(x)) (stem = stem.slice(0, -x.length)), (again = true);
+          }
+          // the copy is protected with the same password: its viewer is told, it does not ask again
+          if (password != null) rememberPassword(bytes, password);
+          onResult({ name: stem + (signed ? tr("mobile.signedSuffix") : tr("mobile.markedSuffix")) + ".pdf", bytes, origin: "result" });
         }}
         say={say}
       />
     );
 
+  /** 회전: a quarter turn right on the phone itself (no PC screen) — the same format, shown at once, saved with 새로 저장 */
+  const rotatePhoto = async () => {
+    try {
+      const type = /\.jpe?g$/i.test(doc.name) ? "image/jpeg" : /\.webp$/i.test(doc.name) ? "image/webp" : "image/png";
+      const bmp = await createImageBitmap(new Blob([doc.bytes as BlobPart]));
+      const c = document.createElement("canvas");
+      c.width = bmp.height;
+      c.height = bmp.width;
+      const g = c.getContext("2d")!;
+      g.translate(c.width, 0);
+      g.rotate(Math.PI / 2);
+      g.drawImage(bmp, 0, 0);
+      bmp.close?.();
+      const blob = await new Promise<Blob | null>((r) => c.toBlob(r, type, 0.92));
+      if (!blob) throw new Error("toBlob");
+      const ext = type === "image/jpeg" ? doc.name.match(/\.jpe?g$/i)![0] : type === "image/webp" ? ".webp" : ".png";
+      onResult({ name: doc.name.replace(/\.[^.]+$/, "") + ext, bytes: new Uint8Array(await blob.arrayBuffer()), origin: "result" });
+    } catch (e: any) {
+      say(tr("mobile.failed", { error: e?.message ?? String(e) }));
+    }
+  };
+
   return (
     <div className="m-viewer">
       <header className="m-top m-viewer-top">
         <button className="m-icon-btn" onClick={onBack} aria-label={tr("mobile.back")}>
-          ←
+          <Icon name="back" />
         </button>
         {searching ? (
           <form
@@ -345,31 +433,78 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
             <input className="m-search m-search-in" type="search" autoFocus value={query} placeholder={tr("mobile.searchDoc")} aria-label={tr("mobile.searchDoc")} onChange={(e) => setQuery(e.target.value)} />
           </form>
         ) : (
-          <h1 className="m-doc-name">{doc.name}</h1>
+          <div className="m-doc-head">
+            <h1 className="m-doc-name">{doc.name}</h1>
+            <p className={"m-doc-meta m-k-" + kindOf(doc.name)}>
+              <i />
+              {(extOf(doc.name) || "file").toUpperCase()}
+              {source ? " · " + tr("mobile.v2.pages", { n: source.count }) : ""} · {formatBytes(doc.bytes.length)}
+            </p>
+          </div>
+        )}
+        {source && !searching && kind === "pages" && (
+          // the page as it is ↔ its text in large type that wraps (원본 | 읽기)
+          <div className="m-mode" role="group" aria-label={tr("mobile.read")}>
+            <span className={reading ? "" : "on"} aria-hidden onClick={() => setReading(false)}>
+              {tr("mobile.v2.original")}
+            </span>
+            <button className={reading ? "on" : ""} onClick={() => setReading((r) => !r)} aria-pressed={reading} aria-label={tr(reading ? "mobile.readOff" : "mobile.read")} title={tr(reading ? "mobile.readOff" : "mobile.read")}>
+              {tr("mobile.v2.reading")}
+            </button>
+          </div>
         )}
         {source && !searching && (
           <button className="m-icon-btn" onClick={() => setSearching(true)} aria-label={tr("mobile.searchDoc")}>
-            ⌕︎
+            <Icon name="search" />
           </button>
         )}
       </header>
       {searching && matches && (
         <div className="m-searchbar" role="status">
-          <span>{matches.length ? tr("mobile.searchHits", { at: matchAt + 1, n: matches.length, page: matches[matchAt] }) : tr("mobile.searchNone", { q: query.trim() })}</span>
+          <span>{matches.length ? tr("mobile.searchHits", { at: matchAt + 1, n: matches.length, page: matches[matchAt] }) : tr(noText ? "mobile.searchNoText" : "mobile.searchNone", { q: query.trim() })}</span>
           <button className="m-icon-btn" onClick={() => step(-1)} aria-label={tr("mobile.prev")} disabled={!matches.length}>
-            ‹
+            <Icon name="prev" />
           </button>
           <button className="m-icon-btn" onClick={() => step(1)} aria-label={tr("mobile.next")} disabled={!matches.length}>
-            ›
+            <Icon name="next" />
           </button>
         </div>
       )}
       {doc.origin === "received" && <div className="m-received">{tr("mobile.received")}</div>}
       {doc.origin === "result" && <div className="m-received">{tr("mobile.resultNote")}</div>}
-      <div className="m-pages" ref={scroller}>
+      {pagesView && !reading && pagesView.pages.filter((pg) => pg.sheet).length > 1 && (
+        // a workbook: its sheets as tabs (Excel's sheet bar), the one on screen marked
+        <div className="m-sheet-tabs" role="tablist" aria-label={tr("mobile.v2.sheets")}>
+          {pagesView.pages.map((pg, i) =>
+            pg.sheet ? (
+              <button key={pg.id} role="tab" aria-selected={current === i + 1} className={current === i + 1 ? "on" : ""} onClick={() => goTo(i + 1)}>
+                {pg.name || tr("mobile.v2.sheetN", { n: i + 1 })}
+              </button>
+            ) : null,
+          )}
+        </div>
+      )}
+      {reading && source && <ReadView source={source} />}
+      <div className="m-pages" ref={scroller} hidden={reading}>
         <div className="m-page-col" style={{ width: `${zoom * 100}%` }}>
-          {error && <div className="m-unsupported">{tr("mobile.failed", { error })}</div>}
-          {!error && (kind === "pdf" || kind === "pages") && !source && <div className="m-spinner" role="progressbar" aria-label={tr("mobile.working")} />}
+          {error && (
+            <div className="m-state m-state-error" role="alert">
+              <Icon name="alert" />
+              <b>{tr("mobile.v2.errTitle")}</b>
+              <p>{error}</p>
+              {onDesk && (
+                <button className="m-btn" onClick={() => onDesk()}>
+                  {tr("mobile.desk.openThis")}
+                </button>
+              )}
+            </div>
+          )}
+          {!error && (kind === "pdf" || kind === "pages") && !source && (
+            <div className="m-state m-state-loading">
+              <div className="m-spinner" role="progressbar" aria-label={tr("mobile.working")} />
+              <p>{tr("mobile.v2.loading")}</p>
+            </div>
+          )}
           {source &&
             Array.from({ length: source.count }, (_, i) => (
               <PageView key={i} source={source} index={i} zoom={zoom} tick={sizeTick} onSeen={setCurrent} rects={marks.find((m) => m.page === i + 1)?.rects} />
@@ -377,10 +512,11 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
           {kind === "image" && <ImageView bytes={doc.bytes} name={doc.name} />}
           {kind === "media" && <MediaView bytes={doc.bytes} name={doc.name} />}
           {kind === "other" && (
-            <div className="m-unsupported">
-              <div className="m-kind m-kind-big">{extOf(doc.name).toUpperCase() || "FILE"}</div>
+            <div className="m-state">
+              <Icon name="page" />
+              <b>{doc.name}</b>
               <p>
-                {doc.name} · {formatBytes(doc.bytes.length)}
+                {(extOf(doc.name) || "file").toUpperCase()} · {formatBytes(doc.bytes.length)}
               </p>
               <p>{tr("mobile.notViewable")}</p>
               {onDesk && (
@@ -397,36 +533,78 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
           {tr("mobile.page", { page: current, total: source.count })}
         </button>
       )}
-      <nav className="m-nav m-viewer-bar">
-        {onEdit && (
-          <button onClick={onEdit}>
-            <span aria-hidden>✐︎</span>
-            {tr("mobile.ed.edit")}
-          </button>
-        )}
+      {kind === "image" && onDesk && (
+        // a photo's edits right on the phone screen (each opens the PC feature screen at that command, big buttons)
+        <div className="m-photo-bar" role="toolbar" aria-label={tr("mobile.photo.bar")}>
+          {PHOTO_TOOLS.map((x) => (
+            <button key={x.cmd} type="button" onClick={() => (x.cmd === "object.rotateCW" ? void rotatePhoto() : x.cmd === "image.cropCanvas" ? setCropping(true) : x.cmd === "image.removeBackground" ? setMatting(true) : onDesk(x.cmd))}>
+              <Icon name={x.icon} />
+              {tr(x.label)}
+            </button>
+          ))}
+        </div>
+      )}
+      {cropping && kind === "image" && (
+        // 자르기 on the phone itself (ratio, a finger on the frame, 완료) — like 회전, a new picture of the same format
+        <PhotoCrop
+          bytes={doc.bytes}
+          name={doc.name}
+          onCancel={() => setCropping(false)}
+          onDone={(bytes, name) => {
+            setCropping(false);
+            onResult({ name, bytes, origin: "result" });
+          }}
+        />
+      )}
+      {matting && kind === "image" && (
+        // 배경 지우기 on the phone itself: the cut at once, then 남길 곳 / 지울 곳 points by finger (photoMatte.tsx)
+        <PhotoMatte
+          bytes={doc.bytes}
+          name={doc.name}
+          onCancel={() => setMatting(false)}
+          onDone={(bytes, name) => {
+            setMatting(false);
+            onResult({ name, bytes, origin: "result" });
+          }}
+        />
+      )}
+      {SHOW_EXTS.includes(extOf(doc.name)) && onDesk && (
+        <button type="button" className="m-btn m-btn-primary m-show-btn" onClick={() => onDesk("slide.showFromStart")}>
+          <Icon name="play" />
+          {tr("mobile.show.start")}
+        </button>
+      )}
+      <nav className={"m-nav m-viewer-bar" + (onEdit && !error ? " has-edit" : "")}>
+        <button onClick={onShare}>
+          <Icon name="share" />
+          {tr("mobile.share")}
+        </button>
         {kind === "pdf" && (
           <button onClick={() => setMarkup(true)} disabled={!source}>
-            <span aria-hidden>✎︎</span>
+            <Icon name="mark" />
             {tr("mobile.markup")}
           </button>
         )}
         {kind === "pages" && (
           <button onClick={() => void toPdf()} disabled={!pagesView}>
-            <span aria-hidden>⎙︎</span>
+            <Icon name="convert" />
             {tr("mobile.toPdf")}
           </button>
         )}
-        <button onClick={onShare}>
-          <span aria-hidden>⇪︎</span>
-          {tr("mobile.share")}
-        </button>
+        {onEdit && !error && (
+          // the one main action, where the thumb rests
+          <button className="m-edit-go" onClick={onEdit}>
+            <Icon name="edit" />
+            {tr("mobile.ed.edit")}
+          </button>
+        )}
         <button onClick={onSave}>
-          <span aria-hidden>⤓︎</span>
+          <Icon name="save" />
           {tr("mobile.saveCopy")}
         </button>
         {onDesk && (
           <button onClick={() => setMore(true)} aria-haspopup="dialog">
-            <span aria-hidden>⋯</span>
+            <Icon name="more" />
             {tr("mobile.desk.more")}
           </button>
         )}
@@ -437,7 +615,7 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
             <h2>{tr("mobile.desk.more")}</h2>
             <p className="m-sheet-msg">{tr("mobile.desk.moreNote")}</p>
             <div className="m-more-list">
-              {VIEWER_MORE.filter((x) => !x.pdfOnly || kind === "pdf").map((x) => (
+              {VIEWER_MORE.filter((x) => (!x.pdfOnly || kind === "pdf") && !(x.notImage && kind === "image")).map((x) => (
                 <button
                   key={x.label}
                   className="m-row m-more-row"
@@ -447,7 +625,7 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
                   }}
                 >
                   <span className="m-more-icon" aria-hidden>
-                    {x.icon}
+                    <Icon name={x.icon} />
                   </span>
                   <span className="m-row-name">{tr(x.label)}</span>
                 </button>
@@ -465,6 +643,35 @@ export function MobileViewer({ doc, onBack, onShare, onSave, onEdit, onDesk, onR
   );
 }
 
+/** A document's text, page after page, in large type that wraps to the phone (the page's own layout stays in 쪽 모양). */
+function ReadView({ source }: { source: PageSource }) {
+  const [texts, setTexts] = useState<string[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const out: string[] = [];
+      for (let i = 0; i < Math.min(source.count, 500) && alive; i++) out.push(await source.text(i).catch(() => ""));
+      if (alive) setTexts(out);
+    })();
+    return () => void (alive = false);
+  }, [source]);
+  if (!texts) return <div className="m-spinner" role="progressbar" />;
+  return (
+    <article className="m-read">
+      {texts.map((t, i) => (
+        <section key={i} data-page={i + 1}>
+          {t
+            .split(/\n+/)
+            .filter((l) => l.trim())
+            .map((l, k) => (
+              <p key={k}>{l}</p>
+            ))}
+        </section>
+      ))}
+    </article>
+  );
+}
+
 /** sound and video files: the browser's own player */
 function MediaView({ bytes, name }: { bytes: Uint8Array; name: string }) {
   const url = useMemo(() => URL.createObjectURL(new Blob([bytes as BlobPart])), [bytes]);
@@ -473,20 +680,31 @@ function MediaView({ bytes, name }: { bytes: Uint8Array; name: string }) {
   return audio ? <audio className="m-media" src={url} controls aria-label={name} /> : <video className="m-media" src={url} controls playsInline aria-label={name} />;
 }
 
+/** a photo's edits (ui/commands.ts ids; "op:" = an adjustment dialog of the image menu) */
+const PHOTO_TOOLS: { cmd: string; icon: IconName; label: string }[] = [
+  { cmd: "image.cropCanvas", icon: "crop", label: "mobile.photo.crop" },
+  { cmd: "object.rotateCW", icon: "rotate", label: "mobile.photo.rotate" },
+  { cmd: "op:brightnessContrast", icon: "light", label: "mobile.photo.light" },
+  { cmd: "image.eraser", icon: "eraser", label: "mobile.photo.eraser" },
+  { cmd: "image.removeBackground", icon: "cutout", label: "mobile.photo.bg" },
+];
+/** slide decks: a 발표 (slide show) button on the phone screen */
+const SHOW_EXTS = ["pptx", "ppsx", "ppt", "pps", "odp"];
+
 /** The rest of the PC program's commands for this file, each opening it in the desktop editor on the phone. */
-export const VIEWER_MORE: { cmd: string; icon: string; label: string; pdfOnly?: boolean }[] = [
-  { cmd: "", icon: "▦︎", label: "mobile.desk.allFeatures" },
-  { cmd: "edit.replace", icon: "⌕︎", label: "mobile.desk.replace" },
-  { cmd: "file.print", icon: "⎙︎", label: "mobile.desk.print" },
-  { cmd: "file.saveAs", icon: "⇄︎", label: "mobile.desk.saveAs" },
-  { cmd: "file.saveProtected", icon: "🔒︎", label: "mobile.desk.protect" },
-  { cmd: "page.organizer", icon: "▤︎", label: "mobile.desk.pages" },
-  { cmd: "image.ocr", icon: "Aa", label: "mobile.desk.ocr" },
+export const VIEWER_MORE: { cmd: string; icon: IconName; label: string; pdfOnly?: boolean; notImage?: boolean }[] = [
+  { cmd: "", icon: "grid", label: "mobile.desk.allFeatures" },
+  { cmd: "edit.replace", icon: "search", label: "mobile.desk.replace", notImage: true },
+  { cmd: "file.print", icon: "print", label: "mobile.desk.print" },
+  { cmd: "file.saveAs", icon: "convert", label: "mobile.desk.saveAs" },
+  { cmd: "file.saveProtected", icon: "lock", label: "mobile.desk.protect", notImage: true },
+  { cmd: "page.organizer", icon: "pages", label: "mobile.desk.pages", notImage: true },
+  { cmd: "image.ocr", icon: "ocr", label: "mobile.desk.ocr" },
   // (a PDF's form fields are live as soon as it is open there: no command to run)
-  { cmd: "", icon: "☑︎", label: "mobile.desk.fillForm", pdfOnly: true },
-  { cmd: "text.editPdf", icon: "T", label: "mobile.desk.editPdf", pdfOnly: true },
-  { cmd: "review.newComment", icon: "✉︎", label: "mobile.desk.comment" },
-  { cmd: "tools.commandSearch", icon: "⋯", label: "mobile.desk.cmdSearch" },
+  { cmd: "", icon: "form", label: "mobile.desk.fillForm", pdfOnly: true },
+  { cmd: "text.editPdf", icon: "text", label: "mobile.desk.editPdf", pdfOnly: true },
+  { cmd: "review.newComment", icon: "comment", label: "mobile.desk.comment", notImage: true },
+  { cmd: "tools.commandSearch", icon: "search", label: "mobile.desk.cmdSearch" },
 ];
 
 function ImageView({ bytes, name }: { bytes: Uint8Array; name: string }) {

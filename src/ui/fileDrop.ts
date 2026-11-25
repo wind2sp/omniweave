@@ -7,7 +7,7 @@
 // Places with a drop of their own (page organizer, tab strip, start screen, tools dialog) claim the event first.
 
 import { formatForExt } from "../io/formats";
-import type { OpenedFile } from "../io/platform";
+import type { FileHandle, OpenedFile } from "../io/platform";
 
 const CLAIMED = "__omwDropClaimed";
 
@@ -24,8 +24,23 @@ export function placesOnPage(name: string): boolean {
   return id === "image" || id === "video" || id === "audio";
 }
 
-/** The dropped files read into memory (no path in the browser). */
+/** The dropped files read into memory (no path in the browser). Chrome / Edge also hand each file's handle
+ *  (getAsFileSystemHandle), so 저장 (Ctrl+S) can write that same file. Call it in the drop event itself, before any
+ *  await: the browser empties the drop's items once the event is over. */
 export async function droppedFiles(dt: DataTransfer | null): Promise<OpenedFile[]> {
   const list = Array.from(dt?.files ?? []);
-  return Promise.all(list.map(async (f) => ({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) })));
+  const items = Array.from(dt?.items ?? []).filter((i) => i.kind === "file");
+  const handles: Promise<FileHandle | null>[] =
+    items.length === list.length
+      ? items.map((i) => {
+          const get = (i as DataTransferItem & { getAsFileSystemHandle?: () => Promise<FileHandle | null> }).getAsFileSystemHandle;
+          if (typeof get !== "function") return Promise.resolve(null);
+          try {
+            return Promise.resolve(get.call(i)).then((h) => (h && h.kind === "file" ? h : null), () => null);
+          } catch {
+            return Promise.resolve(null);
+          }
+        })
+      : list.map(() => Promise.resolve(null));
+  return Promise.all(list.map(async (f, i) => ({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()), handle: await handles[i] })));
 }

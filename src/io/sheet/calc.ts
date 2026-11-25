@@ -76,7 +76,7 @@ interface SpillResult {
 
 const VOLATILE = new Set(["NOW", "TODAY", "RAND", "RANDBETWEEN", "OFFSET", "INDIRECT", "INFO", "CELL", "RANDARRAY"]);
 /** Functions that exist only with dynamic arrays: a formula using one is an array formula (Excel stores it as one). */
-const DYNAMIC = new Set(["FILTER", "SORT", "SORTBY", "UNIQUE", "SEQUENCE", "RANDARRAY", "LET", "ANCHORARRAY", "XLOOKUP", "CHOOSECOLS", "CHOOSEROWS", "TAKE", "DROP", "VSTACK", "HSTACK", "TOCOL", "TOROW", "TEXTSPLIT", "WRAPROWS", "WRAPCOLS", "EXPAND"]);
+const DYNAMIC = new Set(["FILTER", "SORT", "SORTBY", "UNIQUE", "SEQUENCE", "RANDARRAY", "LET", "TRANSPOSE", "ANCHORARRAY", "XLOOKUP", "CHOOSECOLS", "CHOOSEROWS", "TAKE", "DROP", "VSTACK", "HSTACK", "TOCOL", "TOROW", "TEXTSPLIT", "WRAPROWS", "WRAPCOLS", "EXPAND"]);
 /** Functions whose arguments are arrays: evaluated element by element even inside a legacy formula. */
 const ARRAY_ARGS = new Set(["SUMPRODUCT", "MMULT", "TRANSPOSE", ...DYNAMIC]);
 /** Scalar functions called once per element when given an array inside an array formula ("all" or the argument indexes). */

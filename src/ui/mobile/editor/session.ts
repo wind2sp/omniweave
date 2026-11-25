@@ -68,20 +68,32 @@ export async function openForEdit(name: string, bytes: Uint8Array): Promise<Edit
       }
     }
     const r = await fmt.open(f, { confirm: () => false, decrypted });
-    if (r.place) throw new Error(t("mobile.ed.notEditable"));
     doc = newDocument(name.replace(/\.[^.]+$/, ""));
     doc.pages = r.pages ?? [];
     doc.assets = r.assets ?? {};
+    if (r.place?.kind === "image") {
+      // a file that opens as a picture only (an SVG with an embedded image, a photo …): the desktop's own way — a page
+      // the size of the picture holding it (ui/actions.ts fileToPages), edited like a photo
+      const { fileToPages } = await import("../../actions");
+      const fp = await fileToPages({ name, path: null, bytes });
+      doc.pages = fp.pages;
+      doc.assets = fp.assets;
+    } else if (r.place) throw new Error(t("mobile.ed.notEditable"));
     if (secretId) for (const p of doc.pages) p.source = { ...(p.source ?? { format: ext, name }), protection: { scheme: "office-agile", secretId } };
     warnings.push(...(r.warnings ?? []));
     message = r.message;
   }
   if (!doc.pages.length) throw new Error(t("mobile.noPages"));
   useStore.getState().load(doc, null);
-  return { name, original: bytes, loaded: doc, warnings, message };
+  // an .ai: its shapes, gradients and text made editable at once, as the PC program does on open (ui/actions.ts)
+  if (ext === "ai") {
+    const { elevateAiOnOpen } = await import("../../actions");
+    if ((await elevateAiOnOpen(doc.pages)) > 0) useStore.setState({ past: [], future: [] } as never);
+  }
+  return { name, original: bytes, loaded: useStore.getState().doc, warnings, message };
 }
 
-export type SaveKind = "same" | "omw" | "pdf" | "png" | "jpg" | "svg" | "dxf";
+export type SaveKind = "same" | "omw" | "pdf" | "png" | "jpg" | "svg" | "dxf" | "csv" | "xlsx" | "hwpx" | "docx" | "odt" | "pptx";
 
 export interface SaveTarget {
   kind: SaveKind;
@@ -107,7 +119,20 @@ export async function saveTargets(page: Page | undefined): Promise<SaveTarget[]>
     { kind: "png", ext: "png", label: t("mobile.ed.asPng"), why: null },
     { kind: "jpg", ext: "jpg", label: t("mobile.ed.asJpg"), why: null },
     { kind: "svg", ext: "svg", label: t("mobile.ed.asSvg"), why: null },
-    { kind: "dxf", ext: "dxf", label: t("mobile.ed.asDxf"), why: page && page.nodes.some((n) => n.type === "VECTOR" || n.type === "TEXT") && !page.sheet ? null : t("mobile.ed.why.noDrawing") },
+    // a table: CSV / Excel as on the PC (파일 › 내보내기); a drawing: DXF — offered only where they make sense (a Word file
+    // listed "DXF 도면으로 내보내기" before)
+    ...(page?.sheet
+      ? [
+          { kind: "csv" as const, ext: "csv", label: t("mobile.ed.asCsv"), why: null },
+          ...(sameExt === "xlsx" ? [] : [{ kind: "xlsx" as const, ext: "xlsx", label: t("mobile.ed.asXlsx"), why: null }]),
+        ]
+      : []),
+    ...(page && !page.sheet && page.nodes.some((n) => n.type === "VECTOR" || n.type === "TEXT") && (src?.cad || /^(dxf|dwg|svg|ai|pdf)$/.test(sameExt)) ? [{ kind: "dxf" as const, ext: "dxf", label: t("mobile.ed.asDxf"), why: null }] : []),
+    // a document in another word processor's format, a deck as PowerPoint (파일 › 다른 이름으로 저장 on the PC)
+    ...(/^(docx|doc|hwpx|hwp|odt|rtf|txt|md|html?)$/.test(sameExt)
+      ? (["hwpx", "docx", "odt"] as const).filter((k) => k !== sameExt).map((k) => ({ kind: k, ext: k, label: t("mobile.v2.as." + k), why: null }))
+      : []),
+    ...(/^(ppt|odp|pps|ppsx)$/.test(sameExt) ? [{ kind: "pptx" as const, ext: "pptx", label: t("mobile.v2.as.pptx"), why: null }] : []),
   ];
 }
 

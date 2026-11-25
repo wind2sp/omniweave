@@ -173,3 +173,32 @@ export function quadsBetween(items: PdfTextItem[], a: [number, number], b: [numb
   }
   return quads;
 }
+
+/**
+ * The text between two points (as quadsBetween marks it): the characters of each line in reading order, a space
+ * between runs set apart, a line break between lines — what Ctrl+C copies from a PDF page (Acrobat's text select).
+ */
+export function textBetween(items: PdfTextItem[], a: [number, number], b: [number, number]): string {
+  const lines = textLines(items);
+  if (!lines.length) return "";
+  let s = locate(lines, a), e = locate(lines, b);
+  if (s.line > e.line || (s.line === e.line && s.x > e.x)) [s, e] = [e, s];
+  const out: string[] = [];
+  for (let li = s.line; li <= e.line; li++) {
+    const l = lines[li];
+    const xs = li === s.line ? s.x : -Infinity, xe = li === e.line ? e.x : Infinity;
+    let text = "", prev: PdfTextItem | null = null;
+    for (const it of l.items) {
+      if (it.x1 <= xs || it.x0 >= xe) continue;
+      const ch = [...it.str], n = Math.max(1, ch.length), w = (it.x1 - it.x0) / n;
+      const k0 = xs > it.x0 ? Math.max(0, Math.floor((xs - it.x0) / w)) : 0;
+      const k1 = xe < it.x1 ? Math.min(n, Math.ceil((xe - it.x0) / w)) : n;
+      if (k1 <= k0) continue;
+      if (prev && it.x0 - prev.x1 > (it.y1 - it.y0) * 0.15 && !text.endsWith(" ")) text += " ";
+      text += ch.slice(k0, k1).join("");
+      prev = it;
+    }
+    out.push(text);
+  }
+  return out.join("\n").replace(/[ \t]+$/gm, "");
+}

@@ -10,11 +10,37 @@ import { settleSlides } from "./slides";
 
 export type Tool =
   | "select" | "direct" | "hand" | "brush" | "eraser" | "pen" | "rect" | "ellipse" | "text"
-  // image mode (Photoshop): marquee M, lasso L, magic wand W, eyedropper I, gradient G, zoom Z (ui/pixelSelect.ts)
-  | "marquee" | "lasso" | "wand" | "eyedropper" | "gradient" | "zoom"
+  // image mode (Photoshop): marquee M, lasso L, magic wand W, eyedropper I, gradient / paint bucket G, zoom Z (ui/pixelSelect.ts)
+  | "marquee" | "lasso" | "wand" | "eyedropper" | "gradient" | "bucket" | "zoom"
   // design mode (Illustrator): line segment \, add / delete anchor point + -, convert anchor point Shift+C,
   // curvature Shift+` (ui/designTools.ts, ui/pathTools.ts) — the last four sit under the pen in the tool strip
-  | "line" | "anchorAdd" | "anchorDel" | "anchorConvert" | "curvature";
+  | "line" | "anchorAdd" | "anchorDel" | "anchorConvert" | "curvature"
+  // the design mode's other shape tools: rounded rectangle, polygon, star (under the rectangle in the tool strip)
+  | "roundRect" | "polygon" | "star"
+  // the design mode's transform tools: rotate R, reflect O, scale S (a reference point, then a drag)
+  | "rotateTool" | "reflectTool" | "scaleTool"
+  // the design mode's second set (ui/design2Canvas.ts): shear (under scale), flare (under the shapes), shape builder
+  // Shift+M, blend W
+  | "shearTool" | "flare" | "shapeBuilder" | "blendTool"
+  // pencil N, scissors C, knife (ui/designCut.ts)
+  | "pencil" | "scissors" | "knife"
+  // the design mode's Magic Wand Y (objects of the same fill) and Smooth tool (ui/designMore.ts)
+  | "objWand" | "smoothTool"
+  // the gradient mesh tool U and the perspective grid tool Shift+P (ui/designMesh.ts, ui/designPersp.ts)
+  | "meshTool" | "perspGrid" | "perspSelect"
+  // the artboard tool (Shift+O): moves, adds and deletes artboards (ui/artboards.ts)
+  | "artboard"
+  // type on a path (a click on a path turns it into the line a text runs along; ui/designPathText.ts)
+  | "typePath"
+  // image mode retouching and selection (ui/ps/canvasExt.ts): spot healing / healing brush / patch J, clone stamp S,
+  // quick selection / object selection W, vertical type T
+  | "spotHeal" | "heal" | "patch" | "clone" | "quickSelect" | "objectSelect" | "vtext"
+  // toning (O): dodge, burn, sponge (ui/ps/toning.tsx)
+  | "dodge" | "burn" | "sponge"
+  // 다각형 올가미 (Shift+L, under the lasso; ui/CanvasView.tsx)
+  | "polyLasso"
+  // 사용자 정의 모양 도구 (Photoshop U group: heart, arrow, speech bubble …; ui/drawDefaults.ts CUSTOM_SHAPES)
+  | "customShape";
 /** Top bar work mode: AUTO follows each page (ui/editModes.ts), the others pick that edit mode for every page. */
 export type Mode = "AUTO" | "DOCUMENT" | "SLIDE" | "IMAGE" | "DESIGN";
 
@@ -23,6 +49,8 @@ export interface BrushSettings {
   hardness: number; // 0..1
   opacity: number; // 0..1
   color: string;
+  /** how much each dab adds within a stroke, 0..1 (Photoshop's flow; omitted = 1) */
+  flow?: number;
 }
 
 export interface View {
@@ -87,7 +115,13 @@ export const storeHooks: {
    * other change would be built on — or thrown away with — the session's gesture base.
    */
   interrupt: ((why: "edit" | "history") => void) | null;
-} = { beforeCommit: null, committed: null, loaded: null, interrupt: null };
+  /**
+   * Live art that follows its sources (the design mode's blends, repeats and symbol instances; ui/designArt.ts): given
+   * the new document and the one before, the document with the generated objects brought up to date, inside the same
+   * undo step.
+   */
+  settle: ((next: OmwDocument, prev: OmwDocument) => OmwDocument) | null;
+} = { beforeCommit: null, committed: null, loaded: null, interrupt: null, settle: null };
 
 export const useStore = create<State>((set, get) => {
   const initial = newDocument();
@@ -103,7 +137,8 @@ export const useStore = create<State>((set, get) => {
     toolLocked: false,
     mode: "AUTO",
     view: { ...DEFAULT_VIEW },
-    brush: { size: 24, hardness: 0.8, opacity: 1, color: "#1d1f24" },
+    // (black: Photoshop and Illustrator start with a black foreground; D resets to it)
+    brush: { size: 24, hardness: 0.8, opacity: 1, color: "#000000" },
     fill: "#4f7cff",
     stroke: "#1d1f24",
     editingTextId: null,
@@ -116,11 +151,12 @@ export const useStore = create<State>((set, get) => {
       storeHooks.beforeCommit?.();
       const { doc, past } = get();
       // slide placeholders that changed get their autofit and anchor (core/slides.ts)
-      const next = settleSlides(produce(doc, (d) => {
+      let next = settleSlides(produce(doc, (d) => {
         recipe(d);
         normalizeDocGroups(d as OmwDocument);
         d.modified = new Date().toISOString();
       }), doc);
+      if (storeHooks.settle && next !== doc) next = storeHooks.settle(next, doc);
       if (next === doc) return;
       set({ doc: next, past: [...past.slice(-HISTORY_LIMIT + 1), { doc, label }], future: [], dirty: true });
       storeHooks.committed?.(next, label);
@@ -147,7 +183,8 @@ export const useStore = create<State>((set, get) => {
       const { gestureBase, doc, past } = get();
       if (!gestureBase) return;
       if (doc === gestureBase) return set({ gestureBase: null });
-      const stamped = produce(settleSlides(doc, gestureBase), (d) => {
+      const settled = settleSlides(doc, gestureBase);
+      const stamped = produce(storeHooks.settle ? storeHooks.settle(settled, gestureBase) : settled, (d) => {
         d.modified = new Date().toISOString();
       });
       set({ doc: stamped, gestureBase: null, past: [...past.slice(-HISTORY_LIMIT + 1), { doc: gestureBase, label }], future: [], dirty: true });
@@ -205,7 +242,7 @@ function fixSelection() {
 }
 
 /** Tools that hand back to the select tool after one object unless locked (pen, brush and eraser keep going). */
-export const ONE_SHOT_TOOLS: readonly Tool[] = ["text", "rect", "ellipse", "line"];
+export const ONE_SHOT_TOOLS: readonly Tool[] = ["text", "rect", "ellipse", "line", "roundRect", "polygon", "star"];
 
 /** Toolbar click: picks the tool unlocked (so clicking a locked tool unlocks it); double-click locks it. */
 export function chooseTool(tool: Tool, lock = false): void {

@@ -14,7 +14,7 @@ import { nodeBounds } from "../core/loom";
 import { flatten, paintBox } from "../core/vector";
 import type { Paint } from "../core/style/types";
 import { gradientFallbackHex } from "../core/style/paint";
-import { newText, newVector, uid, type TextNode, type Contour, type LayerGroup, type SceneNode, type Vec2, type VectorAnchor, type VectorNode } from "../core/types";
+import { newPage, newText, newVector, uid, type Page, type TextNode, type Contour, type LayerGroup, type SceneNode, type Vec2, type VectorAnchor, type VectorNode } from "../core/types";
 
 type M = [number, number, number, number, number, number]; // a b c d e f
 
@@ -428,6 +428,22 @@ export interface SvgArtwork {
 }
 
 /** The SVG's shapes as editable paths, or null when it holds something paths here cannot carry. */
+/**
+ * An SVG file as a design page of editable paths (the SVG's own size), or null when it needs more than paths and
+ * opens as one picture. The same page from every way of opening (desktop canvasImagePage, the format registry the
+ * phone editor opens through).
+ */
+export function svgArtPage(bytes: Uint8Array, name: string): Page | null {
+  const art = svgToVectors(new TextDecoder().decode(bytes));
+  if (!art) return null;
+  const stem = name.replace(/\.[^.]+$/, "") || name;
+  const vp = newPage("DESIGN", Math.max(1, art.width), Math.max(1, art.height), stem);
+  vp.nodes = art.nodes;
+  if (art.groups.length) vp.groups = art.groups;
+  vp.source = { format: "svg", name };
+  return vp;
+}
+
 export function svgToVectors(text: string): SvgArtwork | null {
   if (typeof DOMParser === "undefined") return null;
   const doc = new DOMParser().parseFromString(text, "image/svg+xml");

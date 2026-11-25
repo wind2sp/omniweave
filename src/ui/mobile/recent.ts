@@ -1,5 +1,7 @@
-// Recent files of the phone app: names, sizes, times, the picked URI and a short fingerprint only — never file
-// contents — on this device (docs/MOBILE_PLAN.md §2 "최근(앱 안 목록, 파일 내용은 저장 안 함)").
+// Recent files of the phone app: names, sizes, times, the picked URI and a short fingerprint — never file
+// contents — on this device (docs/MOBILE_PLAN.md §2 "최근(앱 안 목록, 파일 내용은 저장 안 함)"). The home screen's
+// "이어서 하기" card also keeps a small picture of the first page (≈ 96 px wide JPEG, this device only, gone with the
+// entry) and when the file was last saved in its own format.
 // One entry per file: the same URI, or the same contents reached through another URI (a file shared twice from
 // KakaoTalk gets a new content:// each time), replace the older entry.
 
@@ -13,6 +15,10 @@ export interface RecentItem {
   fp?: string;
   /** the URI could not be read any more (the grant ended): reopening goes through the picker */
   expired?: boolean;
+  /** the first page, small (data: URL, JPEG) — the "이어서 하기" card */
+  thumb?: string;
+  /** when it was last saved in its own format from the phone editor (ms) */
+  saved?: number;
 }
 
 const KEY = "omniweave.mobile.recent.v2";
@@ -20,7 +26,7 @@ const OLD_KEY = "omniweave.mobile.recent.v1";
 const MAX = 30;
 /** a URI grant that was not kept (persistable) rarely survives this long; the entry stays, its URI is dropped */
 const GRANT_DAYS = 30;
-const KNOWN = /\.(pdf|png|jpe?g|webp|gif|docx|pptx|ppsx|xlsx|xlsm|hwpx|omw|zip)$/i;
+const KNOWN = /\.(pdf|png|jpe?g|webp|gif|bmp|tiff?|heic|docx?|odt|rtf|txt|md|html?|pptx?|ppsx?|odp|xlsx|xlsm|xls|csv|tsv|ods|hwpx?|omw|zip|psd|psb|ai|svg|eps|dxf|dwg|mp3|wav|m4a|ogg|mp4|webm|mov)$/i;
 
 /** FNV-1a over the size and up to 3 × 16 KB (start, middle, end): cheap for a 100 MB file, distinct enough for a list. */
 export function fingerprint(bytes: Uint8Array): string {
@@ -43,7 +49,7 @@ function clean(list: unknown, now: number): RecentItem[] {
     if (!x || typeof x.name !== "string" || typeof x.at !== "number") continue;
     // entries from the first test build whose name was only a media id ("18"): unusable, dropped
     if (!KNOWN.test(x.name)) continue;
-    const item: RecentItem = { name: x.name, size: Number(x.size) || 0, path: typeof x.path === "string" ? x.path : null, at: x.at, ...(typeof x.fp === "string" ? { fp: x.fp } : {}), ...(x.expired ? { expired: true } : {}) };
+    const item: RecentItem = { name: x.name, size: Number(x.size) || 0, path: typeof x.path === "string" ? x.path : null, at: x.at, ...(typeof x.fp === "string" ? { fp: x.fp } : {}), ...(x.expired ? { expired: true } : {}), ...(typeof x.thumb === "string" && x.thumb.startsWith("data:image/") && x.thumb.length < 40000 ? { thumb: x.thumb } : {}), ...(typeof x.saved === "number" ? { saved: x.saved } : {}) };
     if (item.path && now - item.at > GRANT_DAYS * 864e5) item.expired = true;
     if (out.some((o) => same(o, item))) continue;
     out.push(item);
@@ -79,6 +85,12 @@ function store(list: RecentItem[]) {
 
 /** Put `item` first (replacing the same file, see same()) and keep the newest MAX; returns the new list. */
 export function addRecent(item: RecentItem, list: RecentItem[] = loadRecent()): RecentItem[] {
+  // the same file again: its picture and saved time stay (a new picture comes when the viewer draws it)
+  const old = list.find((x) => same(x, item));
+  if (old && old.fp === item.fp) {
+    const thumb = item.thumb ?? old.thumb, saved = item.saved ?? old.saved;
+    item = { ...item, ...(thumb ? { thumb } : {}), ...(saved ? { saved } : {}) };
+  }
   const next = [item, ...list.filter((x) => !same(x, item))].slice(0, MAX);
   store(next);
   return next;
@@ -100,4 +112,13 @@ export function removeRecent(item: RecentItem, list: RecentItem[] = loadRecent()
 export function clearRecent(): RecentItem[] {
   store([]);
   return [];
+}
+
+/** The newest entry named `name` gets `patch` (its picture, its saved time); returns the new list. */
+export function updateRecent(name: string, patch: Pick<RecentItem, "thumb" | "saved">, list: RecentItem[] = loadRecent()): RecentItem[] {
+  const i = list.findIndex((x) => x.name === name);
+  if (i < 0) return list;
+  const next = list.map((x, k) => (k === i ? { ...x, ...patch } : x));
+  store(next);
+  return next;
 }

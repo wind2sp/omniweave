@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { cfbStreams, readCfbTree } from "../src/io/formats/cfb";
 import { exportById, formatForExt } from "../src/io/formats";
 import { lastLegacySave, legacySource, legacyUnchanged, xlsShape, xlsValuesOnly } from "../src/io/formats/legacyWrite";
+import { readXls } from "../src/io/sheet/readXls";
 import { editWorkbook, workbookOf, type XlsCellEdit } from "../src/io/formats/xlsWrite";
 import type { OmwDocument, Page } from "../src/core/types";
 import type { SheetData } from "../src/core/sheetTypes";
@@ -190,11 +191,13 @@ describe("cell edits of every kind (omni-legacy-xls-cells.xls)", () => {
     expect(records(wb).filter((r) => r.type === 0x04bc).length).toBe(records(workbookOf(new Uint8Array(readFileSync(CELLS_FILE)))).filter((r) => r.type === 0x04bc).length);
   });
 
-  it("the first cell of a shared formula, an array formula cell: refused (save as XLSX)", async () => {
+  it("the first cell of a shared formula, an array formula cell: the workbook written anew as XLS (the patcher refuses them)", async () => {
     for (const a of ["C2", "H3"]) {
       const { doc } = await open(CELLS_FILE);
       put(sheets(doc)[0], a, 5);
-      await expect(save(doc), a).rejects.toThrow(/XLSX|xlsx/);
+      const out = await save(doc);
+      expect(lastLegacySave.xls, a).toBe("fresh");
+      expect(readXls(out, "en").sheets[0].cells[a].v, a).toBe(5);
     }
   });
 
@@ -404,22 +407,25 @@ describe("QA edges (omni-legacy-xls-edge.xls, omni-legacy-xls-manual.xls)", () =
     indexOk(wb, 2);
   });
 
-  it("a data table: its result cells are refused (save as XLSX), its input values are plain values", async () => {
+  it("a data table: its result cells written anew (XLS), its input values are plain values", async () => {
     const { doc } = await open(EDGE);
     put(sheets(doc)[0], "F22", 5);
-    await expect(save(doc)).rejects.toThrow(/XLSX|xlsx/);
+    await save(doc);
+    expect(lastLegacySave.xls).toBe("fresh");
     await edited(EDGE, (by) => put(by(S), "E22", 50));
   });
 
   // Excel in manual calculation does not recalculate on load even without RECALCID (checked: B1 =A1*2 still showed the
   // old 10 after A1 became 50), and Excel itself recalculates before saving — so the edit would leave stale results
-  it("manual calculation with formulas: refused (save as XLSX), the mode is never changed behind the user's back", async () => {
+  it("manual calculation with formulas: written anew with the results recalculated, the mode never changed behind the user's back", async () => {
     const calc = (wb: Uint8Array) => subs(wb).flat().filter((r) => r.type === 0x000d).map((r) => r.data.readUInt16LE(0));
     expect(calc(workbookOf(new Uint8Array(readFileSync(MANUAL))))).toEqual([0]);
     const { doc } = await open(MANUAL);
     put(sheets(doc)[0], "A1", 50);
     expect(xlsValuesOnly(doc.pages)).toBe(true);
-    await expect(save(doc)).rejects.toThrow(/XLSX|xlsx/);
+    const out = await save(doc);
+    expect(lastLegacySave.xls).toBe("fresh");
+    expect(new Set(calc(workbookOf(out)))).toEqual(new Set([0]));
   });
 
   it("manual calculation without a formula: the values are written, CALCMODE stays manual", async () => {
@@ -432,24 +438,36 @@ describe("QA edges (omni-legacy-xls-edge.xls, omni-legacy-xls-manual.xls)", () =
   });
 });
 
-describe("what is still refused", () => {
+describe("what the record patcher refuses: the workbook written anew as XLS", () => {
+  const anew = async (edit: (sh: SheetData, d: OmwDocument) => void) => {
+    const { doc } = await open(CELLS_FILE);
+    edit(sheets(doc)[0], doc);
+    expect(xlsValuesOnly(doc.pages)).toBe(false);
+    const out = await save(doc);
+    expect(lastLegacySave.xls).toBe("fresh");
+    return readXls(out, "en").sheets[0];
+  };
   const refused = async (edit: (sh: SheetData, d: OmwDocument) => void) => {
     const { doc } = await open(CELLS_FILE);
     edit(sheets(doc)[0], doc);
     expect(xlsValuesOnly(doc.pages)).toBe(false);
     await expect(save(doc)).rejects.toThrow();
   };
-  it("a formula typed in", () => refused((s) => (s.cells.A2 = { ...s.cells.A2, f: "1+1" })));
-  it("a value with a format change (a date typed into a general cell)", () =>
-    refused((s) => {
+  it("a formula typed in", async () => expect((await anew((s) => (s.cells.A2 = { ...s.cells.A2, f: "1+1" }))).cells.A2.f).toBe("1+1"));
+  it("a value with a format change (a date typed into a general cell)", async () => {
+    const back = await anew((s) => {
       s.styles.push({ fmt: "yyyy-mm-dd" });
       s.cells.A2 = { v: 46000, s: s.styles.length - 1 };
-    }));
-  it("a value and a column width", () =>
-    refused((s) => {
+    });
+    expect(back.styles[back.cells.A2.s!].fmt).toBe("yyyy-mm-dd");
+  });
+  it("a value and a column width", async () => {
+    const back = await anew((s) => {
       put(s, "A2", 5);
       s.colW[0] = 200;
-    }));
+    });
+    expect(Math.abs(back.colW[0] - 200)).toBeLessThanOrEqual(2);
+  });
   it("a value and a page from elsewhere", () =>
     refused((s, d) => {
       put(s, "A2", 5);

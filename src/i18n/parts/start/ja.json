@@ -2,6 +2,8 @@
   "start.search": "テンプレートとサイズを検索",
   "start.hero.new": "新規ドキュメント",
   "start.hero.newSub": "空のアートボード · 1920 × 1080 px",
+  "start.hero.sheet": "空白のブック",
+  "start.hero.sheetSub": "表計算 · セルのグリッド",
   "start.hero.open": "開く…",
   "start.hero.openSub": "omw · PDF · DOCX · HWPX · PPTX · 画像",
   "start.hero.recent": "最近のファイル",
@@ -87,5 +89,18 @@
   "start.sample.storyTitle": "Omni\nお知らせ",
   "start.sample.storySub": "上にスワイプして詳しく",
   "start.sample.thumbTitle": "10 分で\n仕上げるデザイン",
-  "start.sample.thumbSub": "Omni チュートリアル #1"
+  "start.sample.thumbSub": "Omni チュートリアル #1",
+  "start.cat.sheet": "表 (Excel・シート)",
+  "start.tpl.sheet-blank": "空白のブック",
+  "start.recent.pin": "一覧に固定",
+  "start.recent.unpin": "固定を解除",
+  "start.sizeName.letter": "レター",
+  "start.sizeName.legal": "リーガル",
+  "start.sizeName.card": "名刺",
+  "start.sizeName.postcard": "はがき",
+  "start.sizeName.square": "正方形",
+  "start.sizeName.story": "縦長ビデオ",
+  "start.recent.noAccess": "ブラウザーがこのファイルの再読み込みを許可しませんでした。もう一度クリックして許可するか、開く (Ctrl+O) で選んでください。",
+  "start.recent.emptyWebHandles": "Chrome・Edge で開く (Ctrl+O) やドロップで開いたファイルがここに表示されます。もう一度開くとき、ブラウザーが一度許可を求めることがあります。",
+  "start.recent.webStored": "ブラウザーが記憶したファイル"
 }

@@ -3,6 +3,9 @@
 // keep a tile that was painted before its resources arrived.
 
 import { isEmptyPh } from "../core/slides";
+import { arrowContours } from "../core/arrowheads";
+import { liveParts } from "../core/liveVector";
+import { pathTextGlyphs } from "../core/pathText";
 import { decodePicture } from "./picDecode";
 import { getBlob } from "../core/assets";
 import type { NodeOverride } from "../core/anim";
@@ -15,9 +18,12 @@ import { contourToSvgD, paintBox } from "../core/vector";
 import type { Paint } from "../core/style/types";
 import { boxLines, paraBoxes } from "../core/paraBox";
 import { TILE, type ImageNode, type MediaNode, type OmwDocument, type PdfNode, type PixelTile, type SceneNode, type TableNode, type TextNode, type Vec2, type VectorNode } from "../core/types";
-import { pdfBitmap, pdfBitmapIsExact, pdfBitmapScale, pdfViewHash } from "../io/pdf";
+import { PDF_CELL, pdfAnyBitmap, pdfBitmap, pdfBitmapIsExact, pdfBitmapScale, pdfScreenBitmap, pdfScreenCells, pdfScreenScale, pdfViewHash } from "../io/pdf";
 import { CANVAS_BLEND, fillParts } from "../core/style/blend";
-import { pixelGrid } from "./crisp";
+import { meshRaster, type MeshRaster } from "../core/mesh";
+import { crisp, pixelGrid } from "./crisp";
+import { shownTiles } from "../core/image/layerMask";
+import { drawVerticalText } from "../core/textVertical";
 
 export type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -302,6 +308,20 @@ export function readableInk(c: string): string {
 const ink = (c: string) => (cadInk ? readableInk(c) : c);
 
 export function drawText(ctx: Ctx, n: TextNode) {
+  // type on a path: each character on the path, turned with it (core/pathText.ts)
+  if (n.onPath) {
+    ctx.textBaseline = "alphabetic";
+    for (const g of pathTextGlyphs(n)) {
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.rotate(g.angle);
+      ctx.font = g.font;
+      ctx.fillStyle = ink(reviewLook(g.run).color);
+      ctx.fillText(g.ch, 0, 0);
+      ctx.restore();
+    }
+    return;
+  }
   const lay = layoutText(n);
   if (n.background) {
     ctx.fillStyle = n.background;
@@ -343,6 +363,15 @@ export function drawText(ctx: Ctx, n: TextNode) {
       const thick = Math.max(1, size / 16);
       if (look.underline) ctx.fillRect(p.x, y + size * 0.12, p.width, thick);
       if (look.strike) ctx.fillRect(p.x, y - size * 0.3, p.width, thick);
+      if (p.ruby) {
+        // 덧말 / 윗주: over (or under) the text it belongs to, where layoutText put it
+        ctx.font = p.ruby.font;
+        ctx.save();
+        ctx.translate(p.x + p.ruby.dx, base + p.ruby.dy);
+        if (p.ruby.hscale) ctx.scale(p.ruby.hscale, 1);
+        ctx.fillText(p.ruby.text, 0, 0);
+        ctx.restore();
+      }
     }
   }
 }
@@ -533,6 +562,44 @@ function drawMedia(ctx: Ctx, n: MediaNode, env: DrawEnv) {
   }
 }
 
+/**
+ * The page on screen (weave tiles): rendered at the exact device scale and put down 1:1 on whole device pixels
+ * (io/pdf.ts pdfScreenBitmap), the cells of a big page only where the tile is. Returns false when the node is not
+ * axis-aligned on the device (rotated, flipped, stretched): the bucket bitmap drawn through the transform then.
+ */
+export function drawPdfScreen(ctx: Ctx, n: PdfNode, env: DrawEnv, hash: string, plain: string | null): boolean {
+  if (typeof ctx.getTransform !== "function") return false;
+  const m = ctx.getTransform();
+  if (Math.abs(m.b) > 1e-9 || Math.abs(m.c) > 1e-9 || m.a <= 0 || m.d <= 0 || Math.abs(m.a - m.d) > 1e-6 * m.a) return false;
+  const s = pdfScreenScale(m.a);
+  const ox = Math.round(m.e), oy = Math.round(m.f);
+  const W = Math.ceil(n.width * s), H = Math.ceil(n.height * s);
+  const cw = ctx.canvas.width, ch = ctx.canvas.height;
+  const parts: { bmp: HTMLCanvasElement | null; x: number; y: number }[] = [];
+  if (!pdfScreenCells(n.width, n.height, s)) parts.push({ bmp: pdfScreenBitmap(hash, n.pageIndex, s, null, env.onResourceReady), x: ox, y: oy });
+  else {
+    const cx0 = Math.max(0, Math.floor(-ox / PDF_CELL)), cy0 = Math.max(0, Math.floor(-oy / PDF_CELL));
+    const cx1 = Math.min(Math.ceil(W / PDF_CELL) - 1, Math.floor((cw - ox - 1) / PDF_CELL)), cy1 = Math.min(Math.ceil(H / PDF_CELL) - 1, Math.floor((ch - oy - 1) / PDF_CELL));
+    for (let cy = cy0; cy <= cy1; cy++)
+      for (let cx = cx0; cx <= cx1; cx++) parts.push({ bmp: pdfScreenBitmap(hash, n.pageIndex, s, [cx, cy], env.onResourceReady), x: ox + cx * PDF_CELL, y: oy + cy * PDF_CELL });
+  }
+  if (parts.some((p) => !p.bmp)) {
+    // still rendering: the sharpest render of the page already made, stretched, and the tile is painted again
+    env.incomplete = true;
+    const fb = pdfAnyBitmap(hash, n.pageIndex) ?? (plain ? pdfAnyBitmap(plain, n.pageIndex) : null);
+    if (fb) ctx.drawImage(fb, 0, 0, n.width, n.height);
+    else {
+      ctx.fillStyle = "#f3f4f6";
+      ctx.fillRect(0, 0, n.width, n.height);
+    }
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const p of parts) if (p.bmp) ctx.drawImage(p.bmp, p.x, p.y);
+  ctx.restore();
+  return true;
+}
+
 function drawPdf(ctx: Ctx, n: PdfNode, env: DrawEnv) {
   const asset = env.doc.assets[n.assetId];
   const exact = !env.screen && env.scale <= 2;
@@ -540,8 +607,12 @@ function drawPdf(ctx: Ctx, n: PdfNode, env: DrawEnv) {
   // (new marks / values still being written in: the page shown meanwhile is a stand-in, never kept in a tile cache)
   const pending = { v: false };
   const view = asset ? pdfViewHash(asset.hash, n, env.onResourceReady, env.doc, pending) : null;
-  let bmp = asset && view ? pdfBitmap(view, n.pageIndex, env.scale, env.onResourceReady, exact) : null;
   if (pending.v) env.incomplete = true;
+  if (env.screen && crisp.pdfScreen && asset && view && drawPdfScreen(ctx, n, env, view, view !== asset.hash ? asset.hash : null)) {
+    drawCovers(ctx, n);
+    return;
+  }
+  let bmp = asset && view ? pdfBitmap(view, n.pageIndex, env.scale, env.onResourceReady, exact) : null;
   // the filled file's page still rendering: the plain page meanwhile (no grey flash after each mark or keystroke)
   if (!bmp && asset && view !== asset.hash) {
     env.incomplete = true;
@@ -561,9 +632,68 @@ function drawPdf(ctx: Ctx, n: PdfNode, env: DrawEnv) {
     ctx.fillStyle = "#f3f4f6";
     ctx.fillRect(0, 0, n.width, n.height);
   }
+  drawCovers(ctx, n);
+}
+
+function drawCovers(ctx: Ctx, n: PdfNode) {
   for (const c of n.covers) {
     ctx.fillStyle = c.color;
     ctx.fillRect(c.x, c.y, c.w, c.h);
+  }
+}
+
+const meshCanvases = new WeakMap<MeshRaster, OffscreenCanvas | HTMLCanvasElement>();
+
+/** A gradient mesh fill (core/mesh.ts): its pixels at the device scale, cut to the path. */
+function drawMesh(ctx: Ctx, n: VectorNode, p: Path2D) {
+  if (typeof ImageData === "undefined") return;
+  let k = 1;
+  try {
+    const t = ctx.getTransform();
+    k = Math.hypot(t.a, t.b) || 1;
+  } catch {
+    /* no transform to read */
+  }
+  const r = meshRaster(n.meshFill!, Math.min(4, Math.max(0.25, k)));
+  let c = meshCanvases.get(r);
+  if (!c) {
+    c = makeCanvas(r.pw, r.ph);
+    ctx2d(c).putImageData(new ImageData(r.data as never, r.pw, r.ph), 0, 0);
+    meshCanvases.set(r, c);
+  }
+  ctx.save();
+  ctx.clip(p, n.fillRule);
+  ctx.drawImage(c as CanvasImageSource, r.x, r.y, r.w, r.h);
+  ctx.restore();
+}
+
+/** One plain path: fill, stroke, arrowheads. */
+function drawVector(ctx: Ctx, n: VectorNode, env: DrawEnv) {
+  const p = vectorPath(n);
+  // on screen, straight horizontal / vertical paths (rectangles, h / v lines) sit on whole device pixels and
+  // every stroke is at least one device pixel wide, so a 1 pt line reads crisp at any zoom (Illustrator)
+  const crispPath = env.screen ? onDevicePixels(ctx, n) : null;
+  if (n.meshFill?.pts.length) drawMesh(ctx, n, crispPath?.fill ?? p);
+  else if (n.fill) {
+    // a gradient fill (`fills`, from an SVG / Illustrator gradient) over the path's box; `fill` is its plain fallback
+    ctx.fillStyle = vectorGradient(ctx, n) ?? ink(n.fill);
+    ctx.fill(crispPath?.fill ?? p, n.fillRule);
+  }
+  if (n.stroke && n.strokeWidth > 0) {
+    // a gradient stroke (`strokes`, from an SVG / Illustrator gradient stroke); `stroke` is its plain fallback
+    ctx.strokeStyle = vectorGradient(ctx, n, (n as VectorNode & { strokes?: { paint: Paint }[] }).strokes?.[0]?.paint) ?? ink(n.stroke);
+    ctx.lineWidth = crispPath?.lw ?? (env.screen ? minHairline(ctx, n.strokeWidth) : n.strokeWidth);
+    ctx.lineJoin = n.strokeJoin ?? "round";
+    ctx.lineCap = n.strokeCap ?? "round";
+    if (n.strokeDash?.length) ctx.setLineDash(n.strokeDash);
+    ctx.stroke(crispPath?.stroke ?? p);
+    if (n.strokeDash?.length) ctx.setLineDash([]);
+    // arrowheads (Illustrator's Stroke panel): filled in the stroke colour
+    const heads = arrowContours(n);
+    if (heads.length) {
+      ctx.fillStyle = ink(n.stroke);
+      ctx.fill(new Path2D(heads.map(contourToSvgD).join(" ")));
+    }
   }
 }
 
@@ -616,7 +746,11 @@ export function drawNode(ctx: Ctx, n: SceneNode, env: DrawEnv, o?: NodeOverride,
       const local = inverseTransformRect(n.transform, env.clip);
       const tx0 = Math.floor(local.x / TILE), ty0 = Math.floor(local.y / TILE);
       const tx1 = Math.floor((local.x + local.w) / TILE), ty1 = Math.floor((local.y + local.h) / TILE);
-      ctx.imageSmoothingEnabled = env.scale < 1;
+      // Photoshop: pixels stay sharp squares from 100 % up (nearest), high-quality averaging below it — by the device px
+      // each layer pixel really covers (zoom × dpr × the layer's own scale), not the page zoom alone
+      const dk = typeof ctx.getTransform === "function" ? Math.hypot(ctx.getTransform().a, ctx.getTransform().b) : env.scale;
+      ctx.imageSmoothingEnabled = dk < 1 - 1e-6;
+      ctx.imageSmoothingQuality = "high";
       // Tile by tile, a 256 px seam that does not fall on a device-pixel edge (any zoom but whole multiples, and while
       // panning) is a device pixel each tile covers only in part: the two partial covers leave a faint line along every
       // seam (2026-11-23: a light 1 px line across a rasterized photo at 114 %). Under the tiles, a strip of the left /
@@ -624,8 +758,10 @@ export function drawNode(ctx: Ctx, n: SceneNode, env: DrawEnv, o?: NodeOverride,
       // seam pixel is fully covered before the tiles go on top; the strip ends under the neighbour's own pixels.
       const sx = Math.abs(n.transform.scale) || 1, sy = Math.abs(scaleYOf(n.transform)) || 1;
       const ox = env.scale > 0 ? 1 / (env.scale * sx) : 0, oy = env.scale > 0 ? 1 / (env.scale * sy) : 0;
+      // a layer mask (core/image/layerMask.ts) is applied here: the tiles keep every pixel
+      const tiles = mode?.mask ? n.tiles : shownTiles(n);
       const shown: [number, number, PixelTile][] = [];
-      for (const [k, tile] of Object.entries(n.tiles)) {
+      for (const [k, tile] of Object.entries(tiles)) {
         const i = k.indexOf("_");
         const tx = +k.slice(0, i), ty = +k.slice(i + 1);
         if (tx < tx0 || tx > tx1 || ty < ty0 || ty > ty1) continue;
@@ -648,39 +784,25 @@ export function drawNode(ctx: Ctx, n: SceneNode, env: DrawEnv, o?: NodeOverride,
       }
       if (ox && oy)
         for (const [tx, ty, tile] of shown) {
-          const r = !!n.tiles[`${tx + 1}_${ty}`], b = !!n.tiles[`${tx}_${ty + 1}`];
+          const r = !!tiles[`${tx + 1}_${ty}`], b = !!tiles[`${tx}_${ty + 1}`];
           if (!r && !b) continue;
           const c = tileCanvas(tile), x1 = (tx + 1) * TILE, y1 = (ty + 1) * TILE;
           if (r) ctx.drawImage(c, TILE - 1, 0, 1, TILE, x1 - ox, ty * TILE, 2 * ox, TILE);
           if (b) ctx.drawImage(c, 0, TILE - 1, TILE, 1, tx * TILE, y1 - oy, TILE, 2 * oy);
-          if (r && b && n.tiles[`${tx + 1}_${ty + 1}`]) ctx.drawImage(c, TILE - 1, TILE - 1, 1, 1, x1 - ox, y1 - oy, 2 * ox, 2 * oy);
+          if (r && b && tiles[`${tx + 1}_${ty + 1}`]) ctx.drawImage(c, TILE - 1, TILE - 1, 1, 1, x1 - ox, y1 - oy, 2 * ox, 2 * oy);
         }
       for (const [tx, ty, tile] of shown) ctx.drawImage(tileCanvas(tile), tx * TILE, ty * TILE);      break;
     }
     case "VECTOR": {
-      const p = vectorPath(n);
-      // on screen, straight horizontal / vertical paths (rectangles, h / v lines) sit on whole device pixels and
-      // every stroke is at least one device pixel wide, so a 1 pt line reads crisp at any zoom (Illustrator)
-      const crispPath = env.screen ? onDevicePixels(ctx, n) : null;
-      if (n.fill) {
-        // a gradient fill (`fills`, from an SVG / Illustrator gradient) over the path's box; `fill` is its plain fallback
-        ctx.fillStyle = vectorGradient(ctx, n) ?? ink(n.fill);
-        ctx.fill(crispPath?.fill ?? p, n.fillRule);
-      }
-      if (n.stroke && n.strokeWidth > 0) {
-        // a gradient stroke (`strokes`, from an SVG / Illustrator gradient stroke); `stroke` is its plain fallback
-        ctx.strokeStyle = vectorGradient(ctx, n, (n as VectorNode & { strokes?: { paint: Paint }[] }).strokes?.[0]?.paint) ?? ink(n.stroke);
-        ctx.lineWidth = crispPath?.lw ?? (env.screen ? minHairline(ctx, n.strokeWidth) : n.strokeWidth);
-        ctx.lineJoin = n.strokeJoin ?? "round";
-        ctx.lineCap = n.strokeCap ?? "round";
-        if (n.strokeDash?.length) ctx.setLineDash(n.strokeDash);
-        ctx.stroke(crispPath?.stroke ?? p);
-        if (n.strokeDash?.length) ctx.setLineDash([]);
-      }
+      // a live appearance (corners, aligned / profiled stroke, live effects): its plain parts (core/liveVector.ts)
+      const parts = liveParts(n);
+      if (parts) for (const q of parts) drawVector(ctx, q, env);
+      else drawVector(ctx, n, env);
       break;
     }
     case "TEXT":
-      drawText(ctx, n);
+      if (n.vertical) drawVerticalText(ctx as CanvasRenderingContext2D, n);
+      else drawText(ctx, n);
       break;
     case "IMAGE": {
       const a = env.doc.assets[n.assetId];

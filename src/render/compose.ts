@@ -341,6 +341,29 @@ function canvasCompositor(env: DrawEnv, overrides?: Map<string, NodeOverride>): 
       blitRaw(dst, P, 1, "source-atop");
       give(P);
     },
+    maskIn(dst, n) {
+      // the path's area, opaque, as the mask (destination-in): what is outside it goes
+      if (n.type !== "VECTOR") return;
+      drawNode(dst, { ...n, fill: "#000000", stroke: null, strokeWidth: 0, opacity: 1, effects: undefined, visible: true, fills: undefined } as SceneNode, env, overrides?.get(n.id), { bare: true, gco: "destination-in" });
+    },
+    lumMaskIn(dst, n) {
+      // the mask drawn on a surface of its own, its brightness × coverage as alpha, then destination-in
+      const m = alloc(dst);
+      drawNode(m, { ...n, opacity: 1, visible: true } as SceneNode, env, overrides?.get(n.id), { bare: true });
+      const w = m.canvas.width, h = m.canvas.height;
+      if (w && h) {
+        const px = m.getImageData(0, 0, w, h);
+        const d = px.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const lum = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+          d[i] = d[i + 1] = d[i + 2] = 0;
+          d[i + 3] = Math.round(d[i + 3] * lum);
+        }
+        m.putImageData(px, 0, 0);
+      }
+      blitRaw(dst, m, 1, "destination-in");
+      give(m);
+    },
     knock(dst, n, op) {
       if (!n.visible || op <= 0 || (n.type === "RASTER" && n.adjust)) return;
       // the node's shape erases the group's surface (destination-out) at its opacity

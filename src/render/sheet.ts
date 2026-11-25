@@ -11,6 +11,8 @@ import { printLineBox } from "../io/sheet/printFont";
 import { paintSheetExtras } from "./sheetExtras";
 import { paintSheetPrintPage } from "./sheetPrint";
 import { paintDrawings, type DrawingPaneMap } from "./sheetDrawings";
+import { drawIcon, iconCount } from "./sheetIcons";
+import { periodFormula } from "../io/sheet/writeParts";
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -100,6 +102,10 @@ export interface CondLook {
   italic?: boolean;
   strike?: boolean;
   bar?: { frac: number; color: string; border?: boolean };
+  /** icon set: the set and the band (0 = lowest) */
+  icon?: { set: string; i: number };
+  /** bar / icon only (the value is not shown) */
+  hide?: boolean;
 }
 
 const condCache = new WeakMap<SheetData, Map<string, CondLook>>();
@@ -146,7 +152,7 @@ export function condLooks(sh: SheetData, sheets: SheetData[]): Map<string, CondL
   if (out) return out;
   out = new Map();
   condCache.set(sh, out);
-  if (!sh.cond?.length) return out;
+  if (!sh.cond?.length) return tableLooks(sh, out);
   const list = sheets.includes(sh) ? sheets : [sh];
   const book = new Book(list);
   const si = list.indexOf(sh);
@@ -213,8 +219,22 @@ export function condLooks(sh: SheetData, sheets: SheetData[]): Map<string, CondL
         for (const x of cells)
           if (typeof x.v === "number") {
             const f = max === min ? 1 : Math.min(1, Math.max(0, (x.v - min) / (max - min)));
-            apply(x.a, { bar: { frac: lo + (hi - lo) * f, color: rule.bar ?? "#638EC6" } });
+            apply(x.a, { bar: { frac: lo + (hi - lo) * f, color: rule.bar ?? "#638EC6" }, ...(rule.noValue ? { hide: true } : {}) });
           }
+        break;
+      }
+      case "iconSet": {
+        if (!nums.length) break;
+        const set = rule.icons ?? "3TrafficLights1";
+        const n = iconCount(set);
+        const sc = rule.scale?.length ? rule.scale : Array.from({ length: n }, (_, k) => ({ kind: "percent", val: String(Math.round((k * 100) / n)), color: "" }));
+        const at = sc.map((s) => cfvoValue(s.kind, s.val, nums, book, si));
+        for (const x of cells) {
+          if (typeof x.v !== "number") continue;
+          let k = 0;
+          for (let j = 1; j < Math.min(n, at.length); j++) if (x.v >= at[j]) k = j;
+          apply(x.a, { icon: { set, i: rule.iconReverse ? n - 1 - k : k }, ...(rule.noValue ? { hide: true } : {}) });
+        }
         break;
       }
       case "cellIs": {
@@ -246,6 +266,12 @@ export function condLooks(sh: SheetData, sheets: SheetData[]): Map<string, CondL
       case "expression":
         for (const x of cells) if (truthy(evalAt(rule.formulas?.[0] ?? "FALSE", x.r, x.c))) apply(x.a, styleLook());
         break;
+      case "timePeriod": {
+        // 발생 날짜: the rule's own formula (Excel stores one), else the one Excel would write for the period
+        const f = rule.formulas?.[0] ?? periodFormula(rule.period ?? "today", addr(top.r0, top.c0));
+        for (const x of cells) if (typeof x.v === "number" && truthy(evalAt(f, x.r, x.c))) apply(x.a, styleLook());
+        break;
+      }
       case "top10": {
         const sorted = [...nums].sort((a, b) => (rule.bottom ? a - b : b - a));
         const n = rule.percent ? Math.max(1, Math.floor((sorted.length * (rule.rank ?? 10)) / 100)) : rule.rank ?? 10;
@@ -256,7 +282,7 @@ export function condLooks(sh: SheetData, sheets: SheetData[]): Map<string, CondL
       case "aboveAverage": {
         if (!nums.length) break;
         const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
-        for (const x of cells) if (typeof x.v === "number" && x.v > avg) apply(x.a, styleLook());
+        for (const x of cells) if (typeof x.v === "number" && (rule.below ? x.v < avg : x.v > avg)) apply(x.a, styleLook());
         break;
       }
       case "duplicateValues":
@@ -288,6 +314,54 @@ export function condLooks(sh: SheetData, sheets: SheetData[]): Map<string, CondL
         break;
     }
   }
+  return tableLooks(sh, out);
+}
+
+/** Excel's built-in table styles, roughly: Light / Medium / Dark 1–7 by accent colour (header fill, stripe fill). */
+const TABLE_ACCENTS = [
+  ["#000000", "#D9D9D9"],
+  ["#4472C4", "#D9E1F2"],
+  ["#ED7D31", "#FCE4D6"],
+  ["#A5A5A5", "#EDEDED"],
+  ["#FFC000", "#FFF2CC"],
+  ["#5B9BD5", "#DDEBF7"],
+  ["#70AD47", "#E2EFDA"],
+];
+
+/**
+ * The look of Excel tables (ListObjects) by their table style: a header row filled with the accent colour in white
+ * bold (Medium / Dark), banded rows, a bold totals row. Conditional formats and the cells' own fill / font colour win.
+ */
+function tableLooks(sh: SheetData, out: Map<string, CondLook>): Map<string, CondLook> {
+  for (const t of sh.tables ?? []) {
+    const m = /^TableStyle(Light|Medium|Dark)(\d+)$/.exec(t.style ?? ""); // (no tableStyleInfo: no style, as Excel shows it)
+    if (!m) continue;
+    const g = parseRange(t.ref);
+    if (!g) continue;
+    const kind = m[1], n = Number(m[2]);
+    const [accent, band] = TABLE_ACCENTS[(n - 1) % 7];
+    const set = (r: number, c: number, look: CondLook) => {
+      const a = addr(r, c);
+      const st = sh.styles[sh.cells[a]?.s ?? 0] ?? {};
+      const cur = out.get(a) ?? {};
+      if (look.fill && cur.fill === undefined && !st.fill) cur.fill = look.fill;
+      if (look.color && cur.color === undefined && !st.color) cur.color = look.color;
+      if (look.bold && cur.bold === undefined) cur.bold = true;
+      out.set(a, cur);
+    };
+    const head = t.noHeader ? -1 : g.r0;
+    const foot = t.totals ? g.r1 : -1;
+    const darkHead = kind !== "Light" || n >= 8;
+    for (let c = g.c0; c <= Math.min(g.c1, g.c0 + 200); c++) {
+      if (head >= 0) set(head, c, darkHead ? { fill: kind === "Dark" ? "#000000" : accent, color: "#FFFFFF", bold: true } : { bold: true });
+      if (foot >= 0) set(foot, c, { bold: true });
+    }
+    if (t.rowStripes !== false) {
+      const first = head >= 0 ? head + 1 : g.r0;
+      for (let r = first; r <= Math.min(foot >= 0 ? foot - 1 : g.r1, first + 5000); r++)
+        if ((r - first) % 2 === 0) for (let c = g.c0; c <= Math.min(g.c1, g.c0 + 200); c++) set(r, c, { fill: kind === "Dark" ? accent : band });
+    }
+  }
   return out;
 }
 
@@ -305,10 +379,12 @@ export interface SheetPaint {
   lang: SheetLang;
   /** the other sheets of the book (formulas in conditional formats) */
   sheets?: SheetData[];
-  sel?: { g: Rect; ar: number; ac: number } | null;
+  sel?: { g: Rect; ar: number; ac: number; more?: Rect[] } | null;
   /** cells being edited are drawn by the editor */
   editing?: string | null;
   theme?: "light" | "dark";
+  /** show formulas instead of their values (수식 표시, Ctrl+`) */
+  formulas?: boolean;
   /** cut / copy marching range */
   clip?: Rect | null;
   /** false = leave out the sheet's drawings (pictures, charts): print-title blocks repeated on each printed page */
@@ -438,14 +514,17 @@ export function panes(sh: SheetData, p: Pick<SheetPaint, "zoom" | "headings" | "
   const z = p.zoom;
   const hw = p.headings && sh.headings ? headW(z, lastRow) : 0;
   const hh = p.headings && sh.headings ? Math.round(HEAD_H * Math.max(0.75, z)) : 0;
-  const fr = sh.freeze?.rows ?? 0, fc = sh.freeze?.cols ?? 0;
+  const sp = !sh.freeze && sh.split ? sh.split : null;
+  // a split: the bottom / right pane starts where the window was split (row / col) and scrolls from there on its own
+  const fr = sp ? (sp.rows ? sp.row ?? sp.top + sp.rows : 0) : sh.freeze?.rows ?? 0, fc = sp ? (sp.cols ? sp.col ?? sp.left + sp.cols : 0) : sh.freeze?.cols ?? 0;
+  const frE = sp ? (sp.rows ? sp.top + sp.rows : 0) : fr, fcE = sp ? (sp.cols ? sp.left + sp.cols : 0) : fc;
   const topRow = sh.topLeft ? parseAddr(sh.topLeft) : null;
-  // frozen panes start at the saved top-left row / column of the frozen region (usually 0)
-  const fr0 = fr ? Math.max(0, Math.min(topRow?.r ?? 0, 0)) : 0;
-  const fc0 = 0;
-  const frozenH = fr ? (g.rows.pos(fr) - g.rows.pos(fr0)) * z : 0;
-  const frozenW = fc ? (g.cols.pos(fc) - g.cols.pos(fc0)) * z : 0;
-  return { g, z, hw, hh, fr, fc, fr0, fc0, frozenH, frozenW, x0: hw + frozenW, y0: hh + frozenH, sx: g.cols.pos(fc) + p.scrollX, sy: g.rows.pos(fr) + p.scrollY };
+  // frozen panes start at the saved top-left row / column of the frozen region (usually 0); split panes at their own
+  const fr0 = sp ? (sp.rows ? sp.top : 0) : fr ? Math.max(0, Math.min(topRow?.r ?? 0, 0)) : 0;
+  const fc0 = sp ? (sp.cols ? sp.left : 0) : 0;
+  const frozenH = fr ? (g.rows.pos(frE) - g.rows.pos(fr0)) * z : 0;
+  const frozenW = fc ? (g.cols.pos(fcE) - g.cols.pos(fc0)) * z : 0;
+  return { g, z, hw, hh, fr, fc, fr0, fc0, frE, fcE, frozenH, frozenW, x0: hw + frozenW, y0: hh + frozenH, sx: g.cols.pos(fc) + p.scrollX, sy: g.rows.pos(fr) + p.scrollY };
 }
 
 /** Cell under a point (CSS px in the viewport); `head` = on a heading. */
@@ -499,9 +578,9 @@ export function paintSheet(ctx: Ctx, sh: SheetData, p: SheetPaint) {
   const paneList = [
     { r0: scrollRow, r1: lastVisible(g.rows, scrollRow, L.sy, p.height - L.y0), c0: scrollCol, c1: lastVisible(g.cols, scrollCol, L.sx, p.width - L.x0), clip: { x: L.x0, y: L.y0, w: p.width - L.x0, h: p.height - L.y0 } },
   ];
-  if (L.fr) paneList.push({ r0: L.fr0, r1: L.fr, c0: scrollCol, c1: lastVisible(g.cols, scrollCol, L.sx, p.width - L.x0), clip: { x: L.x0, y: hh, w: p.width - L.x0, h: L.frozenH } });
-  if (L.fc) paneList.push({ r0: scrollRow, r1: lastVisible(g.rows, scrollRow, L.sy, p.height - L.y0), c0: L.fc0, c1: L.fc, clip: { x: hw, y: L.y0, w: L.frozenW, h: p.height - L.y0 } });
-  if (L.fr && L.fc) paneList.push({ r0: L.fr0, r1: L.fr, c0: L.fc0, c1: L.fc, clip: { x: hw, y: hh, w: L.frozenW, h: L.frozenH } });
+  if (L.fr) paneList.push({ r0: L.fr0, r1: L.frE, c0: scrollCol, c1: lastVisible(g.cols, scrollCol, L.sx, p.width - L.x0), clip: { x: L.x0, y: hh, w: p.width - L.x0, h: L.frozenH } });
+  if (L.fc) paneList.push({ r0: scrollRow, r1: lastVisible(g.rows, scrollRow, L.sy, p.height - L.y0), c0: L.fc0, c1: L.fcE, clip: { x: hw, y: L.y0, w: L.frozenW, h: p.height - L.y0 } });
+  if (L.fr && L.fc) paneList.push({ r0: L.fr0, r1: L.frE, c0: L.fc0, c1: L.fcE, clip: { x: hw, y: hh, w: L.frozenW, h: L.frozenH } });
   const rect = (r: number, c: number, r1 = r, c1 = c) => cellRect(sh, p, r, c, r1, c1);
   // printed pages: the lines of the last column / row (and medium borders on the first) reach past the block
   const print = !!p.gridColor;
@@ -614,6 +693,15 @@ export function paintSheet(ctx: Ctx, sh: SheetData, p: SheetPaint) {
           ctx.strokeRect(bx + 0.5, by + 0.5, Math.max(0, bwid - 1), bh - 1);
         }
       }
+    // icon sets
+    for (const r of rows)
+      for (const c of cols) {
+        const ic = looks.get(addr(r, c))?.icon;
+        if (!ic) continue;
+        const q = rect(r, c);
+        const s = Math.max(6, Math.min(q.h - 4, 16 * p.zoom));
+        drawIcon(ctx, ic.set, ic.i, Math.round(q.x) + 2, Math.round(q.y + (q.h - s) / 2), s);
+      }
     // text
     const occupied = (r: number, c: number) => {
       const cell = sh.cells[addr(r, c)];
@@ -696,6 +784,12 @@ export function paintSheet(ctx: Ctx, sh: SheetData, p: SheetPaint) {
     if (L.fr && L.fc) maps.push({ x: fx, y: fy, clip: { x: hw, y: hh, w: L.frozenW, h: L.frozenH } });
     paintDrawings(ctx, sh, z, maps, { lang: p.lang, sheets: p.sheets });
   }
+  // a split: Excel's grey split bars between the panes
+  if (sh.split && !sh.freeze) {
+    ctx.fillStyle = dark ? "#5a5a5a" : "#D6D6D6";
+    if (L.fr) ctx.fillRect(0, Math.round(L.y0) - 2, p.width, 4);
+    if (L.fc) ctx.fillRect(Math.round(L.x0) - 2, 0, 4, p.height);
+  }
   // frozen-pane lines
   ctx.strokeStyle = "#9E9E9E";
   ctx.lineWidth = 1;
@@ -744,7 +838,8 @@ function drawCellText(
   const z = p.zoom;
   const st: SheetStyle = sh.styles[cell.s ?? 0] ?? {};
   const look = looks.get(a);
-  const f = display(sh, cell, p.lang);
+  if (look?.hide) return;
+  const f = p.formulas && cell.f ? ({ text: "=" + cell.f.replace(/_xlfn\.|_xlws\.|_xlpm\./g, "") } as Formatted) : display(sh, cell, p.lang);
   let text = f.text;
   const q = m ? rect(m.r0, m.c0, m.r1, m.c1) : rect(r, c);
   const isNum = typeof cell.v === "number" && cell.t !== "e";
@@ -758,7 +853,8 @@ function drawCellText(
   const pad = 2 * z + 1;
   // (bold text starts a dot further in from 55 % up: 14 / 10 / 8 / 6 dots at 100 / 70 / 55 / 44 %)
   const padL = print ? 8 * PRINT_DOT + Math.round(13 * z + ((look?.bold ?? st.bold) ? 0.6 : 0)) * PRINT_DOT : pad, padR = print ? 13.5 * z * PRINT_DOT : pad;
-  const indent = (st.indent ?? 0) * (sh.mdw + 1) * z;
+  // an icon set's icon takes the left of the cell: text starts after it (a number that no longer fits shows ####)
+  const indent = (st.indent ?? 0) * (sh.mdw + 1) * z + (look?.icon ? Math.max(6, Math.min(q.h - 4, 16 * z)) + 3 : 0);
   const avail = q.w - padL - padR - indent;
   // fill character (accounting formats): repeated to the width
   if (f.fillAt != null) {
@@ -886,7 +982,16 @@ function paintSelection(ctx: Ctx, sh: SheetData, p: SheetPaint, mergeAt: Map<str
   const q = cellRect(sh, p, s.g.r0, s.g.c0, Math.min(s.g.r1, MAX_ROW), Math.min(s.g.c1, MAX_COL));
   const am = mergeAt.get(addr(s.ar, s.ac));
   const aq = am ? cellRect(sh, p, am.r0, am.c0, am.r1, am.c1) : cellRect(sh, p, s.ar, s.ac);
-  const multi = s.g.r0 !== s.g.r1 || s.g.c0 !== s.g.c1;
+  // the other areas of a multi-area selection: shaded with a thin frame (Excel)
+  for (const m of s.more ?? []) {
+    const mq = cellRect(sh, p, m.r0, m.c0, Math.min(m.r1, MAX_ROW), Math.min(m.c1, MAX_COL));
+    ctx.fillStyle = "rgba(43, 116, 236, 0.12)";
+    ctx.fillRect(mq.x, mq.y, mq.w, mq.h);
+    ctx.strokeStyle = "rgba(43,116,236,0.6)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(Math.round(mq.x) + 0.5, Math.round(mq.y) + 0.5, Math.round(mq.w) - 1, Math.round(mq.h) - 1);
+  }
+  const multi = s.g.r0 !== s.g.r1 || s.g.c0 !== s.g.c1 || !!s.more?.length;
   if (multi && !(am && am.r0 === s.g.r0 && am.c0 === s.g.c0 && am.r1 === s.g.r1 && am.c1 === s.g.c1)) {
     // the range is shaded, the active cell in it stays clear
     ctx.fillStyle = "rgba(43, 116, 236, 0.12)";
@@ -936,7 +1041,7 @@ function paintHeadings(ctx: Ctx, sh: SheetData, p: SheetPaint, L: ReturnType<typ
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, p.width, hh);
   const colRuns: [number, number, number][] = []; // [c0, c1, xStart]
-  if (L.fc) colRuns.push([L.fc0, L.fc - 1, hw]);
+  if (L.fc) colRuns.push([L.fc0, L.fcE - 1, hw]);
   colRuns.push([g.cols.at(L.sx), MAX_COL, L.x0]);
   ctx.save();
   ctx.beginPath();
@@ -970,7 +1075,7 @@ function paintHeadings(ctx: Ctx, sh: SheetData, p: SheetPaint, L: ReturnType<typ
   ctx.fillStyle = bg;
   ctx.fillRect(0, hh, hw, p.height - hh);
   const rowRuns: [number, number, number][] = [];
-  if (L.fr) rowRuns.push([L.fr0, L.fr - 1, hh]);
+  if (L.fr) rowRuns.push([L.fr0, L.frE - 1, hh]);
   rowRuns.push([g.rows.at(L.sy), MAX_ROW, L.y0]);
   ctx.save();
   ctx.beginPath();

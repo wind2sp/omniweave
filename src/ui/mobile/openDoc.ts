@@ -105,6 +105,8 @@ export const pdfPassword = (doc: object): string | null => passwords.get(doc) ??
  *  desktop editor on the phone try it first instead of asking again */
 const byBytes = new WeakMap<Uint8Array, string>();
 export const knownPassword = (bytes: Uint8Array): string | null => byBytes.get(bytes) ?? null;
+/** a copy made here with the password of the file it came from (a marked-up PDF): opened without asking again */
+export const rememberPassword = (bytes: Uint8Array, pw: string) => void byBytes.set(bytes, pw);
 
 /** pdf.js document with the password asked through the phone's dialog (up to 5 tries). */
 export async function openPdf(bytes: Uint8Array, name: string) {
@@ -115,6 +117,9 @@ export async function openPdf(bytes: Uint8Array, name: string) {
   let password: string | null = null;
   (task as any).onPassword = (update: (pw: string) => void, reason: number) => {
     if (++tries > 5) return void task.destroy();
+    // the password these very bytes were opened (or made) with: tried first, without asking
+    const known = byBytes.get(bytes);
+    if (known != null && tries === 1) return update((password = known));
     void askPassword({ title: t("mobile.pwPdfTitle"), message: t("mobile.pwPdfMessage", { name }), retry: reason === 2 }).then((pw) => {
       if (pw == null) void task.destroy();
       else update((password = pw));

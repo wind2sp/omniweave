@@ -31,5 +31,6 @@
   "docflow.layout.topBottom": "上下型",
   "docflow.layout.behind": "衬于文字下方",
   "docflow.layout.front": "浮于文字上方",
-  "docflow.hist.makeBody": "添加正文"
+  "docflow.hist.makeBody": "添加正文",
+  "docflow.hist.splitTable": "拆分表格"
 }

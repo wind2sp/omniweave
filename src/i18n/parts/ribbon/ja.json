@@ -252,6 +252,8 @@
   "ribbon.cropRatio.custom": "カスタム",
   "ribbon.crop.customW": "比率の幅",
   "ribbon.crop.customH": "比率の高さ",
+  "ribbon.crop.level": "角度補正",
+  "ribbon.crop.levelTip": "角度補正 — 水平（または垂直）にしたい線に沿ってドラッグすると、その分だけ回転してまっすぐにします",
   "ribbon.crop.straighten": "角度",
   "ribbon.crop.straightenTip": "傾きを補正 — 切り抜きボックスの角度（適用すると内容が回転し、ボックスが水平になります）"
 }

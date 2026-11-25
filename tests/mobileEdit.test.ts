@@ -234,7 +234,8 @@ describe("open → edit → save (phone path) → read again (desktop)", () => {
     const out = await produce("dxf", ses, () => true);
     expect(out.name).toBe("omni-store-drawing.dxf");
     const d = readDxf(out.bytes);
-    expect(d.version).toBe("AC1009");
+    // the drawing export is DXF 2000 (hatches, blocks, lineweights kept; cad/dxfWrite2000.ts)
+    expect(d.version).toMatch(/^AC101[58]$/);
     const built = buildCadPages(d, { name: "back", format: "dxf", asset: makeAsset(out.bytes, "image/vnd.dxf", "back.dxf") });
     const bp = built.pages[0];
     const bl = (bp.groups ?? []).find((g) => g.cad?.layer?.toUpperCase() === L.cad!.layer!.toUpperCase())!;
@@ -262,7 +263,7 @@ describe("open → edit → save (phone path) → read again (desktop)", () => {
     const g = (page.groups ?? []).find((x) => x.cad?.layer);
     if (g) updateGroup(g.id, "off", (x) => (x.visible = false));
     const dxf = await produce("dxf", ses, () => true);
-    expect(readDxf(dxf.bytes).version).toBe("AC1009");
+    expect(readDxf(dxf.bytes).version).toMatch(/^AC101[58]$/);
     const omw = await produce("omw", ses, () => true);
     expect(omw.name.endsWith(".omw")).toBe(true);
     const back = await openForEdit(omw.name, omw.bytes);

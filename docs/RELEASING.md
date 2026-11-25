@@ -41,7 +41,54 @@
 | 베타 | 큰 기능을 미리 시험받을 때 | `0.3.0-beta.1` — GitHub 사전 릴리스, **자동 업데이트 대상 아님** |
 
 **릴리스 관문(모두 통과해야 태그)**: 코드 QA 검수 통과 → `npx tsc --noEmit` 0 오류 → `npm test` 전부 통과 →
-설치본 `--selftest` 통과 → 실무 샘플 열기 결과가 이전 릴리스보다 나빠지지 않음 → exe에 빌드 PC 경로(`C:\Users\…`) 0개.
+설치본 `--selftest` 통과 → 실무 샘플 열기 결과가 이전 릴리스보다 나빠지지 않음 → exe에 빌드 PC 경로(`C:\Users\…`) 0개
+→ 아래 **'배포 관문'**(실사용 회귀 시험·기능×채널 표) 통과.
+
+## 배포 관문 (2026-11-24 책임자 지시)
+
+0.2.2는 단위 시험과 부서 보고("구현됨")만 믿고 냈다가, 실제로 써 보니 기능 수십 개가 빠지거나 안 됐습니다.
+그래서 **사람이 쓰는 그대로 해 본 결과**가 없으면 판을 올리지 않습니다. 보고서·단위 시험의 "○"는 통과로 치지 않습니다.
+
+**판을 올리기 전 반드시 (하나라도 안 되면 태그 금지):**
+
+| | 무엇 | 어떻게 확인 |
+|---|---|---|
+| (a) | 전체 vitest 통과 | `run.mjs --vitest`가 결과 파일에 기록 |
+| (b) | 실사용 회귀 시험 **전 채널** 통과(일부만 돌린 것 안 됨) | `node qa/realuse/run.mjs --channels web,phone,android,desktop --vitest` |
+| (c) | 기능×채널 표에서 이전 판 대비 ○→× 후퇴 0 | 지난 배포 때 남긴 `docs/qa/parity/releases/feature-matrix-<판>.json`과 비교(run.mjs가 계산) |
+| (d) | 남은 ×·△ 목록을 **책임자에게 보고하고 확인** | 결과 요약의 '남은 ×·△'를 보내고 답을 받은 뒤 `--approved "<누가·언제·어디서>"` |
+| (e) | 버전 교차 열기 시험 | 새 앱 ← 옛 .omw는 시나리오 `omw-old-open`, 옛 앱(직전 두 정식 판) ← 새 .omw는 `node qa/realuse/cross.mjs --old <v직전-1 dir>,<v직전 dir> --record`(공개 저장소 태그를 `git archive`로 꺼내 `vite build`한 웹판을 창 없는 Chrome에서 Ctrl+O로 엶, 약 12분) 또는 사람이 확인하고 `run.mjs --record-cross "<판·결과·확인한 사람>"` |
+
+- **기능×채널 표**: `docs/qa/parity/feature-matrix.md`(사람용)·`feature-matrix.json`(기계용). 행 = 실사용 시나리오 + 점검 보고서
+  (비공개 QA 자료의 사용성·기능 점검, 휴대폰 비교)의 모든 항목, 열 = 설치본·웹판·휴대폰 웹·Android 앱.
+  칸은 시험이 확인한 값(`○ 날짜·커밋`, 근거 = 시험 이름)과 보고서에만 있는 값(`○*`, 확인 아님)을 구분합니다.
+  휴대폰 칸은 휴대폰 화면에서 되는지 / 일부러 PC 기능 화면으로 넘겨서 되는지(`(PC 화면)`)를 적습니다.
+  행 다시 만들기: `node qa/realuse/build-matrix.mjs`(기존 결과 칸은 유지).
+- **실사용 회귀 시험** `qa/realuse/`(비공개 qa 아래, 공개 트리에 안 나감): 표의 시나리오마다 실제 마우스·키·터치로
+  열기 → 조작 → 저장/내보내기 → 저장된 파일을 앱 밖에서 다시 읽어 내용 확인 → 앱에서 다시 열기.
+  - 웹판: `vite build` + `vite preview`를 스크립트가 띄우고 끔, 시스템 Chrome(창 없음) 1440×900.
+  - 휴대폰 웹: 같은 빌드, 375×812 터치 에뮬레이션.
+  - Android 앱: 에뮬레이터(창 없음, `-no-window`)에 **이 커밋의 디버그 APK**(`--apk`)를 깔고 핵심 30개 시나리오.
+    Android 자체 열기·저장 화면은 adb로 누릅니다.
+  - 설치본: 화면 코드는 웹과 같으므로 웹 결과로 갈음(표에 `(웹 결과)`). 설치본 고유(`--selftest`·`--update-check`·
+    연결 프로그램 인수·Tauri 파일 저장)는 **이 커밋으로 빌드한 포터블 exe**(`--exe`)를 창 없이 짧게 돌려 확인.
+    exe·APK가 이 커밋보다 옛 빌드면 결과는 △(관문 불통과).
+  - 결과: `qa/realuse/results/latest.json`(커밋·채널별 통과/실패·vitest·교차 열기), 캡처·저장본 `qa/realuse/out/`.
+    종료 코드 0 = 모두 ○, 1 = ×·△ 있음, 2 = 후퇴.
+- **`scripts/release.mjs`가 관문을 강제합니다**(`scripts/release-gate.mjs`): 결과 파일이 **지금 커밋(HEAD)·커밋 안 한 변경 없음**의
+  것이고, (a)~(e)가 모두 맞아야 판을 올립니다. 통과하면 그때의 표를 `docs/qa/parity/releases/feature-matrix-<판>.json`으로
+  남겨 다음 판의 후퇴 기준으로 씁니다. `--dry`는 관문 결과만 보여 주고 파일은 안 바꿉니다.
+- **채널마다 따로 검사합니다.** `run.mjs`는 결과 파일의 채널마다 돌린 커밋·커밋 안 한 변경 여부(dirty)·PC 이름(host)을
+  적고, 관문은 **채널마다** `commit === HEAD`이고 dirty가 아니어야 받습니다. 다른 커밋·다른 PC의 결과를 손으로 합쳐도
+  그 채널은 통과로 치지 않습니다.
+- **Android는 sky-lenovo가 돌립니다.** sky-lenovo가 **배포할 그 커밋**을 깨끗하게 체크아웃해 그 커밋의 디버그 APK로
+  `node qa/realuse/run.mjs --channels android --apk <APK>`를 돌리고, 결과(`qa/realuse/results/latest.json`)를
+  `qa/android-sky-lenovo` 브랜치에 올립니다. 배포를 맡은 PC는 웹·휴대폰 웹·설치본·vitest를 같은 커밋으로 돌린 뒤
+  `node qa/realuse/run.mjs --import-channel android origin/qa/android-sky-lenovo:qa/realuse/results/latest.json`
+  (파일 경로도 됨)으로 들여옵니다. 들여온 채널은 그 PC의 커밋·dirty·host를 그대로 가지므로, 커밋이 다르면 관문이 막습니다.
+  (결과 파일은 체크아웃의 커밋에 묶여 있어, 다른 커밋에서 들여오거나 돌리면 그 파일은 새로 시작합니다.)
+- 새 기능이 들어오면 **그 부서가 시나리오를 함께 추가**합니다(`qa/realuse/scenarios/*.mjs`, 표 행은 build-matrix가 만듦).
+  시나리오가 없는 기능은 표에서 `?`/`*`로 남고, 관문 보고(d)에 '확인 안 됨'으로 올라갑니다.
 
 평소에는 `CHANGELOG.md`의 `## [Unreleased]` 아래에 바뀐 점을 적어 둡니다(비어 있으면 커밋 제목으로 초안을 만듭니다).
 

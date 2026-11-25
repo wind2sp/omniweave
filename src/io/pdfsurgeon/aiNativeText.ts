@@ -148,6 +148,10 @@ class ArcPath {
   }
 }
 
+/** Text frames the last readTextLayout laid out (objects naming the same frame share one): what the tests bound. */
+let framesLaidOut = 0;
+export const lastTextFramesLaidOut = () => framesLaidOut;
+
 export function readTextLayout(native: string, ruler: [number, number] | null, named: Map<string, Paint>): TextLayout | null {
   const td = textDocument(native);
   if (!td) return null;
@@ -161,6 +165,7 @@ export function readTextLayout(native: string, ruler: [number, number] | null, n
   const notes: string[] = [];
   let glyphCount = 0;
   const budget = { n: 0 };
+  framesLaidOut = 0;
   /** a text object per (story, frame): several objects naming the same frame share the work (each gets a copy) */
   const made = new Map<string, TextNode>();
   const fCache = new Map<number, TdDict[]>();
@@ -204,6 +209,7 @@ export function readTextLayout(native: string, ruler: [number, number] | null, n
   };
 
   function makeFrame(storyIndex: number, frameIndex: number): TextNode | null {
+    framesLaidOut++;
     {
       if (budget.n > MAX_VISITS || glyphCount > MAX_GLYPHS) return null;
       const story = stories[storyIndex];

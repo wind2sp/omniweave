@@ -16,6 +16,8 @@
 // below change the model on plain pages or immer drafts (one undo step each in ui/headerFooterActions.ts).
 
 import { formatNumber } from "./lists";
+import { hfKey, hfNodes } from "./slideHf";
+import { layoutChain } from "./slideLayouts";
 import { marginsOf, sectionsOf, type SectionRun } from "./pageSetup";
 import { layoutText } from "./text";
 import { DEFAULT_RUN, IDENTITY, uid, type FieldKind, type HFVariants, type OmwDocument, type Page, type PageNumFormat, type PageNumPos, type SectionHF, type TextNode, type TextParagraph, type TextRun } from "./types";
@@ -344,8 +346,11 @@ const masterMemo = new WeakMap<Page, { base: Page | null; nodes: TextNode[]; out
  * The master a page is drawn with: its master page plus its header, footer and page number (or the master alone /
  * null). The same object while nothing it shows changed (renderers and thumbnails cache by identity).
  */
-export function renderMasterOf(doc: Pick<OmwDocument, "pages" | "masters" | "title">, page: Page): Page | null {
-  const base = page.masterId ? doc.masters.find((m) => m.id === page.masterId) ?? null : null;
+export function renderMasterOf(doc: Pick<OmwDocument, "pages" | "masters" | "title" | "theme">, page: Page): Page | null {
+  // (a layout edited here: its master under its own decoration — core/slideLayouts.ts)
+  const base = layoutChain(doc, page.masterId ? doc.masters.find((m) => m.id === page.masterId) ?? null : null);
+  // a slide's 머리글/바닥글 (date, footer, number: core/slideHf.ts) is drawn with its master
+  if (page.kind === "SLIDE" && page.slideHf) return slideMasterOf(doc, page, base);
   if (page.kind !== "DOCUMENT") return base;
   let i = doc.pages.indexOf(page);
   if (i < 0) i = doc.pages.findIndex((p) => p.id === page.id);
@@ -358,6 +363,22 @@ export function renderMasterOf(doc: Pick<OmwDocument, "pages" | "masters" | "tit
     ? { ...base, nodes: [...base.nodes, ...nodes] }
     : { id: `hf-master:${page.id}`, name: "", kind: "MASTER", width: page.width, height: page.height, background: "rgba(0,0,0,0)", nodes, masterId: null, transition: { type: "NONE", duration: 0 }, animations: [] };
   masterMemo.set(page, { base, nodes, out });
+  return out;
+}
+
+const slideMemo = new WeakMap<Page, { base: Page | null; key: string; out: Page }>();
+
+/** A slide's master with its foot (date, footer, slide number) added; the same object while they show the same. */
+function slideMasterOf(doc: Pick<OmwDocument, "pages" | "theme">, page: Page, base: Page | null): Page | null {
+  const key = hfKey(doc, page);
+  if (!key) return base;
+  const hit = slideMemo.get(page);
+  if (hit && hit.base === base && hit.key === key) return hit.out;
+  const nodes = hfNodes(doc, page);
+  const out: Page = base
+    ? { ...base, nodes: [...base.nodes, ...nodes] }
+    : { id: `hf-master:${page.id}`, name: "", kind: "MASTER", width: page.width, height: page.height, background: "rgba(0,0,0,0)", nodes, masterId: null, transition: { type: "NONE", duration: 0 }, animations: [] };
+  slideMemo.set(page, { base, key, out });
   return out;
 }
 

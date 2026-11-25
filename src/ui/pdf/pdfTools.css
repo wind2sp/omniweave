@@ -1,0 +1,231 @@
+/* Acrobat tools (ui/pdf/PdfTools.tsx): marks on the page and the tool dialogs */
+.pdf-tool-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 17;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pdf-tool-layer.active {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.pdf-tool-layer.picture {
+  cursor: pointer;
+}
+.pdf-redact-mark {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px solid #e0302a;
+  background: rgba(224, 48, 42, 0.16);
+  box-sizing: border-box;
+}
+.pdf-redact-mark.hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+.pdf-tool-drag {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px dashed var(--accent, #2f6fde);
+  background: rgba(47, 111, 222, 0.1);
+  box-sizing: border-box;
+}
+.pdf-tool-drag.redact {
+  border-color: #e0302a;
+  background: rgba(224, 48, 42, 0.16);
+}
+.pt-dialog {
+  max-width: calc(560px * var(--ui-scale));
+  padding: 22px 24px;
+}
+.pt-dialog.wide {
+  max-width: calc(760px * var(--ui-scale));
+}
+.pt-dialog h2 {
+  margin: 0 0 6px;
+}
+.pt-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 12px 0;
+  font-size: var(--fs-ui);
+}
+.pt-grid > label,
+.pt-grid > span.pt-l {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.pt-dialog input[type="text"],
+.pt-dialog input[type="number"],
+.pt-dialog input[type="url"],
+.pt-dialog select,
+.pt-dialog textarea,
+.pt-ribbon-select,
+.pt-input {
+  height: var(--ctl, 28px);
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid var(--line-2, #c9ced6);
+  border-radius: 4px;
+  background: var(--bg-2, #fff);
+  color: var(--text);
+  font: inherit;
+  box-sizing: border-box;
+}
+.pt-grid textarea {
+  height: auto;
+  min-height: 64px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+.pt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.pt-row input[type="number"] {
+  width: 70px;
+}
+.pt-hf {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 8px 0;
+}
+.pt-hf input {
+  width: 100%;
+}
+.pt-list {
+  max-height: calc(300px * var(--ui-scale));
+  overflow: auto;
+  border: 1px solid var(--line, #c9ced6);
+  border-radius: 4px;
+  margin: 8px 0;
+  font-size: var(--fs-ui);
+}
+.pt-list .pt-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--line-2, rgba(0, 0, 0, 0.06));
+  cursor: default;
+}
+.pt-list .pt-item.sel {
+  background: var(--accent-soft, rgba(47, 111, 222, 0.14));
+}
+.pt-list .pt-item input[type="text"] {
+  flex: 1;
+  height: 24px;
+}
+.pt-list .pt-item .pt-page {
+  margin-left: auto;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pt-del {
+  color: #c22;
+  text-decoration: line-through;
+}
+.pt-add {
+  color: #1a7f37;
+}
+.pt-note {
+  margin: 6px 0 0;
+  color: var(--text-3);
+  font-size: var(--fs-ui);
+}
+.pt-warn {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: rgba(224, 48, 42, 0.09);
+  color: var(--text);
+  font-size: var(--fs-ui);
+}
+.pt-swatch {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line, #c9ced6);
+  border-radius: 3px;
+}
+.pt-ribbon-select {
+  height: 24px;
+  font: inherit;
+}
+.pt-scale {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.pt-scale input {
+  width: 52px;
+  height: 22px;
+  font: inherit;
+}
+.pt-scale select {
+  height: 22px;
+  font: inherit;
+}
+.pdf-measure-live {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.pdf-measure-label {
+  font: 600 12px system-ui, sans-serif;
+  fill: #d91a1a;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+}
+.pt-tag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 52vh;
+  overflow: auto;
+}
+.pt-tag-row {
+  display: grid;
+  grid-template-columns: 28px 40px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pt-tag-row:hover {
+  background: var(--hover, rgba(127, 127, 127, 0.12));
+}
+.pt-tag-n,
+.pt-tag-page {
+  opacity: 0.6;
+  font-size: 12px;
+}
+.pt-tag-role {
+  font: 600 11px ui-monospace, monospace;
+  color: var(--accent, #3b82f6);
+}
+.pt-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pt-tag-alt {
+  width: 100%;
+  height: 24px;
+  font: inherit;
+}

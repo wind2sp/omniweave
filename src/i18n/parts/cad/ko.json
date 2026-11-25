@@ -25,7 +25,7 @@
   "engine.cad.group.dim": "치수 {name}",
   "engine.cad.page.model": "{name} · 모형",
   "engine.cad.page.layout": "{name} · 배치 {layout}",
-  "engine.open.cad": "{fmt} 도면 ({release}) · 레이어 {layers}개 · 개체 {n}개 · 축척 {scale}",
+  "engine.open.cad": "{fmt} 도면 ({release}) · 레이어 {layers}개 · 개체 {n}개 · 축척 {scale} · 가져오기 전용(.omw로 작업, 보낼 때는 내보내기 › DXF)",
   "engine.cad.warn.merged": "개체가 많아 같은 레이어·같은 모양의 선 {n}개를 묶어 그렸습니다",
   "engine.cad.warn.empty": "그릴 개체가 없는 도면입니다",
   "engine.cad.warn.unsupported": "읽었지만 아직 그리지 못한 개체: {list}",

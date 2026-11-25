@@ -12,12 +12,13 @@
 // see the editor like any other command.
 
 import { isAppChord } from "./appKeys";
+import { chordOf, keyContext, resolveBinding } from "./keymap";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { Draft } from "immer";
 import { create } from "zustand";
 import * as RT from "../core/richtext";
 import { useStore } from "../core/store";
-import { SCRIPT_SCALE, cssFamily, lineHeightOf, plainText } from "../core/text";
+import { SCRIPT_SCALE, cssFamily, layoutText, lineHeightOf, plainText } from "../core/text";
 import { paraLineRatio, wordMultipleOf } from "../core/lineSpacing";
 import { uid, type OmwDocument, type Page, type TextNode, type TextParagraph, type TextRun } from "../core/types";
 import type { ListDef } from "../core/style/types";
@@ -25,9 +26,10 @@ import type { ListCtx } from "../core/lists";
 import type { Live } from "./shell/ops";
 import { insertBreak } from "./pageSetupActions";
 import { fieldNow, hfEditNode, parseHfId, setHfParas } from "../core/headerFooter";
-import type { FieldKind } from "../core/types";
+import type { FieldKind, Ruby } from "../core/types";
 import { t as tx, useT } from "../i18n";
 import { spellAvailable, useSpell } from "./spell";
+import { brushSelectionDone, copyFormat, pasteFormat, stepFontSize, usePainter, wordAround, type PaintTarget } from "./formatPainter";
 
 const S = () => useStore.getState();
 const ZW = "​";
@@ -59,6 +61,18 @@ export interface RichApi {
   script: (s: "super" | "sub") => void;
   /** set (or with null, clear) one character format on the selection / next input */
   setRun: <K extends keyof RT.RunFormat>(key: K, value: RT.RunFormat[K] | null, label: string) => void;
+  /** several character formats at once (서식 복사, font size keys): one undo step */
+  applyRun?: (patch: RT.RunPatch, label: string) => void;
+  /** the selected text (empty at a caret) */
+  selectedText?: () => string;
+  /** 덧말 / 윗주 (core/richtext.ts rubyRange): whether there is text to put one on, the one it has, put on / take off */
+  /** the paragraph's text before the caret (상용구: the abbreviation typed just before it); "" with a selection */
+  textBefore?: () => string;
+  /** replace the `n` characters before the caret with `text` (one undo step) */
+  replaceBefore?: (n: number, text: string, label: string) => void;
+  rubyOk?: () => boolean;
+  rubyAt?: () => Ruby | undefined;
+  setRuby?: (ruby: Ruby | null, label: string) => void;
   runLive: <K extends keyof RT.RunFormat>(key: K, label: string) => Live<RT.RunFormat[K]>;
   setPara: (patch: RT.ParaPatch, label: string) => void;
   paraLive: <K extends keyof RT.ParaPatch>(key: K, label: string) => Live<NonNullable<RT.ParaPatch[K]>>;
@@ -82,6 +96,15 @@ export interface RichApi {
   insertText: (text: string) => void;
   /** insert a field (쪽 번호, 전체 쪽 수, 날짜 …) at the caret: one undo step */
   insertField: (kind: FieldKind) => void;
+  /**
+   * Any edit of the paragraphs with the selection (styles, captions, bookmarks, cross-references: ui/docStyleActions.ts):
+   * `fn` gets the paragraphs and the selection and returns the new ones (and the selection after it); one undo step.
+   */
+  transform?: (fn: (paras: TextParagraph[], sel: RT.Range) => { paras: TextParagraph[]; sel?: RT.Range } | null, label: string) => void;
+  /** the paragraphs and the selection being edited now (null when none) */
+  snapshot?: () => { paras: TextParagraph[]; sel: RT.Range } | null;
+  /** select a range of the text being edited (책갈피 › 이동) */
+  select?: (r: RT.Range) => void;
   focus: () => void;
 }
 
@@ -118,6 +141,13 @@ function setNodeParas(d: Draft<OmwDocument>, id: string, paras: TextParagraph[])
         // text has just lost its last list item, so the boxes after it count from where the list now is
         const hadList = n.paragraphs.some((q) => q.list);
         n.paragraphs = paras as Draft<TextParagraph>[];
+        // a line of a PDF page made editable (PDF Surgeon ids "ps_…"): Acrobat's Edit Text grows the line to the right
+        // as words are added at its end — the box widens to the line instead of wrapping it onto a second line
+        if (n.id.startsWith("ps_") && paras.length === 1) {
+          const lay = layoutText({ ...(n as unknown as TextNode), paragraphs: paras, width: 1e5 });
+          const need = Math.ceil(Math.max(0, ...lay.lines.map((l) => l.width))) + 2;
+          if (need > n.width) n.width = need;
+        }
         if (hadList || paras.some((q) => q.list)) RT.renumberAfter(d.pages as Page[], id);
         return;
       }
@@ -209,6 +239,8 @@ class Engine {
   backward = false;
   /** "next input" format at a collapsed caret (toggled with nothing selected) */
   pending: { fmt: RT.RunFormat; pos: RT.Pos } | null = null;
+  /** the next paste is text only (Ctrl+Shift+V) */
+  plainPaste = false;
   composing = false;
   needSync = false;
   dirty = false;
@@ -276,6 +308,8 @@ class Engine {
     on(this.el, "cut", (e: ClipboardEvent) => this.onCopy(e, true));
     on(this.el, "paste", (e: ClipboardEvent) => this.onPaste(e));
     on(this.el, "drop", (e: DragEvent) => e.preventDefault());
+    // the armed 서식 복사 brush paints the selection just made with the mouse (ui/formatPainter.ts)
+    on(this.el, "mouseup", () => setTimeout(() => brushSelectionDone(this.paintTarget(), RT.collapsed(this.currentSel())), 0));
     on(document, "selectionchange", () => this.onSelectionChange());
     on(window, "pointerdown", (e: PointerEvent) => this.onOutsideDown(e), true);
     this.off.push(useStore.subscribe(() => this.onStore()));
@@ -675,7 +709,8 @@ class Engine {
 
   onKeyDown(e: KeyboardEvent) {
     // 열기 / 저장 / 새로 / 닫기 / 찾기 / 인쇄 / tab keys: on to the app (what was typed is put into the document first)
-    if (isAppChord(e)) {
+    // and the key table's routed rows (명령 검색 Alt+Q, 하이퍼링크 Ctrl+K, 한글 Alt+… / F7 …): they run while typing too
+    if (isAppChord(e) || resolveBinding(keyContext(), chordOf(e))?.route) {
       this.flush();
       return;
     }
@@ -719,6 +754,12 @@ class Engine {
     if (k === "b") return handled(), api.toggle("bold");
     if (k === "i") return handled(), api.toggle("italic");
     if (k === "u") return handled(), api.toggle("underline");
+    // 서식 복사 Ctrl+Shift+C / V, font size Ctrl+] / [ and Ctrl+Shift+. / , (Word, PowerPoint — ui/formatPainter.ts)
+    if (e.shiftKey && k === "c") return handled(), void copyFormat(this.paintTarget());
+    if (e.shiftKey && k === "v" && usePainter.getState().fmt) return handled(), void pasteFormat(this.paintTarget());
+    if (e.shiftKey && k === "v") return void (this.plainPaste = true); // text only: the browser's paste follows
+    if (!e.shiftKey && (e.code === "BracketRight" || e.code === "BracketLeft")) return handled(), void stepFontSize(this.paintTarget(), e.code === "BracketRight" ? 1 : -1, "step");
+    if (e.shiftKey && (e.code === "Period" || e.code === "Comma")) return handled(), void stepFontSize(this.paintTarget(), e.code === "Period" ? 1 : -1, "list");
     if (k === "z" && !e.shiftKey) return handled(), this.undo(false);
     if (k === "y" || (k === "z" && e.shiftKey)) return handled(), this.undo(true);
     if (e.code === "Equal") return handled(), api.script(e.shiftKey ? "super" : "sub");
@@ -729,6 +770,19 @@ class Engine {
     if (k === "j" && !e.shiftKey) return handled(), api.setPara({ align: "JUSTIFY" }, tx("shell.hist.justify"));
     if (e.altKey && /^[0-3]$/.test(k)) return handled(), api.heading(Number(k) as 0 | 1 | 2 | 3);
     if (k === "s") return handled(), this.flush(); // keep typing in the document before a save shortcut
+  }
+
+  /** What the 서식 복사 / font size keys act on (ui/formatPainter.ts). */
+  paintTarget(): PaintTarget {
+    const sel = RT.clampRange(this.paras, this.currentSel());
+    const wordFirst = () => {
+      const s = RT.clampRange(this.paras, this.currentSel());
+      const w = RT.collapsed(s) ? wordAround(this.paras, s.start) : null;
+      if (!w) return;
+      this.sel = w;
+      this.restoreSel();
+    };
+    return { fmt: RT.collapsed(sel) ? (this.pending?.fmt ?? RT.formatAt(this.paras, sel.start)) : RT.rangeFormat(this.paras, sel), applyRun: this.api().applyRun, wordFirst };
   }
 
   /** The text box is on a document page (not a slide, design or master page). */
@@ -774,7 +828,10 @@ class Engine {
     if (!dt) return;
     const sel = this.currentSel();
     const base = this.pending && RT.collapsed(sel) ? this.pending.fmt : RT.formatAt(this.paras, sel.start);
-    const res = RT.pasteData(this.paras, sel, base, dt.getData("text/html"), dt.getData("text/plain"));
+    // Ctrl+Shift+V: the text only, in the format at the caret
+    const plain = this.plainPaste;
+    this.plainPaste = false;
+    const res = RT.pasteData(this.paras, sel, base, plain ? "" : dt.getData("text/html"), dt.getData("text/plain"));
     if (!res) return;
     this.pending = null;
     this.apply(res.paras, { start: res.pos, end: res.pos }, tx("shell.hist.paste"));
@@ -845,6 +902,29 @@ class Engine {
         this.runCmd(s === "super" ? tx("shell.hist.superscript") : tx("shell.hist.subscript"), (ps, sel) => RT.toggleScript(ps, sel, s), (cur) => ({ script: cur.script === s ? null : s })),
       setRun: (key, value, label) =>
         this.runCmd(label, (ps, sel) => RT.applyRunFormat(ps, sel, { [key]: value } as RT.RunPatch), () => ({ [key]: value }) as RT.RunPatch),
+      applyRun: (patch, label) => this.runCmd(label, (ps, sel) => RT.applyRunFormat(ps, sel, patch), () => patch),
+      selectedText: () => RT.rangeText(this.paras, RT.clampRange(this.paras, this.currentSel())),
+      textBefore: () => {
+        const r = RT.clampRange(this.paras, this.currentSel());
+        return RT.collapsed(r) ? RT.paraText(this.paras[r.start.p]).slice(0, r.start.o) : "";
+      },
+      replaceBefore: (n, text, label) => {
+        const r = RT.clampRange(this.paras, this.currentSel());
+        if (!RT.collapsed(r) || n > r.start.o) return;
+        const cut = RT.deleteRange(this.paras, { start: { p: r.start.p, o: r.start.o - n }, end: r.start });
+        const res = RT.insertText(cut.paras, cut.pos, text, RT.formatAt(cut.paras, cut.pos));
+        this.apply(res.paras, { start: res.pos, end: res.pos }, label);
+      },
+      rubyOk: () => {
+        const r = RT.rubyRange(this.paras, this.currentSel());
+        return !!r && !RT.collapsed(r);
+      },
+      rubyAt: () => RT.rubyAt(this.paras, this.currentSel()),
+      setRuby: (ruby, label) => {
+        const sel = this.currentSel();
+        const next = RT.setRuby(this.paras, sel, ruby);
+        if (next !== this.paras) this.apply(next, RT.clampRange(this.paras, sel), label);
+      },
       runLive: <K extends keyof RT.RunFormat>(key: K, label: string): Live<RT.RunFormat[K]> => ({
         set: (v) => this.api().setRun(key, v, label),
         begin: () => {
@@ -963,6 +1043,23 @@ class Engine {
         const res = RT.insertRun(paras, sel.start, run);
         this.pending = null;
         this.apply(res.paras, { start: res.pos, end: res.pos }, tx("headerfooter.hist.field"));
+      },
+      transform: (fn, label) => {
+        if (this.done || this.composing) return;
+        this.flush();
+        const res = fn(this.paras, RT.clampRange(this.paras, this.currentSel()));
+        if (!res) return;
+        this.pending = null;
+        this.apply(res.paras, res.sel ? RT.clampRange(res.paras, res.sel) : null, label);
+      },
+      snapshot: () => (this.done ? null : { paras: this.paras, sel: RT.clampRange(this.paras, this.currentSel()) }),
+      select: (r) => {
+        if (this.done) return;
+        this.sel = RT.clampRange(this.paras, r);
+        this.backward = false;
+        this.el.focus({ preventScroll: true });
+        this.restoreSel();
+        this.pushStatus();
       },
       insertText: (text) => {
         if (this.done || !text) return;

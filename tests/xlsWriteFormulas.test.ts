@@ -58,12 +58,12 @@ describe("XLS cell save and the formulas read", () => {
     }
   });
 
-  it("a formula typed in or changed is refused, with why", async () => {
+  it("a formula typed in or changed: refused by the record patcher, with why — the workbook written anew as XLS", async () => {
     const { doc, bytes, sheets } = await open();
     const sh = sheets.find((s) => s.name === "F")!;
     sh.cells.F1 = { ...sh.cells.F1, f: "A1+1" };
     sh.cells.A1 = { ...sh.cells.A1, v: 5 };
-    await expect(save(doc)).rejects.toThrow(t("legacysave.err.edited.xls"));
+    expect(readXls(await save(doc), "en").sheets.find((s) => s.name === "F")!.cells.F1.f).toBe("A1+1");
     const l = legacySource(doc.pages, "xls")!.legacy!;
     expect(() => xlsCellEdits(doc.pages, bytes, l)).toThrow(t("legacysave.xlsWhy.formulaEdit"));
   });

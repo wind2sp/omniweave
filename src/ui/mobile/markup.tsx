@@ -12,6 +12,7 @@ import { pageScale } from "./MobileViewer";
 import { pdfPassword, type openPdf } from "./openDoc";
 import { ask } from "./prompt";
 import { useBackClose } from "./back";
+import { Icon, type IconName } from "./icons";
 
 type PdfDoc = Awaited<ReturnType<typeof openPdf>>;
 
@@ -69,6 +70,53 @@ export function loadSignatures(): Signature[] {
     return [];
   }
 }
+/** A saved signature drawn as a transparent PNG (black ink, 600 px wide) — for the PC feature screen's 서명 추가. */
+export async function signatureImage(s: Signature, color = "#111111"): Promise<{ png: Uint8Array; w: number; h: number }> {
+  const w = 600, h = Math.max(1, Math.round(600 * s.aspect));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d")!;
+  g.strokeStyle = color;
+  g.lineCap = g.lineJoin = "round";
+  g.lineWidth = Math.max(1.5, s.line * w);
+  for (const st of s.strokes) g.stroke(new Path2D(strokePath(st, (x, y) => [x * w, y * w])));
+  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+  return { png: new Uint8Array(await blob!.arrayBuffer()), w, h };
+}
+
+/**
+ * Keep a signature drawn as strokes (x, y pairs in any pixel box, line width in the same pixels) in the phone's list,
+ * newest first — from the phone screen's 서명하기 and from the PC feature screen's 서명 추가 alike (one list).
+ */
+export function rememberSignature(strokes: number[][], linePx: number): Signature | null {
+  const pts = strokes.filter((s) => s.length >= 2);
+  if (!pts.length) return null;
+  // normalise to the strokes' own box: width 1, height = aspect
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const s of pts)
+    for (let i = 0; i < s.length; i += 2) {
+      x0 = Math.min(x0, s[i]);
+      x1 = Math.max(x1, s[i]);
+      y0 = Math.min(y0, s[i + 1]);
+      y1 = Math.max(y1, s[i + 1]);
+    }
+  const pad0 = Math.max(12, linePx * 1.7);
+  x0 -= pad0;
+  y0 -= pad0;
+  x1 += pad0;
+  y1 += pad0;
+  const w = Math.max(1, x1 - x0);
+  const sig: Signature = {
+    id: Date.now().toString(36),
+    aspect: (y1 - y0) / w,
+    line: linePx / w,
+    strokes: pts.map((s) => s.map((v, i) => Math.round(((i % 2 === 0 ? v - x0 : v - y0) / w) * 10000) / 10000)),
+  };
+  storeSignatures([sig, ...loadSignatures()]);
+  return sig;
+}
+
 function storeSignatures(list: Signature[]) {
   try {
     localStorage.setItem(SIG_KEY, JSON.stringify(list.slice(0, MAX_SIGS)));
@@ -148,11 +196,15 @@ interface Props {
   pdf: PdfDoc;
   startPage: number;
   onCancel: () => void;
-  onDone: (bytes: Uint8Array) => void;
+  /** the marked-up copy; `signed`: a signature is on it (the new file's name says so); `password`: it is protected with
+   *  the same password as the original (the viewer opens it without asking again) */
+  onDone: (bytes: Uint8Array, signed: boolean, password: string | null) => void;
   say: (msg: string) => void;
+  /** open with the signature sheet (the home screen's "PDF에 서명") */
+  startSigning?: boolean;
 }
 
-export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say }: Props) {
+export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say, startSigning }: Props) {
   const tr = useT();
   const [pageNo, setPageNo] = useState(Math.min(Math.max(1, startPage), pdf.numPages));
   const [items, setItems] = useState<Map<number, Item[]>>(new Map());
@@ -161,7 +213,7 @@ export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say }: Pro
   const [color, setColor] = useState(COLORS[0]);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const [signing, setSigning] = useState(false);
+  const [signing, setSigning] = useState(!!startSigning);
   const [saving, setSaving] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -231,6 +283,9 @@ export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say }: Pro
     }
     if (tool === "text") {
       const today = new Date().toLocaleDateString();
+      // after the finger has lifted: the sheet opening under the finger took the tap's own click and closed at once
+      // (Android: the 글자 tool seemed to do nothing)
+      await new Promise((r) => setTimeout(r, 400));
       const text = await ask({ title: tr("mobile.mk.textTitle"), multiline: true, chips: [today] });
       if (!text?.trim()) return;
       commit([...pageItems, { kind: "text", x, y: y - 8 * unit, size: 14 * Math.max(1, unit * 0.9), color, text: text.trim() }]);
@@ -287,7 +342,7 @@ export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say }: Pro
   const save = async () => {
     setSaving(true);
     try {
-      onDone(await bakeMarkup(doc.bytes, pdf, items));
+      onDone(await bakeMarkup(doc.bytes, pdf, items), [...items.values()].some((l) => l.some((it) => it.kind === "sign")), pdfPassword(pdf));
     } catch (e: any) {
       say(tr("mobile.failed", { error: e?.message ?? String(e) }));
     } finally {
@@ -296,23 +351,23 @@ export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say }: Pro
   };
 
   const sel = selected != null ? pageItems[selected] : null;
-  const tools: { id: Tool; icon: string; label: string }[] = [
-    { id: "move", icon: "✥\uFE0E", label: tr("mobile.mk.move") },
-    { id: "pen", icon: "✎\uFE0E", label: tr("mobile.mk.pen") },
-    { id: "hl", icon: "▍", label: tr("mobile.mk.highlight") },
-    { id: "text", icon: "T", label: tr("mobile.mk.text") },
-    { id: "sign", icon: "✍\uFE0E", label: tr("mobile.sign") },
+  const tools: { id: Tool; icon: IconName; label: string }[] = [
+    { id: "move", icon: "move", label: tr("mobile.mk.move") },
+    { id: "pen", icon: "pen", label: tr("mobile.mk.pen") },
+    { id: "hl", icon: "mark", label: tr("mobile.mk.highlight") },
+    { id: "text", icon: "text", label: tr("mobile.mk.text") },
+    { id: "sign", icon: "sign", label: tr("mobile.sign") },
   ];
 
   return (
     <div className="m-viewer m-markup">
       <header className="m-top m-viewer-top">
         <button className="m-icon-btn" onClick={onCancel} aria-label={tr("mobile.cancel")}>
-          ✕
+          <Icon name="close" />
         </button>
         <h1 className="m-doc-name">{tr("mobile.markup")}</h1>
         <button className="m-icon-btn" onClick={() => undo.length && (setItems(undo[undo.length - 1]), setUndo((u) => u.slice(0, -1)), setSelected(null))} disabled={!undo.length} aria-label={tr("mobile.mk.undo")}>
-          ↶︎
+          <Icon name="undo" />
         </button>
         <button className="m-btn m-btn-primary m-btn-small" onClick={() => void save()} disabled={!changed || saving}>
           {tr("mobile.mk.done")}
@@ -369,11 +424,11 @@ export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say }: Pro
         ))}
         <span className="m-mk-pages">
           <button className="m-icon-btn" disabled={pageNo <= 1} onClick={() => (setPageNo((n) => n - 1), setSelected(null))} aria-label={tr("mobile.prev")}>
-            ‹
+            <Icon name="prev" />
           </button>
           {tr("mobile.page", { page: pageNo, total: pdf.numPages })}
           <button className="m-icon-btn" disabled={pageNo >= pdf.numPages} onClick={() => (setPageNo((n) => n + 1), setSelected(null))} aria-label={tr("mobile.next")}>
-            ›
+            <Icon name="next" />
           </button>
         </span>
       </div>
@@ -389,7 +444,7 @@ export function MarkupEditor({ doc, pdf, startPage, onCancel, onDone, say }: Pro
               if (x.id !== "move") setSelected(null);
             }}
           >
-            <span aria-hidden>{x.icon}</span>
+            <Icon name={x.icon} />
             {x.label}
           </button>
         ))}
@@ -454,30 +509,8 @@ function SignatureSheet({ onClose, onPick }: { onClose: () => void; onPick: (s: 
   };
   const finish = () => {
     if (!strokes.length) return;
-    // normalise to the strokes' own box: width 1, height = aspect
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const s of strokes)
-      for (let i = 0; i < s.length; i += 2) {
-        x0 = Math.min(x0, s[i]);
-        x1 = Math.max(x1, s[i]);
-        y0 = Math.min(y0, s[i + 1]);
-        y1 = Math.max(y1, s[i + 1]);
-      }
-    const pad0 = 12;
-    x0 -= pad0;
-    y0 -= pad0;
-    x1 += pad0;
-    y1 += pad0;
-    const w = Math.max(1, x1 - x0);
-    const sig: Signature = {
-      id: Date.now().toString(36),
-      aspect: (y1 - y0) / w,
-      line: 7 / w,
-      strokes: strokes.map((s) => s.map((v, i) => Math.round(((i % 2 === 0 ? v - x0 : v - y0) / w) * 10000) / 10000)),
-    };
-    const next = [sig, ...list].slice(0, MAX_SIGS);
-    storeSignatures(next);
-    setList(next);
+    const sig = rememberSignature(strokes, 7)!;
+    setList(loadSignatures());
     onPick(sig);
   };
 
@@ -502,7 +535,7 @@ function SignatureSheet({ onClose, onPick }: { onClose: () => void; onPick: (s: 
                       setList(next);
                     }}
                   >
-                    ✕
+                    <Icon name="close" />
                   </button>
                 </div>
               ))}

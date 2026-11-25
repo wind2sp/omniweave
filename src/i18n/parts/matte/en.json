@@ -66,5 +66,6 @@
   "image.matte.inner": "Inner white areas",
   "image.matte.inner.keep": "Keep",
   "image.matte.inner.remove": "Remove",
-  "image.matte.inner.note": "Closed areas in the background colour. Auto removes holes inside letters (O) and keeps surfaces such as a document icon's white page and white letters."
+  "image.matte.inner.note": "Closed areas in the background colour. Auto removes holes inside letters (O) and keeps surfaces such as a document icon's white page and white letters.",
+  "image.matte.personChecking": "Checking for a person… (the preview shows the first result)"
 }

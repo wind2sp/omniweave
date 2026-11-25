@@ -52,7 +52,7 @@ export const MENUS: { id: string; entries: Entry[] }[] = [
     entries: [
       "view.zoomIn", "view.zoomOut", "view.fit", "view.actual", "-",
       { h: "menu.head.aids" }, "view.rulers", "view.textBounds", "view.guides", "view.guidesLock", "view.addGuide", "view.centerGuides", "view.clearGuides", "view.grid", "view.snap", "-",
-      "page.organizer", "view.leftDock", "view.rightDock", "view.layersPanel", "-", "view.nextTab", "view.prevTab", "-", "view.theme",
+      "page.organizer", "view.leftDock", "view.rightDock", "view.layersPanel", "-", "view.nextTab", "view.prevTab", "-", "view.readMode", "view.fullScreen", "-", "view.theme",
     ],
   },
   {
@@ -95,13 +95,21 @@ const FILTERS: OpGroup[] = ["blur", "sharpen", "noise", "stylize"];
 const EDIT_MENU: Entry[] = [
   "edit.undo", "edit.redo", "edit.history", "-",
   "edit.cut", "edit.copy", "edit.paste", "edit.pasteInPlace", "edit.duplicate", "edit.delete", "-",
-  "edit.find", "edit.replace", "-", "object.transform", "-", "file.settings",
+  "edit.find", "edit.replace", "-", "edit.fill", "edit.contentAwareFill", "-", "object.transform", "edit.warp", "-", "file.settings",
+];
+/** Illustrator's Edit menu: the paste family and Transform Again next to the common entries. */
+const DESIGN_EDIT_MENU: Entry[] = [
+  "edit.undo", "edit.redo", "edit.history", "-",
+  "edit.cut", "edit.copy", "edit.paste", "edit.pasteInFront", "edit.pasteInBack", "edit.pasteInPlace", "edit.pasteOnAllArtboards", "edit.duplicate", "edit.delete", "-",
+  "edit.find", "edit.replace", "-", "object.transform", "edit.transformAgain", "-", "file.settings",
 ];
 const SELECT_MENU: Entry[] = ["edit.selectAll", "edit.deselect", "edit.selectInverse"];
+/** Illustrator's Select menu: the common rows and Select › Same (design 2) */
+const DESIGN_SELECT_MENU: Entry[] = [...SELECT_MENU, "-", { sub: "menu.sub.same", entries: ["select.sameFill", "select.sameStroke", "select.sameFillStroke", "select.sameStrokeWidth"] }];
 const VIEW_MENU: Entry[] = [
-  "view.zoomIn", "view.zoomOut", "view.fit", "view.actual", "-",
+  "view.zoomIn", "view.zoomOut", "view.fit", "view.fitAllBoards", "view.actual", "-",
   { h: "menu.head.aids" }, "view.rulers", "view.guides", "view.guidesLock", "view.addGuide", "view.centerGuides", "view.clearGuides", "view.grid", "view.snap", "-",
-  "page.organizer", "view.leftDock", "view.rightDock", "view.layersPanel", "-", "view.nextTab", "view.prevTab", "-", "view.theme",
+  "page.organizer", "view.leftDock", "view.rightDock", "view.layersPanel", "-", "view.nextTab", "view.prevTab", "-", "view.readMode", "view.fullScreen", "-", "view.theme",
 ];
 const ORDER: Entry[] = [{ h: "menu.head.order" }, "object.toFront", "object.forward", "object.backward", "object.toBack"];
 
@@ -114,14 +122,16 @@ export const IMAGE_MENUS: { id: string; entries: Entry[] }[] = [
   {
     id: "image",
     entries: [
-      "image.canvasSize",
+      // 모드 first, as in Photoshop's Image menu
+      { sub: "psfeat.menu.mode", entries: ["image.mode.rgb", "image.mode.gray", "image.mode.cmyk"] }, "-",
+      "image.imageSize", "image.canvasSize",
       // 이미지 크기 키우기(업스케일) — image-upscale, right after the canvas size (Photoshop's 이미지 크기 / 캔버스 크기)
       "image.upscale",
       "-",
-      { sub: "topui.menu.rotation", icon: "rotate", entries: [{ cmd: "page.rotateRight", label: "canvas.rotateRight" }, { cmd: "page.rotateLeft", label: "canvas.rotateLeft" }, "image.rotateCanvas180", "-", "image.flipCanvasH", "image.flipCanvasV"] },
+      { sub: "topui.menu.rotation", icon: "rotate", entries: ["image.rotateCanvasCW", "image.rotateCanvasCCW", "image.rotateCanvas180", "-", "image.flipCanvasH", "image.flipCanvasV"] },
       "object.flipH", "object.flipV", "-",
       "image.cropCanvas", { cmd: "object.crop", label: "topui.menu.cropLayer" }, "-",
-      { sub: "topui.menu.adjust", icon: "sliders", entries: [{ gen: "adjust" }] },
+      { sub: "topui.menu.adjust", icon: "sliders", entries: [{ gen: "adjust" }, "-", "image.desaturate"] },
       "-", "image.removeBackground", "image.removeBackgroundDialog",
     ],
   },
@@ -129,18 +139,22 @@ export const IMAGE_MENUS: { id: string; entries: Entry[] }[] = [
     id: "layer",
     entries: [
       "image.newLayer", "image.duplicateLayer", "image.deleteLayer", "-",
-      "image.groupLayers", "image.ungroupLayers", "image.clippingMask", "image.mergeDown", "image.rasterize", "image.editSmart", "-",
+      { sub: "psfeat.menu.newAdjust", icon: "sliders", entries: ["layer.adjust.brightness", "layer.adjust.levels", "layer.adjust.curves", "layer.adjust.exposure", "-", "layer.adjust.vibrance", "layer.adjust.hueSat", "layer.adjust.colorBalance", "layer.adjust.blackWhite", "-", "layer.adjust.invert", "layer.adjust.posterize", "layer.adjust.threshold"] },
+      "layer.adjust.edit", "layer.style",
+      { sub: "psfeat.menu.layerMask", icon: "mask", entries: ["layer.mask.reveal", "layer.mask.hide", "layer.mask.revealSel", "layer.mask.hideSel", "-", "layer.mask.edit", "layer.mask.toggle", "layer.mask.invert", "-", "layer.mask.apply", "layer.mask.delete"] }, "-",
+      "image.groupLayers", "image.ungroupLayers", "image.clippingMask", "image.mergeDown", "image.mergeVisible", "image.stampVisible", "image.rasterize", "-",
+      { sub: "psfeat.menu.smart", entries: ["layer.smart.convert", "image.editSmart"] }, "-",
       "insert.image", "insert.text", "-", "object.lock", "object.hide", "-", ...ORDER, "-", "view.layersPanel",
     ],
   },
-  { id: "select", entries: ["select.allPixels", "select.deselectPixels", "select.reselect", "select.inversePixels", "-", "select.colorRange", { sub: "selmod.menu.modify", entries: ["select.border", "select.expand", "select.contract", "select.feather"] }, "-", "image.removeBackground"] },
-  { id: "filter", entries: [{ gen: "filters" }, "-", "object.trace"] },
+  { id: "select", entries: ["select.allPixels", "select.deselectPixels", "select.reselect", "select.inversePixels", "-", "select.subject", "tool.objectSelect", "tool.quickSelect", "tool.polyLasso", "select.colorRange", "select.selectAndMask", "select.quickMask", "path.toSelection", { sub: "selmod.menu.modify", entries: ["select.border", "select.expand", "select.contract", "select.feather"] }, "-", "image.removeBackground"] },
+  { id: "filter", entries: ["filter.liquify", "-", { gen: "filters" }, "-", "object.trace"] },
   { id: "view", entries: VIEW_MENU },
 ];
 
 /** The design mode's tab names (Illustrator's menus): 편집 · 개체 · 문자 · 선택 · 효과 · 보기. */
 export const DESIGN_MENUS: { id: string; entries: Entry[] }[] = [
-  { id: "edit", entries: EDIT_MENU },
+  { id: "edit", entries: DESIGN_EDIT_MENU },
   {
     id: "object",
     entries: [
@@ -149,15 +163,26 @@ export const DESIGN_MENUS: { id: string; entries: Entry[] }[] = [
       "object.lock", "object.hide", "image.groupLayers", "image.ungroupLayers", "image.clippingMask", "-",
       { h: "menu.head.align" }, "object.alignLeft", "object.alignHCenter", "object.alignRight", "object.alignTop", "object.alignVCenter", "object.alignBottom", "object.distH", "object.distV", "-",
       ...ORDER, "-",
-      { h: "menu.head.path" }, "object.union", "object.subtract", "object.intersect", "object.exclude", "-",
+      { sub: "menu.sub.transform", entries: ["xform.move", "xform.rotate", "xform.reflect", "xform.scale", "xform.shear", "-", "edit.transformAgain"] },
+      { sub: "menu.sub.path", entries: ["path.outlineStroke", "path.offset", "path.simplify", "path.average", "path.join"] },
+      { sub: "menu.sub.compound", entries: ["path.compoundMake", "path.compoundRelease"] },
+      // design 2: Illustrator's Blend, Repeat and Pattern submenus, Expand Appearance
+      { sub: "menu.sub.blend", entries: ["object.blendMake", "object.blendRelease", "object.blendExpand", "-", "object.blendOptions", "-", "object.blendReplaceSpine"] },
+      { sub: "menu.sub.repeat", entries: ["object.repeatRadial", "object.repeatGrid", "object.repeatMirror", "-", "object.repeatOptions", "object.repeatRelease", "object.repeatExpand"] },
+      { sub: "menu.sub.pattern", entries: ["object.patternMake"] },
+      { sub: "menu.sub.opMask", entries: ["object.opMaskMake", "object.opMaskRelease"] },
+      { sub: "menu.sub.symbol", entries: ["symbol.new", "symbol.edit", "symbol.breakLink"] },
+      "object.expand", "object.expandAppearance", "-",
+      { h: "menu.head.path" }, "object.union", "object.subtract", "object.intersect", "object.exclude", "object.divide", "object.trim", "object.outline", "-",
       "object.trace", "image.rasterize", "image.upscale", "-", "image.canvasSize", "page.setup", "page.addMaster",
     ],
   },
   // 텍스트 편집(승격): an Illustrator / EPS file opens as a PDF page in the design mode (no PDF tabs) — its text is here
-  { id: "type", entries: ["insert.text", "-", "text.bold", "text.italic", "text.underline", "format.paragraph", "-", "insert.symbol", "edit.find", "edit.replace", "text.wordCount", "review.spelling", "-", "text.editPdf"] },
-  { id: "select", entries: SELECT_MENU },
-  { id: "effect", entries: [{ gen: "imageOps" }] },
-  { id: "view", entries: VIEW_MENU },
+  { id: "type", entries: ["insert.text", "type.onPath", "-", "type.createOutlines", "-", "type.charStyles", "type.paraStyles", "-", "text.bold", "text.italic", "text.underline", "format.paragraph", "-", "insert.symbol", "edit.find", "edit.replace", "text.wordCount", "review.spelling", "-", "text.editPdf"] },
+  { id: "select", entries: DESIGN_SELECT_MENU },
+  // Illustrator's Effect menu: its vector effects (live, Appearance panel) first, then the picture effects
+  { id: "effect", entries: [{ h: "menu.head.vectorFx" }, "fx.roundCorners", "fx.offsetPath", "fx.transform", "fx.dropShadow", "fx.outerGlow", "fx.gaussianBlur", "-", "object.expandAppearance", "-", { h: "menu.head.pictureFx" }, { gen: "imageOps" }] },
+  { id: "view", entries: [...VIEW_MENU, "-", "view.perspGrid"] },
 ];
 
 /**
@@ -171,6 +196,38 @@ export const BACKSTAGE: { id: string; entries: string[] }[] = [
   { id: "close", entries: ["file.closeTab", "file.closeAllTabs"] },
   { id: "options", entries: ["file.settings", "tools.commandSearch", "help.shortcuts", "help.checkUpdates", "help.storeUpdates", "help.about", "file.quit"] },
 ];
+
+/**
+ * The design mode's right-click menu on the artboard (Illustrator's context menu): undo / redo, the clipboard, group
+ * / ungroup, the path commands, and the Transform / Arrange / Select submenus. Greyed rows are left out like
+ * Illustrator, which shows only what applies to the selection.
+ */
+const DESIGN_CONTEXT: Entry[] = [
+  "edit.undo", "edit.redo", "-",
+  "edit.cut", "edit.copy", "edit.paste", "edit.pasteInFront", "edit.pasteInBack", "edit.delete", "-",
+  "image.groupLayers", "image.ungroupLayers", "path.join", "path.average", "path.compoundMake", "path.compoundRelease", "type.createOutlines", "path.outlineStroke", "-",
+  { sub: "menu.sub.transform", entries: ["xform.move", "xform.rotate", "xform.reflect", "xform.scale", "xform.shear", "-", "object.flipH", "object.flipV", "-", "edit.transformAgain"] },
+  "object.blendRelease", "object.repeatRelease", "symbol.edit", "symbol.breakLink", "object.expandAppearance",
+  { sub: "menu.sub.arrange", entries: ["object.toFront", "object.forward", "object.backward", "object.toBack"] },
+  { sub: "menu.sub.select", entries: SELECT_MENU },
+];
+
+export function designContextItems(): MenuItem[] {
+  const prune = (items: MenuItem[]): MenuItem[] => {
+    const out: MenuItem[] = [];
+    for (const it of items) {
+      if (it.sub) {
+        const sub = prune(it.sub);
+        if (sub.some((x) => !x.sep)) out.push({ ...it, sub });
+      } else if (it.sep) {
+        if (out.length && !out[out.length - 1].sep) out.push(it);
+      } else if (!it.disabled) out.push(it);
+    }
+    while (out.length && out[out.length - 1].sep) out.pop();
+    return out;
+  };
+  return prune(entryItems(DESIGN_CONTEXT));
+}
 
 export function commandItem(c: Command): MenuItem {
   const checked = c.checked?.();

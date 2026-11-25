@@ -71,3 +71,6 @@ scripts/mobile-shots.mjs
 scripts/mobile-touch-e2e.mjs
 # CAD fidelity runner: reads the AutoCAD reference drawings kept in a private shared folder.
 scripts/fidelity-cad.mjs
+
+# Excel feature tests that read the reference workbooks made in Excel, kept in a private work folder.
+tests/sheet/excelFeatures2.test.ts

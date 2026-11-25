@@ -69,6 +69,8 @@ export type Adjustment =
 export interface LayerAdjust {
   adj: Adjustment;
   hide: boolean;
+  /** settings changed here (Layer › New Adjustment Layer, its properties): the PSD writer writes the record anew */
+  edited?: true;
 }
 
 /** Colour function on 8-bit values (integers 0..255): out[0..2] = f(r, g, b), 0..255 (may be fractional). */

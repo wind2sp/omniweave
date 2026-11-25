@@ -123,5 +123,8 @@
   "mobile.ed.notEditable": "This file opens only as a picture (nothing to edit)",
   "dxfwrite.export.label": "DXF drawing (.dxf)",
   "dxfwrite.export.hint": "Lines and text of this page by layer as DXF R12 — fills, line types and weights are left out",
-  "dxfwrite.export.dwgNote": "DWG is not written — export DXF, which AutoCAD opens"
+  "dxfwrite.export.dwgNote": "DWG is not written — export DXF, which AutoCAD opens",
+  "mobile.ed.where": "Page {page} · paragraph {n} of {total}",
+  "mobile.ed.wherePage": "Page {page}",
+  "mobile.ed.slides": "Slides"
 }

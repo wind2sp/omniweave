@@ -233,5 +233,14 @@
   "dock.history.settings": "설정",
   "dock.history.record": "히스토리 기록",
   "dock.history.includeInFile": ".omw 저장 시 히스토리 포함",
-  "dock.history.fileNote": "남에게 보낼 파일은 포함을 끄고 저장하면 편집 과정 없이 결과만 담깁니다. 히스토리는 파일 안 별도 칸(history/)에 있어 문서 내용에는 영향이 없습니다."
+  "dock.history.fileNote": "남에게 보낼 파일은 포함을 끄고 저장하면 편집 과정 없이 결과만 담깁니다. 히스토리는 파일 안 별도 칸(history/)에 있어 문서 내용에는 영향이 없습니다.",
+  "dock.pages.menu.new": "새 슬라이드",
+  "dock.pages.menu.duplicate": "복제",
+  "dock.pages.menu.cut": "잘라내기",
+  "dock.pages.menu.copy": "복사",
+  "dock.pages.menu.paste": "붙여넣기",
+  "dock.pages.menu.hide": "슬라이드 숨기기",
+  "dock.pages.menu.show": "슬라이드 숨기기 해제",
+  "dock.pages.menu.delete": "삭제",
+  "dock.pages.nothingToPaste": "붙여 넣을 쪽이 없습니다(복사한 쪽이 이 문서에 없음)"
 }

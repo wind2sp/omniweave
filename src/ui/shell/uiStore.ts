@@ -17,7 +17,7 @@ export const UI_SCALES: { id: UIScale; factor: number }[] = [
 export const uiScaleFactor = (s: UIScale) => UI_SCALES.find((x) => x.id === s)?.factor ?? 1;
 export type LeftTab = "pages" | "layers";
 export type RightTab = "props" | "anim" | "history" | "review";
-export type ShellDialog = "palette" | "settings" | "shortcuts" | "about" | "find" | "pdfFind" | "replace" | "wordCount" | "symbol" | "sizePdf" | "pageSetup" | "columns" | "canvasSize" | "selectModify" | "paragraph" | "listFormat" | "pageNumber";
+export type ShellDialog = "palette" | "settings" | "shortcuts" | "about" | "find" | "pdfFind" | "replace" | "wordCount" | "symbol" | "sizePdf" | "pageSetup" | "columns" | "canvasSize" | "selectModify" | "designXform" | "designFx" | "designArt" | "exportScreens" | "textStyles" | "paragraph" | "char" | "link" | "ruby" | "tableProps" | "autotext" | "listFormat" | "pageNumber" | "slideHf" | "slideChart" | "slideSmart" | "slideExport";
 
 interface UIState {
   theme: Theme;
@@ -33,6 +33,9 @@ interface UIState {
   welcome: boolean;
   /** Timestamp of the last successful Shuttle journal autosave. */
   journalAt: number | null;
+  /** how often the recovery copy is written while there are unsaved edits (Word's 자동 복구 정보 저장 간격):
+   *  "now" = 1.5 s after the last change (default), "1" / "5" / "10" minutes, "off" = never */
+  autoSave: AutoSaveEvery;
   /** Open quick tool (Tools menu dialog), or null. */
   quickTool: string | null;
   /** View aids: rulers (Ctrl+R), guides shown (Ctrl+;), guides locked (Ctrl+Alt+;), grid (Ctrl+'), snapping (Ctrl+Shift+;) */
@@ -62,6 +65,9 @@ interface UIState {
   set: (p: Partial<UIState>) => void;
 }
 
+export type AutoSaveEvery = "now" | "1" | "5" | "10" | "off";
+export const AUTOSAVE_CHOICES: AutoSaveEvery[] = ["now", "1", "5", "10", "off"];
+
 export interface SnapTo {
   grid: boolean;
   guides: boolean;
@@ -74,7 +80,7 @@ export interface SnapTo {
 export const DEFAULT_SNAP_TO: SnapTo = { grid: true, guides: true, page: true, objects: true, spacing: true };
 
 const KEY = "omniweave.ui.v1";
-const PERSIST: (keyof UIState)[] = ["theme", "uiScale", "leftOpen", "rightOpen", "leftW", "rightW", "leftTab", "rightTab", "rulers", "guides", "guidesLocked", "grid", "snap", "snapTo", "rulerUnit", "grids", "alignRef", "devInfo", "reviewAuthor"];
+const PERSIST: (keyof UIState)[] = ["theme", "uiScale", "leftOpen", "rightOpen", "leftW", "rightW", "leftTab", "rightTab", "rulers", "guides", "guidesLocked", "grid", "snap", "snapTo", "rulerUnit", "grids", "alignRef", "devInfo", "reviewAuthor", "autoSave"];
 const UNIT_VALUES = ["auto", "px", "mm", "cm", "pt", "in"];
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
 
@@ -112,6 +118,7 @@ export const useUI = create<UIState>((set) => ({
   rightTab: saved.rightTab === "anim" || saved.rightTab === "history" || saved.rightTab === "review" ? saved.rightTab : "props",
   welcome: false,
   journalAt: null,
+  autoSave: AUTOSAVE_CHOICES.includes(saved.autoSave as AutoSaveEvery) ? (saved.autoSave as AutoSaveEvery) : "now",
   quickTool: null,
   rulers: bool(saved.rulers, true),
   guides: bool(saved.guides, true),

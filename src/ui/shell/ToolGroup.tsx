@@ -21,8 +21,25 @@ export interface GroupItem {
 /** Groups, keyed by id; a group appears in a mode when the mode offers two or more of its tools. */
 export const TOOL_GROUPS: Record<string, GroupItem[]> = {
   pen: [{ key: "pen", tool: "pen" }, { key: "curvature", tool: "curvature" }, { key: "anchorAdd", tool: "anchorAdd" }, { key: "anchorDel", tool: "anchorDel" }, { key: "anchorConvert", tool: "anchorConvert" }],
-  shape: [{ key: "rect", tool: "rect" }, { key: "ellipse", tool: "ellipse" }, { key: "line", tool: "line" }],
+  shape: [{ key: "rect", tool: "rect" }, { key: "roundRect", tool: "roundRect" }, { key: "ellipse", tool: "ellipse" }, { key: "polygon", tool: "polygon" }, { key: "star", tool: "star" }, { key: "customShape", tool: "customShape" }, { key: "line", tool: "line" }, { key: "flare", tool: "flare" }],
+  rotate: [{ key: "rotateTool", tool: "rotateTool" }, { key: "reflectTool", tool: "reflectTool" }],
+  scale: [{ key: "scaleTool", tool: "scaleTool" }, { key: "shearTool", tool: "shearTool" }],
+  // the design mode's eraser group (Illustrator): eraser, scissors, knife
+  eraser: [{ key: "eraser", tool: "eraser" }, { key: "scissors", tool: "scissors" }, { key: "knife", tool: "knife" }],
+  // paintbrush and pencil
+  brush: [{ key: "brush", tool: "brush" }, { key: "pencil", tool: "pencil" }, { key: "smoothTool", tool: "smoothTool" }],
+  // L: lasso and polygonal lasso (Shift+L steps between them)
+  lasso: [{ key: "lasso", tool: "lasso" }, { key: "polyLasso", tool: "polyLasso" }],
   marquee: [{ key: "marquee", tool: "marquee", marquee: "rect" }, { key: "marqueeEllipse", tool: "marquee", marquee: "ellipse" }],
+  // Photoshop's W and J groups (ui/ps/canvasExt.ts)
+  wand: [{ key: "objectSelect", tool: "objectSelect" }, { key: "quickSelect", tool: "quickSelect" }, { key: "wand", tool: "wand" }],
+  // G: gradient and paint bucket (Shift+G steps between them)
+  paint: [{ key: "gradient", tool: "gradient" }, { key: "bucket", tool: "bucket" }],
+  // O: dodge, burn, sponge (Shift+O steps between them)
+  tone: [{ key: "dodge", tool: "dodge" }, { key: "burn", tool: "burn" }, { key: "sponge", tool: "sponge" }],
+  heal: [{ key: "spotHeal", tool: "spotHeal" }, { key: "heal", tool: "heal" }, { key: "patch", tool: "patch" }],
+  // the type tools: Photoshop / Illustrator text, vertical type (image mode), type on a path (design mode)
+  type: [{ key: "text", tool: "text" }, { key: "vtext", tool: "vtext" }, { key: "typePath", tool: "typePath" }],
 };
 
 export const groupOf = (tool: Tool): string | null => Object.keys(TOOL_GROUPS).find((g) => TOOL_GROUPS[g].some((i) => i.tool === tool)) ?? null;
@@ -102,11 +119,12 @@ export function GroupButton({ group, items, profile, icon, label, face }: GroupB
     const close = (e: Event) => {
       if (e instanceof KeyboardEvent && e.key !== "Escape") return;
       if (e.type === "pointerdown" && (e.target as HTMLElement)?.closest?.(".tool-flyout")) return;
-      if (e instanceof KeyboardEvent && menu.current?.contains(document.activeElement)) {
-        // Esc in the menu closes only the menu (not the canvas selection) and returns to the button
+      if (e instanceof KeyboardEvent) {
+        // Esc while the group is open closes only the menu (not the canvas selection; also when it was opened with the
+        // mouse — Illustrator); from inside the menu the focus returns to the button
         e.stopPropagation();
         e.preventDefault();
-        faceBtn()?.focus();
+        if (menu.current?.contains(document.activeElement)) faceBtn()?.focus();
       }
       byKey.current = false;
       setOpen(null);

@@ -42,7 +42,7 @@
   "mobile.theme.light": "浅色",
   "mobile.theme.dark": "深色",
   "mobile.licensesNote": "所用开源组件的许可证见随应用分发的 THIRD_PARTY_NOTICES。",
-  "mobile.markedSuffix": "_签名",
+  "mobile.markedSuffix": "_标注",
   "mobile.mk.move": "选择",
   "mobile.mk.pen": "笔",
   "mobile.mk.highlight": "荧光笔",
@@ -96,5 +96,6 @@
   "mobile.signaturesCleared": "已删除保存的签名。",
   "mobile.toPdf": "转为 PDF",
   "mobile.untitledDoc": "文档",
-  "mobile.untitledImage": "照片"
+  "mobile.untitledImage": "照片",
+  "mobile.searchNoText": "找不到“{q}”— 此文档的文字只是图片。请先执行 更多 › 文字识别 (OCR) 再搜索。"
 }

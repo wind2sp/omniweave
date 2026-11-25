@@ -3,6 +3,7 @@
 // AutoCAD GROUP; entities are picked on the canvas or with QSELECT, never listed. Loaded with the drawing screen.
 
 import { useRef, useState } from "react";
+import { useQs } from "./moreEdit";
 import { findPage, useStore } from "../../core/store";
 import type { Page } from "../../core/types";
 import { t as tr, useT } from "../../i18n";
@@ -115,6 +116,8 @@ export function CadLayerManager() {
   const [picked, setPicked] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [qs, setQs] = useState(false);
+  // QSELECT / FILTER typed on the command line open it too
+  const qsReq = useQs((s) => s.open);
   // AutoCAD's group manager hides unnamed (*A) groups unless "Include Unnamed" is on
   const [unnamed, setUnnamed] = useState(false);
   if (!page?.source?.cad) return null;
@@ -143,7 +146,7 @@ export function CadLayerManager() {
         <span className="dock-tabs-spacer" />
         <IconBtn icon="search" tip={t("cadlm.qs.tip")} pressed={qs} onClick={() => setQs(!qs)} />
       </div>
-      {qs && <QSelect page={page} onClose={() => setQs(false)} />}
+      {(qs || qsReq) && <QSelect page={page} onClose={() => (setQs(false), useQs.setState({ open: false }))} />}
       <div className="dock-scroll cad-lm-scroll">
         <table className="cad-lm-table" role="grid" aria-label={t("cadlm.title")}>
           <thead>

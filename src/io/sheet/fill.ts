@@ -37,9 +37,13 @@ export type FillMode = "auto" | "copy";
 
 type Src = { cell: SheetCell | undefined; pos: number };
 
+/** The person's own lists (파일 ▸ 옵션 ▸ 사용자 지정 목록 편집), after Excel's — set by the app. */
+export let USER_LISTS: string[][] = [];
+export const setUserLists = (lists: string[][]) => void (USER_LISTS = lists);
+
 const listOf = (s: string): { list: string[]; i: number } | null => {
   const l = s.trim().toLowerCase();
-  for (const list of FILL_LISTS) {
+  for (const list of [...USER_LISTS, ...FILL_LISTS]) {
     const i = list.findIndex((x) => x.toLowerCase() === l);
     if (i >= 0) return { list, i };
   }

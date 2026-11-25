@@ -4,21 +4,24 @@
 // ↑↓ in the rail, Ctrl+F or / focuses search, Enter opens; files can be dropped anywhere on the dialog.
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { closeBackstage } from "./Backstage";
 import type { PageKind } from "../../core/types";
 import { t as tr, useLang, useT } from "../../i18n";
 import { isTauri } from "../../io/platform";
 import { newFileFromPage, openAndRemember, openAny, openRecentFile, openSample } from "../actions";
-import { claimDrop } from "../fileDrop";
+import { claimDrop, droppedFiles } from "../fileDrop";
 import { cx } from "./controls";
 import { Modal } from "./Dialogs";
 import { Icon, LogoMark, type IconName } from "./Icons";
-import { forgetRecent, useRecent, type RecentFile } from "./recent";
+import { forgetRecent, isHandlePath, togglePinRecent, useRecent, type RecentFile } from "./recent";
+import { handlesSupported } from "../../io/handleStore";
 import { hintEditMode } from "../editModes";
 import {
   buildCustomPage,
   buildTemplatePage,
   CATEGORIES,
   formatSize,
+  sizeNames,
   templateById,
   templateSize,
   templateThumb,
@@ -32,7 +35,7 @@ import {
 } from "./templates";
 
 type View = "home" | "recent" | TemplateCategory | "custom";
-const CAT_ICON: Record<TemplateCategory, IconName> = { doc: "modeDoc", present: "modeSlide", image: "modeImage", print: "pdf", sns: "sparkle", photo: "camera" };
+const CAT_ICON: Record<TemplateCategory, IconName> = { sheet: "table", doc: "modeDoc", present: "modeSlide", image: "modeImage", print: "pdf", sns: "sparkle", photo: "camera" };
 const MIN_PX = 16, MAX_PX = 16384;
 
 /** colour family for a file-format badge */
@@ -130,15 +133,18 @@ function RecentCard({ f, index }: { f: RecentFile; index: number }) {
   const t = useT();
   const lang = useLang((s) => s.lang);
   return (
-    <div className="recent-card" style={{ ["--i" as any]: Math.min(index, 12) }}>
-      <button type="button" className="recent-open" data-card title={f.path} onClick={() => void openRecentFile(f.path)}>
+    <div className={cx("recent-card", f.pinned && "pinned")} style={{ ["--i" as any]: Math.min(index, 12) }}>
+      <button type="button" className="recent-open" data-card title={isHandlePath(f.path) ? f.name : f.path} onClick={() => void openRecentFile(f.path)}>
         <span className="recent-thumb">
           {f.thumb ? <img src={f.thumb} alt="" /> : <span className={cx("recent-ph", badgeTone(f.format))}>{f.format.toUpperCase()}</span>}
           <span className={cx("fmt-badge", badgeTone(f.format))}>{f.format.toUpperCase()}</span>
         </span>
         <span className="recent-name">{f.name}</span>
-        <span className="recent-path">{f.path}</span>
+        <span className="recent-path">{isHandlePath(f.path) ? t("start.recent.webStored") : f.path}</span>
         <span className="recent-time">{relTime(f.at, lang)}</span>
+      </button>
+      <button type="button" className={cx("recent-pin ibtn ibtn-sm", f.pinned && "on")} aria-label={t(f.pinned ? "start.recent.unpin" : "start.recent.pin")} aria-pressed={!!f.pinned} data-tip={t(f.pinned ? "start.recent.unpin" : "start.recent.pin")} onClick={() => togglePinRecent(f.path)}>
+        <Icon name="pin" size={12} />
       </button>
       <button type="button" className="recent-x ibtn ibtn-sm" aria-label={t("start.recent.remove")} data-tip={t("start.recent.remove")} onClick={() => forgetRecent(f.path)}>
         <Icon name="close" size={12} />
@@ -153,7 +159,7 @@ function RecentEmpty() {
     <div className="start-empty">
       <Icon name="clock" size={22} />
       <b>{t("start.recent.empty")}</b>
-      <span>{t(isTauri ? "start.recent.emptyHint" : "start.recent.emptyWeb")}</span>
+      <span>{t(isTauri ? "start.recent.emptyHint" : handlesSupported() ? "start.recent.emptyWebHandles" : "start.recent.emptyWeb")}</span>
     </div>
   );
 }
@@ -256,6 +262,11 @@ function CustomSize({ onCreate }: { onCreate: (kind: PageKind, w: number, h: num
 export function StartScreen({ onClose, first }: { onClose: () => void; first: boolean }) {
   const t = useT();
   const lang = useLang((s) => s.lang);
+  // the start screen opened from anywhere (the status bar's 새 문서, Ctrl+N) replaces the 파일 screen: a template picked
+  // here must land on the document, not behind a 파일 screen left open
+  useEffect(() => closeBackstage(), []);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const recent = useRecent((s) => s.list);
   const [view, setView] = useState<View>("home");
   const [q, setQ] = useState("");
@@ -283,7 +294,7 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
     if (!query) return [];
     return TEMPLATES.filter((tp) => {
       const { w, h } = templateSize(tp, landscape);
-      const hay = [tr(`start.tpl.${tp.id}`), tr(`start.cat.${tp.cat}`), formatSize(w, h, tp.unit), formatSize(w, h, "px"), tp.id].join(" ").toLowerCase();
+      const hay = [tr(`start.tpl.${tp.id}`), tr(`start.cat.${tp.cat}`), formatSize(w, h, tp.unit), formatSize(w, h, "px"), sizeNames(w, h), tp.id].join(" ").toLowerCase();
       return query.split(/\s+/).every((word) => hay.includes(word));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -298,6 +309,13 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
         searchRef.current?.focus();
         searchRef.current?.select();
       }
+      // Ctrl+O on the start screen opens a file, as everywhere else (QA basic-ux-office 5-1: no response right after start)
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        e.stopPropagation();
+        onCloseRef.current();
+        void openAny();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -310,16 +328,16 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
     e.preventDefault();
     claimDrop(e);
     setOver(false);
-    const files = Array.from(e.dataTransfer.files);
-    if (!files.length) return;
+    if (!e.dataTransfer.files.length) return;
+    const files = droppedFiles(e.dataTransfer); // in the event itself: the browser empties the drop afterwards
     onClose();
-    for (const f of files) await openAndRemember({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) });
+    for (const f of await files) await openAndRemember(f);
   };
 
   const navItems: { id: View; icon: IconName; label: string; count?: number }[] = [
     { id: "home", icon: "pages", label: t("start.nav.home") },
     // the browser keeps no recent files (no paths), so the web start screen leaves the entry out
-    ...(isTauri || recent.length ? [{ id: "recent" as View, icon: "clock" as IconName, label: t("start.nav.recent"), count: recent.length || undefined }] : []),
+    ...(isTauri || handlesSupported() || recent.length ? [{ id: "recent" as View, icon: "clock" as IconName, label: t("start.nav.recent"), count: recent.length || undefined }] : []),
     ...CATEGORIES.map((c) => ({ id: c as View, icon: CAT_ICON[c], label: t(`start.cat.${c}`), count: TEMPLATES.filter((x) => x.cat === c).length })),
     { id: "custom", icon: "transform", label: t("start.nav.custom") },
   ];
@@ -480,6 +498,16 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
               <small>{t("start.hero.newSub")}</small>
             </span>
           </button>
+          {/* Excel's first tile: a blank workbook (the sheet grid at once) */}
+          <button type="button" className="hero-card hero-sheet" onClick={() => pick(templateById("sheet-blank")!, false)}>
+            <span className="hero-ico">
+              <Icon name="table" size={20} />
+            </span>
+            <span className="hero-text">
+              <b>{t("start.hero.sheet")}</b>
+              <small>{t("start.hero.sheetSub")}</small>
+            </span>
+          </button>
           <button
             type="button"
             className="hero-card"
@@ -497,7 +525,7 @@ export function StartScreen({ onClose, first }: { onClose: () => void; first: bo
             </span>
             <kbd>Ctrl+O</kbd>
           </button>
-          {isTauri || recent.length ? (
+          {isTauri || handlesSupported() || recent.length ? (
             <button type="button" className={cx("hero-card", view === "recent" && "on")} onClick={() => (setQ(""), setView("recent"))}>
               <span className="hero-ico">
                 <Icon name="clock" size={20} />

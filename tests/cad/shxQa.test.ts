@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { pairGlyph, parseShx, shxGlyph, type ShxFont } from "../../src/io/formats/cad/shx";
 import { loadDrawingShx, loadShxFamilies, resetShxCache, safeShxName } from "../../src/io/formats/cad/shxLoad";
 import { registerShxPair, strokeAdvance, strokeFontTtf, STROKE_SHX } from "../../src/io/formats/cad/strokeFont";
+import { cpuNow, cpuBudget, wallTimeout } from "../budget";
 
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
 const le16 = (v: number) => [v & 255, (v >> 8) & 255];
@@ -47,7 +48,7 @@ describe("SHX reading QA", () => {
     const shapes: Record<number, number[]> = { 0x41: [...calls(1)], 0x42: [...Array(100).fill([4, 255]).flat(), 0x8c, 0] };
     for (let k = 1; k <= 6; k++) shapes[k] = calls(k + 1);
     shapes[7] = [1, 0x14, 0x10, 0];
-    const t0 = performance.now();
+    const t0 = cpuNow();
     const f = parseShx(unifont(shapes), "bomb.shx")!;
     const a = shxGlyph(f, 0x41)!;
     expect(a.strokes.reduce((n, s) => n + s.length, 0)).toBeLessThanOrEqual(20_001);
@@ -58,7 +59,7 @@ describe("SHX reading QA", () => {
     const font = (fontkit as any).create(ttf as any);
     expect(font.glyphForCodePoint(0x41).id).toBeGreaterThan(0);
     expect(Number.isFinite(strokeAdvance("AB", "shx:bomb"))).toBe(true);
-    expect(performance.now() - t0).toBeLessThan(5000);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(5000));
   });
 
   it("headers claiming huge counts and big-font ranges past the end", () => {
@@ -85,13 +86,13 @@ describe("SHX reading QA", () => {
           b = src.slice();
           for (let j = 0; j < 1 + r() * 40; j++) b[64 + Math.floor(r() * (b.length - 64))] = Math.floor(r() * 256);
         }
-        const t0 = performance.now();
+        const t0 = cpuNow();
         expect(() => exercise(b, name)).not.toThrow();
-        worst = Math.max(worst, performance.now() - t0);
+        worst = Math.max(worst, cpuNow() - t0);
       }
     }
-    expect(worst).toBeLessThan(5000);
-  }, 300000);
+    expect(worst).toBeLessThan(cpuBudget(5000));
+  }, wallTimeout(300000));
 
   it("font names are file names only: no folder parts, drive, '..' or separator", async () => {
     for (const bad of ["../x.shx", "..\\..\\x.shx", "c:x.shx", "c:/x.shx", "a/b.shx", "*.shx", "a+b.shx", ".shx", "..shx", "x.ttf", "x\u0000.shx"]) expect(safeShxName(bad), bad).toBeNull();

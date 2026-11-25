@@ -107,6 +107,8 @@ export class Stroke {
     const r = Math.max(0.5, (this.brush.size / 2) * (0.25 + 0.75 * p));
     const d = dab(r, this.brush.hardness, this.erase ? "#000000" : this.brush.color);
     const s = d.width;
+    // flow (Photoshop): each dab adds this much; the stroke still never passes the opacity (applied at commit)
+    this.mctx.globalAlpha = this.fctx.globalAlpha = Math.max(0.01, Math.min(1, this.brush.flow ?? 1));
     this.mctx.drawImage(d, x - s / 2, y - s / 2);
     if (this.full !== this.mask) this.fctx.drawImage(d, x - s / 2 + this.ox, y - s / 2 + this.oy);
     const b = { x: x - s / 2, y: y - s / 2, w: s, h: s };
@@ -143,6 +145,8 @@ export class Stroke {
   /** Composite the stroke into new tiles. Returns the next tile map, or null if nothing changed. */
   commit(): Record<string, PixelTile> | null {
     if (!this.bounds) return null;
+    // (erasing a layer whose transparent pixels are locked would make new transparency: nothing changes)
+    if (this.erase && this.node.lockAlpha) return null;
     const b = this.bounds;
     const colored = this.full; // dabs are already in brush colour
 
@@ -161,7 +165,8 @@ export class Stroke {
         wc.globalAlpha = 1;
         if (old) wc.drawImage(tileCanvas(old), 0, 0);
         else wc.clearRect(0, 0, TILE, TILE);
-        wc.globalCompositeOperation = this.erase ? "destination-out" : "source-over";
+        // transparent pixels locked (Photoshop): paint only where there are pixels, keeping their alpha
+        wc.globalCompositeOperation = this.erase ? "destination-out" : this.node.lockAlpha ? "source-atop" : "source-over";
         wc.globalAlpha = this.brush.opacity;
         wc.drawImage(colored, tx * TILE + this.ox, ty * TILE + this.oy, TILE, TILE, 0, 0, TILE, TILE);
         const data = wc.getImageData(0, 0, TILE, TILE).data;

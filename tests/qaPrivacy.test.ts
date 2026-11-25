@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import { readCfb } from "../src/io/formats/cfb";
 import { decryptOffice, isEncryptedOffice } from "../src/io/crypto/office";
 import { decryptPdf, isEncrypted as isEncryptedPdf } from "../src/io/pdfsurgeon/decrypt";
+import { wallTimeout } from "./budget";
 
 const ROOTS = ["qa", "docs", "tests", "public", "src/assets", "assets", "website", "marketing"];
 const EXT = /\.(docx|docm|dotx|pptx|pptm|potx|xlsx|xlsm|xltx|hwpx|omw|odt|odp|ods|doc|dot|ppt|xls|hwp|pdf|ai|eps|psd)$/i;
@@ -355,7 +356,7 @@ describe("QA material carries no personal names", () => {
       if (where.length) hits.push(`${f} (${[...new Set(where)].join(", ")})`);
     }
     expect(hits, "고치기: node qa/interop/scripts/scrub_author.mjs --password omw-test-1234 <파일>").toEqual([]);
-  }, 180_000);
+  }, wallTimeout(180_000));
 
   it("author fields hold 'Omniweave QA' (or empty / a 'QA---' stand-in / a synthetic test id), never a person's name", async () => {
     const bad: string[] = [];
@@ -368,5 +369,5 @@ describe("QA material carries no personal names", () => {
     }
     expect(seen).toBeGreaterThanOrEqual(PUBLIC_TREE ? 0 : 21); // the readers do find the fields
     expect(bad, "고치기: node qa/interop/scripts/scrub_author.mjs --name <그 이름> --password omw-test-1234 <파일>").toEqual([]);
-  }, 180_000);
+  }, wallTimeout(180_000));
 });

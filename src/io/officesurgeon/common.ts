@@ -41,7 +41,12 @@ export const markedBodyRuns = (p: TextParagraph) => docxBodyRuns(p, markerLength
  * with the original in its older shape too (preWordMultipleView), read with that importer's run defaults (11 pt without
  * w:sz, theme fonts ignored, sizes to 0.1 px: office.ts docxContext legacy).
  */
-export const MODEL_VERSION = 9;
+export const MODEL_VERSION = 11;
+/**
+ * Model 10: paragraphs keep their named style (TextParagraph.style: DOCX w:pStyle, HWPX styleIDRef; core/docStyles.ts)
+ * and the file's styles are the document's sheet. A map before it reads the original without the style.
+ */
+export const MODEL_PARA_STYLES = 10;
 /**
  * Model 9: comments and tracked changes are read (core/review.ts): deleted and moved-away text are runs (TextRun.rev),
  * DOCX moves no longer read twice, 한글 memo text is a comment, not body paragraphs. A map before it reads the original
@@ -80,6 +85,13 @@ export const runKey = (r: TextRun) => {
   // a format change's mark and the comments on the text (stage 2: accepting a format change, adding a comment are edits)
   if (r.fmtRev) base.push({ fmt: 1 });
   if (r.comments?.length) base.push({ c: [...r.comments].sort() });
+  // a hyperlink put on or taken off the text is an edit (TextRun.link)
+  if (r.link) base.push({ l: r.link });
+  // a bookmark put on or taken off the text (model 10, core/docRefs.ts); a field made here (SEQ / REF: field code)
+  if (r.bookmarks?.length) base.push({ b: r.bookmarks });
+  if (r.field === "seq" || r.field === "ref" || r.field === "pageref") base.push({ f: r.fieldCode ?? r.field });
+  // 덧말 put on, changed or taken off (TextRun.ruby)
+  if (r.ruby) base.push({ rb: r.ruby });
   return JSON.stringify(base);
 };
 
@@ -112,6 +124,8 @@ export const paraPropsKey = (p: TextParagraph) => {
   // a Word multiple (DOCX import; core/lineSpacing.ts): appended only when the paragraph is drawn with one
   const wm = wordMultipleOf(p);
   if (wm !== undefined) base.push({ wm });
+  // the named style (model 10): appended only when the paragraph has one (older hashes stay)
+  if (p.style) base.push({ st: p.style });
   // 단 나누기: appended only when the paragraph has one (older hashes stay)
   if (p.colBreak) base.push({ cb: p.colBreak });
   // 이어서 구역 that begins here (its columns; the Office Surgeon writes them into the section's own w:sectPr)
@@ -184,12 +198,15 @@ export const cellParas = (c: TableCell): TextParagraph[] | null =>
 
 export function cellFp(c: TableCell): string {
   const rich = cellParas(c)?.map(paraFp) ?? null;
-  return hashString(JSON.stringify([rich ? null : c.text, !!c.bold, !!c.italic, c.align ?? null, c.color ?? null, c.fill ?? null, c.colSpan ?? 1, c.rowSpan ?? 1, c.formula ?? null, c.numFmt ?? null, rich]));
+  const key: unknown[] = [rich ? null : c.text, !!c.bold, !!c.italic, c.align ?? null, c.color ?? null, c.fill ?? null, c.colSpan ?? 1, c.rowSpan ?? 1, c.formula ?? null, c.numFmt ?? null, rich];
+  // a row made taller by dragging its edge (TableCell.rowMin) is an edit; absent: the key as before
+  if (c.rowMin) key.push({ h: c.rowMin });
+  return hashString(JSON.stringify(key));
 }
 
 /** Table-level format (everything but the cells). */
 export const tablePropsKey = (t: TableNode) =>
-  JSON.stringify([t.colWidths.map((w) => Math.round(w * 10) / 10), t.headerRow, t.fontFamily, t.fontSize, t.color, t.borderColor, t.headerFill]);
+  JSON.stringify([t.colWidths.map((w) => Math.round(w * 10) / 10), t.headerRow, t.fontFamily, t.fontSize, t.color, t.borderColor, t.headerFill, ...(t.wordAlign ? [t.wordAlign.jc] : [])]);
 
 export const tableFp = (t: TableNode) => hashString(tablePropsKey(t) + "\u0000" + t.rows.map((r) => r.map(cellFp).join(",")).join(";"));
 
@@ -226,6 +243,15 @@ export const listDefKey = (d: ListDef) => JSON.stringify([!!d.outline, d.levels.
 export function changedListDefs(cur: readonly ListDef[], orig: readonly ListDef[] | undefined): Set<string> {
   const was = new Map((orig ?? []).map((d) => [d.id, listDefKey(d)]));
   return new Set(cur.filter((d) => was.has(d.id) && was.get(d.id) !== listDefKey(d)).map((d) => d.id));
+}
+
+/** Two outline numberings (개요 번호 모양) number the same way: every level's format and text (levels 1–7, 한글's). */
+export function sameOutlineLevels(a: ListDef, b: ListDef): boolean {
+  for (let i = 0; i < 7; i++) {
+    const x = levelOf(a, i), y = levelOf(b, i);
+    if (x.format !== y.format || x.text !== y.text) return false;
+  }
+  return true;
 }
 
 /** One run of a list written with numbering of its own: the restart numbers of its levels (first item of each). */

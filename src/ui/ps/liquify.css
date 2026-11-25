@@ -1,0 +1,27 @@
+/* 필터 › 픽셀 유동화 (LiquifyDialog.tsx) */
+.liquify-dialog {
+  max-width: min(92vw, calc(720px * var(--ui-scale)));
+  padding: 20px 24px;
+}
+.liquify-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.liquify-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  background: var(--bg-3);
+  border-radius: var(--r-sm);
+  padding: 8px;
+}
+.liquify-canvas {
+  max-width: 100%;
+  max-height: 60vh;
+  cursor: crosshair;
+  touch-action: none;
+}

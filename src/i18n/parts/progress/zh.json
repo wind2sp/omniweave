@@ -4,5 +4,8 @@
   "progress.save": "正在保存…",
   "progress.export": "正在导出 {fmt}…",
   "progress.ocr": "正在识别文字…",
-  "progress.matte": "正在去除背景…"
+  "progress.matte": "正在去除背景…",
+  "progress.matte.subject": "正在查找主体…",
+  "progress.matte.person": "正在细化人物轮廓…",
+  "progress.matte.refine": "正在细化边缘…"
 }

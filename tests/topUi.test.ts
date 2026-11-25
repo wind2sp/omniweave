@@ -82,7 +82,7 @@ describe("no command of the old menu bar is lost", () => {
   });
   it("issue 2-2: flip, rotate and canvas size are in the image menu; crop and painting are toolbox tools", () => {
     const image = JSON.stringify(IMAGE_MENUS.find((m) => m.id === "image")!.entries);
-    for (const id of ["object.flipH", "object.flipV", "page.rotateRight", "page.rotateLeft", "image.canvasSize", "image.cropCanvas", "object.crop"]) expect(image, id).toContain(`"${id}"`);
+    for (const id of ["object.flipH", "object.flipV", "image.rotateCanvasCW", "image.rotateCanvasCCW", "image.canvasSize", "image.cropCanvas", "object.crop"]) expect(image, id).toContain(`"${id}"`);
     expect(PROFILES.IMAGE.tools).toEqual(expect.arrayContaining(["brush", "gradient"]));
     // the options bar no longer ends with its own flip / paint group in the image and design modes
     const ribbon = readFileSync("src/ui/shell/Ribbon.tsx", "utf8");

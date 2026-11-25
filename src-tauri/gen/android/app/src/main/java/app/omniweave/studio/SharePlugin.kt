@@ -45,6 +45,11 @@ class SpellArgs {
 }
 
 @InvokeArg
+class PresentArgs {
+  var on: Boolean = false
+}
+
+@InvokeArg
 class PrintArgs {
   lateinit var path: String
   var title: String? = null
@@ -133,6 +138,7 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
         return
       }
       out.use { o -> src.inputStream().use { it.copyTo(o, 1 shl 16) } }
+      fixNumberedName(Uri.parse(args.uri))
       invoke.resolve()
     } catch (e: Exception) {
       invoke.reject(e.message ?: e.toString())
@@ -261,6 +267,41 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       } catch (e: Exception) {
         invoke.reject(e.message ?: e.toString())
       }
+    }
+  }
+
+  /** A slide show: the screen sideways and the system bars hidden (on); the phone's own orientation and bars (off). */
+  @Command
+  fun present(invoke: Invoke) {
+    val on = try { invoke.parseArgs(PresentArgs::class.java).on } catch (e: Exception) { false }
+    activity.runOnUiThread {
+      try {
+        activity.requestedOrientation = if (on) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        val ctl = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+        if (on) {
+          ctl.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+          ctl.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        } else ctl.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        invoke.resolve()
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: e.toString())
+      }
+    }
+  }
+
+  /** A file type Android does not know (HWPX, OMW, DXF …) saved under a name already taken gets the number after the
+   *  extension ("a.hwpx (1)"), which no app opens: put it before the extension ("a (1).hwpx"). Quietly as it was when
+   *  the provider cannot rename. */
+  private fun fixNumberedName(uri: Uri) {
+    try {
+      var name: String? = null
+      activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) name = c.getString(0) }
+      android.util.Log.i("omw", "saved as: $name ($uri)")
+      val m =Regex("^(.*)(\\.[A-Za-z0-9]{1,6}) \\((\\d+)\\)$").find(name ?: return) ?: return
+      val fixed = m.groupValues[1] + " (" + m.groupValues[3] + ")" + m.groupValues[2]
+      android.provider.DocumentsContract.renameDocument(activity.contentResolver, uri, fixed)
+    } catch (e: Exception) {
+      android.util.Log.w("omw", "rename failed: $e")
     }
   }
 

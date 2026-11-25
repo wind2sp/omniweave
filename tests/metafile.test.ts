@@ -2,6 +2,7 @@
 // checked for what each record draws, and a fuzz run (mutated and truncated files end in time without throwing).
 import { describe, expect, it } from "vitest";
 import { metafileKind, metafileSize, metafileToSvg, wmfPlaceable } from "../src/io/formats/metafile";
+import { cpuNow, cpuBudget } from "./budget";
 
 // ── EMF builder ──
 class Emf {
@@ -305,7 +306,7 @@ describe("metafile: robustness", () => {
     ];
     let state = 12345;
     const rnd = () => ((state = (state * 1103515245 + 12345) >>> 0) / 2 ** 32);
-    const t0 = Date.now();
+    const t0 = cpuNow();
     let made = 0;
     for (let round = 0; round < 1500; round++) {
       const base = seeds[round % seeds.length];
@@ -334,7 +335,7 @@ describe("metafile: robustness", () => {
       metafileToSvg(b);
     }
     expect(made).toBeGreaterThan(100);
-    expect(Date.now() - t0).toBeLessThan(20000);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(20000));
   });
 
   it("huge counts in a small record are refused, not allocated", () => {

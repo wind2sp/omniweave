@@ -16,6 +16,9 @@ public/models/*
 # OCR models (PP-OCRv5 int8, Apache-2.0, converted by scripts/convert-ppocr.mjs) are in git too: 4.9 MB, pinned by
 # sha256 in tests/fixtures/ocr/models-manifest.json and checked by scripts/ocr-models.mjs on every build
 !public/models/ocr/
+# Person matting model (MODNet int8, Apache-2.0, converted by scripts/convert-modnet.mjs) is in git: 6.6 MB, its two
+# files allowed by scripts/size-budget.mjs (MATTE_MODEL_FILES)
+!public/models/matte/
 qa/interop/.adobe-work/
 
 # Store trailer frames (marketing/video/store_trailer/make_trailer.py makes them again)

@@ -20,6 +20,7 @@ import { exportById, formatForExt } from "../src/io/formats";
 import { lastLegacySave, legacyFingerprint, legacySource } from "../src/io/formats/legacyWrite";
 import { collectFlow } from "../src/io/office";
 import { installDom } from "./coverage/helpers";
+import { cpuNow, cpuBudget } from "./budget";
 
 beforeAll(installDom);
 
@@ -227,9 +228,9 @@ describe("keep with next longer than a page", () => {
     const rows = Array.from({ length: 80 }, (_, i) => [{ text: `행 ${i}`, richText: [P(`행 ${i}`, { keepNext: true })] }]);
     const tb = newTable(rows, [300], "표");
     const ps = [...Array.from({ length: 10 }, (_, i) => P(`앞 ${i}`)), P("제목", { keepNext: true })];
-    const t0 = Date.now();
+    const t0 = cpuNow();
     const out = reflowPages([pageWith(ps, tb)]);
-    expect(Date.now() - t0).toBeLessThan(20000);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(20000));
     const parts = out.flatMap((pg) => pg.nodes).filter((n): n is TableNode => n.type === "TABLE");
     expect(parts.reduce((s, t) => s + t.rows.length, 0)).toBeGreaterThanOrEqual(80);
     expect(parts.length).toBeGreaterThan(1);

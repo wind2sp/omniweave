@@ -4,5 +4,8 @@
   "progress.save": "保存しています…",
   "progress.export": "{fmt} に書き出しています…",
   "progress.ocr": "文字を認識しています…",
-  "progress.matte": "背景を削除しています…"
+  "progress.matte": "背景を削除しています…",
+  "progress.matte.subject": "被写体を探しています…",
+  "progress.matte.person": "人物の輪郭を整えています…",
+  "progress.matte.refine": "境界を整えています…"
 }

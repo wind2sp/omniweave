@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { version } from "../../../package.json";
 import { LANGS, useLang, useT } from "../../i18n";
 import { allCommands, commandLabel, enabled, type Command } from "../commands";
+import { indexRibbon, ribbonCommands } from "./ribbonIndex";
 import { Modal } from "./Dialogs";
 import { Icon, LogoMark } from "./Icons";
 import { cx } from "./controls";
@@ -14,10 +15,19 @@ import { SizeDialog } from "./SizeDialog";
 import { PageSetupDialog } from "./PageSetupDialog";
 import { ColumnsDialog } from "./ColumnsDialog";
 import { CanvasSizeDialog } from "./CanvasSizeDialog";
+import { DesignXformDialog } from "./DesignXformDialog";
+import { DesignArtDialog, DesignFxDialog } from "./DesignD2Dialogs";
+import { ExportScreensDialog } from "./ExportScreensDialog";
+import { TextStylesDialog } from "./TextStylesDialog";
 import { SelectModifyDialog } from "./SelectModifyDialog";
 import { PageNumberDialog } from "./HeaderFooterDialog";
 import { ListDialog, ParagraphDialog } from "./ParagraphDialogs";
-import { UI_SCALES, useUI } from "./uiStore";
+import { CharDialog } from "./CharDialog";
+import { LinkDialog } from "./LinkDialog";
+import { RubyDialog } from "./RubyDialog";
+import { TablePropsDialog } from "./TablePropsDialog";
+import { AutoTextDialog } from "./AutoTextDialog";
+import { UI_SCALES, useUI, AUTOSAVE_CHOICES } from "./uiStore";
 import { SpellStatus } from "./SpellStatus";
 import { setSpellOn, spellAvailable, useSpell } from "../spell";
 import { keyContext } from "../keymap";
@@ -36,18 +46,31 @@ export function matchCommands(list: Command[], query: string): Command[] {
     .map((c) => {
       const label = norm(commandLabel(c));
       const kbd = norm(c.kbd ?? "");
-      const score = label.startsWith(q) ? 0 : label.includes(q) ? 1 : kbd === q ? 0 : kbd.includes(q) ? 2 : -1;
+      // other words it goes by (밝기 → 조정 ▸ 명도/대비): found after the label matches
+      const words = c.keywords ? norm(c.keywords()) : "";
+      const score = label.startsWith(q) ? 0 : label.includes(q) ? 1 : kbd === q ? 0 : kbd.includes(q) ? 2 : words && words.includes(q) ? 3 : -1;
       return { c, score };
     })
     .filter((x) => x.score >= 0);
-  return scored.sort((a, b) => a.score - b.score).map((x) => x.c);
+  // (for the same words, what can be used here first: the current mode's commands before the greyed ones of others)
+  return scored.sort((a, b) => a.score - b.score || Number(!enabled(a.c)) - Number(!enabled(b.c))).map((x) => x.c);
 }
 
 function Palette() {
   const t = useT();
   const [q, setQ] = useState("");
   const [cur, setCur] = useState(0);
-  const list = useMemo(() => matchCommands(allCommands(), q), [q]);
+  // the ribbon's buttons too (shell/ribbonIndex.ts), listed once the search is open
+  const [rv, setRv] = useState(0);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      indexRibbon();
+      setRv((v) => v + 1);
+    });
+    return () => clearTimeout(id);
+  }, []);
+  const all = useMemo(() => [...allCommands(), ...ribbonCommands()], [rv]); // eslint-disable-line react-hooks/exhaustive-deps
+  const list = useMemo(() => matchCommands(all, q), [q, all]);
   const listRef = useRef<HTMLDivElement>(null);
   // the highlighted row stays in view while walking the list with the arrow keys
   // (braces: newer Chromium / WebView2 returns a Promise from scrollIntoView, which React would take for a cleanup)
@@ -82,7 +105,7 @@ function Palette() {
           aria-label={t("palette.placeholder")}
           onChange={(e) => {
             setQ(e.target.value);
-            setCur(Math.max(0, matchCommands(allCommands(), e.target.value).findIndex(enabled)));
+            setCur(Math.max(0, matchCommands(all, e.target.value).findIndex(enabled)));
           }}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") (e.preventDefault(), setCur((i) => step(i, 1)));
@@ -132,6 +155,7 @@ function Settings() {
   const uiScale = useUI((s) => s.uiScale);
   const devInfo = useUI((s) => s.devInfo);
   const reviewAuthor = useUI((s) => s.reviewAuthor);
+  const autoSave = useUI((s) => s.autoSave);
   const spellOn = useSpell((s) => s.on);
   return (
     <Modal labelledBy="settings-title" className="modal-sm" onClose={close}>
@@ -184,6 +208,18 @@ function Settings() {
           </label>
         </div>
         <SpellStatus />
+      </fieldset>
+      <fieldset className="pref-group">
+        <legend>{t("settings.autoSave")}</legend>
+        <div className="pref-options">
+          {AUTOSAVE_CHOICES.map((v) => (
+            <label key={v} className={cx("pref-option", autoSave === v && "on")}>
+              <input type="radio" name="omw-autosave" checked={autoSave === v} onChange={() => useUI.getState().set({ autoSave: v })} />
+              <span>{t(`settings.autoSave.${v}`)}</span>
+            </label>
+          ))}
+        </div>
+        <p className="modal-sub">{t(autoSave === "off" ? "settings.autoSaveOffHint" : "settings.autoSaveHint")}</p>
       </fieldset>
       <fieldset className="pref-group">
         <legend>{t("review.settings.title")}</legend>
@@ -316,7 +352,17 @@ export function ShellDialogs() {
   if (which === "columns") return <ColumnsDialog />;
   if (which === "canvasSize") return <CanvasSizeDialog />;
   if (which === "selectModify") return <SelectModifyDialog />;
+  if (which === "designXform") return <DesignXformDialog />;
+  if (which === "designFx") return <DesignFxDialog />;
+  if (which === "designArt") return <DesignArtDialog />;
+  if (which === "exportScreens") return <ExportScreensDialog />;
+  if (which === "textStyles") return <TextStylesDialog />;
   if (which === "paragraph") return <ParagraphDialog />;
+  if (which === "char") return <CharDialog />;
+  if (which === "link") return <LinkDialog />;
+  if (which === "ruby") return <RubyDialog />;
+  if (which === "tableProps") return <TablePropsDialog />;
+  if (which === "autotext") return <AutoTextDialog />;
   if (which === "listFormat") return <ListDialog />;
   if (which === "pageNumber") return <PageNumberDialog />;
   return null;

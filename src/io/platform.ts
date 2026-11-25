@@ -98,6 +98,30 @@ export interface OpenedFile {
   name: string;
   path: string | null;
   bytes: Uint8Array;
+  /** the browser's handle of the opened file (File System Access: the open picker, or a drop that gives one) —
+   *  저장 (Ctrl+S) writes back into it, as the desktop does into `path` */
+  handle?: FileHandle | null;
+}
+
+/** the part of the browser's FileSystemFileHandle the app uses */
+export interface FileHandle {
+  kind: "file";
+  name: string;
+  getFile(): Promise<File>;
+  createWritable(): Promise<{ write(d: BlobPart): Promise<void>; close(): Promise<void> }>;
+  queryPermission?(o: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  requestPermission?(o: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+}
+
+/** May the app write into this handle? Asks the browser the first time (its own "save changes to file?" prompt);
+ *  needs the person's recent key / click, so it is called before the file is built. */
+export async function handleWritable(h: FileHandle): Promise<boolean> {
+  try {
+    if ((await h.queryPermission?.({ mode: "readwrite" })) === "granted") return true;
+    return (await h.requestPermission?.({ mode: "readwrite" })) === "granted";
+  } catch {
+    return false;
+  }
 }
 
 export interface Filter {
@@ -109,10 +133,33 @@ export async function openFiles(filters: Filter[], multiple = false): Promise<Op
   if (isTauri) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { readFile } = await import("@tauri-apps/plugin-fs");
-    const sel = await open({ multiple, filters });
+    // Android: the system picker filters by media type, and it calls HWPX, DXF, PSD … "application/octet-stream" — they
+    // were greyed out. The phone picker shows every file; the format registry tells what it can open.
+    const sel = await open(nativeMobile ? { multiple } : { multiple, filters });
     if (!sel) return [];
     const paths = Array.isArray(sel) ? sel : [sel];
     return Promise.all(paths.map(async (p) => ({ name: await pickedName(p), path: p, bytes: await readFile(p) })));
+  }
+  // Chrome / Edge on a PC: the open picker hands back the file's handle, so 저장 (Ctrl+S) can write that same file
+  // as Word does (the browser asks once for leave to write). Without it (Firefox, Safari, phones) <input type=file>.
+  const w = window as any;
+  if (typeof w.showOpenFilePicker === "function" && !isIOS()) {
+    try {
+      const exts = (f: Filter) => f.extensions.filter((e) => /^[a-z0-9+]{1,15}$/i.test(e)).map((e) => "." + e);
+      const handles: FileHandle[] = await w.showOpenFilePicker({
+        multiple,
+        types: filters.filter((f) => exts(f).length).map((f) => ({ description: f.name, accept: { "application/octet-stream": exts(f) } })),
+      });
+      return Promise.all(
+        handles.map(async (h) => {
+          const file = await h.getFile();
+          return { name: file.name, path: null, bytes: new Uint8Array(await file.arrayBuffer()), handle: h };
+        }),
+      );
+    } catch (e: any) {
+      if (e?.name === "AbortError") return [];
+      // a filter the browser refuses, or a picker it does not allow here: the plain file input below
+    }
   }
   return new Promise((resolve) => {
     const input = document.createElement("input");
@@ -123,15 +170,21 @@ export async function openFiles(filters: Filter[], multiple = false): Promise<Op
     if (!isIOS()) input.accept = filters.flatMap((f) => f.extensions.map((e) => "." + e)).join(",");
     input.onchange = async () => {
       const files = Array.from(input.files ?? []);
-      resolve(await Promise.all(files.map(async (f) => ({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) }))));
+      done(Promise.all(files.map(async (f) => ({ name: f.name, path: null, bytes: new Uint8Array(await f.arrayBuffer()) }))));
     };
-    input.oncancel = () => resolve([]);
+    let settled = false;
+    const done = (v: OpenedFile[] | Promise<OpenedFile[]>) => {
+      if (!settled) (settled = true), resolve(v);
+    };
+    input.oncancel = () => done([]);
+    // a browser that does not say "cancelled": the window gets the focus back with no file chosen
+    window.addEventListener("focus", () => setTimeout(() => !input.files?.length && done([]), 1500), { once: true });
     input.click();
   });
 }
 
 /** Returns the saved path (desktop) or the file name (browser), or null when cancelled. */
-export async function saveFile(suggested: string, bytes: Uint8Array | string, filters: Filter[], existingPath?: string | null): Promise<string | null> {
+export async function saveFile(suggested: string, bytes: Uint8Array | string, filters: Filter[], existingPath?: string | null, handle?: FileHandle | null): Promise<string | null> {
   const data = typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes;
   if (isTauri) {
     const { save } = await import("@tauri-apps/plugin-dialog");
@@ -150,6 +203,17 @@ export async function saveFile(suggested: string, bytes: Uint8Array | string, fi
     return path;
   }
   const w = window as any;
+  // the file this document was opened from (its browser handle): written in place, no save picker
+  if (handle) {
+    try {
+      const ws = await handle.createWritable();
+      await ws.write(data as BlobPart);
+      await ws.close();
+      return handle.name;
+    } catch {
+      // leave to write refused, or the file is gone: ask where to save, as below
+    }
+  }
   if (w.showSaveFilePicker) {
     try {
       const handle = await w.showSaveFilePicker({

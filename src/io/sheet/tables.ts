@@ -2,7 +2,7 @@
 // (read.ts): table definitions feed structured references (Table1[Col]); cells inside an array formula's range are
 // marked as filled by it. Omniweave's own implementation.
 
-import type { SheetData, SheetTable } from "../../core/sheetTypes";
+import type { SheetData, SheetFilter, SheetTable } from "../../core/sheetTypes";
 import { attr, children, descendants, parseXml } from "../xml";
 import { addr, parseRange } from "./formula";
 
@@ -28,7 +28,31 @@ export function readTables(read: (path: string) => string | undefined, sheetPart
     const cols = descendants(root, "tableColumns").flatMap((tc) => children(tc, "tableColumn")).map((c) => attr(c, "name") ?? "");
     const t: SheetTable = { name: attr(root, "displayName") ?? attr(root, "name") ?? "", ref, cols };
     if (attr(root, "headerRowCount") === "0") t.noHeader = true;
+    const id = Number(attr(root, "id"));
+    if (id > 0) t.id = id;
     if (Number(attr(root, "totalsRowCount") ?? 0) > 0) t.totals = true;
+    const af = children(root, "autoFilter")[0];
+    if (af && attr(af, "ref")) {
+      const cols: NonNullable<SheetFilter["cols"]> = {};
+      for (const fc of children(af, "filterColumn")) {
+        const id = Number(attr(fc, "colId"));
+        const fs = children(fc, "filters")[0];
+        const cf = children(fc, "customFilters")[0];
+        if (fs && !cf) cols[id] = { vals: children(fs, "filter").map((x) => attr(x, "val") ?? ""), ...(attr(fs, "blank") === "1" ? { blank: true } : {}) };
+        else if (cf) cols[id] = { custom: { ...(attr(cf, "and") === "1" ? { and: true } : {}), items: children(cf, "customFilter").map((x) => ({ op: (attr(x, "operator") ?? "equal") as "equal", val: attr(x, "val") ?? "" })) } };
+        else cols[id] = { other: true };
+      }
+      t.filter = { ref: attr(af, "ref")!, ...(Object.keys(cols).length ? { cols } : {}) };
+    }
+    const si = descendants(root, "tableStyleInfo")[0];
+    if (si) {
+      const name = attr(si, "name");
+      if (name) t.style = name;
+      if (attr(si, "showRowStripes") === "0") t.rowStripes = false;
+      if (attr(si, "showColumnStripes") === "1") t.colStripes = true;
+      if (attr(si, "showFirstColumn") === "1") t.firstCol = true;
+      if (attr(si, "showLastColumn") === "1") t.lastCol = true;
+    }
     if (t.name) out.push(t);
   }
   return out;

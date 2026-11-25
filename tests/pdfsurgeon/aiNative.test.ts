@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { interpretNative, readNativeDocument } from "../../src/io/pdfsurgeon/aiNative";
+import { MAX_WORK, interpretNative, lastNativeWork, readNativeDocument } from "../../src/io/pdfsurgeon/aiNative";
 import { nativeToPdf } from "../../src/io/pdfsurgeon/aiNativePdf";
 import { parseTextDoc } from "../../src/io/pdfsurgeon/aiTextDoc";
 import { openJs } from "./helpers";
@@ -103,7 +103,6 @@ describe("AI without PDF content: drawn from the native data", () => {
     const base = await native("omni-ai-layers-nopdf.ai");
     let seed = 7;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
-    const t0 = Date.now();
     for (let k = 0; k < 120; k++) {
       let s = base;
       const art = s.indexOf("%%EndSetup");
@@ -121,17 +120,18 @@ describe("AI without PDF content: drawn from the native data", () => {
         s = s.slice(0, Math.min(a, b)) + s.slice(Math.max(a, b)) + s.slice(Math.min(a, b), Math.max(a, b));
       }
       const doc = interpretNative(s);
+      // bounded by the work limit (tokens read), not by the clock — a busy machine made 60 s fail
+      expect(lastNativeWork().tokens).toBeLessThanOrEqual(MAX_WORK + 16);
       if (doc) await nativeToPdf(doc);
     }
-    expect(Date.now() - t0).toBeLessThan(60_000);
   }, 120_000);
 
   it("a symbol made of itself many times over stops at the work limit", () => {
     const inst = "/SymbolInstance :\n(S) /SymbolRef ,\n1 0 0 1 0 0 /RTransformMatrix\n;\n";
     const s = `%!PS-Adobe-3.0\n%AI3_Cropmarks: 0 0 100 100\n%%EndComments\n%%BeginSetup\n%AI14_BeginSymbol\n(S)\n0 0 m 10 10 L f\n${inst.repeat(12)}%AI10_EndSymbol\n%%EndSetup\n${inst}%%PageTrailer\n`;
-    const t0 = Date.now();
     const doc = interpretNative(s);
-    expect(Date.now() - t0).toBeLessThan(30_000);
+    // 12 ** depth instances would never end: the work limit stops it (counted in tokens, not in seconds)
+    expect(lastNativeWork().tokens).toBeLessThanOrEqual(MAX_WORK + 16);
     expect(doc).not.toBeNull();
   }, 60_000);
 

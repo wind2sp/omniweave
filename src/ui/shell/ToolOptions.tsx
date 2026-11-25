@@ -2,22 +2,25 @@
 // in the ribbon's context strip. Omniweave's own features sit where those programs' users look for them — a pixel
 // selection offers "Layer via Copy" next to AI background removal and text recognition (OCR).
 
+import { selectSubject } from "../ps/selectSubject";
 import { useStore, type Tool } from "../../core/store";
 import { useT } from "../../i18n";
-import { ColorField, IconBtn, NumField, Seg, Sep } from "./controls";
+import { ColorField, IconBtn, Menu, NumField, Seg, Sep, type MenuItem } from "./controls";
+import { ARROW_HEADS, type ArrowHead, type StrokeArrows } from "../../core/arrowheads";
 import { Icon } from "./Icons";
 import { nodeLive, plainLive } from "./ops";
 import { updateSelected } from "../actions";
 import type { VectorNode } from "../../core/types";
 import { useImageUI } from "./imageMenu";
+import { MeshOptions, PerspOptions } from "./DesignMaskBar";
 import {
   clearSelectionPixels, cropToSelection, defaultColors, deselect, fillSelection, invertSelection, layerViaCopy, swapColors, usePixelSel, type GradientKind, type MarqueeShape,
 } from "../pixelSelect";
 
 const S = () => useStore.getState();
 
-const IMAGE_TOOLS = new Set<Tool>(["marquee", "lasso", "wand", "eyedropper", "gradient", "zoom"]);
-const DESIGN_TOOLS = new Set<Tool>(["line", "anchorAdd", "anchorDel", "anchorConvert", "curvature"]);
+const IMAGE_TOOLS = new Set<Tool>(["marquee", "lasso", "polyLasso", "objectSelect", "wand", "eyedropper", "gradient", "bucket", "zoom"]);
+const DESIGN_TOOLS = new Set<Tool>(["line", "anchorAdd", "anchorDel", "anchorConvert", "curvature", "meshTool", "perspGrid", "perspSelect"]);
 
 export const hasToolOptions = (tool: Tool) => IMAGE_TOOLS.has(tool) || DESIGN_TOOLS.has(tool);
 
@@ -29,6 +32,29 @@ export function StrokeOptions({ node }: { node: VectorNode }) {
   const t = useT();
   const cap = node.strokeCap ?? "round", join = node.strokeJoin ?? "round";
   const dash = node.strokeDash?.[0] ?? 0;
+  const gap = node.strokeDash?.[1] ?? dash;
+  const arrows = node.strokeArrows ?? {};
+  const setArrows = (label: string, f: (a: StrokeArrows) => void) =>
+    updateSelected(label, (x) => {
+      if (x.type !== "VECTOR") return;
+      const a: StrokeArrows = { ...(x.strokeArrows ?? {}) };
+      f(a);
+      if (!a.start) delete a.start;
+      if (!a.end) delete a.end;
+      if (!a.start && !a.end) delete x.strokeArrows;
+      else x.strokeArrows = a;
+    });
+  const headItems = (end: "start" | "end"): MenuItem[] => [
+    { label: t("design.stroke.arrow.none"), checked: !arrows[end], onSelect: () => setArrows(t("design.stroke.arrows"), (a) => delete a[end]) },
+    ...ARROW_HEADS.map((h: ArrowHead) => ({ label: t(`design.stroke.arrow.${h}`), checked: arrows[end] === h, onSelect: () => setArrows(t("design.stroke.arrows"), (a) => (a[end] = h)) })),
+  ];
+  const arrowMenu = (): MenuItem[] => [
+    { label: t("design.stroke.arrow.start"), sub: headItems("start") },
+    { label: t("design.stroke.arrow.end"), sub: headItems("end") },
+    { label: t("design.stroke.arrow.scale"), sub: [50, 75, 100, 150, 200, 300].map((k) => ({ label: `${k}%`, checked: (arrows.scale ?? 100) === k, onSelect: () => setArrows(t("design.stroke.arrows"), (a) => (k === 100 ? delete a.scale : (a.scale = k))) })) },
+    { sep: true },
+    { label: t("design.stroke.arrow.swap"), disabled: !arrows.start && !arrows.end, onSelect: () => setArrows(t("design.stroke.arrows"), (a) => ([a.start, a.end] = [a.end, a.start])) },
+  ];
   const glyph = (d: string) => (
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
       <path d={d} fill="none" stroke="currentColor" strokeWidth="1.4" />
@@ -66,9 +92,38 @@ export function StrokeOptions({ node }: { node: VectorNode }) {
         width={60}
         live={nodeLive(t("design.stroke.dash"), (x, v: number) => {
           if (x.type !== "VECTOR") return;
-          if (v > 0) x.strokeDash = [v, v];
+          // the first dash; the gap and any further dash / gap pairs (an opened .ai / .svg pattern) stay
+          const rest = x.strokeDash?.slice(1) ?? [];
+          if (v > 0) x.strokeDash = [v, ...(rest.length ? rest : [v])];
           else delete x.strokeDash;
         })}
+      />
+      <NumField
+        label={t("design.stroke.gap")}
+        tip={t("design.stroke.gapTip")}
+        value={gap}
+        min={0}
+        max={500}
+        unit="px"
+        width={60}
+        disabled={!dash}
+        live={nodeLive(t("design.stroke.gap"), (x, v: number) => {
+          if (x.type !== "VECTOR" || !x.strokeDash?.length) return;
+          const d = x.strokeDash.slice();
+          d[1] = Math.max(0, v);
+          x.strokeDash = d;
+        })}
+      />
+      <Menu
+        button={
+          <>
+            {glyph("M2 10h13M11 6l5 4-5 4")}
+            <span>{t("design.stroke.arrows")}</span>
+          </>
+        }
+        tip={t("design.stroke.arrowsTip")}
+        className="btn btn-ghost btn-sm"
+        items={arrowMenu}
       />
     </span>
   );
@@ -146,6 +201,11 @@ export function ToolOptions({ tool }: { tool: Tool }) {
     </span>
   );
   switch (tool) {
+    case "meshTool":
+      return <MeshOptions />;
+    case "perspGrid":
+    case "perspSelect":
+      return <PerspOptions />;
     case "marquee":
       return (
         <>
@@ -163,10 +223,24 @@ export function ToolOptions({ tool }: { tool: Tool }) {
           <SelectionActions />
         </>
       );
-    case "lasso":
+    case "objectSelect":
+      // Photoshop's Object Selection options: drag a box round the object, or 피사체 선택 for the main subject
       return (
         <>
-          {chip(t("ribbon.tool.lasso"), "lasso")}
+          {chip(t("ribbon.tool.objectSelect"), "objectSelect")}
+          <button type="button" className="btn btn-ghost" data-tip={t("psfeat.subject.buttonTip")} onClick={() => void selectSubject()}>
+            {t("psfeat.subject.button")}
+          </button>
+          <Sep />
+          <SelectionActions />
+        </>
+      );
+    case "lasso":
+    case "polyLasso":
+      return (
+        <>
+          {chip(t(`ribbon.tool.${tool}`), tool)}
+          {tool === "polyLasso" && <span className="muted-note">{t("ribbon.tool.polyLassoHint")}</span>}
           <Sep />
           <SelectionActions />
         </>
@@ -212,6 +286,23 @@ export function ToolOptions({ tool }: { tool: Tool }) {
           />
           <NumField icon="opacity" tip={t("ribbon.opacity")} value={brush.opacity} scale={100} min={1} max={100} unit="%" width={72} live={plainLive((v) => S().set({ brush: { ...S().brush, opacity: v } }))} />
           <span className="ctx-hint">{t("imgmode.gradient.hint")}</span>
+        </>
+      );
+    case "bucket":
+      return (
+        <>
+          {chip(t("ribbon.tool.bucket"), "bucket")}
+          <FgBg />
+          <NumField icon="opacity" tip={t("ribbon.opacity")} value={brush.opacity} scale={100} min={1} max={100} unit="%" width={72} live={plainLive((v) => S().set({ brush: { ...S().brush, opacity: v } }))} />
+          <NumField label={t("imgmode.wand.tolerance")} tip={t("imgmode.wand.toleranceTip")} value={ps.wandTolerance} min={0} max={255} width={64} live={plainLive((v) => ps.set({ wandTolerance: v }))} />
+          <label className="check-inline">
+            <input type="checkbox" checked={ps.wandContiguous} onChange={(e) => ps.set({ wandContiguous: e.target.checked })} />
+            {t("imgmode.wand.contiguous")}
+          </label>
+          <label className="check-inline">
+            <input type="checkbox" checked={ps.sampleAll} onChange={(e) => ps.set({ sampleAll: e.target.checked })} />
+            {t("imgmode.wand.sampleAll")}
+          </label>
         </>
       );
     case "zoom":

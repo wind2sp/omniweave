@@ -79,5 +79,12 @@
   "menu.export.kind.show": "演示",
   "menu.export.kind.table": "表格",
   "cmd.help.storeUpdates": "更新：Microsoft Store",
-  "menu.toast.mergedAsPixels": "已将图片/形状图层绘制为像素并合并（Ctrl+Z 撤销）"
+  "menu.toast.mergedAsPixels": "已将图片/形状图层绘制为像素并合并（Ctrl+Z 撤销）",
+  "cmd.edit.pasteInFront": "贴在前面",
+  "cmd.edit.pasteInBack": "贴在后面",
+  "cmd.edit.pasteOnAllArtboards": "在所有画板上粘贴",
+  "cmd.edit.transformAgain": "再次变换",
+  "menu.hist.pasteFront": "贴在前面",
+  "menu.hist.pasteBack": "贴在后面",
+  "design.hist.again": "再次变换"
 }

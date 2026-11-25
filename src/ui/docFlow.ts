@@ -47,7 +47,9 @@ import { OBJ_CHAR, newParagraph as makeParagraph, newText, uid, type AssetRef, t
 import { nodeBounds } from "../core/loom";
 import { nodeOrder, objSize } from "../core/flow";
 import { applyNoteAreaEdits, newNoteRun, type NoteKind } from "../core/notes";
-import { skipHidden } from "../core/review";
+import { skipHidden, trackingOn } from "../core/review";
+import { openLink } from "./openLink";
+import { brushSelectionDone, copyFormat, pasteFormat, stepFontSize, usePainter, wordAround, type PaintTarget } from "./formatPainter";
 
 const S = () => useStore.getState();
 type Pos = RT.Pos;
@@ -78,6 +80,8 @@ export interface FlowState {
    * yet — the original file stays as it was — until something is typed (materializeTail).
    */
   tail?: boolean;
+  /** where selected text dragged with the mouse would go (Word's dotted caret), while it is dragged */
+  drop?: Pos | null;
 }
 
 const ZERO: Pos = { p: 0, o: 0 };
@@ -146,6 +150,34 @@ let selfWrite = false;
 function closeTyping() {
   clearTimeout(typingTimer);
   typingOpen = false;
+}
+
+/**
+ * 표 나누기 (Word 레이아웃 ▸ 표 나누기, Ctrl+Shift+Enter in a table): the rows from `row` on become a table of their
+ * own after an empty paragraph, in the document body. A table cut over pages by the flow is split as a whole table
+ * (its first piece's id). False when the table is not in a body or has nothing to split.
+ */
+export function splitFlowTable(nodeId: string, row: number): boolean {
+  const pages = S().doc.pages;
+  const pi = pages.findIndex((p) => p.nodes.some((n) => n.id === nodeId));
+  if (pi < 0) return false;
+  const seg = segmentAt(pages, pi);
+  const st = gatherStory(pages, seg);
+  const k = st.objs.findIndex((o) => o.node.id === nodeId);
+  const o = st.objs[k];
+  if (k < 0 || o.node.type !== "TABLE" || row <= 0 || row >= o.node.rows.length) return false;
+  const t = o.node;
+  const body = RT.bodyFormat(st.paras);
+  const np: TextParagraph = { ...makeParagraph(""), runs: [{ ...RT.plainFormat(body), text: "" } as TextRun] };
+  // t1, the empty paragraph, t2, then what followed the table
+  const at = o.before === STORY_END ? st.paras.length : st.paras.findIndex((p) => p.id === o.before);
+  if (at < 0) return false;
+  const paras = [...st.paras.slice(0, at), np, ...st.paras.slice(at)];
+  const t1 = { ...t, rows: t.rows.slice(0, row) } as SceneNode;
+  const t2 = { ...t, id: uid(), rows: t.rows.slice(row), headerRow: false } as SceneNode;
+  const objs = [...st.objs.slice(0, k), { node: t1, before: np.id }, { node: t2, before: o.before }, ...st.objs.slice(k + 1)];
+  writePages(reflowSegment(pages as Page[], seg.start, { ...st, paras, objs }), tx("docflow.hist.splitTable"));
+  return true;
 }
 
 function writePages(pages: Page[], label: string | null) {
@@ -410,6 +442,28 @@ function insert(text: string, label: string | null = null, lineBreak = false) {
   const res = lineBreak ? RT.insertRun(paras, r.start, { ...RT.plainFormat(fmt), text: "\n" } as TextRun) : RT.insertText(paras, r.start, text, fmt);
   pending = null;
   applyParas(res.paras, res.pos, res.pos, label);
+  if (text === " " && !lineBreak) autoList();
+}
+
+/**
+ * Word's AutoFormat As You Type (and 한글's 글머리표 자동): "* ", "- ", "• " at the start of a paragraph make it a
+ * bulleted item, "1. " / "1) " a numbered one; the typed marker goes. Its own undo step, so one Ctrl+Z gives back the
+ * text as typed (Word). (QA 11-24 real use: the marker stayed text)
+ */
+function autoList() {
+  const st = story();
+  if (!st) return;
+  const r = RT.clampRange(st.paras, selRange());
+  if (!RT.collapsed(r)) return;
+  const p = st.paras[r.start.p];
+  if (!p || p.list || p.role === "li" || p.role === "oli") return;
+  const head = RT.paraText(p).slice(0, r.start.o);
+  const kind = /^[*\-•] $/.test(head) ? "li" : /^1[.)] $/.test(head) ? "oli" : null;
+  if (!kind) return;
+  const cut = RT.deleteRange(st.paras, { start: { p: r.start.p, o: 0 }, end: r.start });
+  const res = RT.toggleList(cut.paras, r.start.p, r.start.p, kind);
+  const at = shiftPos(cut.pos, res.delta);
+  applyParas(res.paras, at, at, kind === "li" ? tx("shell.hist.bullets") : tx("shell.hist.numbering"));
 }
 
 function newParagraph() {
@@ -512,6 +566,9 @@ export function flowBreak(kind: "page" | "section"): boolean {
   useFlow.setState({ segId: first.id });
   S().set({ editingTextId: flowEditId(first.id) });
   setSel(ZERO);
+  // typing goes on at the new page (the ribbon's 쪽 / 구역 나누기 button took the focus — QA 11-25 real use: what was
+  // typed after 삽입 ▸ 구역 나누기 went nowhere)
+  focusInput();
   return true;
 }
 
@@ -701,6 +758,17 @@ export function onKeyDown(e: KeyboardEvent) {
   if (k === "b") return done(), api.toggle("bold");
   if (k === "i") return done(), api.toggle("italic");
   if (k === "u") return done(), api.toggle("underline");
+  // 서식 복사 Ctrl+Shift+C / V, font size Ctrl+] / [ and Ctrl+Shift+. / , (Word — ui/formatPainter.ts); Ctrl+Shift+V
+  // with no format copied: paste the text only (the browser's paste event follows)
+  if (sh && k === "c") return done(), void copyFormat(paintTarget());
+  if (sh && k === "v" && usePainter.getState().fmt) return done(), void pasteFormat(paintTarget());
+  if (sh && k === "v") {
+    plainPaste = true;
+    e.stopPropagation();
+    return;
+  }
+  if (!sh && (e.code === "BracketRight" || e.code === "BracketLeft")) return done(), void stepFontSize(paintTarget(), e.code === "BracketRight" ? 1 : -1, "step");
+  if (sh && (e.code === "Period" || e.code === "Comma")) return done(), void stepFontSize(paintTarget(), e.code === "Period" ? 1 : -1, "list");
   if (k === "z" && !sh) return done(), undo(false);
   if (k === "y" || (k === "z" && sh)) return done(), undo(true);
   if (e.code === "Equal") return done(), api.script(sh ? "super" : "sub");
@@ -965,15 +1033,89 @@ export function onPaste(e: ClipboardEvent) {
   if (!dt) return;
   const r = RT.clampRange(st.paras, selRange());
   const base = pending && RT.collapsed(r) ? pending.fmt : RT.formatAt(st.paras, r.start);
-  const res = RT.pasteData(st.paras, r, base, dt.getData("text/html"), dt.getData("text/plain"));
+  const plain = plainPaste;
+  plainPaste = false;
+  const res = RT.pasteData(st.paras, r, base, plain ? "" : dt.getData("text/html"), dt.getData("text/plain"));
   if (!res) return;
   pending = null;
   applyParas(res.paras, res.pos, res.pos, tx("shell.hist.paste"));
 }
 
+/** the next paste is text only (Ctrl+Shift+V, 붙여넣기 ▸ 텍스트만) */
+let plainPaste = false;
+
+/** What the 서식 복사 / font size keys act on: the selection (or the caret's format) of the body. */
+export function paintTarget(): PaintTarget | null {
+  const st = story();
+  if (!st) return null;
+  const r = RT.clampRange(st.paras, selRange());
+  const wordFirst = () => {
+    const s2 = story();
+    const c = s2 ? RT.clampRange(s2.paras, selRange()) : null;
+    const w = c && RT.collapsed(c) ? wordAround(s2!.paras, c.start) : null;
+    if (w) setSel(w.start, w.end);
+  };
+  return { fmt: RT.collapsed(r) ? (pending?.fmt ?? RT.formatAt(st.paras, r.start)) : RT.rangeFormat(st.paras, r), applyRun: api.applyRun, wordFirst };
+}
+
 // ───────── pointer ─────────
 
-let drag: { mode: "char" | "word" | "para"; origin: RT.Range } | null = null;
+let drag: { mode: "char" | "word" | "para" | "move"; origin: RT.Range; to?: Pos | null; at?: Pos } | null = null;
+
+/** Is `pos` inside the range (its ends excluded: a press at an end starts a new selection, as in Word)? */
+const insideRange = (r: RT.Range, pos: Pos) => RT.cmpPos(pos, r.start) > 0 && RT.cmpPos(pos, r.end) < 0;
+
+/**
+ * Selected text dragged to `to` (Word: drag the selection; with Ctrl a copy). The text keeps its format (through the
+ * same HTML as the clipboard); one undo step. The moved text is selected after.
+ */
+export function moveSelectionTo(to: Pos, copy: boolean): boolean {
+  const st = story();
+  if (!st) return false;
+  const r = RT.clampRange(st.paras, selRange());
+  if (RT.collapsed(r) || (!copy && (insideRange(r, to) || RT.cmpPos(to, r.start) === 0 || RT.cmpPos(to, r.end) === 0))) return false;
+  const html = rangeHtml(st.paras, r);
+  const text = RT.rangeText(st.paras, r);
+  const base = RT.formatAt(st.paras, r.start);
+  // the text put in at `to`; spaces at its ends the HTML lost are put back (Word moves "word " with its space)
+  const put = (ps: TextParagraph[]) => {
+    let res = RT.pasteData(ps, { start: to, end: to }, base, html, text);
+    if (!res) return null;
+    const got = RT.rangeText(res.paras, RT.range(to, res.pos));
+    const trail = /[ \t]+$/.exec(text)?.[0] ?? "";
+    if (trail && !/[ \t]$/.test(got)) res = RT.insertText(res.paras, res.pos, trail, base);
+    const lead = /^[ \t]+/.exec(text)?.[0] ?? "";
+    if (lead && !/^[ \t]/.test(got)) {
+      const r2 = RT.insertText(res.paras, to, lead, base);
+      res = { paras: r2.paras, pos: res.pos.p === to.p ? { p: res.pos.p, o: res.pos.o + lead.length } : res.pos };
+    }
+    return res;
+  };
+  let paras = st.paras;
+  let start: Pos, end: Pos;
+  if (copy || RT.cmpPos(to, r.start) <= 0) {
+    // before the selection (or a copy): take the text out first, then put it in — the place before is unchanged
+    if (!copy) paras = RT.deleteRange(paras, r).paras;
+    const res = put(paras);
+    if (!res) return false;
+    paras = res.paras;
+    start = to;
+    end = res.pos;
+  } else {
+    // after it: put the text in first (the selection before stays where it is), then take the selection out
+    const res = put(paras);
+    if (!res) return false;
+    const del = RT.deleteRange(res.paras, r);
+    paras = del.paras;
+    // the places after the selection moved back by what was taken out
+    // (recording changes: the text stays there, struck through — nothing moves back)
+    const back = (p: Pos): Pos => (trackingOn() ? p : p.p === r.end.p ? { p: r.start.p, o: r.start.o + p.o - r.end.o } : { p: p.p - (r.end.p - r.start.p), o: p.o });
+    start = back(to);
+    end = back(res.pos);
+  }
+  applyParas(paras, start, end, tx(copy ? "docux.hist.copyText" : "docux.hist.moveText"));
+  return true;
+}
 
 /**
  * A press on a document page: put the caret there (true), or leave it to the canvas (false: not a flowing page, a
@@ -981,7 +1123,7 @@ let drag: { mode: "char" | "word" | "para"; origin: RT.Range } | null = null;
  */
 let lastPress = { t: 0, x: 0, y: 0, n: 0, page: "" };
 
-export function flowPointerDown(page: Page, x: number, y: number, opts: { detail: number; shift: boolean }): boolean {
+export function flowPointerDown(page: Page, x: number, y: number, opts: { detail: number; shift: boolean; ctrl?: boolean }): boolean {
   // click count: some engines give pointerdown no detail, so count presses close in time and place too
   const now = Date.now();
   const near = now - lastPress.t < 500 && page.id === lastPress.page && Math.hypot(x - lastPress.x, y - lastPress.y) < 6 / Math.max(0.05, S().view.zoom);
@@ -1003,6 +1145,23 @@ export function flowPointerDown(page: Page, x: number, y: number, opts: { detail
   if (!f.active || f.segId !== hit.segId) beginTyping(page.id, hit.pos);
   const paras = story()!.paras;
   const pos = RT.clampPos(paras, hit.pos);
+  // Ctrl+click on a link opens it (Word)
+  if (opts.ctrl && opts.detail === 1 && !opts.shift) {
+    const link = paras[pos.p]?.runs.length ? RT.formatAt(paras, { p: pos.p, o: Math.min(pos.o + 1, RT.paraText(paras[pos.p]).length) }).link : undefined;
+    if (link) {
+      openLink(link);
+      return true;
+    }
+  }
+  // a press inside the selection: it may be dragged somewhere else (Word; Ctrl: a copy) — a click without moving puts
+  // the caret there on release
+  const was = f.active && f.segId === hit.segId ? RT.clampRange(paras, selRange()) : null;
+  if (was && opts.detail === 1 && !opts.shift && insideRange(was, pos)) {
+    drag = { mode: "move", origin: was, to: null, at: pos };
+    focusInput();
+    setTimeout(focusInput, 0);
+    return true;
+  }
   if (opts.detail >= 3) {
     const r = { start: { p: pos.p, o: 0 }, end: { p: pos.p, o: RT.paraText(paras[pos.p]).length } };
     drag = { mode: "para", origin: r };
@@ -1065,14 +1224,32 @@ export function flowPointerMove(page: Page, x: number, y: number) {
   const pos = posAt(c.lines, i, x, y);
   if (!pos) return;
   const o = drag.origin;
+  if (drag.mode === "move") {
+    // (still on the press point: not a drag yet)
+    if (!drag.to && drag.at && RT.cmpPos(pos, drag.at) === 0) return;
+    drag.to = pos;
+    useFlow.setState({ drop: pos });
+    return;
+  }
   if (drag.mode === "char") return setSel(F().anchor, pos);
   const unit = drag.mode === "word" ? wordAt(c.story.paras, pos) : { start: { p: pos.p, o: 0 }, end: { p: pos.p, o: RT.paraText(c.story.paras[pos.p]).length } };
   if (RT.cmpPos(unit.start, o.start) < 0) setSel(o.end, unit.start);
   else setSel(o.start, RT.cmpPos(unit.end, o.end) > 0 ? unit.end : o.end);
 }
 
-export function flowPointerUp() {
+export function flowPointerUp(copy = false) {
+  const was = drag;
   drag = null;
+  if (was?.mode === "move") {
+    useFlow.setState({ drop: null });
+    if (was.to) moveSelectionTo(was.to, copy);
+    else if (was.at) setSel(was.at);
+    focusInput();
+    return;
+  }
+  // the armed 서식 복사 brush paints the selection just made (ui/formatPainter.ts)
+  const st = was && F().active ? story() : null;
+  if (st) brushSelectionDone(paintTarget(), RT.collapsed(RT.clampRange(st.paras, selRange())));
   focusInput();
 }
 
@@ -1163,6 +1340,44 @@ const api: RichApi = {
   toggle: (key) => runCmd(toggleLabel(key), (ps, r) => RT.toggleRunFormat(ps, r, key), (cur) => ({ [key]: !cur[key] })),
   script: (s) => runCmd(s === "super" ? tx("shell.hist.superscript") : tx("shell.hist.subscript"), (ps, r) => RT.toggleScript(ps, r, s), (cur) => ({ script: cur.script === s ? null : s })),
   setRun: (key, value, label) => runCmd(label, (ps, r) => RT.applyRunFormat(ps, r, { [key]: value } as RT.RunPatch), () => ({ [key]: value }) as RT.RunPatch),
+  applyRun: (patch, label) => runCmd(label, (ps, r) => RT.applyRunFormat(ps, r, patch), () => patch),
+  selectedText: () => {
+    const st = story();
+    return st ? RT.rangeText(st.paras, RT.clampRange(st.paras, selRange())) : "";
+  },
+  textBefore: () => {
+    const st = story();
+    if (!st) return "";
+    const r = RT.clampRange(st.paras, selRange());
+    return RT.collapsed(r) ? RT.paraText(st.paras[r.start.p]).slice(0, r.start.o) : "";
+  },
+  replaceBefore: (n, text, label) => {
+    const st = story();
+    if (!st) return;
+    const r = RT.clampRange(st.paras, selRange());
+    if (!RT.collapsed(r) || n > r.start.o) return;
+    const cut = RT.deleteRange(st.paras, { start: { p: r.start.p, o: r.start.o - n }, end: r.start });
+    const res = RT.insertText(cut.paras, cut.pos, text, RT.formatAt(cut.paras, cut.pos));
+    pending = null;
+    applyParas(res.paras, res.pos, res.pos, label);
+    focusInput();
+  },
+  rubyOk: () => {
+    const st = story();
+    const r = st ? RT.rubyRange(st.paras, selRange()) : null;
+    return !!r && !RT.collapsed(r);
+  },
+  rubyAt: () => {
+    const st = story();
+    return st ? RT.rubyAt(st.paras, selRange()) : undefined;
+  },
+  setRuby: (ruby, label) => {
+    const st = story();
+    if (!st) return;
+    const next = RT.setRuby(st.paras, selRange(), ruby);
+    if (next !== st.paras) applyParas(next, F().anchor, F().focus, label);
+    focusInput();
+  },
   runLive: (key, label) => {
     const set = (v: unknown) => api.setRun(key, v as never, label);
     const lv = liveFor((base, v) => RT.applyRunFormat(base, selRange(), { [key]: v } as RT.RunPatch), label, set);
@@ -1239,6 +1454,26 @@ const api: RichApi = {
     applyParas(RT.setHeading(st.paras, a, b, level, RT.bodyFormat(st.paras), lc()), F().anchor, F().focus, level ? tx("shell.hist.heading", { level }) : tx("shell.hist.body"));
   },
   insertText: (text) => insert(text),
+  transform: (fn, label) => {
+    const st = story();
+    if (!st) return;
+    const res = fn(st.paras, RT.clampRange(st.paras, selRange()));
+    if (!res) return;
+    pending = null;
+    if (res.sel) applyParas(res.paras, res.sel.start, res.sel.end, label);
+    else applyParas(res.paras, F().anchor, F().focus, label);
+    focusInput();
+  },
+  snapshot: () => {
+    const st = story();
+    return st ? { paras: st.paras, sel: RT.clampRange(st.paras, selRange()) } : null;
+  },
+  select: (r) => {
+    const st = story();
+    if (!st) return;
+    setSel(RT.clampPos(st.paras, r.start), RT.clampPos(st.paras, r.end));
+    focusInput();
+  },
   insertField: (kind) => {
     const c = ctx();
     if (!c) return;
@@ -1404,6 +1639,37 @@ export function startNote(kind: NoteKind): boolean {
   return insertNote(kind);
 }
 
+/**
+ * Put paragraph `np` into the body above or below an object of the story (a table or picture standing between
+ * paragraphs: its id) — else above / below the paragraphs with the caret (참조 › 캡션 삽입). The caret goes to its end.
+ */
+export function insertParagraphBy(np: TextParagraph, where: "above" | "below", objId: string | null, label: string): boolean {
+  const c = ctx();
+  if (!c) return false;
+  closeTyping();
+  let paras = c.story.paras;
+  let objs = c.story.objs;
+  const o = objId ? objs.find((x) => x.node.id === objId) : undefined;
+  let k: number;
+  if (o) {
+    // the object stands before paragraph X: the new paragraph goes before X, and below the object it takes X's place
+    // as the paragraph the object stands before … or after it
+    k = o.before === STORY_END ? paras.length : Math.max(0, paras.findIndex((p) => p.id === o.before));
+    if (where === "below") objs = objs.map((x) => (x === o ? { ...x, before: np.id } : x));
+  } else {
+    const inl = objId ? paras.findIndex((p) => p.runs.some((r) => r.obj?.id === objId)) : -1;
+    const r = RT.clampRange(paras, selRange());
+    const a = inl >= 0 ? inl : r.start.p, b = inl >= 0 ? inl : r.end.p;
+    k = where === "above" ? a : b + 1;
+    // (below the last paragraph: objects ending the story stay before the new one's place — after it, the end)
+  }
+  paras = [...paras.slice(0, k), np, ...paras.slice(k)];
+  writePages(reflowSegment(c.pages, c.start, { ...c.story, paras, objs }), label);
+  setSel({ p: k, o: RT.paraText(np).length });
+  focusInput();
+  return true;
+}
+
 export function insertObject(node: SceneNode, assets?: Record<string, AssetRef>): boolean {
   const c = ctx();
   if (!c) return false;
@@ -1416,7 +1682,10 @@ export function insertObject(node: SceneNode, assets?: Record<string, AssetRef>)
   if (node.type !== "TABLE") {
     const box0 = bodyBox(c.pages[c.start]);
     const s0 = objSize(node);
-    const k0 = Math.min(1, box0.w / Math.max(1, s0.w), (box0.h * 0.8) / Math.max(1, s0.h));
+    // (its line is as tall as the picture times the paragraph's line multiple: the line still fits a page — a taller
+    // one was laid on page after page, QA 11-24 basic-ux 'picture overlaps the text')
+    const mult = Math.max(1, paras[at.p]?.lineMultiple?.v ?? 1);
+    const k0 = Math.min(1, box0.w / Math.max(1, s0.w), (box0.h * 0.8) / mult / Math.max(1, s0.h));
     const obj = { ...node, flow: true, transform: { ...node.transform, scale: node.transform.scale * k0, ...(node.transform.scaleY !== undefined ? { scaleY: node.transform.scaleY * k0 } : {}) } } as SceneNode;
     if (obj.type === "IMAGE") obj.place = { mode: "inline" };
     const sz = objSize(obj);
@@ -1471,6 +1740,14 @@ export function insertObject(node: SceneNode, assets?: Record<string, AssetRef>)
     selfWrite = false;
   }
   setSel(at);
+  // a table: typing goes into its first cell, as in Word and 한글 (QA 11-24 real use: the caret stayed under the table and
+  // what was typed went into the paragraph after it) — not a 목차, whose rows the app writes: the caret stays in the text
+  if (obj.type === "TABLE" && !obj.toc && docHooks.editCell) {
+    closeTyping();
+    const id = obj.id;
+    setTimeout(() => docHooks.editCell?.(id, 0, 0), 0);
+    return true;
+  }
   focusInput();
   return true;
 }
@@ -1608,6 +1885,9 @@ if (typeof window !== "undefined")
     const before = s.past[s.past.length - 1]?.doc ?? prev.doc;
     // note text edited in a note area goes back into its notes first (the flow lays the areas out from them)
     let pages = applyNoteAreaEdits(s.doc.pages, before.pages);
+    // a picture of the body made larger than the page's body: back to the body's size (its line or block could not be
+    // laid on any page — QA 11-24 basic-ux, a picture bigger than the page)
+    pages = fitFlowObjects(pages, before.pages);
     const done = new Set<number>();
     for (let i = 0; i < pages.length; i++) {
       if (before.pages.includes(pages[i])) continue;
@@ -1626,6 +1906,26 @@ if (typeof window !== "undefined")
       selfWrite = false;
     }
   });
+
+/** Changed flowing pages with their body pictures / shapes scaled down to fit the body (the same array when none is). */
+export function fitFlowObjects(pages: Page[], before: readonly Page[]): Page[] {
+  let out: Page[] | null = null;
+  pages.forEach((p, i) => {
+    if (before.includes(p) || p.kind !== "DOCUMENT") return;
+    const box = bodyBox(p);
+    let changed = false;
+    const nodes = p.nodes.map((n) => {
+      if (!n.flow || (n.type !== "IMAGE" && n.type !== "VECTOR")) return n;
+      const s = objSize(n);
+      const k = Math.min(1, box.w / Math.max(1, s.w), (box.h * 0.95) / Math.max(1, s.h));
+      if (k >= 0.999) return n;
+      changed = true;
+      return { ...n, transform: { ...n.transform, scale: n.transform.scale * k, ...(n.transform.scaleY !== undefined ? { scaleY: n.transform.scaleY * k } : {}) } } as SceneNode;
+    });
+    if (changed) (out ??= [...pages])[i] = { ...p, nodes };
+  });
+  return out ?? pages;
+}
 
 // ───────── picture layout options (Word's 레이아웃 옵션 button) ─────────
 

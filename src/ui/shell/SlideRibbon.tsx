@@ -7,24 +7,70 @@ import { setPageProps } from "../actions";
 import { toggleGrid, toggleGuides, toggleRulers } from "../aids";
 import { useSlideUI } from "../slideActions";
 import { ColorField, Menu, NumField, Select } from "./controls";
-import { BigBtn, CmdBig, CmdSmall, CtxPanel, Group, HomePanel, SmallBtn, run } from "./DocRibbon";
+import { BigBtn, CmdBig, CmdSmall, CtxPanel, Group, HomePanel, SmallBtn, ViewModesGroup, run } from "./DocRibbon";
 import { Icon } from "./Icons";
 import { pageLive, zoomStep } from "./ops";
 import { TRANSITIONS } from "./Ribbon";
 import type { RibbonContext } from "./ribbonContext";
 import { ChartDataButton, SlideStructureTools } from "./SlideMode";
 import { useUI } from "./uiStore";
+import { createPortal } from "react-dom";
+import { SlideDesignPanel, SlideDialogs, SlideTablePanel, SmartEditButton, TableGridButton } from "./SlideDesign";
+import { TransitionGallery, AnimationGallery } from "./SlideMotion";
+import { AnimTimingGroup } from "./AnimTiming";
+import { usePainter } from "../formatPainter";
+import { isLayoutPage } from "../../core/slideLayouts";
+import { deleteLayout, editLayout, insertLayout, insertPlaceholder } from "../slideActions";
+import "../slidePainter";
+
+const dialog = (d: "slideHf" | "slideChart" | "slideSmart" | "slideExport") => useUI.getState().set({ shellDialog: d });
 
 const S = () => useStore.getState();
 
 function SlideGroup({ page }: { page: Page }) {
   const t = useT();
+  useStore((s) => s.selection.length);
   return (
-    <Group label={t("topui.slide.g.slides")}>
-      <div className="rrow rrow-wrap">
-        <SlideStructureTools page={page} />
-      </div>
-    </Group>
+    <>
+      <Group label={t("topui.slide.g.slides")}>
+        <div className="rrow rrow-wrap">
+          <SlideStructureTools page={page} />
+        </div>
+      </Group>
+      <Group label={t("slideppt.g.painter")}>
+        <CmdSmall id="slide.eyedropper" icon="eyedropper" />
+      </Group>
+    </>
+  );
+}
+
+/** 슬라이드 마스터 view (보기 › 슬라이드 마스터): the master's own tab in place of 홈. */
+function MasterPanel() {
+  const t = useT();
+  const onLayout = useStore((s) => isLayoutPage(findPage(s.doc, s.pageId)));
+  return (
+    <div className="rpanel">
+      <Group label={t("slideppt.g.masterViews")}>
+        <CmdBig id="page.addMaster" icon="master" label={t("slideppt.master.insert")} />
+        <BigBtn icon="slide" label={t("slideppt.master.insertLayout")} onClick={insertLayout} />
+        <BigBtn icon="sliders" label={t("slideppt.master.editLayout")} onClick={editLayout} />
+      </Group>
+      {onLayout && (
+        <Group label={t("slideppt.master.layouts")}>
+          <BigBtn icon="textBox" label={t("slideppt.master.addPh")} onClick={insertPlaceholder} />
+          <BigBtn icon="trash" label={t("slideppt.master.deleteLayout")} onClick={deleteLayout} />
+        </Group>
+      )}
+      <Group label={t("docmode.group.illustrations")}>
+        <CmdBig id="insert.image" icon="image" />
+        <CmdBig id="insert.text" icon="textBox" />
+        <CmdBig id="insert.rect" icon="rect" />
+      </Group>
+      <Group label={t("slideppt.master.close")}>
+        <CmdBig id="slide.closeMaster" icon="close" />
+      </Group>
+      <span className="ctx-hint">{t(onLayout ? "slideppt.master.layoutBanner" : "slideppt.master.banner")}</span>
+    </div>
   );
 }
 
@@ -38,7 +84,7 @@ function InsertPanel() {
         <CmdSmall id="insert.slidePage" />
       </Group>
       <Group label={t("docmode.group.tables")}>
-        <CmdBig id="insert.table" icon="table" />
+        <TableGridButton />
       </Group>
       <Group label={t("docmode.group.illustrations")}>
         <CmdBig id="insert.image" icon="image" />
@@ -57,11 +103,19 @@ function InsertPanel() {
             { label: t("ribbon.tool.pen"), icon: "pen", onSelect: () => run("insert.pen") },
           ]}
         />
+        <BigBtn icon="smartart" label={t("slideppt.smart.button")} tip={t("slideppt.smart.tip")} onClick={() => dialog("slideSmart")} />
+        <BigBtn icon="chart" label={t("slideppt.chart.button")} tip={t("slideppt.chart.tip")} onClick={() => dialog("slideChart")} />
         <ChartDataButton />
+        <SmartEditButton />
       </Group>
       <Group label={t("docmode.group.text")}>
         <CmdBig id="insert.text" icon="textBox" />
-        <CmdBig id="insert.symbol" icon="symbol" />
+        <BigBtn icon="footer" label={t("slideppt.hf.button")} tip={t("slideppt.hf.tip")} onClick={() => dialog("slideHf")} />
+        <div className="rcol">
+          <SmallBtn icon="pageNum" label={t("slideppt.hf.numButton")} onClick={() => dialog("slideHf")} />
+          <SmallBtn icon="clock" label={t("slideppt.hf.dateButton")} onClick={() => dialog("slideHf")} />
+          <CmdSmall id="insert.symbol" icon="symbol" />
+        </div>
       </Group>
       <Group label={t("menu.head.media")}>
         <CmdBig id="insert.media" icon="media" />
@@ -73,6 +127,7 @@ function InsertPanel() {
 
 function DesignPanel({ page }: { page: Page }) {
   const t = useT();
+  if (page.kind === "SLIDE" || page.kind === "MASTER") return <SlideDesignPanel />;
   return (
     <div className="rpanel">
       <Group label={t("topui.slide.g.customize")}>
@@ -93,10 +148,20 @@ function TransitionsPanel({ page }: { page: Page }) {
   const t = useT();
   return (
     <div className="rpanel">
+      <Group label={t("slideppt.trans.gallery")}>
+        <TransitionGallery page={page} />
+      </Group>
       <Group label={t("ribbon.slide.transition")}>
         <div className="rcol">
           <Select<TransitionType> icon="transition" tip={t("ribbon.slide.transition")} value={page.transition.type} options={TRANSITIONS} width={150} onChange={(v) => setPageProps({ transition: { ...page.transition, type: v } })} />
           <NumField icon="clock" tip={t("ribbon.slide.duration")} value={page.transition.duration} min={0} max={5000} step={50} unit="ms" width={110} disabled={page.transition.type === "NONE"} live={pageLive<number>((p, v) => (p.transition = { ...page.transition, duration: v }), t("ribbon.slide.duration"))} />
+          <label className="rcheck" data-tip={t("slideppt.trans.afterTip")}>
+            <input type="checkbox" checked={page.transition.after !== undefined} onChange={(e) => setPageProps({ transition: { ...page.transition, after: e.target.checked ? 5000 : undefined } })} />
+            <span>{t("slideppt.trans.after")}</span>
+          </label>
+          {page.transition.after !== undefined && (
+            <NumField icon="clock" tip={t("slideppt.trans.after")} value={page.transition.after / 1000} min={0} max={3600} step={0.5} precision={2} unit="s" width={110} live={pageLive<number>((p, v) => (p.transition = { ...page.transition, after: Math.round(v * 1000) }), t("slideppt.trans.after"))} />
+          )}
         </div>
       </Group>
       <Group label={t("topui.slide.g.timing")}>
@@ -120,9 +185,13 @@ function AnimationsPanel({ page }: { page: Page }) {
   const t = useT();
   return (
     <div className="rpanel">
-      <Group label={t("ribbon.slide.anim")}>
-        <BigBtn icon="sparkle" label={page.animations.length ? t("ribbon.slide.animCount", { n: page.animations.length }) : t("ribbon.slide.anim")} tip={t("ribbon.slide.animTip")} onClick={() => run("slide.animation")} />
+      <Group label={t("slideppt.anim.gallery")}>
+        <AnimationGallery />
       </Group>
+      <Group label={t("ribbon.slide.anim")}>
+        <BigBtn icon="sparkle" label={page.animations.length ? t("ribbon.slide.animCount", { n: page.animations.length }) : t("slideppt.anim.pane")} tip={t("ribbon.slide.animTip")} onClick={() => run("slide.animation")} />
+      </Group>
+      <AnimTimingGroup />
       <span className="ctx-hint">{t("topui.slide.animHint")}</span>
     </div>
   );
@@ -135,6 +204,10 @@ function ShowPanel() {
       <Group label={t("topui.slide.g.start")}>
         <CmdBig id="slide.showFromStart" icon="play" />
         <CmdBig id="slide.showFromCurrent" icon="play" />
+        <CmdBig id="slide.presenterView" icon="presenter" />
+      </Group>
+      <Group label={t("slideppt.g.export")}>
+        <BigBtn icon="export" label={t("slideppt.export.button")} tip={t("slideppt.export.tip")} onClick={() => dialog("slideExport")} />
       </Group>
     </div>
   );
@@ -147,10 +220,14 @@ function ViewPanel() {
   const notes = useSlideUI((s) => s.notes);
   return (
     <div className="rpanel">
+      <ViewModesGroup />
       <Group label={t("topui.slide.g.views")}>
         <BigBtn icon="slide" label={t("topui.slide.normal")} on={!sorter} onClick={() => useSlideUI.setState({ sorter: false })} />
         <BigBtn icon="pages" label={t("topui.slide.sorter")} on={sorter} onClick={() => useSlideUI.setState({ sorter: true })} />
         <BigBtn icon="text" label={t("topui.slide.notes")} on={notes} onClick={() => useSlideUI.setState({ notes: !notes })} />
+      </Group>
+      <Group label={t("slideppt.g.masterViews")}>
+        <CmdBig id="slide.masterView" icon="master" />
       </Group>
       <Group label={t("docmode.group.show")}>
         <div className="rcol">
@@ -190,7 +267,9 @@ export function SlideRibbon({ tab, ctx }: { tab: string; ctx: RibbonContext | nu
   return (
     <div className="ribbon doc-ribbon slide-ribbon">
       <div className="rbody" role="tabpanel" aria-label={tab === "ctx" ? ctx?.label : t(`topui.tab.slide.${tab}`)}>
-        {tab === "home" ? (
+        {tab === "home" && page.kind === "MASTER" ? (
+          <MasterPanel />
+        ) : tab === "home" ? (
           <HomePanel slide={<SlideGroup page={page} />} />
         ) : tab === "insert" ? (
           <InsertPanel />
@@ -204,10 +283,26 @@ export function SlideRibbon({ tab, ctx }: { tab: string; ctx: RibbonContext | nu
           <ShowPanel />
         ) : tab === "view" ? (
           <ViewPanel />
+        ) : ctx?.key === "table" ? (
+          <SlideTablePanel />
         ) : (
-          <CtxPanel ctx={ctx} />
+          <div className="slide-ctx">
+            <CtxPanel ctx={ctx} />
+            <div className="rpanel">
+              <SmartEditButton />
+              <button type="button" className="btn btn-ghost" data-tip={t("slideppt.painter.tip")} onClick={() => run("format.painter")} onDoubleClick={() => (usePainter.getState().armed || run("format.painter"), usePainter.setState({ armed: true, sticky: true }))}>
+                <Icon name="brush" size={14} />
+                <span>{t("cmd.format.painter")}</span>
+              </button>
+              <button type="button" className="btn btn-ghost" data-tip={t("slideppt.painter.eyedropTip")} onClick={() => run("slide.eyedropper")}>
+                <Icon name="eyedropper" size={14} />
+                <span>{t("cmd.slide.eyedropper")}</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
+      {createPortal(<SlideDialogs />, document.body)}
     </div>
   );
 }

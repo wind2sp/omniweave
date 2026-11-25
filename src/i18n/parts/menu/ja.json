@@ -79,5 +79,12 @@
   "menu.export.kind.show": "プレゼンテーション",
   "menu.export.kind.table": "表",
   "cmd.help.storeUpdates": "更新: Microsoft Store",
-  "menu.toast.mergedAsPixels": "画像・図形レイヤーをピクセルにして結合しました（Ctrl+Z で元に戻す）"
+  "menu.toast.mergedAsPixels": "画像・図形レイヤーをピクセルにして結合しました（Ctrl+Z で元に戻す）",
+  "cmd.edit.pasteInFront": "前面へペースト",
+  "cmd.edit.pasteInBack": "背面へペースト",
+  "cmd.edit.pasteOnAllArtboards": "すべてのアートボードにペースト",
+  "cmd.edit.transformAgain": "変形の繰り返し",
+  "menu.hist.pasteFront": "前面へペースト",
+  "menu.hist.pasteBack": "背面へペースト",
+  "design.hist.again": "変形の繰り返し"
 }

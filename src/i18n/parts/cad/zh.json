@@ -25,7 +25,7 @@
   "engine.cad.group.dim": "尺寸 {name}",
   "engine.cad.page.model": "{name} · 模型",
   "engine.cad.page.layout": "{name} · 布局 {layout}",
-  "engine.open.cad": "{fmt} 图纸 ({release})· 图层 {layers} 个 · 对象 {n} 个 · 比例 {scale}",
+  "engine.open.cad": "{fmt} 图纸 ({release})· 图层 {layers} 个 · 对象 {n} 个 · 比例 {scale} · 仅导入（以 .omw 编辑，发送时用 导出 › DXF）",
   "engine.cad.warn.merged": "对象较多：同一图层、同样式的 {n} 条线已合并绘制",
   "engine.cad.warn.empty": "图纸中没有可绘制的对象",
   "engine.cad.warn.unsupported": "已读取但尚未绘制的对象：{list}",

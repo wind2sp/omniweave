@@ -15,7 +15,8 @@ function norm(v: unknown, key = ""): unknown {
   if (v && typeof v === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, x] of Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1))) {
-      if (x === undefined || k === "handle" || k === "owner") continue;
+      // (raw: a TEXT / MTEXT's group codes as read, for writing it back — they differ between releases by design)
+      if (x === undefined || k === "handle" || k === "owner" || k === "raw") continue;
       // viewport numbers other than 1 (the sheet) are given on load
       if (k === "id" && (v as { k?: string }).k === "viewport" && x !== 1) continue;
       out[k] = norm(x, k);

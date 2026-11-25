@@ -54,15 +54,30 @@ export function useBackClose(open: boolean, close: () => void) {
     if (!open || typeof history === "undefined") return;
     const entry: Entry = { close: () => ref.current(), done: false };
     stack.push(entry);
-    history.pushState({ omwLayer: stack.length }, "");
+    // a layer closed in the same moment (the viewer giving way to the editor; React's development double run of
+    // effects) leaves its history entry to this one instead of going back: history.back() runs later than a
+    // pushState, so back-then-push took the new layer's entry and, layer after layer, left the page (about:blank)
+    if (pendingBacks > 0) pendingBacks--;
+    else history.pushState({ omwLayer: stack.length }, "");
     return () => {
       if (entry.done) return;
       const i = stack.indexOf(entry);
       if (i >= 0) stack.splice(i, 1);
-      skip++;
-      history.back();
+      pendingBacks++;
+      setTimeout(flushBacks, 0);
     };
   }, [open]);
+}
+
+/** history entries of closed layers not yet taken out (see useBackClose) */
+let pendingBacks = 0;
+function flushBacks() {
+  if (pendingBacks <= 0) return;
+  // one step back over all of them: one popstate, skipped
+  const n = pendingBacks;
+  pendingBacks = 0;
+  skip++;
+  history.go(-n);
 }
 
 /** layers open now (tests, diagnostics) */

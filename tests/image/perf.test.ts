@@ -5,14 +5,15 @@ import { describe, expect, it } from "vitest";
 import { applyOps, defaultParams, type ImageOp } from "../../src/core/image/ops";
 import { presetOptions, traceImage } from "../../src/core/image/trace";
 import { logo, photo } from "./scenes";
+import { cpuNow, cpuBudget } from "../budget";
 
 /** best of `n` runs (the machine may be shared with other work; the minimum is the least disturbed run) */
 const time = <T>(f: () => T, n = 3): [T, number] => {
   let best = Infinity, v!: T;
   for (let i = 0; i < n; i++) {
-    const t0 = performance.now();
+    const t0 = cpuNow();
     v = f();
-    best = Math.min(best, performance.now() - t0);
+    best = Math.min(best, cpuNow() - t0);
   }
   return [v, best];
 };
@@ -23,7 +24,7 @@ describe("performance (Node)", () => {
     const [r, ms] = time(() => traceImage(img, presetOptions("logo")));
     console.log(`[perf] trace 1000×1000 흑백 로고: ${ms.toFixed(0)} ms, paths ${r.paths}, anchors ${r.anchors}`);
     expect(r.paths).toBeGreaterThanOrEqual(5);
-    expect(ms).toBeLessThan(3000);
+    expect(ms).toBeLessThan(cpuBudget(3000));
   });
 
   it("trace a 1000×1000 colour logo (6 colours)", () => {
@@ -31,7 +32,7 @@ describe("performance (Node)", () => {
     const [r, ms] = time(() => traceImage(img, presetOptions("color6")));
     console.log(`[perf] trace 1000×1000 색상 6: ${ms.toFixed(0)} ms, layers ${r.layers.length}, paths ${r.paths}, anchors ${r.anchors}`);
     expect(r.layers.length).toBeGreaterThanOrEqual(5);
-    expect(ms).toBeLessThan(5000);
+    expect(ms).toBeLessThan(cpuBudget(5000));
   });
 
   it("filters and adjustments on a 1000×1000 photo", () => {
@@ -59,7 +60,7 @@ describe("performance (Node)", () => {
       const [out, ms] = time(() => applyOps(img, [op]));
       expect(out.width).toBe(1000);
       lines.push(`${op.op} ${ms.toFixed(0)}ms`);
-      expect(ms).toBeLessThan(8000);
+      expect(ms).toBeLessThan(cpuBudget(8000));
     }
     console.log(`[perf] 1000×1000: ${lines.join(", ")}`);
   });

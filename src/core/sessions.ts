@@ -11,6 +11,7 @@
 import { create } from "zustand";
 import { DEFAULT_VIEW, useStore, type StoreState } from "./store";
 import { DEFAULT_TITLE, newDocument, uid, type OmwDocument } from "./types";
+import type { FileHandle } from "../io/platform";
 
 /** The part of the store that belongs to one document. Tool, brush and colours stay with the app. */
 export const DOC_KEYS = ["doc", "past", "future", "dirty", "filePath", "pageId", "selection", "mode", "view", "editingTextId", "gestureBase"] as const;
@@ -38,6 +39,8 @@ export interface TabMeta {
   pinned: boolean;
   /** a file is being opened into this tab (the tab shows a busy mark; visual-design owns its look) */
   busy?: boolean;
+  /** the file it was opened from: name, size in bytes and when (파일 › 정보) */
+  openedFile?: { name: string; size: number; at: string };
   /** creation number: a still-untitled document shows as "Untitled 2", "Untitled 3"… (stable, like Word's Document2) */
   seq: number;
   /** a new document or opened file was put in this tab on purpose (it is never reused as an "empty" tab) */
@@ -89,6 +92,7 @@ function metaFromStore(id: string, prev?: TabMeta): TabMeta {
     dirty: s.dirty,
     filePath: s.filePath,
     openedPath: prev?.openedPath ?? null,
+    openedFile: prev?.openedFile,
     kind: docKind(s.doc, s.filePath),
     pinned: prev?.pinned ?? false,
     busy: prev?.busy,
@@ -221,6 +225,7 @@ export function removeSession(id: string) {
   const { tabs, active } = SS();
   const i = tabs.findIndex((t) => t.id === id);
   if (i < 0) return;
+  openedHandles.delete(id);
   if (id === active) {
     quiesce();
     const next = tabs[i + 1] ?? tabs[i - 1];
@@ -259,6 +264,23 @@ export function setPinned(id: string, pinned: boolean) {
   const tabs = SS().tabs.map((t) => (t.id === id ? { ...t, pinned } : t));
   // pinned first, keeping each group's order
   useSessions.setState({ tabs: [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)] });
+}
+
+/** The file a tab's document was opened from (열기, a recent file, the exe's arguments), or null. */
+export const openedPathOf = (id: string): string | null => SS().tabs.find((t) => t.id === id)?.openedPath ?? null;
+/** the browser's handle of the file a tab was opened from (not kept across reloads: the browser's handles are not
+ *  plain data) — the web build's openedPath */
+const openedHandles = new Map<string, FileHandle>();
+export const openedHandleOf = (id: string): FileHandle | null => openedHandles.get(id) ?? null;
+export function setOpenedHandle(id: string, h: FileHandle | null) {
+  if (h) openedHandles.set(id, h);
+  else openedHandles.delete(id);
+}
+
+/** the file a tab was opened from, as 파일 › 정보 shows it */
+export const openedFileOf = (id: string) => SS().tabs.find((t) => t.id === id)?.openedFile ?? null;
+export function setOpenedFile(id: string, f: { name: string; size: number } | null) {
+  setTab(id, { openedFile: f ? { ...f, at: new Date().toISOString() } : undefined });
 }
 
 export function setOpenedPath(id: string, path: string | null) {

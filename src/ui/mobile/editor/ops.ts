@@ -11,7 +11,7 @@ import { groupIndex, lockedInTree, pickableOn, reorderInGroups } from "../../../
 import { currentPage, draftPage, findPage, useStore } from "../../../core/store";
 import { layoutText } from "../../../core/text";
 import { copyNode, newText, newVector, uid, type OmwDocument, type Page, type SceneNode, type TextNode, type TextRun, type Vec2, type VectorAnchor, type VectorNode } from "../../../core/types";
-import { ellipseContour, rectContour } from "../../../core/vector";
+import { distanceToContour, ellipseContour, pointInContours, rectContour } from "../../../core/vector";
 import { isFlowSegment, reflowSegment, segmentAt } from "../../../core/flow";
 import { t } from "../../../i18n";
 
@@ -49,8 +49,34 @@ export function nodesAt(page: Page, p: Vec2, slop = 0): SceneNode[] {
 /** The object a tap picks: the top one, skipping a full-page PDF background or locked layers unless nothing else is there. */
 export function pickAt(page: Page, p: Vec2, slop = 0): SceneNode | null {
   const idx = groupIndex(page.groups);
-  const all = nodesAt(page, p, slop).filter((n) => !n.locked && !lockedInTree(n, idx));
+  // a drawn shape counts where its lines are (or inside, when filled), not anywhere in its box: on a drawing a line
+  // under the finger is picked, not the outline round the whole plan whose box covers everything (phone check
+  // 2026-11-24: on a DXF the whole drawing moved instead of one line)
+  const all = nodesAt(page, p, slop).filter((n) => !n.locked && !lockedInTree(n, idx) && (n.type !== "VECTOR" || onShape(n as VectorNode, p, slop)));
+  // a table under the finger wins over the body text whose box it sits in (a Word page: the table is laid out inside
+  // the flow's frame, and a tap on a cell used to open the paragraph after the table)
+  const table = all.find((n) => n.type === "TABLE");
+  if (table) return table;
+  // of several text boxes there, the one with a line of text under the finger (frames overlap on a page)
+  const onLine = all.find((n) => n.type === "TEXT" && lineAt(n as TextNode, p) >= 0);
+  if (onLine) return onLine;
   return all.find((n) => n.type !== "PDF") ?? null;
+}
+
+/** a point on (within `slop` of) a shape's lines, or inside it where it is filled */
+function onShape(n: VectorNode, p: Vec2, slop: number): boolean {
+  const lp = invertTransform(n.transform, p);
+  const k = Math.abs(n.transform.scale) || 1;
+  if (n.fill && pointInContours(n, lp)) return true;
+  const tol = slop / k + (n.strokeWidth ?? 1) / 2;
+  return n.contours.some((c) => distanceToContour(c, lp) <= tol);
+}
+
+/** the laid-out line of a text object at a page point, or -1 */
+function lineAt(n: TextNode, p: Vec2): number {
+  const [, ly] = invertTransform(n.transform, p);
+  const lines = layoutText(n).lines;
+  return lines.findIndex((l) => ly >= l.y && ly < l.y + l.height);
 }
 
 /** The paragraph of a text object at a page point (its laid-out line), and the character offset nearest to it. */

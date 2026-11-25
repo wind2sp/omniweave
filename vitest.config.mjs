@@ -7,6 +7,7 @@
 // In the development repository qa/ is there and every test runs as before.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { availableParallelism } from "node:os";
 import { defineConfig, mergeConfig } from "vitest/config";
 import base from "./vite.config.ts";
 import { needsPrivateQa } from "./scripts/make-public-tree.mjs";
@@ -22,5 +23,12 @@ function walk(dir) {
 const skip = existsSync("qa") ? [] : needsPrivateQa(["tests", "scripts", "bench"].flatMap(walk), (f) => readFileSync(join(".", f), "utf8"), (f) => existsSync(f));
 if (skip.length && process.env.OMW_SHOW_SKIPPED) console.log(`no qa/: ${skip.length} test files skipped\n  ${skip.join("\n  ")}`);
 
+// Several departments run the full suite at once on one PC: half the logical cores as test processes (one file each)
+// leaves room for the others; more only adds contention. OMW_TEST_FORKS=<n> to change it.
+// Time budgets in the tests are CPU time (tests/budget.ts); OMW_TEST_SLOW=<n> stretches them and the default timeout.
+const SLOW = Math.max(1, Number(process.env.OMW_TEST_SLOW) || 1);
+const FORKS = Number(process.env.OMW_TEST_FORKS) || Math.max(2, Math.floor(availableParallelism() / 2));
+const pool = { pool: "forks", poolOptions: { forks: { maxForks: FORKS, minForks: 1 } }, testTimeout: 90000 * SLOW };
+
 // (vite.config.ts is a function of the mode: the phone app builds with --mode mobile)
-export default defineConfig((env) => mergeConfig(typeof base === "function" ? base(env) : base, { test: { exclude: skip } }));
+export default defineConfig((env) => mergeConfig(typeof base === "function" ? base(env) : base, { test: { exclude: skip, ...pool } }));

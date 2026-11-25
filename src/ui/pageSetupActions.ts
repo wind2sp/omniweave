@@ -5,7 +5,9 @@ import { currentRegion, flowActive, flowBreak, setRegionColumns } from "./docFlo
 import { applySetupInPlace, breakPageInPlace, sectionAt, setupOf, type PageSetup } from "../core/pageSetup";
 import { draftPage, findPage, useStore } from "../core/store";
 import { anchorOf, deleteColsInPlace, deleteRowsInPlace, expandRange, insertColsInPlace, insertRowsInPlace, mergeCellsInPlace, spanOf, splitCellInPlace } from "../core/table";
-import { uid, type Page, type TableNode, type TextParagraph } from "../core/types";
+import { uid, type Page, type PageBorder, type TableNode, type TextParagraph } from "../core/types";
+import { reflowPages } from "../core/flow";
+import { current } from "immer";
 import { t } from "../i18n";
 import { useCellSel } from "./CellEditor";
 import { deleteSelected, fitCurrent } from "./actions";
@@ -72,6 +74,32 @@ export function applyColumns(cols: PageSetup["columns"], scope: "section" | "doc
   return targets.length;
 }
 
+/** 쪽 테두리 of the current page's section: `border` (null = none), drawn at once (one undo step). */
+export function setPageBorder(border: PageBorder | null): number {
+  const s = S();
+  const index = s.doc.pages.findIndex((p) => p.id === s.pageId);
+  if (index < 0 || s.doc.pages[index].kind !== "DOCUMENT") {
+    s.notify(t("pagesetup.toast.noPage"));
+    return 0;
+  }
+  const targets = scopePages(s.doc.pages, index, "section");
+  s.commit(t("docux.border.hist"), (d) => {
+    for (const i of targets) {
+      const pg = d.pages[i] as Page;
+      // (taken off: a border of width 0 — the file's own border is then removed when saved, core/pageSetup.ts sameBorder)
+      pg.border = border ? { ...border } : { style: "single", width: 0, color: "#000000", space: 32, from: "page" };
+    }
+    d.pages = reflowPages(current(d.pages) as Page[]) as typeof d.pages;
+  });
+  return targets.length;
+}
+
+/** The current page's 쪽 테두리. */
+export const pageBorderHere = (): PageBorder | undefined => {
+  const s = S();
+  const b = s.doc.pages.find((p) => p.id === s.pageId)?.border;
+  return b && b.width > 0 ? b : undefined;
+};
 /** 단 where the caret is: its 이어서 구역's, else the page's section's. */
 export function columnsHere(): PageSetup["columns"] {
   const r = currentRegion();

@@ -16,7 +16,8 @@ export const useImageUI = create<{ open: ImageDialogState; set: (open: ImageDial
 }));
 
 /** ops applied at once from the menu (no settings worth a dialog) */
-const INSTANT = new Set(["invert", "autoLevels", "autoContrast", "autoColor"]);
+export const IMAGE_INSTANT = new Set(["invert", "autoLevels", "autoContrast", "autoColor"]);
+const INSTANT = IMAGE_INSTANT;
 
 /** menu sections in order; headings are `image.menu.group.<group>` */
 const GROUPS: OpGroup[] = ["adjust", "auto", "blur", "sharpen", "noise", "stylize"];

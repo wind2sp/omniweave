@@ -39,5 +39,7 @@
   "pdf.sign.histMove": "서명 옮기기",
   "cmd.text.pdfSign": "서명 추가",
   "pdf.find.hint": "PDF 쪽의 글자를 찾습니다. Enter: 다음, Shift+Enter: 이전",
-  "pdf.find.searching": "찾는 중…"
+  "pdf.find.searching": "찾는 중…",
+  "pdf.select.copied": "선택한 글자 {n}자를 복사했습니다",
+  "pdf.select.copyFailed": "클립보드에 복사하지 못했습니다"
 }

@@ -98,6 +98,8 @@ export function exportMenuItems(icons = true): MenuItem[] {
   for (const [k, list] of groups) out.push({ heading: t(`menu.export.kind.${k}`) }, ...list.map(item));
   // size-reduced PDF (lossless by default; lossy photo re-encoding only when chosen in the dialog)
   out.push({ sep: true }, { label: t("size.menu"), hint: t("size.menuHint"), icon: icons ? "export" : undefined, onSelect: () => useUI.getState().set({ shellDialog: "sizePdf" }) });
+  // the design mode: Illustrator's Export for Screens (each artboard, several formats and scales)
+  if (currentEditMode() === "DESIGN") out.push({ label: `${t("cmd.file.exportScreens")}…`, kbd: "Ctrl+Alt+E", icon: icons ? "export" : undefined, onSelect: () => useUI.getState().set({ shellDialog: "exportScreens" }) });
   return out;
 }
 
@@ -113,5 +115,8 @@ export function exportCommandList(): { id: string; label: string; enabled: boole
     run: () => void exportAs(x.id),
   }));
   // the last row of the menus too (size-reduced PDF), so the command search offers the same list
-  return [...formats, { id: "export.sizePdf", label: `${head} ▸ ${t("size.menu")}`, enabled: true, blocked: null, run: () => useUI.getState().set({ shellDialog: "sizePdf" }) }];
+  const rows = [...formats, { id: "export.sizePdf", label: `${head} ▸ ${t("size.menu")}`, enabled: true, blocked: null, run: () => useUI.getState().set({ shellDialog: "sizePdf" }) }];
+  // the design mode's Export for Screens row, as the menu shows it (exportMenuItems)
+  if (currentEditMode() === "DESIGN") rows.push({ id: "export.screens", label: `${head} ▸ ${t("cmd.file.exportScreens")}…`, enabled: true, blocked: null, run: () => useUI.getState().set({ shellDialog: "exportScreens" }) });
+  return rows;
 }

@@ -453,6 +453,16 @@ export function readHwpxTruth(bytes: Uint8Array): HwpxTruth {
               hasObject = true;
               outerSubLists(c).forEach((sl, si) => children(sl, "p").forEach((ip, i) => visitP(ip, `${path}/obj${si}/p${i}`, "object", section)));
             }
+          } else if (name === "dutmal") {
+            // 덧말 (office.ts reads its main text as the run's text): the text is there, laid out as one object
+            const main = child(c, "mainText");
+            const mt = main ? main.textContent ?? "" : "";
+            const start = text.length;
+            text += mt;
+            for (let i = 0; i < mt.length; i++) pos.push(u);
+            if (mt) runs.push({ start, end: text.length, charPrIDRef: cp });
+            u += UNITS.control;
+            hasObject = true;
           } else if (name === "tbl") {
             flush(false);
             objects++;

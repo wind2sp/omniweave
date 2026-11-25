@@ -963,6 +963,15 @@ body.resizing * {
   background: rgba(255, 255, 255, 0.12);
   color: #d4d6de;
 }
+/* a greyed control's reason: its own line under the name */
+.tooltip:has(.tooltip-why) {
+  flex-wrap: wrap;
+}
+.tooltip-why {
+  flex-basis: 100%;
+  color: #b9bcc6;
+  font-weight: 400;
+}
 @keyframes tip-in {
   from {
     opacity: 0;
@@ -2873,6 +2882,16 @@ body.resizing .splitter::after {
   max-width: calc(420px * var(--ui-scale));
   padding: 24px;
 }
+/* 표 속성 (shell/TablePropsDialog): the table panel inside a window, scrolled when tall */
+.tblprops {
+  max-width: calc(440px * var(--ui-scale));
+  padding: 24px;
+}
+.tblprops-panel {
+  max-height: 60vh;
+  overflow: auto;
+  margin-top: 8px;
+}
 .modal h2 {
   margin: 0;
   font-size: var(--fs-title);
@@ -2998,6 +3017,10 @@ body.resizing .splitter::after {
   gap: 8px;
   color: var(--text);
 }
+.export-loss-list {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
 .modal-sub {
   margin: 8px 0 0;
   color: var(--text-3);
@@ -3097,7 +3120,7 @@ body.resizing .splitter::after {
 
 .start-hero {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   padding: 0 24px 18px;
 }
@@ -3450,6 +3473,22 @@ body.resizing .splitter::after {
 .recent-card:hover .recent-x,
 .recent-x:focus-visible {
   opacity: 1;
+}
+/* pin (Word's 목록에 고정): beside the remove button; always shown once pinned */
+.recent-pin {
+  position: absolute;
+  top: 6px;
+  right: 34px;
+  background: var(--bg-1);
+  opacity: 0;
+}
+.recent-card:hover .recent-pin,
+.recent-pin:focus-visible,
+.recent-pin.on {
+  opacity: 1;
+}
+.recent-pin.on {
+  color: var(--accent);
 }
 
 .start-empty {
@@ -4564,6 +4603,20 @@ body.resizing .splitter::after {
   gap: 0;
   padding: 0;
 }
+.ribbon-more {
+  position: fixed;
+  z-index: 40;
+  width: 18px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--bg-2, var(--bg-1));
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ribbon-more:hover {
+  background: var(--hover);
+}
 .rtabs {
   display: flex;
   align-items: stretch;
@@ -4704,6 +4757,24 @@ body.resizing .splitter::after {
 }
 .rbig > span {
   white-space: nowrap;
+}
+/* the ▾ beside a big button (붙여넣기 옵션) */
+.rsplit {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: calc(16px * var(--ui-scale));
+  height: calc(54px * var(--ui-scale));
+  margin-left: -4px;
+  padding: 0 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.rsplit:hover:not(:disabled) {
+  background: var(--hover);
 }
 .rbig:hover:not(:disabled) {
   background: var(--hover);
@@ -5020,6 +5091,13 @@ body.resizing .splitter::after {
     opacity: 0;
   }
 }
+/* where dragged text would go (Word's dotted caret) */
+.flow-drop {
+  position: absolute;
+  width: 0;
+  border-left: 2px dotted #1d1f24;
+  pointer-events: none;
+}
 .flow-input {
   position: absolute;
   width: 2px;
@@ -5334,11 +5412,11 @@ body.resizing .splitter::after {
 }
 
 /* ───── 표 계산 격자 (ui/sheet/SheetView.tsx): Excel's name box, formula bar, grid, sheet tabs ───── */
-.sheet-view { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg-1); color: var(--text); }
+.sheet-view { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg-1); color: var(--text); overflow: clip; }
 .sheet-bar { display: flex; align-items: stretch; gap: 0; height: calc(26px * var(--ui-scale, 1)); border-bottom: 1px solid var(--line-2); background: var(--bg-2); }
 .sheet-namebox { width: calc(96px * var(--ui-scale, 1)); border: 0; border-right: 1px solid var(--line-2); background: var(--bg-1); color: var(--text); padding: 0 8px; font: inherit; font-size: var(--fs-sm, 12px); }
 .sheet-fx { display: flex; align-items: center; justify-content: center; width: 36px; color: var(--text-3); border-right: 1px solid var(--line-2); font-family: "Times New Roman", serif; font-size: 14px; }
-.sheet-formula { flex: 1; border: 0; background: var(--bg-1); color: var(--text); padding: 0 8px; font: inherit; font-size: var(--fs-sm, 12px); min-width: 0; }
+.sheet-formula { flex: 1; border: 0; background: var(--bg-1); color: var(--text); padding: 0 8px; font: inherit; font-size: var(--fs-sm, 12px); min-width: 0; resize: none; overflow: hidden; white-space: pre; align-self: stretch; line-height: calc(24px * var(--ui-scale, 1)); height: auto; }
 .sheet-namebox:focus, .sheet-formula:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
 .sheet-body { position: relative; flex: 1; min-height: 0; }
 .sheet-scroll { position: absolute; inset: 0; z-index: 1; overflow: scroll; overscroll-behavior: contain; cursor: cell; touch-action: none; }
@@ -5387,6 +5465,13 @@ body.resizing .splitter::after {
 }
 .cad-cmd-hist:empty { display: none; }
 .cad-cmd.open .cad-cmd-hist { max-height: calc(14 * 1.35em + 8px); overflow-y: auto; }
+/* the three history lines let clicks through to the drawing under them (only the F2 panel scrolls) — QA bux2 #13 */
+.cad-cmd:not(.open) > .cad-cmd-hist { pointer-events: none; opacity: 0.92; }
+/* the drawing screen: a notice sits above the command line, not on it (QA bux2: the open notice covered it) */
+body:has(.cad-cmd) .toast { bottom: calc(var(--h-status) + 18px + var(--cad-cmd-h, 120px)); }
+.cad-cmd-fold { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--text-3); cursor: pointer; }
+.cad-cmd-fold:hover { background: var(--bg-4); color: var(--text); }
+.cad-cmd-fold.folded svg { transform: rotate(180deg); }
 .cad-cmd-line { white-space: pre-wrap; overflow-wrap: anywhere; }
 .cad-cmd-row {
   display: flex;
@@ -5472,6 +5557,17 @@ body.resizing .splitter::after {
 .cad-prop-in:focus { border-color: var(--accent); outline: 0; }
 .cad-ribbon .rcol { gap: 1px; }
 .cad-ribbon .rpanel { padding-top: 2px; padding-bottom: 1px; }
+/* a narrow window scrolls the drawing ribbon sideways instead of cutting its last groups off (QA bux2 #14) */
+.cad-ribbon .rbody { overflow-x: auto; scrollbar-width: thin; }
+.cad-ribbon { position: relative; }
+/* a folded group: one button, its tools in a panel under it (Office's narrow ribbon) */
+.cad-ribbon .rg-folded { position: relative; }
+.cad-ribbon .rg-folded > .rbig svg { transform: rotate(0deg); }
+.cad-ribbon .rg-pop { position: fixed; z-index: 950; max-width: calc(100vw - 16px); padding: 6px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+.cad-ribbon .rg-pop > .rg-body { display: flex; flex-wrap: wrap; gap: 2px; }
+.cad-ribbon-more { position: absolute; right: 0; top: 0; bottom: 0; z-index: 2; width: 22px; border: 0; border-left: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); font-size: 15px; cursor: pointer; }
+.cad-ribbon-more:hover { background: var(--bg-4); color: var(--text); }
+.cad-ribbon-more.hidden { display: none; }
 .cad-ribbon .rcol > .rsmall, .cad-ribbon .rcol > .rrow > .rsmall { height: calc(22px * var(--ui-scale)); }
 .cad-ribbon .rcol > .select { height: calc(24px * var(--ui-scale)); }
 /* ───── 표 계산 2단계 (ui/sheet/SheetDialogs.tsx): find & replace, sort, filter menu, validation list, notes ───── */
@@ -5511,6 +5607,114 @@ body.resizing .splitter::after {
 .sheet-list .menu-item.on { background: var(--active); }
 .sheet-note { position: absolute; z-index: 6; width: 180px; min-height: 64px; padding: 4px 6px; background: #ffffe1; color: #000; border: 1px solid #8a8a8a; box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3); font: 12px "Segoe UI", "맑은 고딕", sans-serif; white-space: pre-wrap; word-break: break-word; pointer-events: none; }
 .sheet-note-edit { pointer-events: auto; resize: both; outline: 2px solid var(--accent); height: 90px; }
+
+/* ───────── sheet: Excel's dialogs and ribbon tabs (ui/sheet/SheetFeatureDialogs.tsx, SheetRibbon.tsx) ───────── */
+.sx-dlg { width: calc(440px * var(--ui-scale, 1)); max-width: calc(100vw - 32px); padding: 18px 20px; }
+.sx-dlg.sx-wide { width: calc(600px * var(--ui-scale, 1)); }
+.sx-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.sx-row > span:first-child { width: 120px; flex: none; color: var(--text-2); }
+.sx-row input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), .sx-row select, .sx-row textarea, .sx-hf select, .sx-hf input, .sx-table select { flex: 1; min-width: 0; height: 24px; border: 1px solid var(--line-2); border-radius: 4px; background: var(--bg-1); color: var(--text); padding: 0 6px; font: inherit; }
+.sx-row textarea { height: auto; padding: 4px 6px; resize: vertical; }
+.sx-row input[type="color"] { width: 40px; height: 24px; padding: 0 2px; border: 1px solid var(--line-2); border-radius: 4px; background: var(--bg-1); }
+.sx-check { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+/* 선택하여 붙여넣기: two columns of choices in each box, as Excel lays them out */
+.sx-ps-group { border: 1px solid var(--line, rgba(127,127,127,.35)); border-radius: 6px; padding: 6px 10px 8px; margin: 8px 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.sx-ps-group legend { padding: 0 4px; font-weight: 600; }
+.sx-ps-group:disabled { opacity: .5; }
+.sx-ps-checks { display: flex; gap: 24px; margin: 6px 0 2px; }
+/* the sheet tab menu: 탭 색 swatches; the formula argument hint under the cell being typed */
+.sx-tabcolors { padding: 4px 10px; display: flex; flex-direction: column; gap: 4px; }
+.sx-swatches { display: flex; gap: 4px; flex-wrap: wrap; }
+.sx-swatch { width: 16px; height: 16px; border: 1px solid rgba(127,127,127,.5); border-radius: 2px; padding: 0; }
+.sx-swatch-none { background: linear-gradient(135deg, transparent 45%, #d00 45%, #d00 55%, transparent 55%), #fff; }
+.sx-fnhint { position: absolute; z-index: 30; background: var(--panel, #fff); color: var(--text, #111); border: 1px solid var(--line, rgba(127,127,127,.4)); border-radius: 4px; padding: 2px 6px; font-size: 12px; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.sx-fnhint b { font-weight: 700; }
+/* the outline bar (데이터 ▸ 그룹): level buttons, group brackets, − / + */
+.sheet-ol-level, .sheet-ol-toggle { position: absolute; z-index: 3; width: 13px; height: 13px; padding: 0; font: 600 9px/11px var(--font-ui, sans-serif); color: #333; background: #f3f3f3; border: 1px solid #9a9a9a; border-radius: 1px; cursor: pointer; }
+.sheet-ol-toggle { font-size: 11px; line-height: 10px; background: #fff; }
+.sheet-ol-bracket { position: absolute; z-index: 2; pointer-events: none; border-color: #6b6b6b; border-style: solid; border-width: 0; }
+.sheet-ol-bracket.sheet-ol-row { width: 5px; border-left-width: 1px; border-bottom-width: 1px; }
+.sheet-ol-bracket.sheet-ol-col { height: 5px; border-top-width: 1px; border-right-width: 1px; }
+/* a slicer on the grid: Excel's light look (white box, caption, item buttons; picked items filled) */
+.sx-slicer { position: absolute; z-index: 4; display: flex; flex-direction: column; background: #fff; color: #222; border: 1px solid #c8c8c8; box-shadow: 0 1px 3px rgba(0,0,0,.18); font-family: var(--font-ui, sans-serif); overflow: hidden; }
+.sx-slicer:focus { outline: 2px solid #217346; outline-offset: 1px; }
+.sx-slicer-head { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-bottom: 1px solid #e3e3e3; cursor: move; user-select: none; }
+.sx-slicer-cap { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sx-slicer-tool { width: 20px; height: 20px; padding: 0; border: 1px solid transparent; background: none; color: #444; cursor: pointer; border-radius: 2px; }
+.sx-slicer-tool.on { border-color: #999; background: #e8e8e8; }
+.sx-slicer-tool:disabled { opacity: .35; cursor: default; }
+.sx-slicer-items { flex: 1; overflow: auto; padding: 4px 6px; display: flex; flex-direction: column; gap: 3px; }
+.sx-slicer-item { text-align: left; padding: 3px 6px; border: 1px solid #d0d0d0; background: #f7f7f7; color: #888; border-radius: 2px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sx-slicer-item.on { background: #d9e1f2; border-color: #8ea9db; color: #1f1f1f; }
+.sheet-filter-cond > summary { list-style: none; cursor: pointer; }
+.sheet-filter-cond > summary::after { content: "▸"; margin-left: auto; opacity: .6; }
+.sheet-filter-cond[open] > summary::after { content: "▾"; }
+.sheet-filter-conds { padding-left: 12px; }
+.sheet-cf-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px; }
+.sx-hint { color: var(--text-3); font-size: 12px; margin: 6px 0; line-height: 1.45; }
+.sx-split { display: flex; gap: 12px; min-height: 230px; }
+.sx-pane { flex: 1; min-width: 0; }
+.sx-list { display: flex; flex-direction: column; border: 1px solid var(--line-2); border-radius: 4px; overflow: auto; background: var(--bg-1); }
+.sx-split > .sx-list { width: 140px; flex: none; }
+.sx-list > button { border: 0; background: transparent; color: var(--text); text-align: left; padding: 3px 8px; font: inherit; cursor: pointer; white-space: nowrap; }
+.sx-list > button:hover { background: var(--hover); }
+.sx-list > button.on { background: var(--accent-soft); color: var(--accent-text); }
+.sx-codes { max-height: 120px; margin-top: 6px; }
+.sx-fnlist { height: 180px; margin-top: 6px; }
+.sx-sample { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line-2); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; min-height: 30px; }
+.sx-sample > span { color: var(--text-3); }
+.sx-font-sample, .sx-cond-sample { justify-content: center; background: #fff; color: #000; grid-column: 1 / -1; margin-top: 8px; }
+.sx-fill-sample { height: 40px; margin-top: 8px; }
+.sx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px; align-items: center; }
+.sx-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px 12px; align-items: center; }
+.sx-grid2 .sx-row > span:first-child, .sx-grid3 .sx-row > span:first-child { width: 72px; }
+.sx-unit { color: var(--text-3); }
+.sx-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0; }
+.sx-btns .sx-row { margin: 0; }
+.sx-btns .sx-row > span:first-child { width: auto; }
+.sx-inline { flex-direction: row; gap: 18px; }
+.sx-short { width: 64px !important; flex: none !important; }
+.sx-left { margin-right: auto; }
+.sx-border-box { position: relative; width: 170px; height: 130px; flex: none; border: 1px solid var(--line-2); border-radius: 4px; background: #fff; }
+.sx-bcell { position: absolute; inset: 26px; display: flex; align-items: center; justify-content: center; color: #555; border: 1px dashed #c8c8c8; }
+.sx-bside { position: absolute; border: 0; background: transparent; cursor: pointer; padding: 0; }
+.sx-bside::after { content: ""; position: absolute; background: #c8c8c8; }
+.sx-bside.on::after { background: #000; }
+.sx-bt, .sx-bb { left: 26px; right: 26px; height: 14px; }
+.sx-bt { top: 12px; }
+.sx-bb { bottom: 12px; }
+.sx-bt::after, .sx-bb::after { left: 0; right: 0; height: 2px; top: 6px; }
+.sx-bl, .sx-br { top: 26px; bottom: 26px; width: 14px; }
+.sx-bl { left: 12px; }
+.sx-br { right: 12px; }
+.sx-bl::after, .sx-br::after { top: 0; bottom: 0; width: 2px; left: 6px; }
+.sx-swatches { display: grid; grid-template-columns: repeat(10, 22px); gap: 4px; margin: 6px 0 10px; }
+.sx-swatch { width: 22px; height: 22px; border: 1px solid var(--line-2); border-radius: 3px; cursor: pointer; padding: 0; }
+.sx-swatch.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sx-nofill { background: linear-gradient(to top left, transparent 46%, #d33 48%, #d33 52%, transparent 54%), #fff; }
+.sx-table { margin: 6px 0; }
+.sx-table td .btn { padding: 0 6px; height: 22px; }
+.sx-look { display: inline-block; padding: 0 8px; border: 1px solid var(--line-2); background: #fff; color: #000; }
+.sx-checklist { max-height: 200px; overflow: auto; border: 1px solid var(--line-2); border-radius: 4px; padding: 4px 8px; }
+.sx-preview { max-height: 120px; overflow: auto; display: block; border: 1px solid var(--line-2); border-radius: 4px; }
+.sx-preview td { border-right: 1px solid var(--line-2); }
+.sx-hf { border: 1px solid var(--line-2); border-radius: 4px; padding: 6px 8px 8px; margin: 8px 0; }
+.sx-hf legend { color: var(--text-2); padding: 0 4px; }
+.sx-hf3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
+.sx-caret { font-size: 9px; opacity: 0.7; }
+.rg-launch { border: 0; background: transparent; color: var(--text-3); cursor: pointer; font-size: 10px; padding: 0 2px; margin-left: 4px; line-height: 1; }
+.rg-launch:hover { color: var(--text); }
+.sx-scale { gap: 2px; }
+.sx-rlabel { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--text-2); }
+.sx-optgrid { display: grid; grid-template-columns: auto auto auto; gap: 2px 10px; align-items: center; font-size: 12px; padding: 2px 4px; }
+.sx-optgrid b { font-weight: 500; color: var(--text-2); }
+.sx-chart-sel { position: absolute; z-index: 5; border: 1px solid var(--accent); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8); pointer-events: none; }
+.sx-chart-handle { position: absolute; right: -5px; bottom: -5px; width: 9px; height: 9px; background: #fff; border: 1px solid var(--accent); border-radius: 50%; }
+.sx-suggest { position: absolute; z-index: 7; min-width: 140px; max-height: 200px; overflow: auto; }
+.sx-suggest .menu-item.on { background: var(--active); }
+.sx-prompt, .sx-linktip { min-height: 0; width: auto; max-width: 240px; }
+button.sheet-fx { background: transparent; border-top: 0; border-bottom: 0; border-left: 0; cursor: pointer; }
+button.sheet-fx:hover { color: var(--text); }
 
 /* ───────── slide mode (docs/design/SLIDE_MODE.md, ui/shell/SlideMode.tsx) ───────── */
 .split-btn {
@@ -5833,3 +6037,208 @@ body.resizing .splitter::after {
 .cad-lm-group { display: flex; align-items: center; gap: 6px; background: none; border: 0; color: inherit; font: inherit; font-size: 12px; padding: 3px 4px; text-align: left; cursor: pointer; }
 .cad-lm-group:hover { background: var(--hover, rgba(127,127,127,.1)); }
 .cad-lm-group .count { margin-left: auto; opacity: .7; }
+
+/* design 2: the Appearance and Symbols panels (ui/shell/DesignAppearance.tsx) */
+.appearance-list { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.appearance-row { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 1px 4px; border-radius: 4px; font-size: 12px; }
+.appearance-row:hover { background: var(--bg-2, rgba(127,127,127,.08)); }
+.appearance-row > .link-btn { flex: 1; text-align: left; }
+.appearance-row > span:not(.appearance-swatch):not(.muted-note) { flex: 1; }
+.appearance-eye { width: 22px; min-width: 22px; padding: 0; opacity: .45; }
+.appearance-eye.on { opacity: 1; }
+.appearance-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line-2, #888); flex: none; margin: 0 4px; }
+.sub-head { margin: 10px 0 4px; font-size: 12px; font-weight: 600; }
+.pattern-swatches { flex-wrap: wrap; gap: 4px; }
+/* named styles (ui/shell/StyleDialogs.tsx): the ▾ of the gallery, the 수정 dialog, the 스타일 창 */
+.style-more {
+  align-self: stretch;
+}
+.docstyle-dlg .docstyle-set {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 6px 10px 8px;
+  margin: 0 0 10px;
+}
+.docstyle-dlg legend {
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+  padding: 0 4px;
+}
+.docstyle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 14px;
+}
+.docstyle-preview {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: #fff;
+  color: #1d1f24;
+  padding: 8px 12px;
+  margin: 8px 0;
+  max-height: 150px;
+  overflow: hidden;
+}
+.docstyle-preview p {
+  margin: 0;
+}
+.docstyle-preview .docstyle-ghost {
+  color: #b4b8c0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.docstyle-pane {
+  position: fixed;
+  right: 18px;
+  top: 150px;
+  z-index: 60;
+  width: calc(250px * var(--ui-scale));
+  max-height: calc(100vh - 190px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg, 10px);
+  background: var(--bg-1, var(--bg-2));
+  color: var(--text);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+.docstyle-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.docstyle-pane-head h3 {
+  margin: 0;
+  font-size: var(--fs-ui);
+}
+.docstyle-list,
+.docref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  min-height: 80px;
+  max-height: 340px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 3px;
+  background: var(--bg-2);
+}
+.docref-list {
+  max-height: 220px;
+  margin-bottom: 8px;
+}
+.docstyle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm, 4px);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.docstyle-item:hover {
+  background: var(--bg-3, rgba(127, 127, 127, 0.12));
+}
+.docstyle-item.on {
+  border-color: var(--accent);
+}
+.docstyle-item.cur > span:first-child::before {
+  content: "✓ ";
+  color: var(--accent-text);
+}
+.docstyle-kind {
+  color: var(--text-3);
+  font-size: var(--fs-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.docstyle-all {
+  font-size: var(--fs-caption);
+}
+.docstyle-pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.docstyle-desc {
+  margin: 0;
+}
+.docref-fixed {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sheet-ribbon { position: relative; }
+.sheet-ribbon > .rpanel:first-child { overflow: hidden; max-width: 100vw; box-sizing: border-box; }
+.sx-more-btn { margin-left: auto; flex: none; }
+.sx-more-pop { position: fixed; z-index: 40; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 32px); background: var(--bg-1); border: 1px solid var(--line-2); border-radius: var(--r-lg, 8px); box-shadow: var(--shadow-modal); padding: 4px 6px; }
+.sx-sub { font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+.sx-valrow select { height: 24px; border: 1px solid var(--line-2); border-radius: 4px; background: var(--bg-1); color: var(--text); font: inherit; }
+
+/* reading mode (Word's 읽기 모드): a slim bar over the pages alone */
+.reading-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: calc(40px * var(--ui-scale));
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-1);
+}
+.reading-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.reading-title b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reading-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-3, rgba(127, 127, 127, 0.18));
+  font-size: var(--fs-caption);
+}
+.reading-pages {
+  color: var(--text-3);
+}
+.reading-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.app.reading-mode {
+  grid-template-rows: calc(40px * var(--ui-scale)) minmax(0, 1fr) var(--h-status);
+}
+.sx-ruletypes { max-height: none; margin-bottom: 8px; }
+.sx-ruletypes > button { white-space: normal; padding: 4px 8px; }
+.sx-label { font-weight: 600; margin: 6px 0 4px; }
+.sx-goto-list { height: 140px; margin-bottom: 8px; }
+.sx-radios2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin: 8px 0; }
+.sx-series { display: flex; gap: 12px; margin-bottom: 8px; }
+.sx-fieldset { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line-2); border-radius: 4px; padding: 4px 10px 8px; }
+.sx-fieldset:disabled { opacity: .5; }
+.sx-eval { border: 1px solid var(--line-2); border-radius: 4px; padding: 8px; min-height: 48px; font-family: Consolas, monospace; background: var(--bg-1); word-break: break-all; }
+.sx-watch { position: absolute; right: 16px; bottom: 40px; z-index: 20; width: 460px; max-height: 260px; overflow: auto; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-size: var(--fs-sm, 12px); }
+.sx-watch-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line-2); }
+.sx-watch-head b { flex: 1; }
+.sx-watch table { width: 100%; border-collapse: collapse; }
+.sx-watch th, .sx-watch td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line-2); }
+.sx-watch tr.on td { background: var(--accent-soft, rgba(43,116,236,.15)); }
+.sheet-find-fmt { display: flex; align-items: center; gap: 6px; }
+.sx-col { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.sx-thread-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow: auto; margin: 8px 0; }
+.sx-thread-item { border-left: 3px solid #8f6bd9; padding: 4px 8px; background: var(--bg-1); border-radius: 4px; white-space: pre-wrap; }
+.sx-thread-input { width: 100%; resize: vertical; }
+.sx-thread-done { color: #2e7d32; font-size: .8em; }

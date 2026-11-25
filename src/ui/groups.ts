@@ -8,6 +8,7 @@ import { moveIdsTo } from "../core/pages";
 import { currentPage, draftPage, useStore } from "../core/store";
 import { newGroup, type LayerGroup, type Page, type SceneNode } from "../core/types";
 import { t } from "../i18n";
+import { currentEditMode } from "./editModes";
 
 const S = () => useStore.getState();
 
@@ -150,6 +151,8 @@ export function toggleClipping(ids: string[] = S().selection) {
   const s = S();
   const page = currentPage();
   if (!page) return;
+  // the design mode (Illustrator's Ctrl+7): the topmost selected path is the clipping path of the others
+  if (currentEditMode() === "DESIGN" && designClip(page, ids)) return;
   const ok = clippable(page, ids);
   const nodes = page.nodes.filter((n) => ok.has(n.id));
   if (!nodes.length) return s.notify(t("layers.toast.nothingToClip"));
@@ -173,6 +176,44 @@ export function toggleClipping(ids: string[] = S().selection) {
         else delete n.clip;
       }
   });
+}
+
+/**
+ * Illustrator's Object › Clipping Mask › Make on two or more objects: the topmost selected path becomes the clipping
+ * path (moved under the others, its fill and stroke taken away as Illustrator does) and the others are clipped by its
+ * shape (core/layerTree.ts isClipPath).
+ * False when this does not apply (one object, the top is not a path, or every one is clipped already: a release).
+ */
+function designClip(page: Page, ids: readonly string[]): boolean {
+  const want = new Set(ids);
+  const sel = page.nodes.filter((n) => want.has(n.id) && !n.locked);
+  if (sel.length < 2 || sel.every((n) => n.clip)) return false;
+  const top = sel[sel.length - 1];
+  if (top.type !== "VECTOR") return false;
+  const others = new Set(sel.slice(0, -1).map((n) => n.id));
+  S().commit(t("layers.hist.clip"), (d) => {
+    const pg = draftPage(d, page.id);
+    if (!pg) return;
+    const i = pg.nodes.findIndex((n) => n.id === top.id);
+    const [path] = pg.nodes.splice(i, 1);
+    const at = pg.nodes.findIndex((n) => others.has(n.id));
+    pg.nodes.splice(Math.max(0, at), 0, path);
+    delete path.clip;
+    // Illustrator takes the clipping path's paint away: it only cuts
+    if (path.type === "VECTOR") {
+      path.fill = null;
+      path.stroke = null;
+      delete (path as { fills?: unknown }).fills;
+      delete (path as { strokes?: unknown }).strokes;
+    }
+    // the clipped objects share the clipping path's group (the stack is contiguous there)
+    for (const n of pg.nodes)
+      if (others.has(n.id)) {
+        n.clip = true;
+        n.groupId = path.groupId;
+      }
+  });
+  return true;
 }
 
 export const clipToggleUsable = () => {

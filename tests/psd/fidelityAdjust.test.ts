@@ -142,12 +142,13 @@ describe("saving a PSD with adjustment layers", () => {
     const s = (await scorePsd(r.bytes))!.score;
     expect(s.within2).toBe(100);
   });
-  it("a new PSD from scratch leaves adjustment layers out (no settings record to write) and says so", async () => {
+  it("a new PSD from scratch writes the adjustment layer of a kind it can write (2026-11-24: before, it was left out)", async () => {
     const { doc, page } = open("omni-fid-adj-invert");
     const copy: Page = { ...page, source: undefined };
     const r = await writePsd(doc, copy);
     expect(r.method).toBe("fresh");
-    expect(r.warnings.join(" ")).toContain("Adjust invert");
+    expect(r.warnings.join(" ")).not.toContain("Adjust invert");
+    expect(parsePsdLayout(r.bytes).records.some((x) => x.blocks.some((k) => k.key === "nvrt"))).toBe(true);
   });
   it("an adjustment layer is never merged down as pixels", () => {
     const { page } = open("omni-fid-adj-invert");

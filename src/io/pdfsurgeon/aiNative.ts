@@ -231,6 +231,7 @@ function parseGradients(s: string, cmykDoc: boolean): Map<string, Gradient> {
   let guard = 0;
   while ((m = re.exec(s)) && guard++ < 100_000) {
     const end = s.indexOf("%AI5_EndGradient", m.index);
+    scans += (end < 0 ? s.length : end) - m.index;
     if (end < 0) break;
     re.lastIndex = end; // a Begin without its End inside the previous gradient is not read again (quadratic work)
     const body = s.slice(m.index, end);
@@ -373,7 +374,7 @@ export interface InterpretOptions {
   cache: Map<string, unknown>;
 }
 
-const MAX_WORK = 40_000_000;
+export const MAX_WORK = 40_000_000;
 
 export class Interpreter {
   private stack: Tok[] = [];
@@ -413,6 +414,7 @@ export class Interpreter {
     const m = this.seen.get(marker);
     if (m && m[0] <= from && (m[1] < 0 || m[1] >= from)) return m[1];
     const at = this.o.source.indexOf(marker, from);
+    scans += (at < 0 ? this.o.source.length : at) - from;
     this.seen.set(marker, [from, at]);
     return at;
   }
@@ -1133,8 +1135,17 @@ function rulerOrigin(s: string, from: number, to: number): [number, number] | nu
   return m ? [+m[1], +m[2]] : null;
 }
 
+/**
+ * The work of the last interpretNative: tokens read (what MAX_WORK counts) and characters scanned looking for end markers.
+ * The hostile-input tests bound these, not the clock (wall-clock limits failed on a loaded test machine, QA 11-24).
+ */
+let scans = 0;
+let lastWork = { tokens: 0, scans: 0 };
+export const lastNativeWork = () => lastWork;
+
 /** Read the native document (latin1 string) into a scene. Null when it is not Illustrator's native format. */
 export function interpretNative(native: string): NativeDoc | null {
+  scans = 0;
   if (!native.startsWith("%!PS-Adobe")) return null;
   const endSetup = native.indexOf("%%EndSetup");
   if (endSetup < 0) return null;
@@ -1162,6 +1173,7 @@ export function interpretNative(native: string): NativeDoc | null {
     notes.set("damaged", 1);
   }
   it.closeAll();
+  lastWork = { tokens: base.work.n, scans };
   const artboards = readArtboards(native.slice(setupStart, endSetup), header);
   if (!artboards.length) {
     const b = emptyBox();

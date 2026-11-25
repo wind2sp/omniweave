@@ -9,7 +9,8 @@ import { toPx } from "./len";
 import type { Color, Effect, EffectType, StyleBlend } from "./types";
 
 /** Effects the renderer draws (others are kept and written back, not drawn: bevel, satin, blur, reflection). */
-export const RENDERED_EFFECTS: ReadonlySet<EffectType> = new Set(["dropShadow", "innerShadow", "outerGlow", "innerGlow", "fxStroke", "overlay", "softEdge"]);
+// (blur: Illustrator's Effect › Blur › Gaussian Blur — the whole object softened, design 2 2026-11-25)
+export const RENDERED_EFFECTS: ReadonlySet<EffectType> = new Set(["dropShadow", "innerShadow", "outerGlow", "innerGlow", "fxStroke", "overlay", "softEdge", "blur"]);
 
 /** Effects the panel can add, in Photoshop's dialog order (top = drawn on top). */
 export const PANEL_EFFECTS: readonly EffectType[] = ["fxStroke", "innerShadow", "innerGlow", "overlay", "outerGlow", "dropShadow", "softEdge", "bevel"];
@@ -151,6 +152,7 @@ export function effectMargins(fx: readonly Effect[] | undefined): Margins {
       continue;
     }
     if (e.type === "outerGlow") all = grow + toPx(e.size) * 1.25 + 1;
+    else if (e.type === "blur") all = grow + toPx(e.radius) * 3 + 1;
     else if (e.type === "fxStroke") all = (e.stroke.align === "inside" ? 0 : e.stroke.align === "center" ? toPx(e.stroke.width) / 2 : toPx(e.stroke.width)) + 1;
     m.l = Math.max(m.l, all);
     m.r = Math.max(m.r, all);

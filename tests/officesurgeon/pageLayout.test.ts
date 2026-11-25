@@ -94,7 +94,8 @@ describe.each(["docx", "hwpx"] as const)("Office Surgeon page layout — %s", (k
     else expect((part(out, MAIN.hwpx).match(/pageBreak="1"/g) ?? []).length).toBe(2);
   });
 
-  it("a section break cannot be added in place: the file is written anew after the notice", async () => {
+  // DOCX: in place since QA 11-25 (Word's section-break paragraph, layout.ts addSections); HWPX: anew after the notice
+  it("a section break: DOCX written in place, HWPX written anew after the notice", async () => {
     const doc = await open(kind);
     const { i, t } = splittable(doc);
     breakPageInPlace(doc.pages, i, "section", { pageId: "pgS", nodeId: "nS", name: "s" }, { nodeId: t.id, keep: t.paragraphs.slice(0, 1), moved: t.paragraphs.slice(1) });
@@ -103,7 +104,7 @@ describe.each(["docx", "hwpx"] as const)("Office Surgeon page layout — %s", (k
     for (const k of sectionAt(doc.pages, i + 1)) applySetupInPlace(doc.pages[k], land);
     const msgs: string[] = [];
     const out = await save(kind, doc, msgs);
-    expect(msgs.length).toBe(1);
+    expect(msgs.length).toBe(kind === "docx" ? 0 : 1);
     expect(layoutOf(kind, out).sections.length).toBe(2);
   });
 });

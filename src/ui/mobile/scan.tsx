@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "../../i18n";
 import { defaultQuad, detectQuad, enhance, quadSize, rotate90, toGray, warp, type Quad, type ScanMode } from "./scanImage";
 import { useBackClose } from "./back";
+import { Icon } from "./icons";
 import { capture } from "./markup";
 
 export interface ScanPage {
@@ -154,7 +155,7 @@ export function ScanEditor({ pages, setPages, onAddPhoto, onCancel, onFinish }: 
     <div className="m-viewer m-scan">
       <header className="m-top m-viewer-top">
         <button className="m-icon-btn" onClick={onCancel} aria-label={tr("mobile.cancel")}>
-          ✕
+          <Icon name="close" />
         </button>
         <h1 className="m-doc-name">{tr("mobile.scan.title", { n: at + 1, total: pages.length })}</h1>
         <button className="m-btn m-btn-primary m-btn-small" onClick={() => onFinish(pages)}>
@@ -207,25 +208,25 @@ export function ScanEditor({ pages, setPages, onAddPhoto, onCancel, onFinish }: 
         </div>
         <span className="m-mk-pages">
           <button className="m-icon-btn" disabled={at <= 0} onClick={() => setAt(at - 1)} aria-label={tr("mobile.prev")}>
-            ‹
+            <Icon name="prev" />
           </button>
           {at + 1}/{pages.length}
           <button className="m-icon-btn" disabled={at >= pages.length - 1} onClick={() => setAt(at + 1)} aria-label={tr("mobile.next")}>
-            ›
+            <Icon name="next" />
           </button>
         </span>
       </div>
       <nav className="m-nav m-viewer-bar">
         <button onClick={() => setPreviewing((v) => !v)} className={previewing ? "on" : ""} aria-pressed={previewing}>
-          <span aria-hidden>◐︎</span>
+          <Icon name="contrast" />
           {tr("mobile.scan.preview")}
         </button>
         <button onClick={() => update({ turns: page.turns + 1 })}>
-          <span aria-hidden>↻︎</span>
+          <Icon name="rotate" />
           {tr("mobile.scan.rotate")}
         </button>
         <button onClick={() => update({ quad: defaultQuad(page.w, page.h, 0), auto: false })}>
-          <span aria-hidden>⛶︎</span>
+          <Icon name="full" />
           {tr("mobile.scan.whole")}
         </button>
         <button
@@ -234,7 +235,7 @@ export function ScanEditor({ pages, setPages, onAddPhoto, onCancel, onFinish }: 
             setPages((list) => list.filter((x) => x.id !== page.id));
           }}
         >
-          <span aria-hidden>✕</span>
+          <Icon name="close" />
           {tr("mobile.mk.delete")}
         </button>
         <button onClick={onAddPhoto}>

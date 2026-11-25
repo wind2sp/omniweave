@@ -247,7 +247,7 @@ describe("saving an XLS opened with its formatting", () => {
     expect(lastLegacySave.xls).toBe("original");
   });
 
-  it("formatting edits are refused (save as XLSX): bold, a fill, a merge, frozen panes, the page setup, a row height", async () => {
+  it("formatting edits: the workbook written anew as XLS (bold, a fill, a merge, frozen panes, the page setup, a row height)", async () => {
     const edits: ((s: SheetData) => void)[] = [
       (s) => (s.styles[s.cells.A4.s!] = { ...s.styles[s.cells.A4.s!], bold: true }),
       (s) => (s.styles[s.cells.A4.s!] = { ...s.styles[s.cells.A4.s!], fill: "#FF0000" }),
@@ -260,17 +260,18 @@ describe("saving an XLS opened with its formatting", () => {
       const { doc } = await open(RICH);
       e(sheetsOf(doc)[0]);
       expect(xlsValuesOnly(doc.pages)).toBe(false);
-      await expect(save(doc)).rejects.toThrow(/XLSX|xlsx/);
+      const back = readXls(await save(doc), "en").sheets[0];
+      expect(back.cells.A4?.v).toEqual(sheetsOf(doc)[0].cells.A4?.v);
     }
   });
 
-  it("a formula typed in or changed is refused", async () => {
+  it("a formula typed in or changed: the workbook written anew as XLS with it", async () => {
     for (const [a, f] of [["A13", "1+1"], ["E12", "A4*$B$4+1"]]) {
       const { doc } = await open(RICH);
       const s = sheetsOf(doc)[0];
       s.cells[a] = { ...s.cells[a], f };
       expect(xlsValuesOnly(doc.pages), a).toBe(false);
-      await expect(save(doc)).rejects.toThrow();
+      expect(readXls(await save(doc), "en").sheets[0].cells[a].f, a).toBe(f);
     }
   });
 

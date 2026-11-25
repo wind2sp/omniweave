@@ -12,8 +12,11 @@ import { exportMenuItems } from "../exportMenu";
 import { BACKSTAGE } from "../menus";
 import { cx, type MenuItem } from "./controls";
 import { DocPropsTab } from "./DocProps";
+import { activeSessionId, openedFileOf, openedPathOf, useSessions } from "../../core/sessions";
+import { useStore } from "../../core/store";
 import { Icon, type IconName } from "./Icons";
-import { forgetRecent, useRecent } from "./recent";
+import { forgetRecent, isHandlePath, togglePinRecent, useRecent } from "./recent";
+import { handlesSupported } from "../../io/handleStore";
 
 export type BackstagePane = "recent" | "export" | "info" | "tools" | "help";
 const PANES: { id: BackstagePane; icon: IconName }[] = [
@@ -100,17 +103,17 @@ function RecentPane() {
     return (
       <p className="bs-empty">
         <b>{t("start.recent.empty")}</b>
-        <span>{t(isTauri ? "start.recent.emptyHint" : "start.recent.emptyWeb")}</span>
+        <span>{t(isTauri ? "start.recent.emptyHint" : handlesSupported() ? "start.recent.emptyWebHandles" : "start.recent.emptyWeb")}</span>
       </p>
     );
   return (
     <div className="bs-rows">
       {list.map((f) => (
-        <div key={f.path} className="bs-recent">
+        <div key={f.path} className={cx("bs-recent", f.pinned && "pinned")}>
           <button
             type="button"
             className="bs-row"
-            title={f.path}
+            title={isHandlePath(f.path) ? f.name : f.path}
             onClick={() => {
               closeBackstage();
               void openRecentFile(f.path);
@@ -119,8 +122,11 @@ function RecentPane() {
             <span className="bs-fmt">{f.format.toUpperCase()}</span>
             <span className="bs-row-text">
               <b>{f.name}</b>
-              <small>{f.path}</small>
+              <small>{isHandlePath(f.path) ? t("start.recent.webStored") : f.path}</small>
             </span>
+          </button>
+          <button type="button" className={cx("ibtn ibtn-sm", f.pinned && "on")} aria-label={t(f.pinned ? "start.recent.unpin" : "start.recent.pin")} aria-pressed={!!f.pinned} data-tip={t(f.pinned ? "start.recent.unpin" : "start.recent.pin")} onClick={() => togglePinRecent(f.path)}>
+            <Icon name="pin" size={12} />
           </button>
           <button type="button" className="ibtn ibtn-sm" aria-label={t("start.recent.remove")} data-tip={t("start.recent.remove")} onClick={() => forgetRecent(f.path)}>
             <Icon name="close" size={12} />
@@ -128,6 +134,53 @@ function RecentPane() {
         </div>
       ))}
     </div>
+  );
+}
+
+/** 파일 › 정보: the file this document came from and where it is saved (Word's 정보 ▸ 속성) */
+function FileInfo() {
+  const t = useT();
+  useSessions((s) => s.tabs);
+  const filePath = useStore((s) => s.filePath);
+  const dirty = useStore((s) => s.dirty);
+  const modified = useStore((s) => s.doc.modified);
+  const id = activeSessionId();
+  const f = openedFileOf(id);
+  const path = openedPathOf(id);
+  const kb = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024)).toLocaleString()} KB`);
+  const when = (iso?: string) => (iso ? new Date(iso).toLocaleString() : "—");
+  const ext = f ? (/\.([^.]+)$/.exec(f.name)?.[1] ?? "").toUpperCase() : "";
+  return (
+    <section className="bs-file-info" aria-label={t("topui.bs.fileInfo")}>
+      <h2>{t("topui.bs.fileInfo")}</h2>
+      <dl className="info-list">
+        <dt>{t("topui.bs.fileName")}</dt>
+        <dd>{f?.name ?? t("topui.bs.notFromFile")}</dd>
+        {f && (
+          <>
+            <dt>{t("topui.bs.fileType")}</dt>
+            <dd>{ext || "—"}</dd>
+            <dt>{t("topui.bs.fileSize")}</dt>
+            <dd>{kb(f.size)}</dd>
+            <dt>{t("topui.bs.openedAt")}</dt>
+            <dd>{when(f.at)}</dd>
+          </>
+        )}
+        {(path || filePath) && (
+          <>
+            <dt>{t("topui.bs.location")}</dt>
+            <dd className="bs-path">{path ?? filePath}</dd>
+          </>
+        )}
+        {/* changed here and not saved yet; saved here: when (the opened file's own date is not known to the browser) */}
+        {(dirty || filePath) && (
+          <>
+            <dt>{t("topui.bs.modified")}</dt>
+            <dd>{dirty ? t("topui.bs.unsaved") : when(modified)}</dd>
+          </>
+        )}
+      </dl>
+    </section>
   );
 }
 
@@ -142,6 +195,19 @@ export function Backstage() {
     // letters (실사용 점검 2026-11-23 #86 — "새문서QA" landed in C5)
     const behind = (t: EventTarget | null) => !(t instanceof Node && ref.current?.contains(t)) && !document.querySelector(".modal-backdrop, .menu-pop");
     const onKey = (e: KeyboardEvent) => {
+      // ↑ ↓ (Home / End) walk the left column like Office's 파일 menu; Enter runs the focused row
+      const nav = ref.current?.querySelector(".bs-nav");
+      if (nav && ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key) && (nav.contains(document.activeElement) || behind(e.target))) {
+        const rows = [...nav.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+        if (rows.length) {
+          e.preventDefault();
+          e.stopPropagation();
+          const at = rows.indexOf(document.activeElement as HTMLButtonElement);
+          const next = e.key === "Home" ? 0 : e.key === "End" ? rows.length - 1 : e.key === "ArrowDown" ? (at + 1) % rows.length : (at - 1 + rows.length) % rows.length;
+          rows[next].focus();
+          return;
+        }
+      }
       if (e.key !== "Escape") {
         if (behind(e.target) && (e.key.length === 1 || e.key === "Process" || e.key === "Backspace" || e.key === "Delete" || e.key === "Enter") && !e.ctrlKey && !e.metaKey && !e.altKey) {
           e.preventDefault();
@@ -207,6 +273,7 @@ export function Backstage() {
           <Rows items={exportMenuItems()} />
         ) : pane === "info" ? (
           <div className="bs-info">
+            <FileInfo />
             <DocPropsTab />
             <div className="bs-rows">
               <CmdRow id="page.properties" />

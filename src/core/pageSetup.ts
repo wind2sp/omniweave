@@ -8,7 +8,7 @@
 
 import { layoutTable } from "./table";
 import { layoutText } from "./text";
-import type { Page, PageColumns, PageMargins, SceneNode, TextNode, TextParagraph } from "./types";
+import type { Page, PageBorder, PageColumns, PageMargins, SceneNode, TextNode, TextParagraph } from "./types";
 
 /** px per mm at 96 dpi */
 export const PX_PER_MM = 96 / 25.4;
@@ -33,9 +33,11 @@ export interface PageSetup {
   margins: PageMargins;
   /** 단 (columns); omitted = one column */
   columns?: PageColumns;
+  /** 쪽 테두리 (Page.border) */
+  border?: PageBorder;
 }
 
-export const setupOf = (p: Pick<Page, "width" | "height" | "margins"> & { columns?: PageColumns }): PageSetup => ({ width: p.width, height: p.height, margins: marginsOf(p), ...(p.columns && p.columns.n > 1 ? { columns: p.columns } : {}) });
+export const setupOf = (p: Pick<Page, "width" | "height" | "margins"> & { columns?: PageColumns; border?: PageBorder }): PageSetup => ({ width: p.width, height: p.height, margins: marginsOf(p), ...(p.columns && p.columns.n > 1 ? { columns: p.columns } : {}), ...(p.border ? { border: p.border } : {}) });
 
 /** Word's default gap between columns: 1.27 cm (w:space 720 twips) */
 export const DEFAULT_COL_GAP = 48;
@@ -68,7 +70,13 @@ export const sameColumns = (a: PageColumns | undefined, b: PageColumns | undefin
 
 const near = (a: number, b: number, tol = 0.5) => Math.abs(a - b) <= tol;
 export const sameMargins = (a: PageMargins, b: PageMargins) => (["top", "right", "bottom", "left", "header", "footer"] as const).every((k) => near(a[k], b[k]));
-export const sameSetup = (a: PageSetup, b: PageSetup) => near(a.width, b.width) && near(a.height, b.height) && sameMargins(a.margins, b.margins) && sameColumns(a.columns, b.columns);
+export const sameSetup = (a: PageSetup, b: PageSetup) => near(a.width, b.width) && near(a.height, b.height) && sameMargins(a.margins, b.margins) && sameColumns(a.columns, b.columns) && sameBorder(a.border, b.border);
+
+/**
+ * The same 쪽 테두리 as far as `a` (the pages now) says: a page without the field says nothing (a document saved before
+ * borders were read keeps the file's own); taken off, it is a border of width 0.
+ */
+export const sameBorder = (a: PageBorder | undefined, b: PageBorder | undefined) => !a || (!(a.width > 0) && !b) || (!!a && !!b && a.style === b.style && near(a.width, b.width, 0.1) && a.color.toLowerCase() === b.color.toLowerCase() && near(a.space, b.space, 0.5) && a.from === b.from);
 
 /** Margins as stored: undefined when they equal the defaults (old files keep no field). */
 export const storedMargins = (m: PageMargins): PageMargins | undefined => (sameMargins(m, DEFAULT_MARGINS) ? undefined : { ...m });

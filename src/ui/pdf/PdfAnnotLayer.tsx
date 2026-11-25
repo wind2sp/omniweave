@@ -10,7 +10,7 @@ import { draftPage, findPage, useStore } from "../../core/store";
 import type { PdfNode } from "../../core/types";
 import { t as tr, useT } from "../../i18n";
 import { nodePointToPdf, pdfPageGeom, pdfTextItems, widgetRectOnNode, type PdfFormInfo, type PdfTextItem } from "../../io/pdf";
-import { annotRect, fitUpright, placeUpright, type PdfAnnot, type PdfAnnotKind } from "../../io/pdfsurgeon/annots";
+import { annotRect, fitUpright, placeUpright, type PdfAnnot, type PdfAnnotKind, type PdfReviewState } from "../../io/pdfsurgeon/annots";
 import { quadsBetween } from "./textMark";
 import { SignDialog, capture } from "./SignDialog";
 import { makeAsset } from "../../core/assets";
@@ -23,7 +23,7 @@ type Sig = { png: Uint8Array; w: number; h: number };
  * the comment tool in use (null: none — the page behaves as usual); `signing`: the signature dialog is open;
  * `sig`: the signature the "sign" tool places
  */
-export const usePdfAnnot = create<{ tool: PdfAnnotKind | null; open: string | null; signing: boolean; sig: Sig | null }>(() => ({ tool: null, open: null, signing: false, sig: null }));
+export const usePdfAnnot = create<{ tool: PdfAnnotKind | null; open: string | null; signing: boolean; sig: Sig | null; autoPlace?: boolean }>(() => ({ tool: null, open: null, signing: false, sig: null }));
 
 /** Acrobat's default colours */
 export const ANNOT_COLOR: Record<PdfAnnotKind, [number, number, number]> = {
@@ -32,6 +32,7 @@ export const ANNOT_COLOR: Record<PdfAnnotKind, [number, number, number]> = {
   strike: [0.89, 0.16, 0.16],
   note: [1, 0.82, 0.16],
   sign: [0, 0, 0],
+  measure: [0.85, 0.1, 0.1],
 };
 const css = (c: [number, number, number]) => `rgb(${c.map((v) => Math.round(v * 255)).join(",")})`;
 let seq = 0;
@@ -98,11 +99,33 @@ export function PdfAnnotLayer() {
     return () => window.removeEventListener("keydown", esc);
   }, [tool]);
   useEffect(() => usePdfAnnot.setState({ open: null, signing: false }), [page?.id]);
+  // on a phone (the PC feature screen): the signature lands at once in the middle of the page shown, at a size a finger
+  // can grab (twice Acrobat's), then is dragged / resized by its handles — no "now tap the page" step to guess
+  const autoPlace = usePdfAnnot((s) => s.autoPlace);
+  useEffect(() => {
+    if (!autoPlace || !sig || !page || !node || !geom) return;
+    usePdfAnnot.setState({ autoPlace: false, tool: null });
+    const wrap = layer.current?.parentElement ?? document.querySelector(".stage .canvas-wrap");
+    const r = wrap?.getBoundingClientRect();
+    const v = useStore.getState().view;
+    const lp = invertTransform(node.transform, [((r ? r.width / 2 : 180) - v.panX) / v.zoom, ((r ? r.height / 2.4 : 300) - v.panY) / v.zoom]);
+    const p = nodePointToPdf(geom, node.pageIndex, lp as [number, number]);
+    const rot = geom.pages[node.pageIndex]?.rotate ?? 0;
+    const w = SIGN_W * 2;
+    const rect = placeUpright(p, w, (w * sig.h) / sig.w, rot);
+    const asset = makeAsset(sig.png, "image/png", "signature.png");
+    const a: PdfAnnot = { id: newId(), kind: "sign", rect, color: ANNOT_COLOR.sign, assetId: asset.id, upright: true };
+    useStore.getState().commit(tr("pdf.sign.hist"), (d) => {
+      d.assets[asset.id] = asset;
+      const n = draftPage(d, page.id)?.nodes.find((x) => x.id === node.id) as PdfNode | undefined;
+      if (n) n.annots = [...((n.annots as PdfAnnot[] | undefined) ?? []), a];
+    });
+  }, [autoPlace, sig, page, node, geom]);
   // another tool (or Esc): a drag in progress is dropped
   useEffect(() => setDrag(null), [tool]);
   if (!page || !node || !geom || !node.visible) return null;
   const dialog = signing && (
-    <SignDialog onDone={(sg) => usePdfAnnot.setState({ signing: false, sig: sg, tool: "sign" })} onCancel={() => usePdfAnnot.setState({ signing: false })} />
+    <SignDialog onDone={(sg) => usePdfAnnot.setState({ signing: false, sig: sg, tool: "sign", autoPlace: document.documentElement.classList.contains("phone-desk") })} onCancel={() => usePdfAnnot.setState({ signing: false })} />
   );
   if (appTool !== "select" && !tool) return dialog || null;
 
@@ -244,6 +267,12 @@ export function PdfAnnotLayer() {
           annot={openAnnot}
           at={boxOf(annotRect(openAnnot))}
           onText={(text) => commitAnnots(page.id, node.id, tr("pdf.annot.hist.edit"), (l) => l.map((x) => (x.id === openAnnot.id ? { ...x, contents: text || undefined } : x)))}
+          onReply={(text) =>
+            commitAnnots(page.id, node.id, tr("pdftools.reply.hist"), (l) =>
+              l.map((x) => (x.id === openAnnot.id ? { ...x, replies: [...(x.replies ?? []), { id: newId(), contents: text, date: new Date().toISOString() }] } : x)),
+            )
+          }
+          onState={(st) => commitAnnots(page.id, node.id, tr("pdftools.state.hist"), (l) => l.map((x) => (x.id === openAnnot.id ? { ...x, state: st || undefined } : x)))}
           onDelete={() => {
             commitAnnots(page.id, node.id, tr("pdf.annot.hist.delete"), (l) => l.filter((x) => x.id !== openAnnot.id));
             usePdfAnnot.setState({ open: null });
@@ -256,9 +285,31 @@ export function PdfAnnotLayer() {
   );
 }
 
-function AnnotPopover({ annot, at, onText, onDelete, onClose }: { annot: PdfAnnot; at: { left: number; top: number; width: number; height: number }; onText: (s: string) => void; onDelete: () => void; onClose: () => void }) {
+function AnnotPopover({
+  annot,
+  at,
+  onText,
+  onReply,
+  onState,
+  onDelete,
+  onClose,
+}: {
+  annot: PdfAnnot;
+  at: { left: number; top: number; width: number; height: number };
+  onText: (s: string) => void;
+  onReply: (s: string) => void;
+  onState: (s: PdfReviewState | "") => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
   const t = useT();
   const [text, setText] = useState(annot.contents ?? "");
+  const [reply, setReply] = useState("");
+  const sendReply = () => {
+    if (!reply.trim()) return;
+    onReply(reply.trim());
+    setReply("");
+  };
   const ref = useRef<HTMLTextAreaElement>(null);
   const saved = useRef(annot.contents ?? "");
   const save = () => {
@@ -275,7 +326,16 @@ function AnnotPopover({ annot, at, onText, onDelete, onClose }: { annot: PdfAnno
     return () => latest.current();
   }, []);
   return (
-    <div className="pdf-annot-pop" style={{ left: at.left, top: at.top + at.height + 4 }} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+    <div className="pdf-annot-pop" style={{ left: at.left, top: at.top + at.height + 4 }} onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        // Esc anywhere in the box closes it (what was typed is kept); Ctrl / Cmd shortcuts (save …) still reach the app
+        if (e.key === "Escape" && !e.defaultPrevented) {
+          e.preventDefault();
+          save();
+          onClose();
+        }
+        if (!e.ctrlKey && !e.metaKey) e.stopPropagation();
+      }}>
       <div className="pdf-annot-pop-head">
         <span className="swatch" style={{ background: css(annot.color) }} />
         <span>{t("pdf.annot.kind." + annot.kind)}</span>
@@ -296,6 +356,43 @@ function AnnotPopover({ annot, at, onText, onDelete, onClose }: { annot: PdfAnno
         }}
       />
       )}
+      {/* Acrobat's comment replies and review state */}
+      {(annot.replies ?? []).map((r) => (
+        <div key={r.id} className="pdf-annot-reply">
+          <span className="pdf-annot-reply-mark">↳</span> {r.contents}
+        </div>
+      ))}
+      {annot.kind !== "sign" && (
+        <div className="pdf-annot-reply-row">
+          <input
+            type="text"
+            value={reply}
+            placeholder={t("pdftools.reply.placeholder")}
+            aria-label={t("pdftools.reply.placeholder")}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                sendReply();
+              }
+            }}
+          />
+          <button type="button" className="btn btn-ghost" disabled={!reply.trim()} onClick={sendReply}>
+            {t("pdftools.reply.send")}
+          </button>
+        </div>
+      )}
+      <label className="pdf-annot-state">
+        <span>{t("pdftools.state.label")}</span>
+        <select value={annot.state ?? ""} onChange={(e) => onState(e.target.value as PdfReviewState | "")} aria-label={t("pdftools.state.label")}>
+          <option value="">{t("pdftools.state.none")}</option>
+          {(["Accepted", "Rejected", "Cancelled", "Completed"] as const).map((s) => (
+            <option key={s} value={s}>
+              {t("pdftools.state." + s)}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="pdf-annot-pop-foot">
         <button
           type="button"

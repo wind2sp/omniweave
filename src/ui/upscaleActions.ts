@@ -7,7 +7,8 @@
 //    become PNG) with the original's metadata carried over (core/image/imageMeta.ts); the node keeps its size on the
 //    page, so it is simply sharper there. The original asset stays in history, so undo restores it.
 //  - `canvas`: when the target covers the whole canvas (an opened picture, a one-layer image), the page grows by the
-//    same factor — Photoshop's Image Size.
+//    same factor — Photoshop's Image Size: the other layers grow with it (scaled in place from the page's corner), so
+//    the picture keeps its make-up (QA image-design-cad △ 업스케일 범위: only the chosen layer grew).
 // Refused (with a notice): adjustment and text layers, CMYK and 32-bit PSD documents (docs/design/IMAGE_UPSCALE.md §3),
 // SVG pictures (vectors need no enlarging).
 
@@ -254,10 +255,18 @@ export async function applyUpscale(req: UpscaleRequest, onProgress?: (done: numb
       return null;
     }
     const label = tr("image.upscale.undo", { w: W, h: H });
+    let others = 0;
     const growPage = (pg: Page) => {
       if (!grow) return;
       pg.width = Math.round(pg.width * sx);
       pg.height = Math.round(pg.height * sy);
+      for (const n of pg.nodes) {
+        if (n.id === t.node.id) continue;
+        const tr0 = n.transform;
+        const ky = tr0.scaleY ?? tr0.scale;
+        n.transform = { ...tr0, x: tr0.x * sx, y: tr0.y * sy, scale: tr0.scale * sx, ...(tr0.scaleY !== undefined || sx !== sy ? { scaleY: ky * sy } : {}) };
+        others++;
+      }
     };
     if (t.node.type === "RASTER") {
       // tile-aligned frame around the new pixels (top-left of the painted area fixed)
@@ -302,7 +311,7 @@ export async function applyUpscale(req: UpscaleRequest, onProgress?: (done: numb
         }
       });
     }
-    s.notify(tr("image.upscale.done", { w: W, h: H, ms: Math.round(ms) }));
+    s.notify(tr("image.upscale.done", { w: W, h: H, ms: Math.round(ms) }) + (others ? " " + tr("image.upscale.others", { n: others }) : ""));
     return { ms, width: W, height: H };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

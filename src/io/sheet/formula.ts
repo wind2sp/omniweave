@@ -7,7 +7,8 @@ export type Ast =
   | { k: "str"; v: string }
   | { k: "bool"; v: boolean }
   | { k: "err"; v: string }
-  | { k: "ref"; sheet?: string; r0: number; c0: number; r1: number; c1: number; area: boolean }
+  /** `body`: the reference as written ($A$1:B2 — its absolute marks) */
+  | { k: "ref"; sheet?: string; r0: number; c0: number; r1: number; c1: number; area: boolean; body?: string }
   | { k: "name"; name: string; sheet?: string }
   | { k: "fn"; name: string; args: Ast[] }
   | { k: "un"; op: "-" | "+"; a: Ast }
@@ -213,7 +214,7 @@ export class FormulaError extends Error {}
 function refAst(tk: { body: string; sheet?: string }): Ast {
   const g = parseRange(tk.body);
   if (!g) return { k: "err", v: "#REF!" };
-  return { k: "ref", sheet: tk.sheet, ...g, area: tk.body.includes(":") };
+  return { k: "ref", sheet: tk.sheet, ...g, area: tk.body.includes(":"), body: tk.body };
 }
 
 /** Expression tree of a formula (without "="); throws FormulaError when it cannot be read. */

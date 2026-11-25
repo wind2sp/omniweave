@@ -50,6 +50,12 @@ BSD 3-Clause), converted (convolution + PReLU fused, half precision /
 8-bit weights) to Omniweave's own format and run by Omniweave's own code;
 the license text ships in models/sr/LICENSE.
 
+Background removal of person photos bundles the MODNet portrait matting
+weights (Zhanghan Ke et al.; https://github.com/ZHKKKe/MODNet, Apache-2.0),
+converted (8-bit weights with per-channel scales) to Omniweave's own format
+and run by Omniweave's own code; the license text ships in
+models/matte/LICENSE.
+
 CMYK documents without a usable colour profile are shown through an
 altered, reduced version of the FOGRA39L Coated profile from the OpenICC /
 colord free profile set (Kai-Uwe Behrmann, Marti Maria, Photogamut,

@@ -14,6 +14,7 @@
 // or new tile has none and is read back from its RGB (C, M, Y = R, G, B with no black ink: exact for the reader's
 // conversion). Only tiles with black ink are stored — without black the RGB tile already says everything.
 
+import { shownTiles } from "./layerMask";
 import { compositeInks, compositeTree, type PlacedPixels } from "./softComposite";
 import { linearToSrgb as encodeSrgb, srgbToLinear } from "./adjust";
 import { cmykToRgba, readChannelPlane, duotoneGrey, duotoneLut, importPsdPage, layerCmykPlanes, parsePsdLayout, psdCmykProfile, type GreyOf } from "../../io/formats/psd";
@@ -245,6 +246,8 @@ export interface Geo {
   w: number;
   h: number;
   tiles: RasterNode["tiles"];
+  /** a layer with a mask: its own tiles (the channels are stored by these hashes); `tiles` are what it shows */
+  src?: RasterNode["tiles"];
 }
 
 const geos = new WeakMap<RasterNode, Geo | null>();
@@ -254,12 +257,14 @@ export function rasterGeo(n: RasterNode): Geo | null {
   let g = geos.get(n);
   if (g !== undefined) return g;
   let mx = -1, my = -1;
-  for (const k of Object.keys(n.tiles)) {
+  // (a layer mask applied: core/image/layerMask.ts)
+  const shown = shownTiles(n);
+  for (const k of Object.keys(shown)) {
     const i = k.indexOf("_");
     mx = Math.max(mx, +k.slice(0, i));
     my = Math.max(my, +k.slice(i + 1));
   }
-  g = mx < 0 ? null : { x: Math.round(n.transform.x), y: Math.round(n.transform.y), w: (mx + 1) * TILE, h: (my + 1) * TILE, tiles: n.tiles };
+  g = mx < 0 ? null : { x: Math.round(n.transform.x), y: Math.round(n.transform.y), w: (mx + 1) * TILE, h: (my + 1) * TILE, tiles: shown, ...(shown !== n.tiles ? { src: n.tiles } : {}) };
   geos.set(n, g);
   return g;
 }
@@ -289,7 +294,9 @@ export function slicePass(g: Geo, X0: number, Y0: number, rw: number, rh: number
       const sx0 = Math.max(lx0, tx * TILE), sx1 = Math.min(lx0 + w, (tx + 1) * TILE);
       const sy0 = Math.max(ly0, ty * TILE), sy1 = Math.min(ly0 + h, (ty + 1) * TILE);
       // a 32-bit tile with light past white: its floats beside the 8-bit pixels (linearStoreOf)
-      const hdr = pass === "rgb" && store && linearStores.has(store) ? store.get(t.hash) : undefined;
+      // (channels are stored by the layer's own tile; a mask only takes alpha away)
+      const ht = g.src?.[`${tx}_${ty}`]?.hash ?? t.hash;
+      const hdr = pass === "rgb" && store && linearStores.has(store) ? store.get(ht) : undefined;
       if (hdr) {
         const f = new Float32Array(hdr.buffer, hdr.byteOffset, hdr.byteLength >> 2);
         lin ??= linFrom(rgba.length >> 2);
@@ -301,7 +308,7 @@ export function slicePass(g: Geo, X0: number, Y0: number, rw: number, rh: number
             lin[di + 2] = f[si + 2];
           }
       }
-      const ink = pass === "rgb" || !store ? undefined : store.get(t.hash) ?? (record !== undefined ? store.get(layerTileKey(t.hash, record, `${tx}_${ty}`)) : undefined);
+      const ink = pass === "rgb" || !store ? undefined : store.get(ht) ?? (record !== undefined ? store.get(layerTileKey(ht, record, `${tx}_${ty}`)) : undefined);
       // a colour-managed file's changed or new tile: its inks through the profile's separation
       const sep = !ink && pass !== "rgb" ? cmykXformOf(store) : null;
       for (let y = sy0; y < sy1; y++) {
@@ -506,7 +513,7 @@ export function cmykComposable(page: Pick<Page, "nodes" | "groups">): boolean {
     shown.push(n);
   }
   // soft edges of a layer over another (the bottom one's only meet the page colour, as in RGB): the tiles' alpha
-  if (ok && !blend) blend = shown.slice(1).some((n) => Object.values(n.tiles).some(partialTile));
+  if (ok && !blend) blend = shown.slice(1).some((n) => Object.values(shownTiles(n)).some(partialTile));
   const v = blend && ok;
   needMemo.set(page.nodes, { groups: page.groups, v });
   return v;

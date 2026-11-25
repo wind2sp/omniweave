@@ -141,5 +141,7 @@
   "docmode.status.countTip": "字数统计（不含空格的字符数）",
   "docmode.status.langTip": "正文中使用最多的语言",
   "docmode.ruler.topTip": "段落缩进：上 ▽ 首行 · 下 ▲ 悬挂 · □ 左 · 右 ▲ — 拖动调整（Alt：不对齐刻度）。双击：页面设置",
-  "docmode.ruler.leftTip": "垂直标尺 — 上下页边距以阴影显示。双击：页面设置"
+  "docmode.ruler.leftTip": "垂直标尺 — 上下页边距以阴影显示。双击：页面设置",
+  "docmode.status.pageBoxTip": "输入页码并按 Enter 跳转（也可用 PgUp、PgDn、Home、End 翻页）",
+  "docmode.status.pageCount": "{m} 页"
 }

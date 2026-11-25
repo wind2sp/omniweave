@@ -25,7 +25,7 @@
   "engine.cad.group.dim": "Dimension {name}",
   "engine.cad.page.model": "{name} · Model",
   "engine.cad.page.layout": "{name} · Layout {layout}",
-  "engine.open.cad": "{fmt} drawing ({release}) · {layers} layers · {n} objects · scale {scale}",
+  "engine.open.cad": "{fmt} drawing ({release}) · {layers} layers · {n} objects · scale {scale} · import only (work as .omw, send with Export › DXF)",
   "engine.cad.warn.merged": "Large drawing: {n} lines of the same layer and look were merged into shared paths",
   "engine.cad.warn.empty": "The drawing has nothing to draw",
   "engine.cad.warn.unsupported": "Read but not drawn yet: {list}",

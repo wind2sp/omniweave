@@ -39,5 +39,7 @@
   "pdf.sign.histMove": "移动签名",
   "cmd.text.pdfSign": "添加签名",
   "pdf.find.hint": "在 PDF 页面中查找文字。Enter：下一个，Shift+Enter：上一个",
-  "pdf.find.searching": "正在查找…"
+  "pdf.find.searching": "正在查找…",
+  "pdf.select.copied": "已复制所选的 {n} 个字符",
+  "pdf.select.copyFailed": "无法复制到剪贴板"
 }

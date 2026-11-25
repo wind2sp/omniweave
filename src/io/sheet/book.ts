@@ -17,8 +17,14 @@ import { Book } from "./calc";
 import { addr, colLetters, parseAddr, parseRange, tokenize } from "./formula";
 import { formatValue, type SheetLang } from "./numfmt";
 import { readXlsx, widthChars, widthPx } from "./read";
-import { SheetSurgery } from "./bookExtra";
+import { SheetSurgery, writeFreshNotes } from "./bookExtra";
 import { freshStyles, StyleWriter } from "./styleWriter";
+import { splitPaneXml, workbookParts, writeSheetParts } from "./writeParts";
+import { PERSON_CT, PERSON_REL, personsXml, writeThreads } from "./threads";
+import { FreshRels, writeSheetDrawings } from "./writeDrawings";
+import { listPivotCaches, writeNewPivots, type NewPivot } from "./pivots";
+import { listSlicerCaches, slicerCacheXml, SLICER_CACHE_CT, SLICER_CACHE_REL, writeNewSlicers, type SlicerCacheOut } from "./slicers";
+import { writeNewTables } from "./writeTables";
 
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -56,7 +62,7 @@ export function openSheetBook(bytes: Uint8Array, name: string, lang: SheetLang, 
 
 // ───── cell XML ─────
 
-export const FUTURE = new Set(["XLOOKUP", "XMATCH", "IFS", "SWITCH", "MAXIFS", "MINIFS", "CONCAT", "TEXTJOIN", "XOR", "DAYS", "STDEV.S", "STDEV.P", "VAR.S", "VAR.P", "RANK.EQ", "CEILING.MATH", "FLOOR.MATH", "IFNA", "UNICHAR", "UNICODE", "FILTER", "SORT", "SORTBY", "UNIQUE", "SEQUENCE", "RANDARRAY", "LET", "LAMBDA", "CHOOSECOLS", "CHOOSEROWS", "TAKE", "DROP", "VSTACK", "HSTACK", "TOCOL", "TOROW", "WRAPROWS", "WRAPCOLS", "EXPAND", "TEXTSPLIT", "TEXTBEFORE", "TEXTAFTER", "ANCHORARRAY", "SINGLE"]);
+export const FUTURE = new Set(["XLOOKUP", "XMATCH", "IFS", "SWITCH", "MAXIFS", "MINIFS", "CONCAT", "TEXTJOIN", "XOR", "DAYS", "STDEV.S", "STDEV.P", "VAR.S", "VAR.P", "RANK.EQ", "CEILING.MATH", "FLOOR.MATH", "IFNA", "UNICHAR", "UNICODE", "FILTER", "SORT", "SORTBY", "UNIQUE", "SEQUENCE", "RANDARRAY", "LET", "LAMBDA", "CHOOSECOLS", "CHOOSEROWS", "TAKE", "DROP", "VSTACK", "HSTACK", "TOCOL", "TOROW", "WRAPROWS", "WRAPCOLS", "EXPAND", "TEXTSPLIT", "TEXTBEFORE", "TEXTAFTER", "ANCHORARRAY", "SINGLE", "MODE.SNGL", "PERCENTILE.INC", "PERCENTILE.EXC", "QUARTILE.INC"]);
 /** dynamic-array functions Excel stores as _xlfn._xlws. */
 const XLWS = new Set(["FILTER", "SORT"]);
 
@@ -174,7 +180,10 @@ export function cellXml(px: string, ref: string, xf: number, c: SheetCell | unde
   }
   let fXml = "";
   let cmA = "";
-  if (c.f && c.spill) {
+  if (c.dt) {
+    const d = c.dt;
+    fXml = `<${F} t="dataTable" ref="${d.ref}"${d.dt2D ? ' dt2D="1"' : ""}${d.dtr ? ' dtr="1"' : ""} r1="${d.r1}"${d.r2 ? ` r2="${d.r2}"` : ""}/>`;
+  } else if (c.f && c.spill) {
     // a blocked dynamic array (#SPILL!) covers its own cell only
     const fr = c.t === "e" && v === "#SPILL!" && !c.cse ? ref : c.spill;
     fXml = `<${F} t="array" ref="${fr}">${xmlText(fileFormula(c.f))}</${F}>`;
@@ -224,7 +233,7 @@ function xfResolver(sh: SheetData, orig: SheetData | undefined, sw: StyleWriter)
 /** `orig`: a column's width as the file wrote it, kept while it still gives the column's px (a partial save rewrites
  * <cols> when one column changes; the others keep their text, 8.43 not 8.42578125). */
 function colsXml(sh: SheetData, mdw: number, xfOf: (s: number | undefined) => number, orig?: (c: number) => string | undefined): string {
-  const idx = new Set<number>([...Object.keys(sh.colW).map(Number), ...(sh.hiddenCols ?? []), ...Object.keys(sh.colS ?? {}).map(Number)]);
+  const idx = new Set<number>([...Object.keys(sh.colW).map(Number), ...(sh.hiddenCols ?? []), ...Object.keys(sh.colS ?? {}).map(Number), ...Object.keys(sh.colLevel ?? {}).map(Number)]);
   if (!idx.size) return "";
   const hidden = new Set(sh.hiddenCols ?? []);
   const list = [...idx].sort((a, b) => a - b);
@@ -233,7 +242,8 @@ function colsXml(sh: SheetData, mdw: number, xfOf: (s: number | undefined) => nu
     const st = sh.colS?.[c];
     const was = orig?.(c);
     const chars = was != null && Number(was) >= 0 && widthPx(Number(was), mdw) === w ? was : String(widthChars(w, mdw) || 0);
-    return `width="${chars}" customWidth="1"${hidden.has(c) ? ' hidden="1"' : ""}${st ? ` style="${xfOf(st)}"` : ""}`;
+    const lv = sh.colLevel?.[c];
+    return `width="${chars}" customWidth="1"${hidden.has(c) ? ' hidden="1"' : ""}${st ? ` style="${xfOf(st)}"` : ""}${lv ? ` outlineLevel="${lv}"` : ""}`;
   };
   const out: string[] = [];
   for (let i = 0; i < list.length; ) {
@@ -263,12 +273,18 @@ const rowAttrs = (sh: SheetData, r: number, xfOf: (s: number | undefined) => num
   const hidden = sh.hiddenRows?.includes(r);
   const st = sh.rowS?.[r];
   // (a row Excel fitted to its text — rowAuto — is written without customHeight, as Excel wrote it)
-  return `${h != null ? ` ht="${Math.round(((h * 72) / 96) * 100) / 100}"${sh.rowAuto?.[r] ? "" : ' customHeight="1"'}` : ""}${hidden ? ' hidden="1"' : ""}${st ? ` s="${xfOf(st)}" customFormat="1"` : ""}`;
+  const lv = sh.rowLevel?.[r];
+  return `${h != null ? ` ht="${Math.round(((h * 72) / 96) * 100) / 100}"${sh.rowAuto?.[r] ? "" : ' customHeight="1"'}` : ""}${hidden ? ' hidden="1"' : ""}${st ? ` s="${xfOf(st)}" customFormat="1"` : ""}${lv ? ` outlineLevel="${lv}"` : ""}`;
+};
+/** sheetFormatPr's outline depths (Excel sizes the outline bar by them) */
+const outlineAttrs = (sh: SheetData) => {
+  const r = Math.max(0, ...Object.values(sh.rowLevel ?? {})), c = Math.max(0, ...Object.values(sh.colLevel ?? {}));
+  return `${r ? ` outlineLevelRow="${r}"` : ""}${c ? ` outlineLevelCol="${c}"` : ""}`;
 };
 
 export function worksheetXml(sh: SheetData, mdw: number, xfOf: (s: number | undefined) => number, cmOf?: () => number | null): string {
   const rows = rowsOf(sh);
-  for (const r of [...Object.keys(sh.rowH).map(Number), ...(sh.hiddenRows ?? []), ...Object.keys(sh.rowS ?? {}).map(Number)]) if (!rows.has(r)) rows.set(r, []);
+  for (const r of [...Object.keys(sh.rowH).map(Number), ...(sh.hiddenRows ?? []), ...Object.keys(sh.rowS ?? {}).map(Number), ...Object.keys(sh.rowLevel ?? {}).map(Number)]) if (!rows.has(r)) rows.set(r, []);
   const rowsXml = [...rows.keys()]
     .sort((a, b) => a - b)
     .map((r) => {
@@ -282,13 +298,13 @@ export function worksheetXml(sh: SheetData, mdw: number, xfOf: (s: number | unde
     })
     .join("");
   const fr = sh.freeze;
-  const pane = fr && (fr.rows || fr.cols) ? `<pane${fr.cols ? ` xSplit="${fr.cols}"` : ""}${fr.rows ? ` ySplit="${fr.rows}"` : ""} topLeftCell="${addr(fr.rows, fr.cols)}" activePane="${fr.rows && fr.cols ? "bottomRight" : fr.rows ? "bottomLeft" : "topRight"}" state="frozen"/>` : "";
-  const view = `<sheetViews><sheetView${sh.grid ? "" : ' showGridLines="0"'}${sh.headings ? "" : ' showRowColHeaders="0"'}${sh.zoom ? ` zoomScale="${Math.round(sh.zoom * 100)}"` : ""} workbookViewId="0">${pane}</sheetView></sheetViews>`;
+  const pane = !fr && sh.split ? splitPaneXml("", sh) : fr && (fr.rows || fr.cols) ? `<pane${fr.cols ? ` xSplit="${fr.cols}"` : ""}${fr.rows ? ` ySplit="${fr.rows}"` : ""} topLeftCell="${addr(fr.rows, fr.cols)}" activePane="${fr.rows && fr.cols ? "bottomRight" : fr.rows ? "bottomLeft" : "topRight"}" state="frozen"/>` : "";
+  const view = `<sheetViews><sheetView${sh.grid ? "" : ' showGridLines="0"'}${sh.headings ? "" : ' showRowColHeaders="0"'}${sh.zoom ? ` zoomScale="${Math.round(sh.zoom * 100)}"` : ""}${!fr && sh.split ? ` topLeftCell="${addr(sh.split.top, sh.split.left)}"` : ""} workbookViewId="0">${pane}</sheetView></sheetViews>`;
   const merges = sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map((m) => `<mergeCell ref="${m}"/>`).join("")}</mergeCells>` : "";
   const tab = sh.tabColor ? `<sheetPr><tabColor rgb="FF${sh.tabColor.replace("#", "")}"/></sheetPr>` : "";
   return (
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
-    `${tab}${view}<sheetFormatPr defaultRowHeight="${Math.round(((sh.defRowH * 72) / 96) * 100) / 100}"${sh.defRowCustom ? ' customHeight="1"' : ""}/>${colsXml(sh, mdw, xfOf)}<sheetData>${rowsXml}</sheetData>${merges}</worksheet>`
+    `${tab}${view}<sheetFormatPr defaultRowHeight="${Math.round(((sh.defRowH * 72) / 96) * 100) / 100}"${sh.defRowCustom ? ' customHeight="1"' : ""}${outlineAttrs(sh)}/>${colsXml(sh, mdw, xfOf)}<sheetData>${rowsXml}</sheetData>${merges}</worksheet>`
   );
 }
 
@@ -304,9 +320,26 @@ export function writeFreshXlsx(sheets: SheetData[]): Uint8Array {
   const over: string[] = [];
   let dynamic = false;
   const cmOf = () => ((dynamic = true), 1);
+  const pivotCaches: (NewPivot & { si: number })[] = [];
+  let cacheN = 0;
+  const tableIds = new Map<string, number>();
+  const slicerCaches: SlicerCacheOut[] = [];
+  const persons = new Map<string, string>();
   sheets.forEach((sh, i) => {
     const xfOf = (s: number | undefined) => (!s && sameStyle(sh.styles[s ?? 0], {}) ? 0 : sw.xfFor(sh.styles[s ?? 0] ?? {}));
-    files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(worksheetXml(sh, base.mdw, xfOf, cmOf));
+    const part = `xl/worksheets/sheet${i + 1}.xml`;
+    const pkg = new FreshRels(part, files, over);
+    let xml = writeSheetParts(worksheetXml(sh, base.mdw, xfOf, cmOf), sh, null, (st) => sw.dxfFor(st), pkg);
+    xml = writeSheetDrawings(xml, sh, null, pkg);
+    xml = writeFreshNotes(xml, sh, pkg);
+    writeThreads(sh, null, pkg, persons);
+    xml = writeNewTables(xml, sh, null, pkg, tableIds);
+    const sl = writeNewSlicers(xml, sh, null, pkg, sheets);
+    xml = sl.xml;
+    slicerCaches.push(...sl.caches);
+    pivotCaches.push(...writeNewPivots(sh, sheets, pkg, () => ++cacheN).map((x) => ({ ...x, si: i })));
+    files[part] = strToU8(xml);
+    pkg.flush();
     let name = sh.name.replace(/[[\]:*?/\\]/g, "_").slice(0, 31) || `Sheet${i + 1}`;
     for (let k = 2; used.has(name.toLowerCase()); k++) name = `${name.slice(0, 28)}_${k}`;
     used.add(name.toLowerCase());
@@ -322,11 +355,48 @@ export function writeFreshXlsx(sheets: SheetData[]): Uint8Array {
     rels.push(`<Relationship Id="rId${n + 2}" Type="${METADATA_REL}" Target="metadata.xml"/>`);
     over.push(`<Override PartName="/xl/metadata.xml" ContentType="${METADATA_TYPE}"/>`);
   }
-  const names = Object.entries(base.names ?? {});
-  const definedNames = names.length ? `<definedNames>${names.map(([k, v]) => `<definedName name="${esc(k)}">${xmlText(fileFormula(v))}</definedName>`).join("")}</definedNames>` : "";
+  // pivot tables made here: the workbook lists their caches
+  const cacheList = pivotCaches.map((c, k) => {
+    const rid = `rId${n + 3 + k}`;
+    rels.push(`<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="${c.def.replace(/^xl\//, "")}"/>`);
+    return { cacheId: c.cacheId, rid };
+  });
+  // slicers made here: their caches (parts, relationships, the workbook's list and names)
+  const slicerList: { name: string; rid: string; table: boolean }[] = [];
+  slicerCaches.forEach((c) => {
+    const x = slicerCacheXml(
+      c,
+      (name) => tableIds.get(name) ?? null,
+      (sheet, at) => {
+        const p = pivotCaches.find((q) => sheets[q.si].name === sheet && q.at === at);
+        return p && p.x14 != null ? { sheet, at, tabId: p.si + 1, name: p.name, x14: p.x14, items: p.items, shown: p.shown } : null;
+      },
+    );
+    if (!x) return;
+    const k = slicerList.length + 1;
+    const rid = `rId${n + 3 + cacheList.length + k}`;
+    files[`xl/slicerCaches/slicerCache${k}.xml`] = strToU8(x);
+    rels.push(`<Relationship Id="${rid}" Type="${SLICER_CACHE_REL}" Target="slicerCaches/slicerCache${k}.xml"/>`);
+    over.push(`<Override PartName="/xl/slicerCaches/slicerCache${k}.xml" ContentType="${SLICER_CACHE_CT}"/>`);
+    slicerList.push({ name: c.name, rid, table: !!c.table });
+  });
   files["xl/workbook.xml"] = strToU8(
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${base.date1904 ? '<workbookPr date1904="1"/>' : ""}<bookViews><workbookView activeTab="0"/></bookViews><sheets>${sheetEls.join("")}</sheets>${definedNames}<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`,
+    listSlicerCaches(listPivotCaches(
+      workbookParts(
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${base.date1904 ? '<workbookPr date1904="1"/>' : ""}<bookViews><workbookView activeTab="0"/></bookViews><sheets>${sheetEls.join("")}</sheets><calcPr calcId="191029"${base.calcManual ? ' calcMode="manual"' : ""} fullCalcOnLoad="1"/></workbook>`,
+        sheets,
+        null,
+        fileFormula,
+      ),
+      cacheList,
+    ), slicerList),
   );
+  // the authors of threaded comments (메모 스레드)
+  if (persons.size) {
+    files["xl/persons/person.xml"] = strToU8(personsXml(persons));
+    rels.push(`<Relationship Id="rIdPersons" Type="${PERSON_REL}" Target="persons/person.xml"/>`);
+    over.push(`<Override PartName="/xl/persons/person.xml" ContentType="${PERSON_CT}"/>`);
+  }
   files["xl/_rels/workbook.xml.rels"] = strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join("")}</Relationships>`);
   files["_rels/.rels"] = strToU8(
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
@@ -418,11 +488,13 @@ export function saveSheetSurgical(pages: Page[], meta: OfficeSourceMeta): Surger
     const r = rewriteSheet(pre.xml, sh, o, xfResolver(sh, o, sw), te, sh.part, cmOf, spilledAsCalculated, pre.force);
     formulaGone ||= r.formulaGone || ex.moved;
     anyValue ||= r.values || ex.moved;
-    const out = ex.after(sh, o, r.xml);
+    const out = ex.after(sh, o, r.xml, (st) => sw.dxfFor(st), cur);
     if (out !== xml) changed.set(sh.part, enc.encode(out));
   }
   const wb0 = read("xl/workbook.xml") ?? "";
   let wb = ex.workbook(wb0);
+  // print area / titles, names defined here, structure protection (io/sheet/writeParts.ts)
+  wb = workbookParts(wb, cur, { sheets: origSheets, names: origSheets[0]?.names }, fileFormula);
   let wbRels = read("xl/_rels/workbook.xml.rels") ?? "";
   let types = ex.contentTypes(ct);
   // renamed sheets
@@ -474,7 +546,7 @@ export function saveSheetSurgical(pages: Page[], meta: OfficeSourceMeta): Surger
       while (zip.entries.some((e) => e.name === `xl/worksheets/sheet${n}.xml`) || changed.has(`xl/worksheets/sheet${n}.xml`)) n++;
       const part = `xl/worksheets/sheet${n}.xml`;
       const xfOf = (s: number | undefined) => (!s && sameStyle(sh.styles[s ?? 0], {}) ? 0 : sw.xfFor(sh.styles[s ?? 0] ?? {}));
-      changed.set(part, enc.encode(worksheetXml(sh, base.mdw, xfOf, cmOf)));
+      changed.set(part, enc.encode(ex.fresh(sh, worksheetXml(sh, base.mdw, xfOf, cmOf), part, (st) => sw.dxfFor(st), cur)));
       const rid = `rId${nextRid++}`;
       insert += `<${sheetsClose[1] ?? ""}sheet name="${esc(sh.name)}" sheetId="${nextId++}" r:id="${rid}"/>`;
       wbRels = wbRels.replace(/<\/Relationships>/, `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${n}.xml"/></Relationships>`);
@@ -484,7 +556,56 @@ export function saveSheetSurgical(pages: Page[], meta: OfficeSourceMeta): Surger
     if (!/xmlns:r=/.test(wb.slice(0, 600))) throw new SurgeryUnavailable("namespace");
     wb = wb.slice(0, sheetsClose.index) + insert + wb.slice(sheetsClose.index);
   }
+  types = ex.contentTypes(types);
   ex.flush(changed, gone);
+  // the authors of threaded comments added here: the workbook's persons part (made when the file had none)
+  if (ex.personsChanged) {
+    const relTag = [...wbRels.matchAll(/<Relationship\b[^>]*>/g)].find((m) => /\/person"/.test(attrOf(m[0], "Type") ?? "") || attrOf(m[0], "Type") === PERSON_REL);
+    const path = relTag ? "xl/" + (attrOf(relTag[0], "Target") ?? "persons/person.xml").replace(/^\/?xl\//, "").replace(/^\//, "") : "xl/persons/person.xml";
+    changed.set(path, enc.encode(personsXml(ex.persons)));
+    if (!relTag) {
+      const rids = [...wbRels.matchAll(/\sId="rId(\d+)"/g)].map((m) => Number(m[1]));
+      wbRels = wbRels.replace(/<\/Relationships>/, `<Relationship Id="rId${Math.max(0, ...rids) + 1}" Type="${PERSON_REL}" Target="persons/person.xml"/></Relationships>`);
+      types = types.replace(/<\/Types>/, `<Override PartName="/xl/persons/person.xml" ContentType="${PERSON_CT}"/></Types>`);
+    }
+  }
+  // pivot tables made here: their caches in the workbook's relationships and <pivotCaches>
+  if (ex.caches.length) {
+    const list = ex.caches.map((c) => {
+      const rids = [...wbRels.matchAll(/\sId="rId(\d+)"/g)].map((m) => Number(m[1]));
+      const rid = `rId${Math.max(0, ...rids) + 1}`;
+      wbRels = wbRels.replace(/<\/Relationships>/, `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="${c.def.replace(/^xl\//, "")}"/></Relationships>`);
+      return { cacheId: c.cacheId, rid };
+    });
+    wb = listPivotCaches(wb, list);
+  }
+  // slicers made here: their caches (parts, the workbook's relationships, list and names)
+  if (ex.slicerCaches.length) {
+    const tabIds = [...wb.matchAll(/<(?:\w+:)?sheet\b[^>]*\ssheetId="(\d+)"/g)].map((m) => Number(m[1]));
+    const list: { name: string; rid: string; table: boolean }[] = [];
+    let k = 1;
+    for (const c of ex.slicerCaches) {
+      const x = slicerCacheXml(
+        c,
+        (name) => ex.tableIds.get(name) ?? cur.flatMap((s2) => s2.tables ?? []).find((tb) => tb.name === name)?.id ?? null,
+        (sheet, at) => {
+          const p = ex.caches.find((q) => q.sheet === sheet && q.at === at);
+          const si2 = cur.findIndex((s2) => s2.name === sheet);
+          return p && p.x14 != null && si2 >= 0 ? { sheet, at, tabId: tabIds[si2] ?? si2 + 1, name: p.name, x14: p.x14, items: p.items, shown: p.shown } : null;
+        },
+      );
+      if (!x) continue;
+      while (zip.entries.some((e) => e.name === `xl/slicerCaches/slicerCache${k}.xml`) || changed.has(`xl/slicerCaches/slicerCache${k}.xml`)) k++;
+      const part = `xl/slicerCaches/slicerCache${k}.xml`;
+      changed.set(part, enc.encode(x));
+      const rids = [...wbRels.matchAll(/\sId="rId(\d+)"/g)].map((m) => Number(m[1]));
+      const rid = `rId${Math.max(0, ...rids) + 1}`;
+      wbRels = wbRels.replace(/<\/Relationships>/, `<Relationship Id="${rid}" Type="${SLICER_CACHE_REL}" Target="slicerCaches/slicerCache${k}.xml"/></Relationships>`);
+      types = types.replace(/<\/Types>/, `<Override PartName="/${part}" ContentType="${SLICER_CACHE_CT}"/></Types>`);
+      list.push({ name: c.name, rid, table: !!c.table });
+    }
+    wb = listSlicerCaches(wb, list);
+  }
   if (te.any) {
     const get = (name: string) => (name === "xl/workbook.xml" ? wb : gone.has(name) ? null : changed.has(name) ? strFromU8(changed.get(name)!) : read(name));
     const names = [...new Set([...zip.entries.map((e) => e.name), ...changed.keys()])].filter((n) => !gone.has(n));
@@ -496,8 +617,25 @@ export function saveSheetSurgical(pages: Page[], meta: OfficeSourceMeta): Surger
     wbRels = wbRels.replace(/<\/Relationships>/, `<Relationship Id="rId${Math.max(0, ...rids) + 1}" Type="${METADATA_REL}" Target="metadata.xml"/></Relationships>`);
     types = types.replace(/<\/Types>/, `<Override PartName="/xl/metadata.xml" ContentType="${METADATA_TYPE}"/></Types>`);
   }
+  // 계산 옵션 (자동 / 수동) as the book now has it
+  {
+    const manual = !!pages.find((p) => p.sheet)?.sheet?.calcManual;
+    const m = /<(\w+:)?calcPr\b[^>]*>/.exec(wb);
+    const fileManual = !!m && /\scalcMode="manual"/.test(m[0]);
+    if (manual !== fileManual) {
+      if (m) {
+        const tag = m[0].replace(/\s+calcMode="[^"]*"/, "");
+        const fixed = manual ? tag.replace(/^<((\w+:)?calcPr)/, '<$1 calcMode="manual"') : tag;
+        wb = wb.slice(0, m.index) + fixed + wb.slice(m.index + m[0].length);
+      } else if (manual) wb = fullCalcOnLoad(wb).replace(/<((\w+:)?calcPr)\b/, '<$1 calcMode="manual"');
+    }
+  }
   if (!changed.size && !gone.size && wb === wb0 && !sw.changed) return { bytes: orig, unchanged: true, warnings: [] };
-  if (sw.changed && stylesXml != null) changed.set("xl/styles.xml", enc.encode(sw.result()));
+  if (sw.changed && stylesXml != null) {
+    changed.set("xl/styles.xml", enc.encode(sw.result()));
+    // a package whose stylesheet had no content type: Excel ignores the part, and the formats written here point nowhere
+    if (!/PartName="\/xl\/styles\.xml"/.test(types)) types = types.replace(/<\/Types>/, `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`);
+  }
   if (anyValue) wb = fullCalcOnLoad(wb);
   if (wb !== wb0) changed.set("xl/workbook.xml", enc.encode(wb));
   if (formulaGone && zip.entries.some((e) => e.name === "xl/calcChain.xml")) {
@@ -648,17 +786,18 @@ function rewriteSheet(
     } else if (body) newRows.set(r, `<${px}row r="${r + 1}">${body}</${px}row>`);
   }
   // row heights / hidden rows changed
-  for (const r of new Set([...Object.keys(sh.rowH), ...Object.keys(o.rowH)].map(Number).concat(sh.hiddenRows ?? [], o.hiddenRows ?? []))) {
-    if (sh.rowH[r] === o.rowH[r] && !!sh.rowAuto?.[r] === !!o.rowAuto?.[r] && !!sh.hiddenRows?.includes(r) === !!o.hiddenRows?.includes(r)) continue;
+  for (const r of new Set([...Object.keys(sh.rowH), ...Object.keys(o.rowH), ...Object.keys(sh.rowLevel ?? {}), ...Object.keys(o.rowLevel ?? {})].map(Number).concat(sh.hiddenRows ?? [], o.hiddenRows ?? []))) {
+    if (sh.rowH[r] === o.rowH[r] && !!sh.rowAuto?.[r] === !!o.rowAuto?.[r] && !!sh.hiddenRows?.includes(r) === !!o.hiddenRows?.includes(r) && (sh.rowLevel?.[r] ?? 0) === (o.rowLevel?.[r] ?? 0)) continue;
     const el = byRow.get(r);
     const cur = newRows.get(r) ?? (el ? xml.slice(el.start, el.end) : `<${px}row r="${r + 1}"></${px}row>`);
     const open = /^<[^>]*>/.exec(cur)![0];
     // (only hidden / shown: the row's own ht and customHeight stay as they are — a row Excel fitted to its text keeps
     // its exact height and no customHeight)
     const sized = sh.rowH[r] !== o.rowH[r] || !!sh.rowAuto?.[r] !== !!o.rowAuto?.[r];
-    let tag = open.replace(sized ? /\s(ht|customHeight|hidden)="[^"]*"/g : /\shidden="[^"]*"/g, "");
+    let tag = open.replace(sized ? /\s(ht|customHeight|hidden|outlineLevel)="[^"]*"/g : /\s(hidden|outlineLevel)="[^"]*"/g, "");
     const h = sh.rowH[r];
-    const extra = `${sized && h != null ? ` ht="${Math.round(((h * 72) / 96) * 100) / 100}"${sh.rowAuto?.[r] ? "" : ' customHeight="1"'}` : ""}${sh.hiddenRows?.includes(r) ? ' hidden="1"' : ""}`;
+    const lv = sh.rowLevel?.[r];
+    const extra = `${sized && h != null ? ` ht="${Math.round(((h * 72) / 96) * 100) / 100}"${sh.rowAuto?.[r] ? "" : ' customHeight="1"'}` : ""}${sh.hiddenRows?.includes(r) ? ' hidden="1"' : ""}${lv ? ` outlineLevel="${lv}"` : ""}`;
     tag = tag.replace(/(\/?)>$/, `${extra}$1>`);
     newRows.set(r, tag + cur.slice(open.length));
   }
@@ -688,7 +827,10 @@ function rewriteSheet(
     }
   }
   // column widths / hidden columns
-  const colsChanged = JSON.stringify([sh.colW, sh.hiddenCols ?? []]) !== JSON.stringify([o.colW, o.hiddenCols ?? []]);
+  const colsChanged = JSON.stringify([sh.colW, sh.hiddenCols ?? [], sh.colLevel ?? {}]) !== JSON.stringify([o.colW, o.hiddenCols ?? [], o.colLevel ?? {}]);
+  // the outline depths Excel sizes its outline bar by
+  if (JSON.stringify([sh.rowLevel ?? {}, sh.colLevel ?? {}]) !== JSON.stringify([o.rowLevel ?? {}, o.colLevel ?? {}]))
+    out = out.replace(/<((?:\w+:)?sheetFormatPr)\b([^>]*?)(\/?)>/, (_m, n: string, a: string, sl: string) => `<${n}${a.replace(/\soutlineLevel(Row|Col)="[^"]*"/g, "")}${outlineAttrs(sh)}${sl}>`);
   if (colsChanged) {
     const r2 = rootOf(out);
     const k2 = childrenOf(out, r2);

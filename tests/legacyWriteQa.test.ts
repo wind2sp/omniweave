@@ -15,7 +15,8 @@ import { DOMParser } from "@xmldom/xmldom";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { exportById, formatForExt, sameTypeExport } from "../src/io/formats";
-import { LEGACY_KINDS, legacyFingerprint, legacySource, legacyUnchanged, type LegacyKind } from "../src/io/formats/legacyWrite";
+import { LEGACY_KINDS, lastLegacySave, legacyFingerprint, legacySource, legacyUnchanged, type LegacyKind } from "../src/io/formats/legacyWrite";
+import { readXls } from "../src/io/sheet/readXls";
 import { newPage, type OmwDocument, type Page } from "../src/core/types";
 import { DICTS, useLang } from "../src/i18n";
 
@@ -50,6 +51,13 @@ const refusedAll = (kind: LegacyKind, edit: (doc: OmwDocument) => void) => async
     expect(eq(await save(doc, kind), bytes), f).toBe(true);
     edit(doc);
     expect(legacyUnchanged(doc.pages, kind), f).toBe(false);
+    // an .xls is written anew instead (what it cannot hold is asked about first — the confirm here says yes)
+    if (kind === "xls") {
+      const out = await save(doc, kind);
+      expect(lastLegacySave.xls, f).toBe("fresh");
+      expect(readXls(out, "en").sheets.length, f).toBeGreaterThan(0);
+      continue;
+    }
     await expect(save(doc, kind), f).rejects.toThrow();
   }
 };

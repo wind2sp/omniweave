@@ -28,6 +28,9 @@ import { readAdjustment } from "./psdAdjust";
 import { inkApproximation, type LayerAdjust } from "../../core/image/adjustLayer";
 import { linearToSrgb } from "../../core/image/adjust";
 import { blurPlane } from "../../core/image/effects";
+import { maskFingerprint, maskFromPlane } from "../../core/image/layerMask";
+import { readPaths } from "./psdPaths";
+import { readGuides } from "./psdGuides";
 import { psdTextKey, readPsdText } from "./psdText";
 import { contentDims, linkedFiles, readPlaced, smartContentKind } from "./psdSmart";
 import { cmykXform, defaultCmykProfile, type CmykXform } from "../../core/image/iccCmyk";
@@ -84,6 +87,11 @@ export interface PsdLayer {
   protect: number;
   /** a user / vector-rendered mask was applied to `rgba` */
   maskBaked: boolean;
+  /**
+   * a plain user mask kept apart instead (an editable layer mask, RasterNode.mask): its plane (255 = shows) over x, y, w, h
+   * relative to the layer's corner, the default colour outside it, turned off or not
+   */
+  mask?: { plane: Uint8Array; x: number; y: number; w: number; h: number; hide: boolean; off: boolean };
   /** additional-info keys present on the record */
   keys: string[];
   /** Photoshop layer id (lyid), 0 when absent */
@@ -754,6 +762,11 @@ export function duotoneGrey(lut: Uint8Array | null): GreyOf | null {
 }
 
 /** A record's Blend If ranges for its first `channels` channels (core/types.ts NodeBase.blendIf), undefined when all open. */
+/** The blending options and locks of a node as one string (the PSD writer: changed since the file was read?). */
+export function blendOptionsKey(n: { fillOpacity?: number; fillInterior?: boolean; knockout?: string; blendIf?: number[]; lockAlpha?: boolean; lockPixels?: boolean; lockPosition?: boolean }): string {
+  return JSON.stringify([n.fillOpacity ?? 1, !!n.fillInterior, n.knockout ?? "", n.blendIf ?? [], !!n.lockAlpha, !!n.lockPixels, !!n.lockPosition]);
+}
+
 export function blendIfOf(b: Uint8Array, rec: PsdRecord, channels: number): number[] | undefined {
   const n = Math.min(channels * 8, rec.ranges.end - rec.ranges.start);
   if (n < 8) return undefined;
@@ -879,6 +892,8 @@ export interface DecodeOptions {
    * tiles here and sets `layer.rgba = null` keeps only one layer's full buffer alive at a time.
    */
   onLayer?: (layer: PsdLayer) => void;
+  /** keep a plain user mask apart (PsdLayer.mask) instead of baking it into the alpha — the page import does */
+  keepMasks?: boolean;
 }
 
 function u32At(b: Uint8Array, o: number) {
@@ -1120,7 +1135,9 @@ export function decodeLayout(L: PsdLayout, opts: DecodeOptions = {}): PsdImage {
             // the channel planes go out of scope here, before onLayer builds tiles from the RGBA buffer
             const rgba = layerRgba(bytes, rec.channels, w, h, bpc, depth, psb, colorCh, m);
             if (rgba) {
-              layer.maskBaked = bakeMasks(L, rec, rgba, bpc);
+              const em = opts.keepMasks && kind === "pixel" && depth !== 32 ? editableMask(L, rec, bpc) : null;
+              if (em) layer.mask = em;
+              else layer.maskBaked = bakeMasks(L, rec, rgba, bpc);
               layer.rgba = rgba;
               opts.onLayer?.(layer);
               total += w * h;
@@ -1195,6 +1212,28 @@ function adjustRaster(L: PsdLayout, rec: PsdRecord): { node: RasterNode; adjust:
   const adjust: LayerAdjust = { adj: a, hide };
   node.adjust = adjust;
   return { node, adjust, x: on && mw > 0 ? mi!.left : 0, y: on && mh > 0 ? mi!.top : 0 };
+}
+
+/**
+ * A pixel layer's plain user mask, read apart from its pixels so it stays an editable layer mask: one -2 channel (no
+ * vector mask, no rasterised vector mask beside it), full density, no feather. Null otherwise (the mask is baked).
+ */
+function editableMask(L: PsdLayout, rec: PsdRecord, bpc: number): PsdLayer["mask"] | null {
+  const mi = rec.maskInfo;
+  const ch = rec.channels.find((c) => c.id === -2);
+  if (!mi || !ch || mi.real || rec.channels.some((c) => c.id === -3)) return null;
+  if (rec.blocks.some((k) => k.key === "vmsk" || k.key === "vsms")) return null;
+  if ((mi.userDensity ?? 255) < 255 || (mi.userFeather ?? 0) > 0) return null;
+  const w = mi.right - mi.left, h = mi.bottom - mi.top;
+  if (w * h > 100_000_000) return null;
+  let plane = new Uint8Array(0);
+  if (w > 0 && h > 0)
+    try {
+      plane = to8(readChannelPlane(L.bytes, ch.start, ch.end, w, h, bpc, L.psb), w * h, L.depth, w, true);
+    } catch {
+      return null;
+    }
+  return { plane, x: mi.left - rec.left, y: mi.top - rec.top, w: Math.max(0, w), h: Math.max(0, h), hide: mi.defaultColor >= 128, off: !!(mi.flags & 2) };
 }
 
 /**
@@ -1389,15 +1428,23 @@ export interface PsdImport {
  * folders become page.groups (LayerGroup) with the layers' groupId; adjustment and fill layers have no pixels and
  * are kept only in the round-trip map. `assetId` / `hash` identify the original bytes kept as an asset (for psdWrite).
  */
-export function importPsdPage(bytes: Uint8Array, name: string, title: string, asset: { id: string; hash: string } | null): PsdImport {
+export function importPsdPage(bytes: Uint8Array, name: string, title: string, asset: { id: string; hash: string } | null, opts: { keepMasks?: boolean } = {}): PsdImport {
   const L = parsePsdLayout(bytes);
   // each layer becomes tiles the moment it is decoded, so only one full-size buffer is alive at a time; the
   // budget then bounds the tiles kept (4 bytes a pixel), not a pile of decoded layers
   const tiled = new Map<number, RasterNode>();
   const img = decodeLayout(L, {
     maxPixels: IMPORT_MAX_PIXELS,
+    keepMasks: opts.keepMasks ?? true,
     onLayer: (l) => {
-      tiled.set(l.index, rasterFromRgba(l.rgba!, l.width, l.height, ""));
+      const r = rasterFromRgba(l.rgba!, l.width, l.height, "");
+      // a plain user mask stays an editable layer mask (core/image/layerMask.ts)
+      if (l.mask) {
+        const m = l.mask;
+        r.mask = { tiles: m.w > 0 && m.h > 0 ? maskFromPlane(m.plane, m.x, m.y, m.w, m.h, m.hide) : {}, hide: m.hide, ...(m.off ? { off: true as const } : {}) };
+        l.mask = { ...m, plane: new Uint8Array(0) };
+      }
+      tiled.set(l.index, r);
       l.rgba = null;
     },
   });
@@ -1406,6 +1453,15 @@ export function importPsdPage(bytes: Uint8Array, name: string, title: string, as
   // export keeps the transparency, and a Screen / Lighten … layer blends with what is really below it, not with a
   // white sheet (2026-11-23: on white, screen layers vanished; an all-hidden PSD showed white)
   page.background = "transparent";
+  // saved paths (Paths panel, image resources 2000–2997): editable in the image mode's 패스 panel
+  const savedPaths = readPaths(L.bytes, L.resItems, img.width, img.height, uid);
+  if (savedPaths.length) page.paths = savedPaths;
+  // ruler guides (resource 1032)
+  const guides = readGuides(L.bytes, L.resItems);
+  if (guides) page.guides = guides;
+  // the document's colour mode (이미지 › 모드): CMYK and Grayscale files open as such, and are saved as such
+  if (L.mode === 4) page.colorMode = "cmyk";
+  else if (L.mode === 1) page.colorMode = "gray";
   const links: PsdLayerLink[] = [];
   let pixelLayers = 0;
   let hiddenKinds = 0, textish = 0, effects = 0, unclipped = 0;
@@ -1471,6 +1527,12 @@ export function importPsdPage(bytes: Uint8Array, name: string, title: string, as
     }
     r.visible = l.visible;
     r.locked = psdLocked(l.protect);
+    // the partial locks (transparency, image pixels, position) — not the Background layer's own lock signature
+    if (l.protect !== 0xd && !(l.protect & 0x80000000)) {
+      if (l.protect & 1) r.lockAlpha = true;
+      if (l.protect & 2) r.lockPixels = true;
+      if (l.protect & 4) r.lockPosition = true;
+    }
     r.blendMode = BLEND_IN[l.blend] ?? "NORMAL";
     if (fx?.effects.length) r.effects = fx.effects;
     // a text layer whose type block we can write back: editable as text (the pixels stay Photoshop's preview)
@@ -1512,7 +1574,7 @@ export function importPsdPage(bytes: Uint8Array, name: string, title: string, as
     pixelLayers++;
     if (l.kind === "text" && !spec) textish++;
     else if (l.kind === "smart" && !smartOpen && r.psdSmart?.kind !== "linked" && !(r.psdSmart?.content && !r.psdSmart.redraw)) smartClosed++;
-    links.push({ node: r.id, fp: rasterFingerprint(r), name: r.name, opacity: r.opacity, visible: r.visible, locked: r.locked, blend: r.blendMode, x: r.transform.x, y: r.transform.y, ...(r.clip ? { clip: true } : {}), ...(fx ? { fx: effectsFingerprint(r.effects) } : {}), ...(spec ? { txt: psdTextKey(spec) } : {}) });
+    links.push({ node: r.id, fp: rasterFingerprint(r), name: r.name, opacity: r.opacity, visible: r.visible, locked: r.locked, blend: r.blendMode, x: r.transform.x, y: r.transform.y, ...(r.clip ? { clip: true } : {}), ...(fx ? { fx: effectsFingerprint(r.effects) } : {}), ...(spec ? { txt: psdTextKey(spec) } : {}), ...(r.mask ? { mfp: maskFingerprint(r.mask) } : {}), ...(!adj ? { opt: blendOptionsKey(r) } : {}) });
   }
   if (groups.length && pixelLayers) page.groups = groups;
   let compositeNode: string | undefined;

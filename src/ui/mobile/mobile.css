@@ -750,7 +750,7 @@ button.m-pageno {
 .m-actions-4 .m-action {
   min-height: 88px;
 }
-.m-desk-entry {
+.m-actions .m-desk-entry {
   border: 2px solid var(--accent, #2f6fdc) !important;
 }
 .m-desk-note {
@@ -867,6 +867,21 @@ html.phone-desk .splitter {
 html.phone-desk .workspace > .toolbox {
   overflow-y: auto;
   padding: 4px 2px;
+}
+/* #19: a finger a few px off took the next tool (brush for the eraser) — 48 px tool buttons with 8 px between them
+   (and 6 px between ribbon buttons), as the phone versions of Photoshop / Office space their tools */
+html.phone-desk .workspace > .toolbox .tool-strip-v {
+  gap: 8px;
+}
+html.phone-desk .workspace > .toolbox .tool-btn {
+  width: 48px;
+  height: 48px;
+}
+html.phone-desk .workspace > .toolbox .tool-strip-v .tool-gap {
+  margin: 2px 0;
+}
+html.phone-desk .ribbon :is(.tool-strip, .rrow) {
+  gap: 6px;
 }
 /* the side panels: sheets from the bottom, above the bar */
 html.phone-desk .workspace > .dock {
@@ -1142,3 +1157,190 @@ html.phone-desk .pdf-find-bar :is(button, label) {
 html.phone-desk .pdf-find-status {
   font-size: 14px;
 }
+/* ── 2026-11-24 phone use review (ux-audit.md) ── */
+/* a question with its own answers (leave: save / discard): one under another, the first the main one */
+.m-sheet-choices {
+  flex-direction: column;
+}
+.m-sheet-choices .m-btn {
+  width: 100%;
+  min-height: 48px;
+}
+.m-app .m-btn-danger,
+.m-btn-danger {
+  color: var(--danger, #d93025) !important;
+}
+/* a photo's edits on the phone screen: large buttons in a row that scrolls sideways */
+.m-photo-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 8px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.m-photo-bar button {
+  flex: 1 0 64px;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.m-photo-bar button > span {
+  font-size: 20px;
+}
+.m-viewer > .m-show-btn {
+  margin: 6px 10px;
+  min-height: 52px;
+  font-size: 16px;
+}
+/* the editor: the selection chips stay above the page arrows */
+.m-editor:has(.m-ed-pagebar) .m-ed-selbar {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 150px);
+}
+/* the home screen's note under the big buttons: no word cut over two lines */
+.m-desk-note {
+  word-break: keep-all;
+  text-wrap: balance;
+}
+/* a photo held sideways: the whole picture, not the top of it */
+@media (orientation: landscape) and (max-height: 500px) {
+  .m-image {
+    width: auto;
+    max-width: 100%;
+    max-height: calc(100dvh - 120px);
+    margin: 0 auto;
+    object-fit: contain;
+  }
+}
+/* the PC feature screen: no keyboard shortcuts shown (a phone has no keys), the picture dialogs (글자 인식, 업스케일,
+   조정 …) in one column */
+html.phone-desk kbd {
+  display: none !important;
+}
+html.phone-desk .modal [style*="grid-template-columns"] {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+html.phone-desk .modal [style*="min-width: 260px"],
+html.phone-desk .modal [style*="min-width:260px"] {
+  min-width: 0 !important;
+}
+/* a slide show: the whole screen, none of our bars */
+html.pd-presenting .pd-bar {
+  display: none !important;
+}
+html.phone-desk.pd-presenting .app {
+  height: 100%;
+}
+
+/* 글자만 크게 보기 (MobileViewer ReadView) */
+.m-read {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 96px;
+  font-size: 18px;
+  line-height: 1.6;
+  background: var(--bg-0);
+  color: var(--text);
+}
+.m-read section + section {
+  border-top: 1px dashed var(--line-2);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.m-read p {
+  margin: 0 0 10px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+
+/* a deck's page number sits above its 발표 시작 button (it covered the button's label and took its tap) */
+.m-viewer:has(> .m-show-btn) > .m-pageno, .m-viewer:has(> .m-show-btn) .m-pageno {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 160px);
+}
+/* the desktop ribbon's overflow arrows (a mouse aid, 18 px): a finger scrolls the ribbon itself */
+html.phone-desk .ribbon-more {
+  display: none !important;
+}
+
+/* 자르기 on the phone photo screen (photoCrop.tsx): the picture, a frame with four corner handles, the ratios */
+.m-crop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  color: #fff;
+}
+.m-crop-top { background: var(--bg-1); color: var(--text); }
+.m-crop-top .m-doc-name { flex: 1; text-align: center; }
+.m-crop-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  touch-action: none;
+  /* (the frame's dimming shadow stays in the picture area) */
+  overflow: hidden;
+}
+.m-crop-pic { position: relative; max-width: 100%; max-height: 100%; line-height: 0; }
+.m-crop-pic img { display: block; max-width: 100%; max-height: calc(100vh - 200px); user-select: none; -webkit-user-drag: none; }
+.m-crop-frame {
+  position: absolute;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  outline: 2px solid #fff;
+  touch-action: none;
+}
+.m-crop-h {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 4px solid #fff;
+  touch-action: none;
+}
+.m-crop-h0 { left: -6px; top: -6px; border-right: 0; border-bottom: 0; }
+.m-crop-h1 { right: -6px; top: -6px; border-left: 0; border-bottom: 0; }
+.m-crop-h2 { right: -6px; bottom: -6px; border-left: 0; border-top: 0; }
+.m-crop-h3 { left: -6px; bottom: -6px; border-right: 0; border-top: 0; }
+.m-crop-ratios { display: flex; gap: 6px; overflow-x: auto; padding: 8px; background: var(--bg-1); scrollbar-width: none; }
+.m-crop-ratios button {
+  flex: 1 0 auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+}
+.m-crop-ratios button.on { background: var(--accent, #2f6fdc); color: #fff; }
+.m-crop-size { text-align: center; padding: 4px 0 10px; background: var(--bg-1); color: var(--text-2); font-size: 13px; }
+
+/* 배경 지우기 on the phone photo screen (photoMatte.tsx): the cut over a checkerboard, the keep / remove points */
+.m-matte-pic canvas {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 220px);
+  background: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+  touch-action: none;
+}
+.m-matte-dot { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.m-matte-dot.keep { background: #22a35a; }
+.m-matte-dot.drop { background: #d9363e; }
+.m-matte-busy { position: absolute; inset: 0; margin: auto; }
+/* a first result is on screen (the person model is still working): the spinner moves to the corner, the picture stays in view */
+.m-matte-busy.m-matte-busy-over { inset: 8px 8px auto auto; margin: 0; }

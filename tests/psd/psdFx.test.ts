@@ -11,6 +11,7 @@ import { decodePsd, importPsdPage, parsePsdLayout } from "../../src/io/formats/p
 import { buildEffectsDesc, descBytes, effectsBlocks, parseFxBlock, readDescBytes, readEffect, readEffects, writeFxBlock } from "../../src/io/formats/psdFx";
 import { buildPsd, checkPsd, writePsd, type FreshLayer } from "../../src/io/formats/psdWrite";
 import { rasterFromRgba } from "../../src/io/formats/raster";
+import { cpuNow, cpuBudget } from "../budget";
 
 const px = (v: number) => ({ v, u: "px" as const });
 const REF = join(__dirname, "..", "..", "qa", "interop", "adobe-made", "ps_text_effects.psd");
@@ -282,9 +283,9 @@ describe("hostile effect descriptors (PSD is untrusted input)", () => {
   it("a key length of 4 GB throws at once instead of looping over the missing bytes", () => {
     // name "" · class id of length 0xFFFFFFF0 (no bytes follow)
     const b = hdr([...u32(0), ...u32(0xfffffff0)]);
-    const t = Date.now();
+    const t = cpuNow();
     expect(() => parseFxBlock(b)).toThrow();
-    expect(Date.now() - t).toBeLessThan(500);
+    expect(cpuNow() - t).toBeLessThan(cpuBudget(500));
   });
   it("deeply nested objects are refused (no stack overflow)", () => {
     // name "" · class 'null' · 1 item: key 'a   ' Objc → repeated
@@ -307,8 +308,8 @@ describe("hostile effect descriptors (PSD is untrusted input)", () => {
 
   it("a list claiming 2^31 items or reading past the end throws a format error", () => {
     const b = hdr([...u32(0), ...u32(0), 110, 117, 108, 108, ...u32(1), ...u32(0), 97, 32, 32, 32, 86, 108, 76, 115, ...u32(0x7fffffff), 98, 111, 111, 108, 1]);
-    const t = Date.now();
+    const t = cpuNow();
     expect(() => parseFxBlock(b)).toThrow();
-    expect(Date.now() - t).toBeLessThan(500);
+    expect(cpuNow() - t).toBeLessThan(cpuBudget(500));
   });
 });

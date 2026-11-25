@@ -9,7 +9,7 @@
   "mobile.sign": "Sign",
   "mobile.markup": "Markup",
   "mobile.share": "Share",
-  "mobile.saveCopy": "Save as copy",
+  "mobile.saveCopy": "Save copy",
   "mobile.noUpload": "Files never leave this phone",
   "mobile.home": "Home",
   "mobile.files": "Files",
@@ -42,7 +42,7 @@
   "mobile.theme.light": "Light",
   "mobile.theme.dark": "Dark",
   "mobile.licensesNote": "Licenses of the open-source components are in THIRD_PARTY_NOTICES, distributed with the app.",
-  "mobile.markedSuffix": "_signed",
+  "mobile.markedSuffix": "_marked",
   "mobile.mk.move": "Select",
   "mobile.mk.pen": "Pen",
   "mobile.mk.highlight": "Highlighter",
@@ -96,5 +96,6 @@
   "mobile.signaturesCleared": "Saved signatures deleted.",
   "mobile.toPdf": "To PDF",
   "mobile.untitledDoc": "Document",
-  "mobile.untitledImage": "Photo"
+  "mobile.untitledImage": "Photo",
+  "mobile.searchNoText": "Couldn't find ‘{q}’ — this document's text is only a picture. Run More › Text recognition (OCR) to search it."
 }

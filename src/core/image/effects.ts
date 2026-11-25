@@ -398,6 +398,19 @@ export function applyEffects(d: Float32Array, w: number, h: number, effects: rea
         if (grow > 0) paintUnder(d, offsetMatte(A0, w, h, grow, 0, sd), sample, op, w, shape);
         break;
       }
+      case "blur": {
+        // Gaussian Blur (Illustrator: radius = the Gaussian's standard deviation), every channel of the premultiplied
+        // pixels alike, so the edge fades out as well as the colours mix
+        const S = toPx(e.radius) * k;
+        if (S <= 0) break;
+        const n = w * h, ch = new Float32Array(n);
+        for (let c = 0; c < 4; c++) {
+          for (let i = 0; i < n; i++) ch[i] = d[i * 4 + c];
+          blurPlane(ch, w, h, S);
+          for (let i = 0; i < n; i++) d[i * 4 + c] = ch[i];
+        }
+        break;
+      }
       case "softEdge": {
         const R = toPx(e.radius) * k;
         if (R <= 0) break;
@@ -415,7 +428,7 @@ export function applyEffects(d: Float32Array, w: number, h: number, effects: rea
       }
     }
   }
-  let A = fx.some((e) => !isOuterEffect(e) && (e.type === "fxStroke" || e.type === "softEdge")) ? alphaOf(d) : A0;
+  let A = fx.some((e) => !isOuterEffect(e) && (e.type === "fxStroke" || e.type === "softEdge" || e.type === "blur")) ? alphaOf(d) : A0;
   // a faded fill: the shape still knocks out what is drawn under it
   if (shape && A !== A0) A = A.map((a, i) => Math.max(a, A0[i]));
   // (the content is drawn at the opacity × its fill: what it lets through of the knocked-out shadow follows that)

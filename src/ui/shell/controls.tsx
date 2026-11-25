@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSP
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "./Icons";
 import type { Live } from "./ops";
-import { useT } from "../../i18n";
+import { t as tr, useT } from "../../i18n";
 import { hexToCommit, normHex, pickerHex } from "./colorValue";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -13,6 +13,8 @@ const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).jo
 // ───────── buttons ─────────
 
 export interface IconBtnProps {
+  /** why it is greyed out now (shown in its tooltip) */
+  why?: string;
   icon: IconName;
   tip?: string;
   kbd?: string;
@@ -27,13 +29,14 @@ export interface IconBtnProps {
   expanded?: boolean;
 }
 
-export function IconBtn({ icon, tip, kbd, onClick, pressed, disabled, size = "md", className, children, haspopup, expanded }: IconBtnProps) {
+export function IconBtn({ icon, tip, kbd, why, onClick, pressed, disabled, size = "md", className, children, haspopup, expanded }: IconBtnProps) {
   return (
     <button
       type="button"
       className={cx("ibtn", `ibtn-${size}`, pressed && "on", children != null && "with-label", className)}
       data-tip={tip}
       data-kbd={kbd}
+      data-why={why}
       aria-label={tip}
       aria-pressed={pressed}
       aria-haspopup={haspopup}
@@ -335,7 +338,7 @@ function cycleFocus(list: HTMLElement | null, e: React.KeyboardEvent) {
   return true;
 }
 
-export function Menu({ button, items, tip, kbd, className, align = "left", disabled, role }: { button: ReactNode; items: MenuItem[] | (() => MenuItem[]); tip?: string; kbd?: string; className?: string; align?: "left" | "right"; disabled?: boolean; role?: "menuitem" }) {
+export function Menu({ button, items, tip, kbd, className, align = "left", disabled, role, label }: { button: ReactNode; items: MenuItem[] | (() => MenuItem[]); tip?: string; kbd?: string; className?: string; align?: "left" | "right"; disabled?: boolean; role?: "menuitem"; /** the accessible name of a glyph-only button */ label?: string }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<PopPos | null>(null);
   // the open submenu: its item's index, where it shows (null until measured) and whether a key opened it (focus it)
@@ -444,7 +447,9 @@ export function Menu({ button, items, tip, kbd, className, align = "left", disab
         <button
           key={i}
           type="button"
-          role="menuitem"
+          // a checkable item says whether it is checked (screen readers; the check mark alone was only drawn)
+          role={it.checked !== undefined ? "menuitemcheckbox" : "menuitem"}
+          aria-checked={it.checked !== undefined ? !!it.checked : undefined}
           className={cx("menu-item", !inSub && it.sub && sub?.i === i && "open")}
           // greyed with a reason: aria-disabled keeps the tooltip working (a disabled button gets no hover)
           disabled={it.disabled && !it.tip}
@@ -481,6 +486,7 @@ export function Menu({ button, items, tip, kbd, className, align = "left", disab
         role={role}
         data-tip={open ? undefined : tip}
         data-kbd={kbd}
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={disabled}
@@ -517,7 +523,7 @@ export function Menu({ button, items, tip, kbd, className, align = "left", disab
 
 /** One floating tooltip for every element carrying data-tip (and optional data-kbd). */
 export function TooltipLayer() {
-  const [tip, setTip] = useState<{ text: string; kbd?: string; x: number; y: number; below: boolean } | null>(null);
+  const [tip, setTip] = useState<{ text: string; kbd?: string; why?: string; x: number; y: number; below: boolean } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const warm = useRef(0);
 
@@ -545,7 +551,10 @@ export function TooltipLayer() {
         if (!current || !document.contains(current)) return;
         const r = current.getBoundingClientRect();
         const below = r.bottom + 40 < window.innerHeight;
-        setTip({ text: current.dataset.tip!, kbd: current.dataset.kbd, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below });
+        // a greyed control says why it cannot be used now (its own reason, else the general one)
+        const off = current.matches(":disabled, [aria-disabled=true]");
+        const why = off ? current.dataset.why || tr("tooltip.unavailable") : undefined;
+        setTip({ text: current.dataset.tip!, kbd: current.dataset.kbd, why, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below });
         warm.current = Date.now();
       };
       // once a tip has been shown, neighbours appear instantly (scanning a toolbar)
@@ -584,6 +593,7 @@ export function TooltipLayer() {
     <div ref={ref} className={cx("tooltip", tip.below ? "below" : "above")} style={{ left: tip.x + dx, top: tip.y }} role="tooltip">
       {tip.text}
       {tip.kbd && <kbd>{tip.kbd}</kbd>}
+      {tip.why && <span className="tooltip-why">{tip.why}</span>}
     </div>
   );
 }

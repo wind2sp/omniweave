@@ -55,12 +55,27 @@ export async function buildSizedPdf(o: SizeOptions): Promise<SizedPdf> {
     base = await exportPdf(doc, doc.pages, { onWarning: () => {} });
     bytes = base;
   }
+  // whole embedded fonts cut down to the glyphs used (io/pdfsurgeon/fontSubset.ts) — lossless; never on a signed file
+  if (!notes.includes(t("size.signed"))) {
+    try {
+      const { subsetFonts } = await import("../io/pdfsurgeon/fontSubset");
+      const r = await subsetFonts(bytes);
+      if (r.report.fonts.length && r.bytes.length < bytes.length) {
+        bytes = r.bytes;
+        notes.push(t("pdftools.size.fonts", { n: r.report.fonts.length, kb: Math.round(r.report.saved / 1024) }));
+      }
+    } catch (e) {
+      console.warn("font subsetting skipped", e);
+    }
+  }
   if (o.lossy) {
     const r = await compressPdf(bytes, { quality: o.lossy.quality, maxDim: o.lossy.maxDim || 1e9, recompress: canvasRecompressor });
     if (r.effective) bytes = r.bytes;
     else if (r.note && !notes.includes(r.note)) notes.push(r.note);
   }
-  return { bytes, before: base.length, notes };
+  // a later step (fonts, photos) did make it smaller: "could not make it smaller" from the first step no longer holds
+  const shrunk = bytes.length < base.length * 0.99;
+  return { bytes, before: base.length, notes: shrunk ? notes.filter((n) => n !== t("size.notSmaller")) : notes };
 }
 
 export async function saveSizedPdf(o: SizeOptions, built?: SizedPdf): Promise<boolean> {

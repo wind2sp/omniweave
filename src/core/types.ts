@@ -5,6 +5,7 @@
 import type { MatteType } from "./image/matte/classify";
 import type { EdgeOptions } from "./image/matte/refine";
 import type { LayerAdjust } from "./image/adjustLayer";
+import type { LayerMask } from "./image/layerMask";
 import { DEFAULT_TITLE, t } from "../i18n";
 import type { Effect, LineHeight, ListDef, StyleBlend } from "./style/types";
 
@@ -52,6 +53,10 @@ interface NodeBase {
    * Shallow and deep are drawn alike (through the enclosing group). core/layerTree.ts Compositor.knock.
    */
   knockout?: "shallow" | "deep";
+  /** Photoshop's partial locks (PSD lspf bits 0, 1, 2): transparent pixels, image pixels, position; omitted = off */
+  lockAlpha?: boolean;
+  lockPixels?: boolean;
+  lockPosition?: boolean;
   blendMode: BlendMode;
   transform: Transform;
   /**
@@ -66,6 +71,11 @@ interface NodeBase {
    */
   clip?: boolean;
   /**
+   * An opacity mask (Illustrator's Transparency panel › Make Mask): this node is not drawn; its brightness (white
+   * shows, black hides, nothing hides) masks the clipped nodes above it (core/layerTree.ts). Omitted = not a mask.
+   */
+  lumMask?: boolean;
+  /**
    * Layer effects (drop shadow, glows, stroke, overlays… — Photoshop layer style parameters, core/style/effects.ts).
    * Omitted when there are none, so nodes without effects keep their hashes and .omw v1 files stay byte-identical.
    */
@@ -75,6 +85,8 @@ interface NodeBase {
    * the story flows through from page to page. Omitted = a free object placed on the page (every node before flow).
    */
   flow?: true;
+  /** made by live art (a blend step, a repeat copy, a symbol instance's art; LayerGroup.art) — not a source of its own */
+  artGen?: true;
   /** body flow in a section of several columns (단, Page.columns): the column it is laid out in (omitted = the first) */
   flowCol?: number;
   /**
@@ -95,6 +107,8 @@ interface NodeBase {
    * Omitted otherwise.
    */
   cadLayer?: string;
+  /** A block attribute (AutoCAD ATTDEF in a block, ATTRIB in an insert): its tag and prompt. Omitted otherwise. */
+  cadAttr?: { tag: string; prompt?: string; def?: true };
   /**
    * A shape drawn for a slide chart (io/formats/pptxChart.ts): the shapes of one chart follow each other and share
    * `id`; the first carries what the chart shows (`data`), so it can be edited and drawn again. Omitted otherwise.
@@ -104,14 +118,15 @@ interface NodeBase {
 
 /** What a slide chart shows (PPTX c:chartSpace read from its cached values; ui/chartEdit edits it). */
 export interface SlideChart {
-  /** clustered column / bar, line, pie (area and doughnut as read; edited ones become one of the first four) */
-  kind: "col" | "bar" | "line" | "pie" | "area" | "doughnut";
+  /** clustered column / bar, line, pie, area, doughnut, scatter (X–Y), combo (columns with series drawn as lines) */
+  kind: "col" | "bar" | "line" | "pie" | "area" | "doughnut" | "scatter" | "combo";
   /** the chart part of the deck it was read from (ppt/charts/chartN.xml), for the source-preserving save */
   part?: string;
   /** the graphic frame's name (the shapes are named after it) */
   name: string;
   categories: string[];
-  series: { name: string; values: number[]; color: string | null }[];
+  /** a combo chart's series is drawn as columns (omitted), a line or an area; a scatter chart's X values are the categories */
+  series: { name: string; values: number[]; color: string | null; type?: "line" | "area" }[];
   /** the title shown: its own text, null = the name of its only series; omitted = no title */
   title?: string | null;
   /** axis text size the chart saved (hundredths of a point); omitted = none saved */
@@ -149,6 +164,38 @@ export interface LayerGroup {
   effects?: Effect[];
   /** CAD import: the drawing layer or block this group stands for (docs/design/CAD_IMPORT.md); omitted otherwise */
   cad?: CadGroupMeta;
+  /** a SmartArt graphic: what it shows (core/smartArt.ts); its members are its drawing */
+  smart?: import("./smartArt").SmartData;
+  /**
+   * Live art of the design mode (Illustrator's blends, repeats and symbol instances; ui/designArt.ts): the group's
+   * members marked `artGen` are made from the others (or from the symbol) again whenever those change. Omitted otherwise.
+   */
+  art?: ArtGroupMeta;
+}
+
+export type ArtGroupMeta =
+  /** Object › Blend: `steps` shapes between each pair of sources (null = smooth colour) */
+  | {
+      kind: "blend";
+      steps: number | null;
+      /** Object › Blend › Replace Spine: the path the steps follow (page space); omitted = the straight line */
+      spine?: Contour;
+      /** Blend Options › Orientation: steps upright (page, the default) or turned with the spine (path) */
+      orient?: "page" | "path";
+    }
+  /** Object › Repeat › Radial (count, radius), Grid (rows, cols, gaps) or Mirror (axis angle °) */
+  | { kind: "repeat"; mode: "radial" | "grid" | "mirror"; count?: number; radius?: number; rows?: number; cols?: number; gapX?: number; gapY?: number; axis?: number }
+  /**
+   * a symbol instance: the symbol's art moved by (dx, dy) — or, once the instance was turned, scaled, reflected or
+   * sheared, placed by the matrix `m` [a, b, c, d, e, f] (x' = a·x + c·y + e, y' = b·x + d·y + f), which wins
+   */
+  | { kind: "symbol"; symbolId: string; dx: number; dy: number; m?: [number, number, number, number, number, number] };
+
+/** A symbol (Symbols panel): its art in page space as it was defined; instances place copies of it. */
+export interface SymbolDef {
+  id: string;
+  name: string;
+  nodes: SceneNode[];
 }
 
 /** A layer group made from a DXF / DWG layer (`layer`) or block insert (`block`). */
@@ -172,6 +219,23 @@ export interface CadGroupMeta {
   offWhileFrozen?: true;
   /** not plotted */
   noPlot?: true;
+  /**
+   * a block insert's placement in drawing coordinates — insertion point, rotation (radians), x / y scale — so INSERT
+   * can place the block again and the DXF export writes BLOCK + INSERT (omitted on older files: point 0,0, no turn)
+   */
+  ins?: { p: [number, number]; rot: number; sx: number; sy: number };
+  /**
+   * a dimension made on the drawing screen: its kind (DXF DIMENSION type: 0 linear, 1 aligned, 3 diameter, 4 radius,
+   * 5 angular by three points), definition points (drawing coordinates, DXF codes 10 / 11 / 13 / 14 / 15), the measured
+   * value and the angle of a linear one (degrees) — so the DXF export writes a DIMENSION with its *D block
+   */
+  dim?: { type: number; p: Record<string, [number, number]>; measure: number; angle?: number; text?: string; /** DXF 70 as read (ordinate X / Y bit) */ flags?: number; /** arc length dimension (kind 7): start / end angles */ arc?: [number, number]; /** associative: the object point each origin sits on (node, contour, anchor) */ assoc?: Record<string, { id: string; ci: number; i: number }>; /** linear: the measured direction kept when the origins move */ u?: [number, number]; off?: number };
+  /** an external reference (XATTACH): the file's path as chosen, read again on open and on XREF Reload */
+  xref?: { path: string; file: string };
+  /** an associative array (ARRAY): how it was made, and its source item's nodes (ARRAYEDIT makes it again) */
+  arr?: { kind: "rect" | "polar" | "path"; cols?: number; rows?: number; dx?: number; dy?: number; n?: number; fill?: number; c?: [number, number]; rot?: boolean; src?: string[]; /** path array: the path object */ path?: string };
+  /** a layout viewport (MVIEW): the model page it shows, its centre and size on the paper (mm), the model point at its centre, 1:scale */
+  vp?: { model: string; c: [number, number]; w: number; h: number; mc: [number, number]; scale: number };
 }
 
 /** A 256x256 RGBA tile. `hash` is the content address of `data` (a Loom thread). */
@@ -220,6 +284,11 @@ export interface RasterNode extends NodeBase {
    */
   adjust?: LayerAdjust;
   /**
+   * A layer mask (Photoshop's pixel layer mask, core/image/layerMask.ts): grey coverage in node-local tiles, the same
+   * grid as `tiles`, applied when drawn — the tiles keep every pixel. Omitted on layers without one.
+   */
+  mask?: LayerMask;
+  /**
    * A PSD text layer (TySh): what can be edited as text (io/formats/psdText.ts, docs/design/PSD_TEXT.md). The tiles
    * stay its pixels — Photoshop's preview until edited, then drawn here from the spec. Omitted on other layers.
    */
@@ -253,6 +322,8 @@ export interface PsdSmart {
   found?: boolean;
   /** content put back from its own tab: the new file (an asset), its size, and the layer's fingerprint once drawn */
   edited?: { assetId: string; hash: string; w: number; h: number; fp: string; /** put back as another kind (JPEG → PNG) */ name?: string; fileType?: string };
+  /** made here (고급 개체로 변환): the layer's transform when quad was taken (the corners follow its later transforms) */
+  at?: Transform;
 }
 
 /** Editable part of a PSD text layer; sizes in page px. */
@@ -313,12 +384,69 @@ export interface VectorNode extends NodeBase {
    * a layer linetype change lays the dashes out again (ui/cad/layers.ts setLayerLtype). Omitted otherwise.
    */
   cadLt?: { s: number; segs?: number[] };
+  /** arrowheads at the open ends (Illustrator's Stroke panel › Arrowheads; core/arrowheads.ts); omitted = none */
+  strokeArrows?: import("./arrowheads").StrokeArrows;
+  // Live appearance (Illustrator; core/liveVector.ts draws it, Object › Expand Appearance bakes it). Omitted = none.
+  /** live corners: the fillet radius of every sharp corner between straight sides, px */
+  cornerRadius?: number;
+  /** live corners set one by one (direct selection): per contour, per anchor index, px; null = `cornerRadius` */
+  cornerRadii?: (number | null)[][];
+  /** Stroke panel › Align Stroke on closed paths; omitted = centred */
+  strokeAlign?: "inside" | "outside";
+  /** Stroke panel › Profile (variable width); omitted = uniform */
+  widthProfile?: import("./liveVector").WidthProfile;
+  /** live effects (Effect menu; Appearance panel), applied in order */
+  vfx?: import("./liveVector").VectorFx[];
+  /** a pattern swatch as the fill (Object › Pattern › Make; the tile's art in tile coordinates, w × h px) */
+  patternFill?: import("./liveVector").PatternFill;
+  /** a gradient mesh as the fill (Illustrator's Mesh tool; core/mesh.ts), in the path's own coordinates */
+  meshFill?: import("./mesh").MeshFill;
+  /**
+   * Drawn on a plane of the page's perspective grid (Illustrator's perspective objects): the path as it is on that
+   * plane, flat (plane px), from which `contours` are projected again when the grid or the object on it moves.
+   */
+  persp?: import("./perspective").PerspAttach;
+  /**
+   * A drawing hatch (AutoCAD HATCH): its pattern (SOLID, ANSI31 …, or GRADIENT), scale, angle (degrees) and boundary
+   * loops in drawing coordinates, so HATCHEDIT can draw it again and the DXF export writes a HATCH. Omitted otherwise.
+   */
+  cadHatch?: CadHatch;
+  /** a drawing point (AutoCAD POINT, DIVIDE, MEASURE): drawn as a small dot, written to DXF as a POINT at its centre */
+  cadPoint?: true;
+  /** a layout viewport's frame: its centre on the sheet (paper units). The DXF export writes that viewport as a
+   *  VIEWPORT, so it leaves the frame out (AutoCAD draws the viewport's own border) */
+  cadVpFrame?: [number, number];
+  /** a donut (AutoCAD DONUT): drawn as a filled ring, written to DXF as AutoCAD makes it — a closed LWPOLYLINE of two
+   *  half-circle arcs with a constant width */
+  cadDonut?: true;
+}
+
+/** A hatch's definition (VectorNode.cadHatch): the node's contours are what it draws. */
+export interface CadHatch {
+  pattern: string;
+  scale: number;
+  angle: number;
+  loops: [number, number][][];
+  /** gradient: first and second colour */
+  color1?: string;
+  color2?: string;
+  /** gradient kind (LINEAR, CYLINDER, SPHERICAL …), shift and one-colour flag, as AutoCAD keeps them */
+  gname?: string;
+  gshift?: number;
+  gsingle?: boolean;
+  /** associative: the internal point picked and the boundary objects (ids) — the hatch follows when they change */
+  seed?: [number, number];
+  src?: string[];
+  /** made by object selection: the loops are the closed objects themselves */
+  sel?: true;
 }
 
 export type Align = "LEFT" | "CENTER" | "RIGHT" | "JUSTIFY";
 
 export interface TextRun {
   text: string;
+  /** the character style it uses (OmwDocument.textStyles; ui/textStyles.ts); omitted when none */
+  charStyle?: string;
   /** the run's font — for a run with `latinFont`, the font of its Hangul / CJK text (Word w:eastAsia) */
   fontFamily: string;
   /**
@@ -338,6 +466,15 @@ export interface TextRun {
   script?: "super" | "sub";
   /** highlight / character shading colour (형광펜) */
   highlight?: string;
+  /** a hyperlink: the address it opens (URL, or "#name" for a bookmark) — Word w:hyperlink / HYPERLINK field, 한글 hyperlink field */
+  link?: string;
+  /** the bookmarks (책갈피) covering the run's text (core/docRefs.ts; DOCX w:bookmarkStart / End); omitted when none */
+  bookmarks?: string[];
+  /**
+   * 덧말 / 윗주 (ruby, Word w:ruby, 한글 hp:dutmal): small text set over (or under) the run's text, which stays one
+   * unbreakable unit. Omitted for text without one.
+   */
+  ruby?: Ruby;
   /** extra advance after every character, px (자간); may be negative */
   letterSpacing?: number;
   /** 장평 (horizontal glyph scale), percent; omitted when 100. Word w:w, HWPX hh:ratio, PDF Tz */
@@ -378,6 +515,21 @@ export interface TextRun {
   fmtRev?: Revision;
   /** ids of the comments (메모) whose range covers the run (Page.comments; core/review.ts) */
   comments?: string[];
+}
+
+/** 덧말 / 윗주 of a run (TextRun.ruby; core/text.ts lays it out). */
+export interface Ruby {
+  text: string;
+  /** its glyph size, px (Word w:hps; 한글: the run's size × szRatio %) — omitted: half the run's size */
+  size?: number;
+  /** its baseline above the run's baseline, px (Word w:hpsRaise) — omitted: 0.9 × the run's size */
+  raise?: number;
+  /** under the text (한글 posType BOTTOM) */
+  below?: true;
+  /** its font when not the run's (Word: the w:rt run's font) */
+  font?: string;
+  /** the file's own settings, written back as read (Word rubyAlign·lid·hpsBaseText, 한글 szRatio·option·styleIDRef·align) */
+  src?: Record<string, string>;
 }
 
 /** A tracked change as the file records it (core/review.ts). */
@@ -471,11 +623,17 @@ export interface InlineObj {
 export const OBJ_CHAR = "\uFFFC";
 
 /** Fields: this page's number, the document's page count, this section's page count, today's date, the file name. */
-export type FieldKind = "page" | "pages" | "secpages" | "date" | "file";
+/**
+ * Fields: 쪽 번호, 전체 쪽 수, 구역 쪽 수, 날짜, 파일 이름 (headers / footers, core/headerFooter.ts); in the body a caption's
+ * number (SEQ), a cross-reference to a bookmark's text (REF) or page (PAGEREF) — core/docRefs.ts, updated with F9.
+ */
+export type FieldKind = "page" | "pages" | "secpages" | "date" | "file" | "seq" | "ref" | "pageref";
 
 export interface TextParagraph {
   id: string;
   runs: TextRun[];
+  /** the paragraph style it uses (OmwDocument.textStyles; ui/textStyles.ts); omitted when none */
+  paraStyle?: string;
   align: Align;
   /** line height ÷ font size (한글 PERCENT / 100); with a Word multiple, the same height as a size multiple (core/lineSpacing.ts) */
   lineSpacing: number;
@@ -483,6 +641,11 @@ export interface TextParagraph {
   /** left indent of every line, px (왼쪽 여백); omitted when 0 */
   indentLeft?: number;
   spaceAfter: number; // px
+  /**
+   * the named paragraph style (core/docStyles.ts: DOCX w:pStyle, HWPX styleIDRef) the paragraph is in; omitted = the
+   * document's default style (Normal / 바탕글) or, for a heading, its heading style
+   */
+  style?: string;
   /** semantic role kept for Markdown/HTML/DOCX round trips (h1..h6, list item, quote, code) */
   role?: ParaRole;
   /**
@@ -646,9 +809,18 @@ export type ParaRole = "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "li" | "oli" | 
 export interface TextNode extends NodeBase {
   type: "TEXT";
   width: number;
+  /**
+   * An imported DXF TEXT / MTEXT (on its first node): the source entity's group codes, its nodes' look and places at
+   * import — written back with those codes while unchanged (core/cadText.ts, dxfWrite2000.ts)
+   */
+  cadText?: { type: "TEXT" | "MTEXT"; raw: [number, string | number][]; sig: string; at: [number, number][]; parts: number; key?: string };
+  /** another node of such a text drawn in pieces apart (a column MTEXT's later columns): the `key` of its cadText */
+  cadPart?: string;
   paragraphs: TextParagraph[];
   /** keep-all = break between 어절 (Korean word units), normal = break anywhere allowed. */
   wordBreak: "keep-all" | "normal";
+  /** vertical type (Photoshop's 세로 문자): paragraphs are columns, right to left (core/textVertical.ts); omitted = horizontal */
+  vertical?: true;
   /**
    * "half": a space set in an East Asian font is half the size wide (Word's balanceSingleByteDoubleByteWidth, on in
    * Korean Word documents: a Latin font's space next to Hangul is the East Asian font's too). Omitted = the font's own.
@@ -681,6 +853,8 @@ export interface TextNode extends NodeBase {
    * text. Empty, it shows its prompt on the canvas only (never in a show, a print or a file). Omitted for text boxes.
    */
   ph?: Placeholder;
+  /** type on a path (Illustrator): the characters run along this path instead of lines in the box (core/pathText.ts) */
+  onPath?: import("./pathText").PathText;
 }
 
 /** Placeholder role and box of a slide text node (PresentationML p:ph). */
@@ -762,8 +936,13 @@ export interface PdfNode extends NodeBase {
    */
   annots?: {
     id: string;
-    kind: "highlight" | "underline" | "strike" | "note" | "sign";
+    kind: "highlight" | "underline" | "strike" | "note" | "sign" | "measure";
     quads?: number[][];
+    /** measure: the measured points (x, y pairs, PDF user space) and the shape (distance / perimeter / area) */
+    points?: number[];
+    shape?: "line" | "polyline" | "polygon";
+    /** measure: the scale it was taken with (written as the annotation's /Measure) */
+    scale?: { page: number; pageUnit: string; real: number; realUnit: string };
     at?: [number, number];
     color: [number, number, number];
     contents?: string;
@@ -773,6 +952,10 @@ export interface PdfNode extends NodeBase {
     assetId?: string;
     /** sign: placed upright as the page is shown (absent in older files: written unturned, as before) */
     upright?: boolean;
+    /** replies (Acrobat 답글): written as Text annotations /IRT this one */
+    replies?: { id: string; contents: string; author?: string; date?: string }[];
+    /** review state (Acrobat 상태 ▸ 검토): written as a Text annotation /IRT this one, /StateModel /Review */
+    state?: "Accepted" | "Rejected" | "Cancelled" | "Completed";
   }[];
 }
 
@@ -805,6 +988,8 @@ export interface TableCell {
   richText?: TextParagraph[];
   /** vertical alignment of the cell's content in a table with `cellBox` (한글 subList vertAlign); absent = top */
   vAlign?: "middle" | "bottom";
+  /** its row's least height, px, from dragging the row's bottom edge (written as Word w:trHeight atLeast) */
+  rowMin?: number;
   /** the cell's own height as the file set it, px (한글 cellSz): its row is at least this tall in a `cellBox` table */
   minHeight?: number;
   /**
@@ -857,6 +1042,8 @@ export interface TableNode extends NodeBase {
    * is that far less the cell's left margin (Word 2010 tables start their text at the margin). Omitted = 0.
    */
   wordInd?: number;
+  /** a 목차 the app made (ui/docExtrasUi.ts insertToc): 목차 업데이트 lists the headings into it again */
+  toc?: true;
 }
 
 /**
@@ -901,7 +1088,8 @@ export interface MediaNode extends NodeBase {
 export type SceneNode = RasterNode | VectorNode | TextNode | ImageNode | PdfNode | TableNode | MediaNode;
 export type NodeType = SceneNode["type"];
 
-export type TransitionType = "NONE" | "FADE" | "SLIDE_LEFT" | "ZOOM";
+/** Slide transitions (PowerPoint 전환): their look in the show (ui/showTransitions.ts) and p:transition (io/formats/pptx.ts). */
+export type TransitionType = "NONE" | "FADE" | "SLIDE_LEFT" | "ZOOM" | "PUSH_UP" | "WIPE" | "SPLIT" | "COVER" | "UNCOVER" | "CUT" | "RANDOM_BARS" | "CIRCLE" | "DISSOLVE";
 export type AnimTrigger = "ON_CLICK" | "WITH_PREVIOUS" | "AFTER_PREVIOUS";
 export type AnimProperty = "OPACITY" | "TRANSLATION" | "SCALE" | "ROTATION";
 
@@ -923,9 +1111,33 @@ export interface KeyframeAnimation {
    * motion paths…) keep PowerPoint's own. `g` names the effect, `n` how many animations it became.
    */
   pptx?: { g: string; xml: string; n: number; sig: string };
+  /** ms after its start condition (PowerPoint 지연); omitted = 0 */
+  delay?: number;
+  /** played when this shape is clicked in the show (PowerPoint 트리거), not in the click sequence; omitted = in sequence */
+  triggerId?: string;
 }
 
 export type PageKind = "DESIGN" | "DOCUMENT" | "SLIDE" | "PDF" | "MASTER";
+
+/**
+ * A box around the page (Word w:pgBorders, 한글 쪽 테두리 hp:pageBorderFill): one line all round, `space` (px) from the
+ * paper's edge (`from: "page"`) or outside the body text (`from: "text"`).
+ */
+export interface PageBorder {
+  style: "single" | "double" | "thick" | "dashed" | "dotted";
+  /** line width, px */
+  width: number;
+  color: string;
+  space: number;
+  from: "page" | "text";
+}
+
+/** A saved path (Photoshop's Paths panel): contours in page px. */
+export interface SavedPath {
+  id: string;
+  name: string;
+  contours: Contour[];
+}
 
 export interface Page {
   id: string;
@@ -934,9 +1146,15 @@ export interface Page {
   width: number;
   height: number;
   background: string;
+  /**
+   * The design mode's perspective grid (Illustrator's Perspective Grid, core/perspective.ts): its settings and whether
+   * it shows. Saved with the page (.omw; an .ai / PDF keeps it in its page-piece data). Omitted = never shown.
+   */
+  perspGrid?: import("./perspective").SavedPerspGrid;
   nodes: SceneNode[]; // bottom -> top
   masterId: string | null;
-  transition: { type: TransitionType; duration: number };
+  /** `after`: advance to the next slide by itself this many ms after the slide's animations (PowerPoint 다음 시간 후) */
+  transition: { type: TransitionType; duration: number; after?: number };
   animations: KeyframeAnimation[];
   /** PPTX: `animations` hold the slide's whole main sequence (read at import), so saving writes it anew, not added to */
   pptxTiming?: boolean;
@@ -944,8 +1162,14 @@ export interface Page {
   source?: PageSource;
   /** ruler guides in page px (x = vertical lines, y = horizontal lines); omitted when there are none */
   guides?: PageGuides;
+  /** 이미지 › 모드 (Photoshop's Image ▸ Mode): omitted = RGB; a PSD is written (and opens) in this mode (ui/ps/colorMode.ts) */
+  colorMode?: "gray" | "cmyk";
+  /** saved paths of the image mode's 패스 panel (Photoshop's Paths), page px; omitted when none (ui/ps/PathsPanel.tsx) */
+  paths?: SavedPath[];
   /** layer groups (folders) of this page; omitted when there are none (see LayerGroup, NodeBase.groupId) */
   groups?: LayerGroup[];
+  /** design mode: the artboard's top-left on the shared canvas (px; ui/artboards.ts); omitted = laid out in a row */
+  board?: { x: number; y: number };
   /**
    * Page setup (쪽 설정) margins in px; omitted = DEFAULT_MARGINS (core/pageSetup.ts, 76 px ≈ 2 cm around the body,
    * the size every document page had before margins were stored), so old files lay out exactly as before.
@@ -953,6 +1177,8 @@ export interface Page {
   margins?: PageMargins;
   /** 단 (columns) of the page's section (core/pageSetup.ts PageColumns); omitted = one column */
   columns?: PageColumns;
+  /** 쪽 테두리 / Word page border of the page's section (core/pageBorder.ts); omitted = none */
+  border?: PageBorder;
   /**
    * How a document page begins when it is written to a word-processor file (DOCX / HWPX). Omitted = after a page
    * break (쪽 나누기): the first page, and every page made with "new page" or Ctrl+Enter. "flow" = the text simply
@@ -967,6 +1193,8 @@ export interface Page {
   hf?: SectionHF;
   /** note numbering and separators of the document (read from its first page; core/notes.ts) */
   notePr?: NotePr;
+  /** named paragraph styles of the document (스타일; read from its first page; core/docStyles.ts); omitted = the built-in sheet */
+  docStyles?: import("./docStyles").DocStyle[];
   /** comments (메모) of the document, in file order (read from its first page; core/review.ts) */
   comments?: DocComment[];
   /** changes are recorded while editing (Word w:trackRevisions, 한글 변경 내용 추적 켬; core/review.ts); on the first page */
@@ -987,6 +1215,25 @@ export interface Page {
   section?: string;
   /** speaker notes of a slide (plain text, one paragraph per line; PPTX notesSlide body) */
   notes?: string;
+  /**
+   * 배경 서식 › 그라데이션 채우기 (render/weave.ts pageFill, PPTX p:bg a:gradFill): a linear gradient over the page,
+   * `angle` in degrees clockwise from left → right (DrawingML a:lin ang); `background` stays its first colour (for
+   * outputs that take one colour). Omitted = the solid `background`.
+   */
+  bgGrad?: { angle: number; stops: { at: number; color: string }[] };
+  /**
+   * 머리글/바닥글 of a slide (PowerPoint 삽입 › 머리글/바닥글, core/slideHf.ts): date, slide number and footer text drawn
+   * at the slide's foot, written as dt / sldNum / ftr placeholders. Omitted = none shown.
+   */
+  slideHf?: SlideHF;
+}
+
+/** What a slide shows at its foot (core/slideHf.ts). */
+export interface SlideHF {
+  /** date: today's, updated when shown (`fmt`), or fixed text */
+  date?: { auto: true; fmt?: "ymd" | "long" | "mdy" } | { auto?: false; text: string };
+  num?: true;
+  footer?: string;
 }
 
 /** Page number formats: 1 2 3, i ii, I II, a b, A B, - 1 -, 가 나 다. */
@@ -1146,6 +1393,9 @@ export interface CadSourceMeta {
   oy: number;
   /** layout name for a paper-space page; omitted for model space */
   layout?: string;
+  /** that layout's tab order (LAYOUT 71), and whether it was the drawing's active layout (*Paper_Space) */
+  layoutOrder?: number;
+  layoutActive?: true;
   /** block name → number of inserts on this page */
   blocks?: Record<string, number>;
   /** external files the drawing names (xrefs, linked pictures): found or not, kept as assets (CAD_IMPORT.md §11) */
@@ -1154,8 +1404,27 @@ export interface CadSourceMeta {
   layerStates?: Record<string, Record<string, [boolean, boolean, boolean]>>;
   /** AutoCAD GROUPs (named object selections across layers): shown as group rows in the layer manager */
   groups?: CadGroupSource[];
+  /** LTSCALE set on the drawing screen (the import's dashes are at 1) */
+  ltscaleNow?: number;
+  /** LIMITS: lower-left and upper-right corners (drawing units) */
+  limits?: [[number, number], [number, number]];
   /** the drawing's LTYPE table: linetypes loaded in it (upper-case name ??its name and + dash / − gap / 0 dot pattern) */
   ltypes?: Record<string, { name: string; pattern: number[] }>;
+  /** the drawing's STYLE table (upper-case name → as the file has it): written back, so texts keep their fonts */
+  styles?: Record<string, CadStyleSource>;
+}
+
+/** One text style of an imported drawing (AutoCAD STYLE): font file, big font, fixed height, width, oblique (degrees). */
+export interface CadStyleSource {
+  name: string;
+  file: string;
+  bigFont?: string;
+  height: number;
+  width: number;
+  oblique: number;
+  gen: number;
+  family?: string;
+  familyFlags?: number;
 }
 
 /** One AutoCAD GROUP of a page: its member nodes (the entities' nodes on this page). */
@@ -1239,6 +1508,10 @@ export interface PsdLayerLink {
   fx?: string;
   /** text layer: io/formats/psdText psdTextKey of the spec at import (an edit rewrites the record's TySh) */
   txt?: string;
+  /** layer mask kept apart on import (RasterNode.mask): its fingerprint then (core/image/layerMask maskFingerprint) */
+  mfp?: string;
+  /** blending options and partial locks at import (io/formats/psd blendOptionsKey) */
+  opt?: string;
 }
 
 export interface AssetRef {
@@ -1264,6 +1537,17 @@ export interface OmwDocument {
   pages: Page[];
   masters: Page[];
   assets: Record<string, AssetRef>;
+  /** the design mode's symbols (Symbols panel; ui/designArt.ts); omitted when none */
+  symbols?: SymbolDef[];
+  /** the design mode's pattern swatches (Object › Pattern › Make); omitted when none */
+  patterns?: import("./liveVector").PatternFill[];
+  /** character / paragraph styles (Illustrator's panels; ui/textStyles.ts); omitted when none */
+  textStyles?: {
+    char: { id: string; name: string; run: Partial<TextRun> }[];
+    para: { id: string; name: string; para: Partial<TextParagraph>; run: Partial<TextRun> }[];
+  };
+  /** slide theme the deck was given (디자인 › 테마, core/slideTheme.ts); omitted = Omniweave's default look */
+  theme?: import("./slideTheme").SlideTheme;
 }
 
 let idCounter = 0;
@@ -1407,6 +1691,8 @@ export interface OfficeSourceMeta {
   parts: OfficeSourcePart[];
   /** pictures read into IMAGE nodes (model 5 on; officesurgeon/pics.ts): where each is in the file and its fingerprint */
   pics?: OfficeSourcePic[];
+  /** floating shapes / text boxes read into VECTOR / TEXT nodes (model 11 on; officesurgeon/shapes.ts), as `pics` */
+  shapes?: OfficeSourcePic[];
   /**
    * footnotes / endnotes read with their references (model 7 on): each note's kind, its id in the file (DOCX w:id,
    * HWPX instId) and the fingerprint of its text, in document order; absent = an older map (notes left as in the file)

@@ -141,5 +141,7 @@
   "docmode.status.countTip": "文字カウント (空白を除く文字数)",
   "docmode.status.langTip": "本文で最も多く使われている言語",
   "docmode.ruler.topTip": "段落のインデント: 上 ▽ 1 行目 · 下 ▲ ぶら下げ · □ 左 · 右 ▲ — ドラッグで調整 (Alt: 目盛りに合わせない)。ダブルクリック: ページ設定",
-  "docmode.ruler.leftTip": "垂直ルーラー — 上下の余白が網掛けで表示されます。ダブルクリック: ページ設定"
+  "docmode.ruler.leftTip": "垂直ルーラー — 上下の余白が網掛けで表示されます。ダブルクリック: ページ設定",
+  "docmode.status.pageBoxTip": "ページ番号を入力して Enter でそのページへ（PgUp・PgDn・Home・End でも移動）",
+  "docmode.status.pageCount": "{m} ページ"
 }

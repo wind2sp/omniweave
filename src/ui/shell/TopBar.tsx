@@ -1,3 +1,4 @@
+import { PsDialogs } from "../ps/PsDialogs";
 // Top of the window (docs/design/UI_TOP_REDESIGN.md, 제품 결정 2026-11-20):
 //   title bar  — logo (→ start screen) · document tabs · [empty: drag the window] · command search (Alt+Q) · update ·
 //                theme · minimise / maximise / close. The window has no Windows title bar (tauri.conf.json
@@ -9,8 +10,8 @@
 // The classic menu bar is gone; every command it had is still reachable (commandHomes in tests/topUi.test.ts).
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { create } from "zustand";
-import { useStore } from "../../core/store";
-import { saveDoc } from "../actions";
+import { findPage, useStore } from "../../core/store";
+import { saveDoc, saveTargetExt } from "../actions";
 import { exportMenuItems } from "../exportMenu";
 import { useLang, useT } from "../../i18n";
 import { modeMenuItems } from "../menus";
@@ -197,6 +198,10 @@ export function TabRow() {
   const profile = useProfile();
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
+  // the save button names the type it writes (the opened file's own, or .omw)
+  useStore((s) => s.pageId);
+  useStore((s) => s.filePath);
+  const saveExt = saveTargetExt();
   const tool = useStore((s) => s.tool);
   const ui = useUI();
   const t = useT();
@@ -207,6 +212,9 @@ export function TabRow() {
   const setTab = useRibbonTab((s) => s.set);
   const ctx = useRibbonContext(surface);
   const tab = activeTab(surface, chosen, ctx?.key ?? null);
+  // in the master view the slide ribbon's first tab is PowerPoint's 슬라이드 마스터 tab (SlideRibbon MasterPanel)
+  const onMaster = useStore((s) => surface === "slide" && findPage(s.doc, s.pageId)?.kind === "MASTER");
+  const tabName = (id: string) => (onMaster && id === "home" ? t("slideppt.master.view") : t(`topui.tab.${surface}.${id}`));
   const tips = useKeyTips((s) => s.on);
   const bsOpen = useBackstage((s) => s.open);
   // F10 is polar tracking on the drawing screen (AutoCAD); elsewhere it shows the key tips like Alt (Office)
@@ -218,7 +226,9 @@ export function TabRow() {
   const prevCtx = useRef<string | null>(null);
   useEffect(() => {
     const k = ctx?.key ?? null;
-    if (k && k !== prevCtx.current) setTab(surface, "ctx");
+    // (PowerPoint: picking the object to animate on the 애니메이션 tab keeps that tab, as on 전환)
+    const stay = surface === "slide" && ["animations", "transitions"].includes(useRibbonTab.getState().tab[surface] ?? "");
+    if (k && k !== prevCtx.current && !stay) setTab(surface, "ctx");
     else if (!k && prevCtx.current && useRibbonTab.getState().tab[surface] === "ctx") setTab(surface, RIBBON_TABS[surface][0]);
     prevCtx.current = k;
   }, [ctx?.key, surface, setTab]);
@@ -309,7 +319,7 @@ export function TabRow() {
                 className={cx("rtab", tab === id && "on", i === 0 && "rtab-first")}
                 onClick={() => setTab(surface, id)}
               >
-                {t(`topui.tab.${surface}.${id}`)}
+                {tabName(id)}
                 {tip(id)}
               </button>
             ))}
@@ -321,14 +331,15 @@ export function TabRow() {
         )}
       </div>
       <ImageDialogs />
+      <PsDialogs />
       <div className="cmdbar-spacer" />
       <ModeSwitch form={plan.mode} />
       <div className="cmdbar-group">
-        <IconBtn icon="undo" tip={t("cmd.edit.undo")} kbd="Ctrl+Z" disabled={!canUndo && !isDrawing()} onClick={() => void (undoDrawnPoint() || S().undo())} />
-        <IconBtn icon="redo" tip={t("cmd.edit.redo")} kbd="Ctrl+Y" disabled={!canRedo} onClick={() => S().redo()} />
+        <IconBtn icon="undo" tip={t("cmd.edit.undo")} kbd="Ctrl+Z" why={t("tooltip.why.undo")} disabled={!canUndo && !isDrawing()} onClick={() => void (undoDrawnPoint() || S().undo())} />
+        <IconBtn icon="redo" tip={t("cmd.edit.redo")} kbd="Ctrl+Y" why={t("tooltip.why.redo")} disabled={!canRedo} onClick={() => S().redo()} />
       </div>
       <div className="cmdbar-group">
-        <IconBtn icon="save" tip={t("shell.saveOmw")} kbd="Ctrl+S" onClick={() => void saveDoc()} />
+        <IconBtn icon="save" tip={saveExt === "omw" ? t("shell.saveOmw") : t("shell.saveAsType", { ext: saveExt.toUpperCase() })} kbd="Ctrl+S" onClick={() => void saveDoc()} />
         <Menu
           button={
             <>

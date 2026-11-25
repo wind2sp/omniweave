@@ -8,5 +8,6 @@
   "tablemenu.deleteTable": "删除表格",
   "tablemenu.merge": "合并单元格",
   "tablemenu.split": "拆分单元格",
-  "tablemenu.props": "表格属性（宽度、底纹、边框）…"
+  "tablemenu.props": "表格属性（宽度、底纹、边框）…",
+  "tablemenu.splitTable": "拆分表格"
 }

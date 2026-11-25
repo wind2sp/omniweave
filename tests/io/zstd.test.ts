@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { constants, zstdCompressSync, zstdDecompressSync } from "node:zlib";
 import { xxh64, zstdCompress, zstdDecompress, zstdStoredFrame } from "../../src/io/zstd";
+import { cpuNow, cpuBudget, wallTimeout } from "../budget";
 
 const level = (b: Uint8Array, l: number, extra: Record<number, number> = {}) =>
   new Uint8Array(zstdCompressSync(b, { params: { [constants.ZSTD_c_compressionLevel]: l, ...extra } }));
@@ -94,7 +95,7 @@ describe("zstd", () => {
     const srcs = [level(text, 19), level(mixed, 3), aiPrivateFrame(`${AIF}/omni-ai-import-layers.ai`)!.subarray(0, 40_000), zstdCompress(text)];
     const r = rng(7);
     let thrown = 0;
-    const t0 = Date.now();
+    const t0 = cpuNow();
     for (const src of srcs) {
       for (let cut = 0; cut < src.length; cut += Math.max(1, (src.length / 97) | 0)) {
         try {
@@ -118,8 +119,8 @@ describe("zstd", () => {
     }
     expect(thrown).toBeGreaterThan(1000);
     // a hang would hit the test timeout; alone this takes about 2 s
-    expect(Date.now() - t0).toBeLessThan(150_000);
-  }, 200_000);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(150_000));
+  }, wallTimeout(200_000));
   it("random garbage after a valid magic throws cleanly", () => {
     const r = rng(11);
     for (let k = 0; k < 3000; k++) {

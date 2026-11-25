@@ -252,6 +252,8 @@
   "ribbon.cropRatio.custom": "Custom",
   "ribbon.crop.customW": "Ratio width",
   "ribbon.crop.customH": "Ratio height",
+  "ribbon.crop.level": "Straighten",
+  "ribbon.crop.levelTip": "Straighten — draw a line along what should be level (or upright) and the picture is turned to match",
   "ribbon.crop.straighten": "Angle",
   "ribbon.crop.straightenTip": "Straighten — crop box angle (applying turns the content so the box is level)"
 }

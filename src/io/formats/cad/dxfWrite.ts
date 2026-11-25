@@ -109,7 +109,7 @@ export function nearestAci(hex: string | null | undefined): number {
   return best;
 }
 
-function rootGroup(page: Pick<Page, "groups">, id: string | undefined): LayerGroup | undefined {
+export function rootGroup(page: Pick<Page, "groups">, id: string | undefined): LayerGroup | undefined {
   let g = page.groups?.find((x) => x.id === id);
   for (let i = 0; g?.parentId && i < 64; i++) g = page.groups?.find((x) => x.id === g!.parentId) ?? g;
   return g;
@@ -123,7 +123,7 @@ interface LayerOut {
   locked: boolean;
 }
 
-function nodeColor(n: SceneNode): string | null {
+export function nodeColor(n: SceneNode): string | null {
   if (n.type === "VECTOR") return n.stroke ?? n.fill;
   if (n.type === "TEXT") return n.paragraphs.find((p) => p.runs.length)?.runs[0]?.color ?? null;
   return null;
@@ -316,7 +316,7 @@ export function writeDxf(page: Page): DxfWriteReport {
 }
 
 /** The file text → bytes: ASCII one byte, code page 949 characters two (anything else was escaped already). */
-function encodeCp949(s: string): Uint8Array {
+export function encodeCp949(s: string): Uint8Array {
   const table = cp949Table();
   const out = new Uint8Array(s.length * 2);
   let o = 0;

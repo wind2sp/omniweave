@@ -5,12 +5,18 @@
 // defined names), notes added / edited / deleted (comments part and its VML drawing), and the AutoFilter.
 // Every other byte of the package stays as it was.
 
-import type { SheetData, SheetNote } from "../../core/sheetTypes";
+import type { SheetCondRule, SheetData, SheetNote } from "../../core/sheetTypes";
 import { SurgeryUnavailable } from "../officesurgeon/docx";
 import { childrenOf, rootOf } from "../officesurgeon/scan";
 import type { ZipArchive } from "../officesurgeon/zip";
 import { addr, colLetters, parseAddr, parseRange } from "./formula";
 import { relsOf, relTarget } from "./readExtra";
+import { writeSheetDrawings, type PkgRels } from "./writeDrawings";
+import { filterColumnXml, writeSheetParts } from "./writeParts";
+import { readPersons, writeThreads } from "./threads";
+import { writeNewTables } from "./writeTables";
+import { markRefreshed, markShown, maxCacheId, writeNewPivots, type NewPivot } from "./pivots";
+import { writeNewSlicers, type SlicerCacheOut } from "./slicers";
 import { adjustAddr, adjustFormula, adjustRange, adjustSqref, applyStructToSheet, frozenAfter, shiftIndex, shiftSpan, type StructOp } from "./structure";
 
 const attrOf = (tag: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? null;
@@ -300,10 +306,49 @@ const noteXml = (px: string, ref: string, authorId: number, n: SheetNote) => `<$
 const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const sameNote = (a: SheetNote | undefined, b: SheetNote | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
+/**
+ * A fresh sheet's notes (Shift+F2 in a new workbook): the comments part, the VML drawing Excel shows them with and the
+ * sheet's <legacyDrawing>, as Excel writes them.
+ */
+export function writeFreshNotes(xml: string, sh: SheetData, pkg: PkgRels): string {
+  const notes = Object.entries(sh.notes ?? {});
+  if (!notes.length) return xml;
+  const authors: string[] = [];
+  const authorOf = (n: SheetNote) => {
+    const name = n.author ?? "";
+    const i = authors.indexOf(name);
+    return i >= 0 ? i : authors.push(name) - 1;
+  };
+  const list = notes.map(([a, n]) => noteXml("", a, authorOf(n), n)).join("");
+  const cPath = pkg.freeName((n) => `xl/comments${n}.xml`);
+  pkg.setPart(
+    cPath,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<comments xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><authors>${authors.map((a) => `<author>${escText(a)}</author>`).join("")}</authors><commentList>${list}</commentList></comments>`,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml",
+  );
+  pkg.addRel(pkg.part, `${REL_NS}/comments`, cPath);
+  const vPath = pkg.freeName((n) => `xl/drawings/vmlDrawing${n}.vml`);
+  const block = Number(/(\d+)\.vml$/.exec(vPath)![1]);
+  let id = block * 1024 + 1;
+  const shapes = notes.map(([a]) => {
+    const p = parseAddr(a)!;
+    return noteShape(id++, p.r, p.c);
+  });
+  pkg.setPart(
+    vPath,
+    `<xml xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><o:shapelayout v:ext="edit"><o:idmap v:ext="edit" data="${block}"/></o:shapelayout>${SHAPETYPE}${shapes.join("")}</xml>`,
+    "application/vnd.openxmlformats-officedocument.vmlDrawing",
+  );
+  const rid = pkg.addRel(pkg.part, `${REL_NS}/vmlDrawing`, vPath);
+  return placeChild(xml, "legacyDrawing", `<legacyDrawing r:id="${rid}"/>`);
+}
+
 // ───── the surgery ─────
 
 export class SheetSurgery {
   private parts = new Map<string, string>();
+  /** binary parts written here (pictures) */
+  private bins = new Map<string, Uint8Array>();
   private removed = new Set<string>();
   private wbFns: ((wb: string) => string)[] = [];
   private ctFns: ((ct: string) => string)[] = [];
@@ -430,11 +475,97 @@ export class SheetSurgery {
     return { xml, force };
   }
 
-  /** After the cell diff: notes and the AutoFilter written when they changed. */
-  after(sh: SheetData, o: SheetData, xml: string): string {
+  /**
+   * After the cell diff: notes and the AutoFilter written when they changed; with `dxfOf`, also conditional formats,
+   * validation, hyperlinks, protection, page setup and charts (io/sheet/writeParts.ts, writeDrawings.ts).
+   */
+  /** pivot caches of pivot tables written here (the workbook lists them; io/sheet/book.ts) */
+  caches: (NewPivot & { sheet: string })[] = [];
+  private cacheId = -1;
+  /** table ids (new tables and the file's), and the slicer caches of slicers made here (io/sheet/slicers.ts) */
+  tableIds = new Map<string, number>();
+  slicerCaches: SlicerCacheOut[] = [];
+
+  /** the workbook's threaded-comment authors (persons part): read once, added to by threads written here */
+  private personsMap: Map<string, string> | null = null;
+  personsChanged = false;
+  get persons(): Map<string, string> {
+    return (this.personsMap ??= readPersons(this.readOrig("xl/persons/person.xml")));
+  }
+
+  after(sh: SheetData, o: SheetData, xml: string, dxfOf?: (st: NonNullable<SheetCondRule["style"]>) => number, sheets?: SheetData[]): string {
     if (JSON.stringify(sh.notes ?? {}) !== JSON.stringify(o.notes ?? {})) xml = this.writeNotes(sh, o, xml);
+    if (sh.part && JSON.stringify(sh.threads ?? {}) !== JSON.stringify(o.threads ?? {})) {
+      const n = this.persons.size;
+      if (writeThreads(sh, o, this.pkgFor(sh.part), this.persons) && this.persons.size !== n) this.personsChanged = true;
+    }
     if (JSON.stringify(sh.filter ?? null) !== JSON.stringify(o.filter ?? null)) xml = this.writeFilter(sh, o, xml);
+    if (dxfOf && sh.part) {
+      const pkg = this.pkgFor(sh.part);
+      const before = xml;
+      xml = writeSheetParts(xml, sh, o, dxfOf, pkg);
+      xml = writeSheetDrawings(xml, sh, o, pkg);
+      xml = writeNewTables(xml, sh, o, pkg, this.tableIds);
+      if (sheets) {
+        const sl = writeNewSlicers(xml, sh, o, pkg, sheets);
+        xml = sl.xml;
+        this.slicerCaches.push(...sl.caches);
+        markRefreshed(sh, o, pkg);
+        markShown(sh, o, pkg);
+        this.caches.push(...writeNewPivots(sh, sheets, pkg, () => (this.cacheId = (this.cacheId < 0 ? maxCacheId(this.readOrig("xl/workbook.xml") ?? "") : this.cacheId) + 1)).map((x) => ({ ...x, sheet: sh.name })));
+      }
+      if (xml !== before && /\sr:id=/.test(xml) && !new RegExp(`xmlns:r="${REL_NS}"`).test(xml.slice(0, rootOf(xml).openEnd))) xml = xml.replace(/<((?:\w+:)?worksheet)\b/, `<$1 xmlns:r="${REL_NS}"`);
+    }
     return xml;
+  }
+
+  /** A sheet added here (written whole): its formats, validation, links, protection, page setup, charts and pivots. */
+  fresh(sh: SheetData, xml: string, part: string, dxfOf: (st: NonNullable<SheetCondRule["style"]>) => number, sheets: SheetData[]): string {
+    const pkg = this.pkgFor(part);
+    xml = writeSheetParts(xml, sh, null, dxfOf, pkg);
+    xml = writeSheetDrawings(xml, sh, null, pkg);
+    xml = writeFreshNotes(xml, sh, pkg);
+    xml = writeNewTables(xml, sh, null, pkg, this.tableIds);
+    const sl = writeNewSlicers(xml, sh, null, pkg, sheets);
+    xml = sl.xml;
+    this.slicerCaches.push(...sl.caches);
+    this.caches.push(...writeNewPivots(sh, sheets, pkg, () => (this.cacheId = (this.cacheId < 0 ? maxCacheId(this.readOrig("xl/workbook.xml") ?? "") : this.cacheId) + 1)).map((x) => ({ ...x, sheet: sh.name })));
+    return xml;
+  }
+
+  /** The package as the chart / hyperlink writers see it, for one worksheet part. */
+  private pkgFor(part: string): PkgRels {
+    return {
+      part,
+      addRel: (from, type, target) => this.addRel(from, type, target),
+      rels: (from) => this.rels(from),
+      getPart: (name) => this.get(name),
+      setPart: (name, text, ct) => {
+        const isNew = !this.exists(name);
+        this.set(name, text);
+        if (isNew && ct) this.ctFns.push((c) => (c.includes(`"/${name}"`) ? c : c.replace(/<\/Types>/, `<Override PartName="/${name}" ContentType="${ct}"/></Types>`)));
+      },
+      setBytes: (name, bytes, ct) => {
+        this.bins.set(name, bytes);
+        this.ctFns.push((c) => (c.includes(`"/${name}"`) ? c : c.replace(/<\/Types>/, `<Override PartName="/${name}" ContentType="${ct}"/></Types>`)));
+      },
+      freeName: (p) => this.freeName(p),
+      link: (url) => {
+        const rp = relsOf(part);
+        let x = this.get(rp) ?? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`;
+        const ids = [...x.matchAll(/\sId="rId(\d+)"/g)].map((m) => Number(m[1]));
+        const id = `rId${Math.max(0, ...ids) + 1}`;
+        const el = `<Relationship Id="${id}" Type="${REL_NS}/hyperlink" Target="${escAttr(url)}" TargetMode="External"/>`;
+        x = /<\/Relationships>\s*$/.test(x) ? x.replace(/<\/Relationships>\s*$/, `${el}</Relationships>`) : x.replace(/<Relationships\b([^>]*)\/>/, `<Relationships$1>${el}</Relationships>`);
+        this.set(rp, x);
+        return id;
+      },
+      dropLinks: () => {
+        const rp = relsOf(part);
+        const x = this.get(rp);
+        if (x) this.set(rp, x.replace(/<Relationship\b[^>]*Type="[^"]*\/hyperlink"[^>]*\/>/g, ""));
+      },
+    };
   }
 
   private writeNotes(sh: SheetData, o: SheetData, xml: string): string {
@@ -445,7 +576,8 @@ export class SheetSurgery {
     const ldTag = /<(?:\w+:)?legacyDrawing\b[^>]*>/.exec(xml)?.[0];
     const ldId = ldTag ? attrOf(ldTag, "r:id") ?? attrOf(ldTag, "id") : null;
     const vRel = ldId ? rels.find((r) => r.id === ldId) : rels.find((r) => r.type === "vmlDrawing");
-    const live = Object.entries(notes).filter(([a, n]) => !n.threaded || sameNote(n, o.notes?.[a]));
+    // a thread's legacy comment (author "tc={id}") is written as Omniweave keeps it; other threaded notes as they were
+    const live = Object.entries(notes).filter(([a, n]) => !n.threaded || n.author?.startsWith("tc=") || sameNote(n, o.notes?.[a]));
     // comments part
     let cPath = cRel?.target ?? null;
     let cx = cPath ? this.get(cPath) : null;
@@ -497,7 +629,7 @@ export class SheetSurgery {
     const list = order
       .map((a) => {
         const n = notes[a];
-        if (kept.has(a) && (n.threaded || sameNote(n, o.notes?.[a]))) return kept.get(a)!;
+        if (kept.has(a) && ((n.threaded && !n.author?.startsWith("tc=")) || sameNote(n, o.notes?.[a]))) return kept.get(a)!;
         return noteXml(px, a, authorOf(n), n);
       })
       .join("");
@@ -554,8 +686,7 @@ export class SheetSurgery {
       .sort((a, b) => Number(a[0]) - Number(b[0]))
       .map(([k, v]) => {
         if (v.other) return new RegExp(`<(?:\\w+:)?filterColumn\\b[^>]*colId="${k}"[^>]*(?:/>|>[\\s\\S]*?</(?:\\w+:)?filterColumn>)`).exec(old)?.[0] ?? "";
-        if (!v.vals) return "";
-        return `<${px}filterColumn colId="${k}"><${px}filters${v.blank ? ' blank="1"' : ""}>${v.vals.map((x) => `<${px}filter val="${escAttr(x)}"/>`).join("")}</${px}filters></${px}filterColumn>`;
+        return filterColumnXml(px, k, v);
       })
       .join("");
     xml = placeChild(xml, "autoFilter", cols ? `<${px}autoFilter ref="${f.ref}">${cols}</${px}autoFilter>` : `<${px}autoFilter ref="${f.ref}"/>`);
@@ -582,11 +713,16 @@ export class SheetSurgery {
   workbook(wb: string): string {
     return this.wbFns.reduce((w, f) => f(w), wb);
   }
+  private ctDone = 0;
+  /** [Content_Types].xml with the parts added since the last call. */
   contentTypes(ct: string): string {
-    return this.ctFns.reduce((c, f) => f(c), ct);
+    const fns = this.ctFns.slice(this.ctDone);
+    this.ctDone = this.ctFns.length;
+    return fns.reduce((c, f) => f(c), ct);
   }
   /** Parts written / removed, into the save's maps. */
   flush(changed: Map<string, Uint8Array>, gone: Set<string>) {
+    for (const [k, v] of this.bins) changed.set(k, v);
     const enc = new TextEncoder();
     for (const [k, v] of this.parts) changed.set(k, enc.encode(v));
     for (const k of this.removed) gone.add(k);

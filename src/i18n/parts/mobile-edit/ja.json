@@ -123,5 +123,8 @@
   "mobile.ed.notEditable": "このファイルは画像としてのみ開きます(編集できる内容がありません)",
   "dxfwrite.export.label": "DXF図面(.dxf)",
   "dxfwrite.export.hint": "このページの線・文字をレイヤーごとにDXF R12で — 塗り・線種・線幅は含まれません",
-  "dxfwrite.export.dwgNote": "DWG では保存しません — DXF で書き出せば AutoCAD で開けます"
+  "dxfwrite.export.dwgNote": "DWG では保存しません — DXF で書き出せば AutoCAD で開けます",
+  "mobile.ed.where": "{page} ページ · 段落 {n}/{total}",
+  "mobile.ed.wherePage": "{page} ページ",
+  "mobile.ed.slides": "スライド一覧"
 }

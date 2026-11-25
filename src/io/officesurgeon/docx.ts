@@ -26,6 +26,7 @@ import {
   docxNoteXml,
   docxNotesPartXml,
   docxRuns,
+  docxRubyXml,
   flowNotes,
   useDocxNoteIds,
   docxColsXml,
@@ -50,6 +51,9 @@ import {
   docxTable,
   docxTableXml,
   docxText,
+  patchDocxStyles,
+  docxStyleSheet,
+  docxBookmarkMarks,
   type DocxCtx,
   type FlowItem,
 } from "../office";
@@ -57,7 +61,8 @@ import { children, descendants, esc, parseXml } from "../xml";
 import { MAX_LEVELS, levelOf, resolveDef } from "../../core/lists";
 import type { ListDef } from "../../core/style/types";
 import { listDefKey, noteFp } from "./common";
-import { cellFp, cellParagraphs, cellParas, legacyParaView, legacyRunView, lookKey, MODEL_AFTER_TABLE, MODEL_HEADING_STYLES, MODEL_OPTIONAL_FIELDS, MODEL_REVIEW, MODEL_VERSION, MODEL_WORD_MULTIPLE, MODEL_WORD_STYLES, preWordMultipleView, revLookKey, WORD_ENGINE_VERSION, isListRole, itemFp, markedBodyRuns, itemId, paraFp, paraPropsKey, tablePropsKey, changedListDefs, fileListDefs, flowParas, itemRelisted, normalRuns, origParas, paraReviewKey, relistPlan, type ListSegment, type RelistPlan } from "./common";
+import { restyleParas, type DocStyle } from "../../core/docStyles";
+import { cellFp, cellParagraphs, cellParas, legacyParaView, legacyRunView, lookKey, MODEL_AFTER_TABLE, MODEL_HEADING_STYLES, MODEL_OPTIONAL_FIELDS, MODEL_PARA_STYLES, MODEL_REVIEW, MODEL_VERSION, MODEL_WORD_MULTIPLE, MODEL_WORD_STYLES, preWordMultipleView, revLookKey, WORD_ENGINE_VERSION, isListRole, itemFp, markedBodyRuns, itemId, paraFp, paraPropsKey, tablePropsKey, changedListDefs, fileListDefs, flowParas, itemRelisted, normalRuns, origParas, paraReviewKey, relistPlan, type ListSegment, type RelistPlan } from "./common";
 import { commentNeighbours, COMMENTS_CT, COMMENTS_EX_CT, COMMENTS_EX_REL, COMMENTS_REL, docxAnnotationStyles, docxCommentMarks, docxCommentXml, docxComments, docxPPrReview, docxRevXml, docxWithRPrChange, docxSettingsTracking, docxTracking, newParaId, paraIdsIn, tidyDocxCommentMarks, tidyDocxMoveRanges, W15_NS, W14_NS, withW14, type DocxCommentIds } from "../officeReview";
 import { docComments } from "../../core/review";
 import { formerRun } from "../../core/richtext";
@@ -65,6 +70,9 @@ import type { DocComment } from "../../core/types";
 import { childNamed, childrenOf, descendantsNamed, rootOf, type XmlEl } from "./scan";
 import type { AssetRef } from "../../core/types";
 import { NS_R, NS_WP, REL_IMAGE, docxDrawingXml, docxPicPara, itemTops, picTargets, type OfficePic, type PicMedia } from "../officeDrawing";
+import { MODEL_SHAPES, shapeChanges, shapeMap, shapesKept } from "./shapes";
+import { docxDml } from "../formats/docxDml";
+import { docxShapeXml } from "../officeShapes";
 import { MODEL_PICTURES, bytesHash, docxDrawingPlace, emptyDocxPara, patchDocxDrawing, patchElement, picChanges, picMap, placeKey, type PicEdit } from "./pics";
 import { entryData, readZip, rewriteZip, type ZipArchive } from "./zip";
 import { picFormat as picFormatOf } from "../officeDrawing";
@@ -74,9 +82,10 @@ const MAIN_RELS = "word/_rels/document.xml.rels";
 const NUMBERING = "word/numbering.xml";
 const tn = (key: string, n: number) => t(n === 1 ? `${key}_one` : key, { n });
 const tableKey = (tb: TableNode) => hashString(tablePropsKey(tb));
+const styleTag = (id: string) => `<w:pStyle w:val="${esc(id)}"/>`;
 
 /** Block map of a freshly imported DOCX (null when the import and the element count disagree). */
-export function docxMeta(pages: Page[], blockItems: number[], asset: { id: string; hash: string }, pics?: OfficePic[], assets?: Record<string, AssetRef>): OfficeSourceMeta | null {
+export function docxMeta(pages: Page[], blockItems: number[], asset: { id: string; hash: string }, pics?: OfficePic[], assets?: Record<string, AssetRef>, shapes?: OfficePic[]): OfficeSourceMeta | null {
   const flow = collectFlow(pages);
   if (blockItems.reduce((a, b) => a + b, 0) !== flow.length) return null;
   let i = 0;
@@ -87,8 +96,10 @@ export function docxMeta(pages: Page[], blockItems: number[], asset: { id: strin
     return b;
   });
   // pictures read (report.pictures): model 5 with the picture map; an import without them is a model 4 map
-  const meta: OfficeSourceMeta = { engine: WORD_ENGINE_VERSION, model: pics ? MODEL_VERSION : MODEL_HEADING_STYLES, hf: HF_MAP_VERSION, assetId: asset.id, hash: asset.hash, parts: [{ part: MAIN, blocks }] };
+  // (shapes read, report.shapes: model 11 with the shape map)
+  const meta: OfficeSourceMeta = { engine: WORD_ENGINE_VERSION, model: pics ? (shapes ? MODEL_VERSION : MODEL_PARA_STYLES) : MODEL_HEADING_STYLES, hf: HF_MAP_VERSION, assetId: asset.id, hash: asset.hash, parts: [{ part: MAIN, blocks }] };
   if (pics?.length) meta.pics = picMap(pages, pics, assets);
+  if (pics && shapes?.length) meta.shapes = shapeMap(pages, shapes);
   // footnotes / endnotes (model 7): each note's id in the file and the fingerprint of its text
   if (pics) meta.notes = flowNotes(flow).map((n) => ({ k: n.kind, id: n.src ?? "", fp: noteFp(n) }));
   return meta;
@@ -192,12 +203,13 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
   const flow = collectFlow(pages, starts);
   // page layout: the original's (read again) against the pages' — new breaks, changed paper / margins (layout.ts)
   // (a map from model 5 on was made by the importer that reads pictures: the original is read the same way)
-  const rep: OfficeImportReport = { notesDropped: 0, ...((meta.model ?? 1) >= MODEL_PICTURES ? { pictures: [] } : {}), ...((meta.model ?? 1) >= MODEL_AFTER_TABLE ? { afterTableParas: true as const } : {}), ...((meta.model ?? 1) < MODEL_REVIEW ? { noReview: true as const } : {}) };
+  const rep: OfficeImportReport = { notesDropped: 0, ...((meta.model ?? 1) >= MODEL_PICTURES ? { pictures: [] } : {}), ...((meta.model ?? 1) >= MODEL_SHAPES ? { shapes: [], dml: docxDml } : {}), ...((meta.model ?? 1) >= MODEL_AFTER_TABLE ? { afterTableParas: true as const } : {}), ...((meta.model ?? 1) < MODEL_REVIEW ? { noReview: true as const } : {}) };
   const origItems = parseDocxFlow(orig, rep);
   if (origItems.length !== blocks.reduce((a, b) => a + b.ids.length, 0) || !rep.layout) throw new SurgeryUnavailable("layout");
   const diff = legacy ?? layoutDiff(pages, flow, starts, blocks.flatMap((b) => b.ids), rep.layout);
   // headers / footers / numbering against the original's (hf.ts; older maps keep the original's as they are)
-  const hfc: HFCompare = { cur: flowLayout(pages, starts, flow.length).hfs, orig: rep.layout.sections, curEvenOdd: !!pages[0]?.hf?.evenOdd };
+  // (a section added here copies its enclosing section's settings element, header / footer references with it)
+  const hfc: HFCompare = { cur: flowLayout(pages, starts, flow.length).hfs.filter((_, j) => !diff.addedSections?.has(j)), orig: rep.layout.sections, curEvenOdd: !!pages[0]?.hf?.evenOdd };
   const hfDiff = !legacy && hfChanged(meta, hfc);
   const where = new Map<string, { b: number; k: number }>();
   blocks.forEach((bl, b) => bl.ids.forEach((id, k) => where.set(id, { b, k })));
@@ -235,9 +247,15 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
   const curComments = review ? docComments(pages) : [];
   const commentsChanged = review && JSON.stringify(curComments) !== JSON.stringify(origComments);
   const trackChanged = review && !!pages[0]?.trackChanges !== docxTracking(part("word/settings.xml"));
-  if (sameOrder && intact.every(Boolean) && diff.none && !hfDiff && !pc.any && !nc.any && !commentsChanged && !trackChanged) return { bytes: orig, unchanged: true, warnings: pc.skipped ? [tn("engine.office.picsSkipped", pc.skipped)] : [] };
+  // named styles changed or made here (core/docStyles.ts): their w:style elements of styles.xml
+  const stylesEdited = (meta.model ?? 1) >= MODEL_PARA_STYLES && !!pages[0]?.docStyles?.some((x) => x.edited);
+  // shapes and text boxes (model 11 map; shapes.ts): a changed or deleted one → the file is written anew (stage 1)
+  const sc = shapeChanges(pages, meta);
+  if (sc.changed) throw new SurgeryUnavailable("shape changed");
+  if (sameOrder && intact.every(Boolean) && diff.none && !hfDiff && !pc.any && !sc.added.length && !nc.any && !commentsChanged && !trackChanged && !stylesEdited) return { bytes: orig, unchanged: true, warnings: pc.skipped ? [tn("engine.office.picsSkipped", pc.skipped)] : [] };
   useDocxNoteIds(nc.tracked ? nc.ids : null);
   const w = new DocxWriter(zip, xml, els, meta.model ?? 1, defsNow, plan, changedDefs);
+  if (stylesEdited) w.sheet = pages[0]!.docStyles!;
   // the file's comment id of each comment (new ones after the file's highest), the comments around each paragraph
   const ids = new Map<string, string>();
   if (review) {
@@ -264,6 +282,8 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
     picEdited.add(b);
   }
   const chunks: Chunk[] = [];
+  // sections added here (LayoutDiff.addSections), in the order their placeholders went into the chunks
+  const newSects: { orig: number; setup: PageSetup }[] = [];
   const kindOf = (el: XmlEl): Chunk["kind"] => (el.local === "p" ? "p" : el.local === "tbl" ? "tbl" : el.local === "sectPr" ? "end" : "other");
   // the empty paragraph Word keeps after a table belongs to that table (dropped with it)
   const tail = new Map<number, number>();
@@ -303,6 +323,12 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
     const o = seen.has(id) ? undefined : where.get(id);
     // a new page break before this item (Word's page-break paragraph)
     if (!seen.has(id)) for (let k = diff.addBreaks.get(id) ?? 0; k > 0; k--) chunks.push({ xml: DOCX_PAGE_BREAK, kind: "p" });
+    // a section added before this item (구역 나누기): a placeholder for its section-break paragraph (written after the
+    // original sections' settings are patched, which counts the file's own w:sectPr elements)
+    if (!seen.has(id) && diff.addSections?.has(id)) {
+      newSects.push(diff.addSections.get(id)!);
+      chunks.push({ xml: `\u0000OMWSECT${newSects.length - 1}\u0000`, kind: "p" });
+    }
     seen.add(id);
     if (!o) {
       chunks.push(it.kind === "p" ? { xml: w.freshPara(it.p), kind: "p" } : { xml: w.freshTable(it.t), kind: "tbl" });
@@ -324,6 +350,8 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
     }
     // a picture change in an element that is rewritten (its text changed): not placed here
     if (picEdited.has(o.b)) throw new SurgeryUnavailable("picture in a changed paragraph");
+    // (a shape or text box read from the file in an element that is rewritten: not placed here either, stage 1)
+    if (meta.shapes?.some((x) => x.b === o.b)) throw new SurgeryUnavailable("shape in a changed paragraph");
     const single = bl.ids.length === 1;
     if (!single) w.controlDropped(el);
     if (it.kind === "p") {
@@ -335,27 +363,35 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
       if (single) pushTail(o.b);
     }
   }
-  // new pictures: placed like a fresh save places them (before / after the item at their place, anchored in it)
-  if (pc.added.length) {
+  // new pictures, shapes and text boxes: placed like a fresh save places them (before / after the item at their place,
+  // anchored in it)
+  if (pc.added.length || sc.added.length) {
     const ids = flow.map(itemId);
-    const targets = picTargets(
-      pc.added.map((m) => m.pic),
-      ids,
-      itemTops(pages),
-    );
+    const tops = itemTops(pages);
     const before = new Map<number, string[]>(), after = new Map<number, string[]>(), inside = new Map<number, string>();
     const end: string[] = [];
-    targets.forEach((t, i) => {
+    const holder = (run: string) => `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${run}</w:p>`;
+    const place = (t: { item: number; after: boolean }, run: string, float: boolean, own: () => string) => {
+      const ci = t.item >= 0 ? chunkOf.get(ids[t.item]) : undefined;
+      if (ci === undefined) end.push(holder(run));
+      else if (float && chunks[ci].kind === "p") inside.set(ci, (inside.get(ci) ?? "") + run);
+      else {
+        const map = t.after ? after : before;
+        map.set(ci, [...(map.get(ci) ?? []), own()]);
+      }
+    };
+    picTargets(
+      pc.added.map((m) => m.pic),
+      ids,
+      tops,
+    ).forEach((t, i) => {
       const m = pc.added[i];
       const run = `<w:r>${media.fresh(m)}</w:r>`;
-      const ci = t.item >= 0 ? chunkOf.get(ids[t.item]) : undefined;
-      if (ci === undefined) end.push(`<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${run}</w:p>`);
-      else if (m.pic.place.mode === "float" && chunks[ci].kind === "p") inside.set(ci, (inside.get(ci) ?? "") + run);
-      else {
-        const xml = m.pic.place.mode === "inline" ? docxPicPara(run, m.pic.align, m.pic.indent, t.before, t.below) : `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${run}</w:p>`;
-        const map = t.after ? after : before;
-        map.set(ci, [...(map.get(ci) ?? []), xml]);
-      }
+      place(t, run, m.pic.place.mode === "float", () => (m.pic.place.mode === "inline" ? docxPicPara(run, m.pic.align, m.pic.indent, t.before, t.below) : holder(run)));
+    });
+    picTargets(sc.added, ids, tops).forEach((t) => {
+      const run = `<w:r>${docxShapeXml(t.pic, { id: media.nextDocPr(), paras: (ps) => ps.map((q) => w.freshPara(q)).join("") || "<w:p/>" })}</w:r>`;
+      place(t, run, true, () => holder(run));
     });
     const next: Chunk[] = [];
     chunks.forEach((c, i) => {
@@ -384,6 +420,8 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
     if (j >= chunks.length || chunks[j].kind === "tbl" || chunks[j].kind === "end") out.push("<w:p/>");
   });
   let bodyXml = out.join("");
+  // every shape read from the file is still in it (its paragraph deleted, the shape still on the page: written anew)
+  if (!shapesKept(meta, MAIN, xml, els, bodyXml, "docx")) throw new SurgeryUnavailable("shape's paragraph deleted");
   // comments: their marks one per comment, none of a deleted one; a comment whose text is all gone goes too (Word)
   let alive: DocComment[] = [];
   if (review) {
@@ -410,6 +448,18 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
   }
   // changed paper / margins: only those sections' w:pgSz and w:pgMar
   if (diff.setups.size) bodyXml = patchSectPrs(bodyXml, xml.slice(body.openEnd, body.closeStart), diff.setups, rep.layout.sections);
+  // sections added (구역 나누기): Word's section-break paragraph — the enclosing original section's w:sectPr (its header /
+  // footer references, notes, grid) with the part's own paper, margins and columns, starting a new page
+  if (newSects.length) {
+    const origSects = [...xml.slice(body.openEnd, body.closeStart).matchAll(SECTPR)].map((m) => m[0]);
+    bodyXml = bodyXml.replace(/\u0000OMWSECT(\d+)\u0000/g, (_, i: string) => {
+      const ns = newSects[Number(i)];
+      const src = rep.layout?.sections[ns.orig]?.src;
+      const base = src !== undefined ? origSects[src] : undefined;
+      if (!base) throw new SurgeryUnavailable("section settings");
+      return `<w:p><w:pPr>${newSectPr(base, ns.setup, rep.layout?.sections[ns.orig]?.setup)}</w:pPr></w:p>`;
+    });
+  }
   // 이어서 구역 (TextParagraph.contSect): the same ones as the original's — their changed columns into their own w:sectPr
   // only; one added or taken out is written anew
   {
@@ -442,6 +492,24 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
     if (w.numberingCreated) addNumberingPart(zip, changed);
   }
   media.commit(changed);
+  // (a heading style the file did not define, used by a paragraph now — Word's latent heading picked in the gallery)
+  for (const m of newXml.matchAll(/<w:pStyle w:val="Heading([1-9])"\/>/g)) w.addedHeadings.add(Number(m[1]));
+  if (w.addedHeadings.size) {
+    const st = changed.get("word/styles.xml") ?? part("word/styles.xml");
+    if (st) {
+      const x = strFromU8(st);
+      const y = addHeadingStyles(x, [...w.addedHeadings]);
+      if (y !== x) changed.set("word/styles.xml", enc.encode(y));
+    }
+  }
+  if (stylesEdited) {
+    const st = changed.get("word/styles.xml") ?? part("word/styles.xml");
+    if (st) {
+      const x = strFromU8(st);
+      const y = patchDocxStyles(x, pages[0]!.docStyles!);
+      if (y !== x) changed.set("word/styles.xml", enc.encode(y));
+    }
+  }
   // notes: only the changed / new / deleted w:footnote and w:endnote elements of their parts
   if (nc.any) patchDocxNotes(zip, changed, nc, w);
   // comments: only the changed / new / deleted w:comment elements and their commentsExtended / commentsIds entries
@@ -462,6 +530,26 @@ function surgicalDocx(pages: Page[], meta: OfficeSourceMeta, assets?: Record<str
  * in the look of its original first paragraph (style, mark run); new notes are added in the look of the part's notes;
  * deleted ones go. A part the original lacks is made (separators, content type, relationship).
  */
+/**
+ * Word's built-in heading styles ("heading N", w:styleId HeadingN) added to a file's styles.xml that does not define them
+ * (DocxWriter.addedHeadings): based on the file's default paragraph style, with Word's outline level and keep-with-next.
+ */
+export function addHeadingStyles(xml: string, levels: number[]): string {
+  const end = xml.lastIndexOf("</w:styles>");
+  if (end < 0) return xml;
+  const def = /<w:style(?=[^>]*w:type="paragraph")(?=[^>]*w:default="(?:1|true)")[^>]*w:styleId="([^"]+)"/.exec(xml)?.[1];
+  const add = levels
+    .sort((a, b) => a - b)
+    .filter((n) => !xml.includes(`w:styleId="Heading${n}"`))
+    .map(
+      (n) =>
+        `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/>${def ? `<w:basedOn w:val="${def}"/><w:next w:val="${def}"/>` : ""}` +
+        `<w:uiPriority w:val="9"/><w:qFormat/><w:pPr><w:keepNext/><w:outlineLvl w:val="${n - 1}"/></w:pPr></w:style>`,
+    )
+    .join("");
+  return add ? xml.slice(0, end) + add + xml.slice(end) : xml;
+}
+
 function patchDocxNotes(zip: ZipArchive, changed: Map<string, Uint8Array>, nc: ReturnType<typeof noteChanges>, w: DocxWriter) {
   const enc = new TextEncoder();
   const read = (name: string) => {
@@ -733,6 +821,11 @@ class DocxMedia {
     return id;
   }
 
+  /** a wp:docPr id no drawing of the document has (a new shape's) */
+  nextDocPr(): number {
+    return ++this.docPr;
+  }
+
   /** w:drawing of a new picture */
   fresh(m: PicMedia): string {
     this.used = true;
@@ -820,6 +913,14 @@ function patchSectPrs(bodyXml: string, origBody: string, setups: Map<number, Pag
   return out + bodyXml.slice(last);
 }
 
+/** A copy of a section's w:sectPr ending a section added here: next page, its own paper / margins (and columns). */
+function newSectPr(base: string, s: PageSetup, was: PageSetup | undefined): string {
+  let x = sectPrWithPage(base.replace(/<w:type\b[^>]*\/>/, "").replace(/\s+w:rsid\w*="[^"]*"/g, ""), s);
+  if (!sameColumns(was?.columns, s.columns)) x = sectPrWithCols(x, s);
+  // w:type (nextPage) before w:pgSz: CT_SectPr order headerReference / footerReference, footnotePr, endnotePr, type, pgSz
+  return x.replace(/<w:pgSz\b/, '<w:type w:val="nextPage"/><w:pgSz');
+}
+
 function sectPrWithCols(sect: string, s: PageSetup): string {
   const x = sect.replace(/<w:cols\b[^>]*?(?:\/>|>[\s\S]*?<\/w:cols>)/, "");
   let at = -1;
@@ -835,7 +936,8 @@ function sectPrWithCols(sect: string, s: PageSetup): string {
 /** A w:sectPr with new paper size and margins, in CT_SectPr order (after the header / footer references, notes and type). */
 function sectPrWithPage(sect: string, s: PageSetup): string {
   if (sect.endsWith("/>")) return sect.slice(0, -2) + ">" + docxPageXml(s) + "</w:sectPr>";
-  const x = sect.replace(/<w:pgSz\b[^>]*\/>/, "").replace(/<w:pgMar\b[^>]*\/>/, "");
+  // (the page border comes with them: docxPageXml)
+  const x = sect.replace(/<w:pgSz\b[^>]*\/>/, "").replace(/<w:pgMar\b[^>]*\/>/, "").replace(/<w:pgBorders\b[\s\S]*?<\/w:pgBorders>|<w:pgBorders\b[^>]*\/>/, "");
   let at = x.indexOf(">") + 1;
   for (const m of x.matchAll(/<w:(headerReference|footerReference|footnotePr|endnotePr|type)\b[^>]*?(?:\/>|>[\s\S]*?<\/w:\1>)/g)) at = Math.max(at, m.index! + m[0].length);
   return x.slice(0, at) + docxPageXml(s) + x.slice(at);
@@ -929,6 +1031,8 @@ class DocxWriter {
   /** numbering.xml rewritten with an added list definition, if one was needed (created: the original had none) */
   numberingXml: string | null = null;
   numberingCreated = false;
+  /** heading levels written with Word's built-in style the file does not define yet (added to styles.xml) */
+  addedHeadings = new Set<number>();
   private moved = 0;
   private tracked = 0;
   /** the map keeps the notes (model 7): note references are written from the model, not copied from the original */
@@ -960,6 +1064,16 @@ class DocxWriter {
     this.ctx = docxContext(files, model < MODEL_WORD_MULTIPLE, model < MODEL_HEADING_STYLES, model < MODEL_WORD_STYLES);
     // a map from model 9 on: the original is read with its tracked changes and comment ranges, as the importer did
     if (model >= MODEL_REVIEW) this.ctx.review = { open: new Set() };
+    if (model < MODEL_PARA_STYLES) this.ctx.noParaStyle = true;
+    this.files = files;
+  }
+  private files: Record<string, Uint8Array>;
+  /** the document's style sheet when a style was changed or made here (core/docStyles.ts); null otherwise */
+  sheet: DocStyle[] | null = null;
+  private origSheetMemo: DocStyle[] | null = null;
+  /** the original file's styles (styles.xml as it was) */
+  private origSheet(): DocStyle[] {
+    return (this.origSheetMemo ??= docxStyleSheet(this.files, { ...this.ctx, review: undefined }));
   }
   /** the map is older than model version 2 (no optional paragraph fields) */
   private get legacyModel() {
@@ -1141,7 +1255,10 @@ class DocxWriter {
 
   private headingStyle(level: number): string {
     for (const [id, l] of this.ctx.headings) if (l === level) return `<w:pStyle w:val="${id.replace(/"/g, "&quot;")}"/>`;
-    return "";
+    // a heading made here in a file without that heading style: Word's built-in "heading N", as Word adds it when the
+    // style is first applied (QA 11-25 real use: Ctrl+Alt+1 in a Word file saved a paragraph with no heading style)
+    this.addedHeadings.add(level);
+    return `<w:pStyle w:val="Heading${level}"/>`;
   }
 
   /** A paragraph that has no original element. */
@@ -1152,7 +1269,7 @@ class DocxWriter {
     const numPr = p.list ? this.numPrForList(p.list, this.relist.at.get(p)) : list ? docxNumPr(this.numFor(list)) : "";
     const runs = docxBodyRuns(p, !!list || !!p.list);
     // comments and the paragraph mark's tracked change (a new paragraph has no move range: moves as deletion / insertion)
-    const pPr = docxPPr(p, level ? this.headingStyle(Number(level)) : "", numPr);
+    const pPr = docxPPr(p, p.style && !this.ctx.noParaStyle ? styleTag(p.style) : level ? this.headingStyle(Number(level)) : "", numPr);
     const cb = (at: "before" | "after") => (p.colBreak === at ? DOCX_COL_BREAK : "");
     return `<w:p>${this.review ? docxPPrReview(pPr, p, false) : pPr}${cb("before")}${runsXml(runs, [], this.review ? docxCommentMarks(p, runs, this.review) : [])}${cb("after")}</w:p>`;
   }
@@ -1181,6 +1298,15 @@ class DocxWriter {
     if (sameNotes && !listOff && !seg && paraFp(p) === paraFp({ ...origPara, role: origRole })) {
       this.noteLists(el);
       return this.text(el); // unchanged (e.g. an untouched paragraph of a changed table cell)
+    }
+    // changed only as its style changed (core/docStyles.ts): the original element — its style in styles.xml is
+    // written anew, and Word draws the paragraph from it (no direct formatting copied into the paragraph)
+    if (this.sheet && sameNotes && !listOff && !seg) {
+      const ex = restyleParas([{ ...origPara, role: origRole }], this.origSheet(), this.sheet)[0];
+      if (paraFp(p) === paraFp(ex)) {
+        this.noteLists(el);
+        return this.text(el);
+      }
     }
     // only the numbering changed (its format / start: numbering of its own), the item at its level and the text as they
     // were: the original element with its w:numPr changed — Word's runs and w:pPr stay (QA list-format)
@@ -1332,7 +1458,9 @@ class DocxWriter {
       const pick = (set: Set<string>) => pk.filter((c) => set.has(c.local)).map((c) => s.slice(c.start, c.end)).join("");
       const ps = pk.find((c) => c.local === "pStyle");
       const origHeading = !!origPara.role && /^h\d$/.test(origPara.role);
-      const pStyle = level ? (origHeading && origPara.role === p.role && ps ? s.slice(ps.start, ps.end) : this.headingStyle(Number(level))) : ps && !origHeading ? s.slice(ps.start, ps.end) : "";
+      // another named style (model 10, core/docStyles.ts): its w:pStyle (none: the default style, or a heading's)
+      const restyled = !this.ctx.noParaStyle && (p.style ?? "") !== (origPara.style ?? "");
+      const pStyle = restyled ? (p.style ? styleTag(p.style) : level ? this.headingStyle(Number(level)) : "") : level ? (origHeading && origPara.role === p.role && ps ? s.slice(ps.start, ps.end) : this.headingStyle(Number(level))) : ps && !origHeading ? s.slice(ps.start, ps.end) : "";
       const np = pk.find((c) => c.local === "numPr");
       const sameList = !seg && !!p.list && !!read.plist && read.plist.id === p.list.id && read.plist.level === p.list.level;
       const numPr = p.list
@@ -1374,7 +1502,13 @@ class DocxWriter {
         inserts.push({ pos: at, len: 0, xml: s.slice(c.start, c.end) });
         placed.add(c);
       }
-    const marks = kids.filter((c) => RANGE_MARKS.has(c.local) && !(commentMark(c) && (review || [...placed].some((x) => x.start === c.start)))).map((c) => s.slice(c.start, c.end));
+    // (model 10: a bookmark the model has on this paragraph's text is written from the model, around its runs)
+    const bmNames = new Set(this.ctx.noParaStyle ? [] : p.runs.flatMap((r) => r.bookmarks ?? []));
+    const bmIdsHere = new Set<string>();
+    for (const c of kids)
+      if (c.local === "bookmarkStart" && bmNames.has(/\bw:name="([^"]*)"/.exec(s.slice(c.start, c.end))?.[1] ?? "\u0000")) bmIdsHere.add(/\bw:id="([^"]*)"/.exec(s.slice(c.start, c.end))?.[1] ?? "");
+    const ownMark = (c: XmlEl) => (c.local === "bookmarkStart" || c.local === "bookmarkEnd") && bmIdsHere.has(/\bw:id="([^"]*)"/.exec(s.slice(c.start, c.end))?.[1] ?? "\u0000");
+    const marks = kids.filter((c) => RANGE_MARKS.has(c.local) && !ownMark(c) && !(commentMark(c) && (review || [...placed].some((x) => x.start === c.start)))).map((c) => s.slice(c.start, c.end));
     const open = el.openEnd === el.end ? s.slice(el.start, el.end - 2).trimEnd() + ">" : s.slice(el.start, el.openEnd);
     return `${open}${pPr}${marks.join("")}${runsXml(runs, orig, inserts, noteOrig, moves)}</${el.name}>`;
   }
@@ -1577,10 +1711,19 @@ function runsXml(runs: TextRun[], orig: OrigRun[], inserts: Insert[], noteOrig?:
   let out = "";
   let pos = 0;
   let k = 0;
+  // runs with a link (TextRun.link) not written back as their original w:hyperlink: inside Word's HYPERLINK field
+  let open: string | null = null;
+  const linkTo = (link: string | null) => {
+    if (open === link) return;
+    if (open) out += "</w:fldSimple>";
+    open = link;
+    if (link) out += `<w:fldSimple w:instr="${esc(link.startsWith("#") ? ` HYPERLINK \\l "${link.slice(1)}" ` : ` HYPERLINK "${link}" `)}">`;
+  };
   /** emit what is due at `pos`; the cut `pos` is inside, if any */
   const due = (): Insert | null => {
     while (k < ins.length && ins[k].pos <= pos) {
       const x = ins[k];
+      linkTo(null);
       if (!x.len) {
         out += x.xml;
         k++;
@@ -1598,18 +1741,53 @@ function runsXml(runs: TextRun[], orig: OrigRun[], inserts: Insert[], noteOrig?:
     }
     return null;
   };
+  // bookmarks of the model (core/docRefs.ts) around the runs they cover
+  const marks = runs.some((r) => r.bookmarks?.length) ? docxBookmarkMarks(runs) : null;
+  let ri = -1;
   for (const r of runs) {
+    ri++;
+    if (marks?.before[ri]) {
+      linkTo(null);
+      out += marks.before[ri];
+    }
+    const end = () => {
+      if (marks?.after[ri]) {
+        linkTo(null);
+        out += marks.after[ri];
+      }
+    };
+    // a caption number / cross-reference made here (SEQ, REF, PAGEREF): Word's simple field, its value as result
+    if ((r.field === "seq" || r.field === "ref" || r.field === "pageref") && r.fieldCode) {
+      due();
+      linkTo(null);
+      out += `<w:fldSimple w:instr="${esc(r.fieldCode)}">${docxRevXml(r, `<w:r>${rPrFor(r, pos)}${docxText(r.text)}</w:r>`, moves)}</w:fldSimple>`;
+      pos += r.text.length;
+      end();
+      continue;
+    }
     if (r.note || r.noteMark) {
       // a note reference: its original run while it is the same note (as numbered: the note's id), else a new one
       due();
+      linkTo(null);
       const id = r.note ? docxNoteId(r.note) : undefined;
       const kept = r.note && id !== undefined ? noteOrig?.get(`${r.note.kind}:${id}`) : undefined;
       out += kept ?? docxNoteRunXml(r, rPrFor(r, pos)) ?? "";
+      end();
       continue;
     }
     if (!r.text) {
       due();
+      linkTo(null);
       out += docxRevXml(r, `<w:r>${rPrFor(r, pos)}</w:r>`, moves);
+      end();
+      continue;
+    }
+    if (r.ruby) {
+      // 덧말 / 윗주: one w:ruby with the run's text as its base
+      due();
+      linkTo(r.link && !r.field ? r.link : null);
+      out += docxRevXml(r, docxRubyXml(r, rPrFor(r, pos)), moves);
+      pos += r.text.length;
       continue;
     }
     let i = 0;
@@ -1623,11 +1801,14 @@ function runsXml(runs: TextRun[], orig: OrigRun[], inserts: Insert[], noteOrig?:
       }
       const next = k < ins.length ? ins[k].pos : Infinity;
       const take = Math.min(r.text.length - i, next - pos);
+      linkTo(r.link && !r.field ? r.link : null);
       out += docxRevXml(r, `<w:r>${rPrFor(r, pos)}${docxText(r.text.slice(i, i + take))}</w:r>`, moves);
       pos += take;
       i += take;
     }
+    end();
   }
+  linkTo(null);
   for (; k < ins.length; k++) if (!started.has(ins[k])) out += ins[k].xml;
   return out;
 }

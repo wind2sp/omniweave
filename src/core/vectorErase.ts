@@ -3,6 +3,7 @@
 // the area the eraser covered. Pure: a path in, the path that remains out.
 
 import polygonClipping, { type MultiPolygon, type Polygon } from "polygon-clipping";
+import { mapMesh } from "./mesh";
 import { applyTransform, invertTransform } from "./geom";
 import { cubicAt, flatten, segments } from "./vector";
 import { IDENTITY, type Contour, type VectorAnchor, type VectorNode, type Vec2 } from "./types";
@@ -160,7 +161,7 @@ export function eraseVector(v: VectorNode, track: Vec2[], radius: number): Vecto
         if (pts.length > 2) contours.push({ closed: true, nodes: pts.map(([x, y]) => ({ anchor: [x, y], handleIn: [x, y], handleOut: [x, y], isCorner: true })) });
       }
     if (!contours.length) return null;
-    return { ...v, contours, fillRule: "evenodd", transform: { ...IDENTITY } };
+    return { ...v, contours, fillRule: "evenodd", ...(v.meshFill ? { meshFill: mapMesh(v.meshFill, (q) => applyTransform(v.transform, q) as Vec2) } : {}), transform: { ...IDENTITY } };
   }
   const local = track.map((p) => invertTransform(v.transform, p));
   const k = (Math.abs(v.transform.scale) + Math.abs(v.transform.scaleY ?? v.transform.scale)) / 2 || 1;

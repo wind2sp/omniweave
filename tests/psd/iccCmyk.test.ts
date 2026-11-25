@@ -14,6 +14,7 @@ import { makeTile } from "../../src/core/tile";
 import { newDocument, type RasterNode } from "../../src/core/types";
 import { decodePsd, importPsdPage, layerCmykPlanes, parsePsdLayout, psdCmykProfile, readCompositePlanes } from "../../src/io/formats/psd";
 import { writePsd } from "../../src/io/formats/psdWrite";
+import { cpuNow, cpuBudget, wallTimeout } from "../budget";
 
 const DIR = join(__dirname, "..", "..", "qa", "interop", "adobe-made", "fidelity");
 const file = (f: string) => new Uint8Array(readFileSync(join(DIR, f)));
@@ -275,9 +276,9 @@ describe("damaged or hostile profiles", () => {
     for (let k = 1; k <= 3; k++) {
       const p = base.slice();
       p[100] = k;
-      const t = performance.now();
+      const t = cpuNow();
       expect(cmykXform(p, `intact ${k}`)).not.toBeNull();
-      unit = Math.max(unit, performance.now() - t);
+      unit = Math.max(unit, cpuNow() - t);
     }
     const limit = Math.max(2000, 25 * unit);
     let seed = 7;
@@ -288,16 +289,16 @@ describe("damaged or hostile profiles", () => {
       if (i % 3 === 0) q = p.subarray(0, 132 + (rnd() % (p.length - 132)));
       else if (i % 3 === 1) for (let j = 0; j < 20; j++) p[132 + (rnd() % 400)] = rnd() & 255; // tag table
       else for (let j = 0; j < 50; j++) p[rnd() % p.length] = rnd() & 255;
-      const t0 = performance.now();
+      const t0 = cpuNow();
       const x = cmykXform(q, `fuzz ${i}`);
       if (x) {
         const o = new Uint8Array(4);
         x.rgb(10, 20, 30, 40, o, 0);
         x.cmyk(10, 200, 30, o, 0);
       }
-      expect(performance.now() - t0, `case ${i} (intact ${unit.toFixed(0)} ms)`).toBeLessThan(limit);
+      expect(cpuNow() - t0, `case ${i} (intact ${unit.toFixed(0)} ms)`).toBeLessThan(limit);
     }
-  }, 120000);
+  }, wallTimeout(120000));
 
   it("huge grid claims are refused before anything is allocated; zero or one grid point too", () => {
     // lut16 with 255 points on 4 inputs (12.7 G values) and lutAtoB with 255⁴: both refused by size, at once
@@ -306,11 +307,11 @@ describe("damaged or hostile profiles", () => {
     const at = 144 + 12 + 32 + 36; // A2B0 data (after two tag entries), its CLUT
     const big = mab.slice();
     big.set([255, 255, 255, 255], at);
-    const t0 = performance.now();
+    const t0 = cpuNow();
     expect(cmykXform(mft2)).toBeNull();
     expect(cmykXform(big)).toBeNull();
     // refused before any table is built: far under one intact build (a fixed 200 ms bound, generous under load)
-    expect(performance.now() - t0).toBeLessThan(2000);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(2000));
     for (const g of [0, 1]) {
       const p = mab.slice();
       p[at + 1] = g;

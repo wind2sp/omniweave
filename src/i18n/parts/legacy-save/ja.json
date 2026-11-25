@@ -50,5 +50,19 @@
   "legacysave.pptWhy.reader": "開いた後で読み方が変わったか、高速保存で古いスライドのレコードが残ったファイルのため、開いたときの文字と照合できません",
   "legacysave.pptWhy.chars": "PPT の文字として保存できない制御文字が含まれています",
   "legacysave.pptWhy.master": "スライド マスターの文字（マスターに従うすべてのスライドに表示）は、スライド上で編集して PPT に書き込めません",
-  "legacysave.pptWhy.verify": "書き込んだファイルを読み直した文字が編集した文字と違います"
+  "legacysave.pptWhy.verify": "書き込んだファイルを読み直した文字が編集した文字と違います",
+  "legacysave.fresh.notesTitle": "XLS (Excel 97-2003) として新しく書き出します。この形式に保存できないもの:",
+  "legacysave.fresh.lose.drawings": "グラフ・図",
+  "legacysave.fresh.lose.cond": "条件付き書式",
+  "legacysave.fresh.lose.valid": "データの入力規則",
+  "legacysave.fresh.lose.notes": "メモ",
+  "legacysave.fresh.lose.links": "ハイパーリンク",
+  "legacysave.fresh.lose.tables": "フィルター・テーブル",
+  "legacysave.fresh.lose.sparks": "スパークライン・ピボットテーブル",
+  "legacysave.fresh.lose.protect": "シート・ブックの保護",
+  "legacysave.fresh.lose.print": "ページ設定",
+  "legacysave.fresh.lose.names": "名前の定義",
+  "legacysave.fresh.lose.size": "IV65536 より外のセル",
+  "legacysave.fresh.lose.formulas": "この形式に保存できない数式 {n} 個 (値として保存)",
+  "legacysave.savedFresh.xls": "XLS として保存しました (Excel 97-2003 形式で新しく書き出しました)"
 }

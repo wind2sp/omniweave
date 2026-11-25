@@ -8,5 +8,6 @@
   "tablemenu.deleteTable": "表の削除",
   "tablemenu.merge": "セルの結合",
   "tablemenu.split": "セルの分割",
-  "tablemenu.props": "表のプロパティ（幅・網かけ・罫線）…"
+  "tablemenu.props": "表のプロパティ（幅・網かけ・罫線）…",
+  "tablemenu.splitTable": "表の分割"
 }

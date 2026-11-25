@@ -10,6 +10,7 @@ import { useStore } from "../../src/core/store";
 import { newDocument, type SceneNode } from "../../src/core/types";
 import { sameTypeExport } from "../../src/io/formats";
 import { collectTables } from "../../src/io/formats/csv";
+import { sheetCells } from "../../src/io/sheet/pages";
 import { readingOrder } from "../../src/io/formats/flow";
 import { importFile, lastImport } from "../../src/ui/actions";
 import { installDom } from "../coverage/helpers";
@@ -92,6 +93,9 @@ const save = async () => {
 };
 /** the grid as Omniweave shows it (tables split over pages joined, trailing empty rows/columns dropped) */
 function omniGrid(): string[][] {
+  // a CSV opens on a sheet page (as in Excel): its cells as shown
+  const sp = S().doc.pages.find((p) => p.sheet);
+  if (sp) return trim(sheetCells(sp.sheet!).rows.map((r) => r.map((c) => c.text)));
   const t = collectTables(S().doc.pages)[0];
   return trim(t ? t.rows.map((r) => r.map((c) => c.text)) : []);
 }
@@ -165,10 +169,19 @@ describe.skipIf(!OUT)("CSV open fidelity vs Excel (scripts/fidelity-csv.mjs)", (
       // one cell edited (row 2, first column): only that line may change, by the mark
       await open(name, bytes);
       const t = readingOrder(S().doc.pages).find((n) => n.type === "TABLE");
-      if (t && t.type === "TABLE" && t.rows[1]?.[0]) {
+      const sp = S().doc.pages.find((p) => p.sheet);
+      const a2 = sp ? sheetCells(sp.sheet!).rows[1]?.[0]?.text : undefined;
+      if (sp && a2 !== undefined) {
         S().commit("csv cell", (d) => {
-          for (const p of d.pages) for (const n of p.nodes as SceneNode[]) if (n.id === t.id && n.type === "TABLE") n.rows[1][0].text += MARK;
+          const sh = d.pages.find((p) => p.id === sp.id)!.sheet!;
+          sh.cells.A2 = { ...sh.cells.A2, v: a2 + MARK };
         });
+      }
+      if (sp ? a2 !== undefined : t && t.type === "TABLE" && t.rows[1]?.[0]) {
+        if (!sp && t && t.type === "TABLE")
+          S().commit("csv cell", (d) => {
+            for (const p of d.pages) for (const n of p.nodes as SceneNode[]) if (n.id === t.id && n.type === "TABLE") n.rows[1][0].text += MARK;
+          });
         try {
           const out = await save();
           const cmp = C.compareTextBytes(bytes, out);

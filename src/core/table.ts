@@ -197,7 +197,8 @@ export function layoutTable(n: TableNode): TableLayout {
       lines[v.r][v.c] = l;
       h = need(Math.max(1, l.length));
     }
-    if (v.rs === 1) heights[v.r] = Math.max(heights[v.r], h);
+    // (a row made taller by dragging its bottom edge: TableCell.rowMin, at least that tall)
+    if (v.rs === 1) heights[v.r] = Math.max(heights[v.r], h, v.cell.rowMin ?? 0);
     else tall.push({ r: v.r, rs: v.rs, h });
   }
   // a cell spanning several rows that needs more room than those rows give grows its last row
@@ -431,4 +432,20 @@ export function deleteColsInPlace(t: Pick<TableNode, "rows" | "colWidths">, c0: 
   t.colWidths.splice(c0, c1 - c0 + 1);
   for (const row of t.rows) row.splice(c0, c1 - c0 + 1);
   return true;
+}
+
+/**
+ * Column widths after the edge right of column `col` was dragged by `dx` (Word): that column and the next share the
+ * change (the table keeps its width); the table's right edge widens or narrows the last column. At least 8 px each.
+ */
+export function resizedColumns(widths: readonly number[], col: number, dx: number): number[] {
+  const MIN = 8;
+  const w = [...widths];
+  if (col < w.length - 1) {
+    const both = w[col] + w[col + 1];
+    const a = Math.max(MIN, Math.min(both - MIN, w[col] + dx));
+    w[col] = Math.round(a * 100) / 100;
+    w[col + 1] = Math.round((both - a) * 100) / 100;
+  } else if (col === w.length - 1) w[col] = Math.round(Math.max(MIN, w[col] + dx) * 100) / 100;
+  return w;
 }

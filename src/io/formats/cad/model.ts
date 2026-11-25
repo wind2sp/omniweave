@@ -44,6 +44,11 @@ export interface CadStyle {
   height: number;
   widthFactor: number;
   oblique: number;
+  /** as the file has it, for writing the style back: font file (3), generation flags (71), TrueType family / flags (ACAD xdata) */
+  file?: string;
+  gen?: number;
+  family?: string;
+  familyFlags?: number;
 }
 
 export interface CadBlock {
@@ -99,9 +104,11 @@ export type CadGeom =
   | { k: "ellipse"; c: P3; major: P3; ratio: number; t0: number; t1: number }
   | { k: "poly"; pts: PolyVertex[]; closed: boolean; width?: number; elevation?: number; /** 3D polyline: points are WCS */ is3d?: boolean }
   | { k: "spline"; degree: number; knots: number[]; ctrl: P3[]; weights?: number[]; fit: P3[]; closed: boolean }
-  | { k: "text"; p: P3; align?: P3; h: number; rot: number; wf?: number; oblique?: number; text: string; style: string; hj: number; vj: number; mirror?: number }
+  | { k: "text"; p: P3; align?: P3; h: number; rot: number; wf?: number; oblique?: number; text: string; style: string; hj: number; vj: number; mirror?: number; /** the entity's group codes as read (an unchanged text is written back with them) */ raw?: [number, string | number][] }
   | {
       k: "mtext";
+      /** the entity's group codes as read, before its embedded object (an unchanged MTEXT is written back with them) */
+      raw?: [number, string | number][];
       p: P3;
       h: number;
       w: number;
@@ -134,9 +141,11 @@ export type CadGeom =
       gradient?: boolean;
       /** gradient fill (DXF 450–470): kind (LINEAR, CYLINDER, SPHERICAL …), direction (radians), shift, colours */
       grad?: { name: string; angle: number; shift: number; single: boolean; tint: number; colors: CadColor[] };
+      /** associative: the handles of the boundary objects (97 / 330 per loop) */
+      src?: string[];
     }
   | { k: "solid"; pts: P3[] }
-  | { k: "dimension"; block: string; text?: string; measure?: number; dimtype: number }
+  | { k: "dimension"; block: string; text?: string; measure?: number; dimtype: number; /** DXF definition points (10 11 13 14 15 16) and rotation (50), when read */ p?: Record<string, P3>; angle?: number; flags?: number; /** ARC_DIMENSION: its start / end angles (radians) */ arc?: [number, number]; /** LARGE_RADIAL_DIMENSION (jogged radius) */ large?: true }
   | { k: "leader"; pts: P3[]; arrow: boolean }
   /** MLEADER: leader lines (arrow at the first point of each), the landing (dogleg) and its MTEXT */
   | {
@@ -263,6 +272,8 @@ export interface CadDrawing {
   unsupported: Record<string, number>;
   /** AutoCAD GROUPs (ACAD_GROUP dictionary order) */
   groups?: CadGroupDef[];
+  /** associative dimensions (DIMASSOC objects): dimension handle → which origins (90: 1 first, 2 second) and the object points */
+  dimAssoc?: Map<string, { flags: number; refs: { obj: string; param: number }[] }>;
 }
 
 /** One AutoCAD GROUP: its dictionary name, description, flags and member entity handles (hex, upper case). */

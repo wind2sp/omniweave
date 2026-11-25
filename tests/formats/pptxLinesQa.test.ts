@@ -10,6 +10,7 @@ import { newDocument, newText, type OmwDocument, type SceneNode, type TextNode }
 import { exportPptx, importPptx } from "../../src/io/formats/pptx";
 import { attachPptxMeta, pptxSurgical, pptxUnchanged } from "../../src/io/officesurgeon/pptx";
 import { cssFamily, layoutText, localFontsSettled, pageFontsSettled, textMetricsEpoch } from "../../src/core/text";
+import { wallBudget } from "../budget";
 
 beforeAll(() => {
   (globalThis as any).DOMParser = DOMParser;
@@ -242,7 +243,7 @@ describe("local() faces of document fonts", () => {
     cssFamily({ fontFamily: "Omni QA Loads" } as any);
     const t0 = Date.now();
     await localFontsSettled(50);
-    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(Date.now() - t0).toBeLessThan(wallBudget(1000)); // a wait limit: wall clock
     expect(textMetricsEpoch()).toBe(e0 + 1);
     // asked again (a re-layout): no new face, no new load
     cssFamily({ fontFamily: "Omni QA Loads" } as any);
@@ -258,6 +259,6 @@ describe("local() faces of document fonts", () => {
     await pageFontsSettled([{ nodes: [t, { children: [{ fontFamily: "Omni QA Table" }] }] }]);
     expect(made.length).toBe(301);
     // (the face that never answered, in the test before, is not waited for again)
-    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(Date.now() - t0).toBeLessThan(wallBudget(1000)); // a wait limit: wall clock
   });
 });

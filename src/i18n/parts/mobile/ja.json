@@ -42,7 +42,7 @@
   "mobile.theme.light": "ライト",
   "mobile.theme.dark": "ダーク",
   "mobile.licensesNote": "使用しているオープンソースのライセンスは、アプリと一緒に配布される THIRD_PARTY_NOTICES に記載しています。",
-  "mobile.markedSuffix": "_署名",
+  "mobile.markedSuffix": "_注記",
   "mobile.mk.move": "選択",
   "mobile.mk.pen": "ペン",
   "mobile.mk.highlight": "蛍光ペン",
@@ -96,5 +96,6 @@
   "mobile.signaturesCleared": "保存した署名を削除しました。",
   "mobile.toPdf": "PDF に",
   "mobile.untitledDoc": "文書",
-  "mobile.untitledImage": "写真"
+  "mobile.untitledImage": "写真",
+  "mobile.searchNoText": "‘{q}’が見つかりません — この文書の文字は画像だけです。その他 › 文字認識(OCR)を行うと検索できます。"
 }

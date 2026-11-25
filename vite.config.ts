@@ -25,13 +25,15 @@ export function sharedWorkers(): Plugin {
       if (/[\\/]src[\\/]core[\\/]image[\\/]worker\.ts$/.test(id)) {
         if (!code.includes(REC_WORKER_CALL)) this.error(`omw-shared-workers: recognition worker construction not found in ${id}`);
         const ref = this.emitFile({ type: "chunk", id: id.replace(/worker\.ts$/, "ocr/recWorker.ts"), name: "worker-ocr-rec" });
-        return code.replace(REC_WORKER_CALL, `new Worker(import.meta.ROLLUP_FILE_URL_${ref}, { type: "module" })`);
+        return code.replace(REC_WORKER_CALL, () => `new Worker(import.meta.ROLLUP_FILE_URL_${ref}, { type: "module" })`);
       }
       const m = /[\\/]src[\\/]core[\\/](image|fidelity)[\\/]run\.ts$/.exec(id);
       if (!m) return;
       if (!code.includes(WORKER_CALL)) this.error(`omw-shared-workers: worker construction not found in ${id}`);
       const ref = this.emitFile({ type: "chunk", id: id.replace(/run\.ts$/, "worker.ts"), name: `worker-${m[1]}` });
-      return code.replace(WORKER_CALL, `new Worker(import.meta.ROLLUP_FILE_URL_${ref}, { type: "module" })`);
+      // (a function, not a string: a reference id may hold "$$", which a replacement string turns into "$" — the build then
+      // failed with "unknown file" in worktrees whose path gave such an id, 2026-11-25)
+      return code.replace(WORKER_CALL, () => `new Worker(import.meta.ROLLUP_FILE_URL_${ref}, { type: "module" })`);
     },
   };
 }

@@ -167,6 +167,7 @@ export function historyStats(entries: HistoryEntry[]) {
         if (n.type === "RASTER") {
           nodeBytes += 200 + Object.keys(n.tiles).length * 30;
           for (const t of Object.values(n.tiles)) tiles.add(t.hash);
+          for (const t of Object.values(n.mask?.tiles ?? {})) tiles.add(t.hash);
         } else nodeBytes += JSON.stringify(n).length;
       }
   return { entries: entries.length, nodes: nodes.size, tiles: tiles.size, approxBytes: nodeBytes + entries.length * 160 + tiles.size * TILE * TILE * 4 };
@@ -213,7 +214,16 @@ function dehydrateNode(n: SceneNode, tiles: Map<string, Uint8ClampedArray>): unk
     t[k] = tile.hash;
     tiles.set(tile.hash, tile.data);
   }
-  return JSON.parse(JSON.stringify({ ...n, tiles: t }));
+  let mask: unknown;
+  if (n.mask) {
+    const mt: Record<string, string> = {};
+    for (const [k, tile] of Object.entries(n.mask.tiles)) {
+      mt[k] = tile.hash;
+      tiles.set(tile.hash, tile.data);
+    }
+    mask = { ...n.mask, tiles: mt };
+  }
+  return JSON.parse(JSON.stringify({ ...n, tiles: t, ...(mask ? { mask } : {}) }));
 }
 
 export function packHistory(entries: HistoryEntry[], opts?: PackHistoryOptions): HistoryPack {
@@ -281,7 +291,8 @@ export function unpackHistory(
           const t = tile(th);
           if (t) tiles[k] = t;
         }
-        n = { ...raw, tiles } as SceneNode;
+        const mask = raw.mask?.tiles ? { ...raw.mask, tiles: Object.fromEntries(Object.entries(raw.mask.tiles as Record<string, string>).map(([k, th]) => [k, tile(th)]).filter((x) => x[1])) } : undefined;
+        n = { ...raw, tiles, ...(mask ? { mask } : {}) } as SceneNode;
       } else n = raw as SceneNode;
       nodeCache.set(h, n);
     }
@@ -324,7 +335,7 @@ export function historyForFile(entries: HistoryEntry[], doc: OmwDocument): Histo
   const assetsOf = (d: OmwDocument) => d.pages.flatMap((p) => p.nodes.flatMap((n) => { const id = (n as { assetId?: string }).assetId; const a = id ? d.assets[id] : undefined; return a ? [a] : []; }));
   for (const a of assetsOf(doc)) if (!seenAssets.has(a.hash)) (seenAssets.add(a.hash), (own += a.size || 0));
   const tilesOf = (d: OmwDocument, out: Set<string>) => {
-    for (const p of d.pages) for (const n of p.nodes) if (n.type === "RASTER") for (const tile of Object.values(n.tiles)) out.add(tile.hash);
+    for (const p of d.pages) for (const n of p.nodes) if (n.type === "RASTER") for (const tile of [...Object.values(n.tiles), ...Object.values(n.mask?.tiles ?? {})]) out.add(tile.hash);
   };
   tilesOf(doc, seenTiles);
   own += seenTiles.size * TILE_BYTES;

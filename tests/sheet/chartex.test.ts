@@ -2,6 +2,7 @@
 import { DOMParser } from "@xmldom/xmldom";
 import { describe, expect, it } from "vitest";
 import { paintChart } from "../../src/render/sheetChart";
+import { cpuNow, cpuBudget } from "../budget";
 
 (globalThis as any).DOMParser ??= DOMParser;
 
@@ -38,9 +39,9 @@ describe("chartex painter on awkward parts", () => {
   it("a histogram with a tiny bin size draws a bounded number of bins", () => {
     const vals = Array.from({ length: 50 }, (_, i) => i * 20);
     const { ctx, calls } = fakeCtx();
-    const t0 = Date.now();
+    const t0 = cpuNow();
     expect(paint(ctx, part("clusteredColumn", vals, '<cx:layoutPr><cx:binning intervalClosed="r"><cx:binSize val="0.000001"/></cx:binning></cx:layoutPr>'))).toBe(true);
-    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(cpuNow() - t0).toBeLessThan(cpuBudget(2000));
     expect(calls.fillRect).toBeLessThan(3000);
   });
   it("leaves the context balanced when the chartex painter fails", () => {

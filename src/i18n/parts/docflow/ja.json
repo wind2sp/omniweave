@@ -31,5 +31,6 @@
   "docflow.layout.topBottom": "上下",
   "docflow.layout.behind": "背面",
   "docflow.layout.front": "前面",
-  "docflow.hist.makeBody": "本文を作成"
+  "docflow.hist.makeBody": "本文を作成",
+  "docflow.hist.splitTable": "表の分割"
 }

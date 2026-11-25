@@ -9,9 +9,10 @@
 
 import { makeAsset } from "../core/assets";
 import { cropImg, imgToTiles, newImg, type Img } from "../core/image/pixels";
-import { runMatte } from "../core/image/run";
+import { cancelImageWork, CANCELLED, runMatte } from "../core/image/run";
+import { isCancelled, withProgress } from "./progress";
 import { encodePng as encodePngPure } from "../core/image/png";
-import { TYPE_EDGE, type MatteOptions, type MatteResult } from "../core/image/matte/pipeline";
+import { MATTE_STAGES, TYPE_EDGE, type MatteOptions, type MatteResult } from "../core/image/matte/pipeline";
 import type { MatteType } from "../core/image/matte/classify";
 import { DEFAULT_EDGE, type EdgeOptions } from "../core/image/matte/refine";
 import type { MatteHint } from "../core/image/matte/hints";
@@ -166,7 +167,19 @@ export async function removeBackgroundSelection(opts: MatteOptions = {}, edit?: 
   try {
     S().notify(tr("image.matte.working"));
     const { src, bounds: b, work } = await matteSource(t.node);
-    const { value: res, ms } = await runMatte(work, opts);
+    // in the image worker, with the step on the progress line and Cancel (it stops the worker)
+    const { value: res, ms } = await withProgress(
+      tr("progress.matte"),
+      (p) =>
+        runMatte(work, {
+          ...opts,
+          onStage: (st) => {
+            p.label(tr(`progress.matte.${st}`));
+            p.set(MATTE_STAGES.indexOf(st) / MATTE_STAGES.length);
+          },
+        }),
+      { cancel: cancelImageWork },
+    );
     const r = b ? { ...res, ...pasteBack(res.cut, res.alpha, src.img.width, src.img.height, b.x, b.y) } : res;
     const s = S();
     const page = findPage(s.doc, t.pageId);
@@ -249,6 +262,7 @@ export async function removeBackgroundSelection(opts: MatteOptions = {}, edit?: 
     s.notify(tr(r.review ? "image.matte.doneReview" : "image.matte.done", { type: matteTypeLabel(r.type), ms: Math.round(ms) }));
     return r;
   } catch (e) {
+    if (isCancelled(e) || (e instanceof Error && e.message === CANCELLED)) return null;
     S().notify(tr("image.matte.failed", { error: e instanceof Error ? e.message : String(e) }));
     return null;
   } finally {

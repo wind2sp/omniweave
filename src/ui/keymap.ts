@@ -75,7 +75,6 @@ export const BINDINGS: Binding[] = [
   { keys: "Ctrl+C", cmd: "edit.copy" },
   { keys: "Ctrl+V", cmd: "edit.paste" },
   { keys: "Ctrl+Shift+V", cmd: "edit.pasteInPlace" },
-  // Word: Ctrl+D is the font dialog (not here yet) — never a copy of the picture under the caret
   { keys: "Ctrl+D", cmd: "edit.duplicate", except: ["WORD"] },
   { keys: "Delete", cmd: "edit.delete" },
   { keys: "Ctrl+A", cmd: "edit.selectAll" },
@@ -117,6 +116,7 @@ export const BINDINGS: Binding[] = [
   // search box key of the Office ribbon
   { keys: "Alt+Q", cmd: "tools.commandSearch", route: true },
   { keys: "F1", cmd: "help.shortcuts" },
+  { keys: "F11", cmd: "view.fullScreen", desktop: true },
 
   // ───────── layers and objects (the modes that have layers) ─────────
   { keys: "Ctrl+T", cmd: "object.transform", in: TOOLS, desktop: true },
@@ -128,28 +128,51 @@ export const BINDINGS: Binding[] = [
   // Photoshop Ctrl+E 아래로 병합; Illustrator Ctrl+7 클리핑 마스크
   { keys: "Ctrl+E", cmd: "image.mergeDown", in: ["IMAGE"] },
   { keys: "Ctrl+7", cmd: "image.clippingMask", in: ["DESIGN"] },
-  { keys: "C", cmd: "object.crop", in: TOOLS },
+  // (the design mode's C is the scissors, Illustrator's; crop is on the tool strip and the menu there)
+  { keys: "C", cmd: "object.crop", in: ["IMAGE"] },
 
   // ───────── Ctrl+K: each program's own meaning ─────────
   // Photoshop / Illustrator / Acrobat: preferences
   { keys: "Ctrl+K", cmd: "file.settings", in: ["IMAGE", "DESIGN", "PDF"], route: true },
-  // Word / 한글 / PowerPoint / Excel / AutoCAD: insert a hyperlink — not in Omniweave yet; the key says so (and where
-  // command search went) instead of doing something else
-  { keys: "Ctrl+K", cmd: "act.linkMissing", in: ["WORD", "HWP", "SLIDE", "SHEET", "CAD"], route: true },
+  // Word / 한글 / PowerPoint: insert a hyperlink (ui/linkActions.ts); Excel / AutoCAD: not here yet — the key says so
+  // (and where command search went) instead of doing something else
+  { keys: "Ctrl+K", cmd: "insert.link", in: ["WORD", "HWP", "SLIDE"], route: true },
+  { keys: "Ctrl+K", cmd: "act.linkMissing", in: ["SHEET", "CAD"], route: true },
 
   // ───────── documents: Word (DOCX) ─────────
   { keys: "F7", cmd: "review.spelling", in: ["WORD"], route: true },
   { keys: "F12", cmd: "file.saveAs", in: ["WORD"], route: true, desktop: true },
   { keys: "Ctrl+F12", cmd: "file.open", in: ["WORD"], route: true },
+  // Word: Ctrl+D is the font dialog — never a copy of the picture under the caret
+  { keys: "Ctrl+D", cmd: "format.font", in: ["WORD"], route: true },
   { keys: "Ctrl+Enter", cmd: "insert.pageBreak", in: ["WORD", "HWP"] },
   { keys: "Alt+Shift+Enter", cmd: "insert.sectionBreak", in: ["WORD", "HWP"] },
   { keys: "Ctrl+Alt+F", cmd: "insert.footnote", in: ["WORD", "HWP"] },
   { keys: "Ctrl+Alt+D", cmd: "insert.endnote", in: ["WORD", "HWP"] },
   { keys: "Ctrl+Alt+M", cmd: "review.newComment", in: ["WORD", "HWP"] },
+  // Word: 변경 내용 추적 on / off
+  { keys: "Ctrl+Shift+E", cmd: "review.track", in: ["WORD"], route: true },
+  // Word: 단어 개수 (Ctrl+Shift+G), 자동 텍스트 — 이름 뒤 F3, 선택한 글로 새로 Alt+F3
+  { keys: "Ctrl+Shift+G", cmd: "text.wordCount", in: ["WORD"], route: true },
+  { keys: "F3", cmd: "text.autotextExpand", in: ["WORD"], route: true },
+  { keys: "Alt+F3", cmd: "insert.autotextAdd", in: ["WORD"], route: true },
   // headings at the caret (the text editors, Word's Ctrl+Alt+1…3) — the dock keys step aside in documents
   { keys: "Ctrl+Alt+1", cmd: "act.doc.heading1", in: DOCS, replaces: "view.leftDock" },
   { keys: "Ctrl+Alt+2", cmd: "act.doc.heading2", in: DOCS, replaces: "view.rightDock" },
   { keys: "Ctrl+Alt+3", cmd: "act.doc.heading3", in: DOCS },
+  // font size by 1 pt (Word / 한글 habits; a document has no stacking order to change with them) and through the size
+  // list; 서식 복사 Ctrl+Shift+C / V (Word, PowerPoint) — the paste-in-place key steps aside (QA 11-24 basic-ux)
+  { keys: "Ctrl+]", cmd: "text.sizeUp", in: ["WORD", "HWP"], replaces: "object.forward" },
+  { keys: "Ctrl+[", cmd: "text.sizeDown", in: ["WORD", "HWP"], replaces: "object.backward" },
+  { keys: "Ctrl+Shift+.", cmd: "text.grow", in: ["WORD", "HWP", "SLIDE"] },
+  { keys: "Ctrl+Shift+,", cmd: "text.shrink", in: ["WORD", "HWP", "SLIDE"] },
+  { keys: "Ctrl+Shift+C", cmd: "format.copyFormat", in: ["WORD", "HWP", "SLIDE"] },
+  { keys: "Ctrl+Shift+V", cmd: "format.pasteFormat", in: ["WORD", "HWP", "SLIDE"], replaces: "edit.pasteInPlace" },
+  // styles, bookmarks and fields (Word): 스타일 창, 표준 스타일, 책갈피, 필드 업데이트
+  { keys: "Ctrl+Alt+Shift+S", cmd: "format.stylesPane", in: ["WORD"], route: true },
+  { keys: "Ctrl+Shift+N", cmd: "format.normalStyle", in: ["WORD"], route: true, desktop: true },
+  { keys: "Ctrl+Shift+F5", cmd: "insert.bookmark", in: ["WORD"], route: true },
+  { keys: "F9", cmd: "references.updateFields", in: ["WORD"], route: true },
 
   // ───────── documents: 한글 (HWP / HWPX) ─────────
   { keys: "Alt+N", cmd: "file.new", in: ["HWP"], route: true },
@@ -158,15 +181,27 @@ export const BINDINGS: Binding[] = [
   { keys: "Alt+V", cmd: "file.saveAs", in: ["HWP"], route: true },
   { keys: "Alt+P", cmd: "file.print", in: ["HWP"], route: true },
   { keys: "Alt+T", cmd: "format.paragraph", in: ["HWP"], route: true },
+  { keys: "Alt+L", cmd: "format.font", in: ["HWP"], route: true },
+  // 한글 상용구: Alt+I (선택 → 등록 / 준말 → 본말), Ctrl+F3 상용구 내용
+  { keys: "Alt+I", cmd: "insert.autotext", in: ["HWP"], route: true },
+  { keys: "Ctrl+F3", cmd: "insert.autotextList", in: ["HWP"], route: true },
   { keys: "F7", cmd: "page.setup", in: ["HWP"], route: true },
   { keys: "F8", cmd: "review.spelling", in: ["HWP"], route: true },
   { keys: "Ctrl+F10", cmd: "insert.symbol", in: ["HWP"], route: true },
+  // 스타일 (F6): the styles list (a browser keeps F6 for its address bar: the desktop app)
+  { keys: "F6", cmd: "format.stylesPane", in: ["HWP"], route: true, desktop: true },
 
   // ───────── slides: PowerPoint ─────────
   { keys: "F5", cmd: "slide.showFromStart", in: ["SLIDE"] },
   { keys: "Shift+F5", cmd: "slide.showFromCurrent", in: ["SLIDE"] },
+  { keys: "Alt+F5", cmd: "slide.presenterView", in: ["SLIDE"] },
   { keys: "Ctrl+M", cmd: "slide.new", in: ["SLIDE"] },
   { keys: "Alt+F9", cmd: "view.guides", in: ["SLIDE"], route: true },
+
+  // ───────── PDF: Acrobat (ui/pdf/PdfTools.tsx) ─────────
+  { keys: "Ctrl+Shift+N", cmd: "pdf.goToPage", in: ["PDF"], desktop: true },
+  { keys: "Ctrl+D", cmd: "pdf.docProps", in: ["PDF"], replaces: "edit.duplicate" },
+  { keys: "Ctrl+Shift+R", cmd: "pdf.rotatePages", in: ["PDF"] },
 
   // ───────── design: a design's show starts at this page ─────────
   { keys: "F5", cmd: "slide.showFromCurrent", in: ["DESIGN"] },
@@ -185,12 +220,34 @@ export const BINDINGS: Binding[] = [
   { keys: "D", cmd: "act.color.default", in: ["IMAGE"] },
   { keys: "X", cmd: "act.color.swap", in: ["IMAGE"] },
   { keys: "Shift+M", cmd: "act.marquee.shape", in: ["IMAGE"] },
+  { keys: "Q", cmd: "select.quickMask", in: ["IMAGE"] },
+  { keys: "Ctrl+Shift+X", cmd: "filter.liquify", in: ["IMAGE"] },
   { keys: "Shift+[", cmd: "act.brush.softer", in: ["IMAGE"] },
   { keys: "Shift+]", cmd: "act.brush.harder", in: ["IMAGE"] },
   ...["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((d): Binding => ({ keys: d, cmd: `act.opacity.${d}`, in: ["IMAGE"] })),
   { keys: "[", cmd: "act.brush.smaller", in: TOOLS },
   { keys: "]", cmd: "act.brush.bigger", in: TOOLS },
   { keys: "Tab", cmd: "act.panels", in: TOOLS },
+  // PS features (ui/ps/psKeys.ts): adjustments, layers, image size, fill, path to selection, tool groups
+  { keys: "Ctrl+L", cmd: "imageop.levels", in: ["IMAGE"], desktop: true },
+  { keys: "Ctrl+M", cmd: "imageop.curves", in: ["IMAGE"] },
+  { keys: "Ctrl+U", cmd: "imageop.hueSaturation", in: ["IMAGE"], replaces: "text.underline" },
+  { keys: "Ctrl+B", cmd: "imageop.colorBalance", in: ["IMAGE"], replaces: "text.bold" },
+  { keys: "Ctrl+I", cmd: "imageop.invert", in: ["IMAGE"], replaces: "text.italic" },
+  { keys: "Ctrl+Alt+Shift+B", cmd: "imageop.blackWhite", in: ["IMAGE"] },
+  { keys: "Ctrl+Shift+U", cmd: "image.desaturate", in: ["IMAGE"] },
+  { keys: "Ctrl+Shift+E", cmd: "image.mergeVisible", in: ["IMAGE"] },
+  { keys: "Ctrl+Alt+Shift+E", cmd: "image.stampVisible", in: ["IMAGE"] },
+  { keys: "Ctrl+Alt+I", cmd: "image.imageSize", in: ["IMAGE"] },
+  { keys: "Ctrl+Alt+C", cmd: "image.canvasSize", in: ["IMAGE"] },
+  { keys: "Shift+F5", cmd: "edit.fill", in: ["IMAGE"] },
+  { keys: "Ctrl+Enter", cmd: "path.toSelection", in: ["IMAGE"] },
+  { keys: "Ctrl+Alt+R", cmd: "select.selectAndMask", in: ["IMAGE"] },
+  { keys: "Shift+W", cmd: "act.tool.cycleW", in: ["IMAGE"] },
+  { keys: "Shift+G", cmd: "act.tool.cycleG", in: ["IMAGE"] },
+  { keys: "Shift+O", cmd: "act.tool.cycleO", in: ["IMAGE"] },
+  { keys: "Shift+J", cmd: "act.tool.cycleJ", in: ["IMAGE"] },
+  { keys: "Shift+T", cmd: "act.tool.cycleT", in: ["IMAGE"] },
 
   // ───────── design: Illustrator (ui/imageDesignKeys.ts) ─────────
   ...toolRows("DESIGN"),
@@ -204,6 +261,24 @@ export const BINDINGS: Binding[] = [
   { keys: "Shift+X", cmd: "act.swatch.swap", in: ["DESIGN"] },
   { keys: "/", cmd: "act.swatch.none", in: ["DESIGN"] },
   { keys: "D", cmd: "act.swatch.default", in: ["DESIGN"] },
+  // Illustrator's own Ctrl keys win in the design mode: Ctrl+D Transform Again, Ctrl+F / Ctrl+B Paste in Front / in
+  // Back (find and bold are on the menus there), Ctrl+Alt+Shift+V Paste on All Artboards
+  { keys: "Ctrl+D", cmd: "edit.transformAgain", in: ["DESIGN"], replaces: "edit.duplicate" },
+  { keys: "Ctrl+F", cmd: "edit.pasteInFront", in: ["DESIGN"], replaces: "edit.find" },
+  { keys: "Ctrl+B", cmd: "edit.pasteInBack", in: ["DESIGN"], replaces: "text.bold" },
+  { keys: "Ctrl+Alt+Shift+V", cmd: "edit.pasteOnAllArtboards", in: ["DESIGN"] },
+  { keys: "Ctrl+Shift+O", cmd: "type.createOutlines", in: ["DESIGN"] },
+  { keys: "Ctrl+8", cmd: "path.compoundMake", in: ["DESIGN"] },
+  { keys: "Ctrl+Alt+Shift+8", cmd: "path.compoundRelease", in: ["DESIGN"] },
+  { keys: "Ctrl+Alt+7", cmd: "image.clippingMask", in: ["DESIGN"], hidden: true },
+  { keys: "Ctrl+Shift+M", cmd: "xform.move", in: ["DESIGN"] },
+  { keys: "Ctrl+Alt+B", cmd: "object.blendMake", in: ["DESIGN"] },
+  // (Ctrl+B is Paste in Back here: bold / underline of a selected text box on Ctrl+Shift, as Photoshop's faux styles)
+  { keys: "Ctrl+Shift+B", cmd: "text.bold", in: ["DESIGN"] },
+  { keys: "Ctrl+Shift+U", cmd: "text.underline", in: ["DESIGN"] },
+  { keys: "Ctrl+Alt+Shift+B", cmd: "object.blendRelease", in: ["DESIGN"] },
+  { keys: "Ctrl+Alt+0", cmd: "view.fitAllBoards", in: ["DESIGN"] },
+  { keys: "Ctrl+Alt+E", cmd: "file.exportScreens", in: ["DESIGN"] },
 
   // ───────── sheet grid: Excel (sheet/sheetActions.ts, sheet/SheetView.tsx) ─────────
   { keys: "Ctrl+PgDn", cmd: "sheet.next", in: ["SHEET"], replaces: "view.nextTab", desktop: true },

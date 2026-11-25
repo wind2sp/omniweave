@@ -13,7 +13,16 @@ export interface StructOp {
   axis: "row" | "col";
   at: number;
   n: number;
+  /**
+   * 셀 삽입 / 셀 삭제 (셀을 아래로 / 오른쪽으로 밀기): only the cells in these columns (row changes) or rows (column
+   * changes) move; the lines themselves (heights, hidden, outline …) stay. A reference moves only when it lies inside
+   * the band, as in Excel.
+   */
+  band?: [number, number];
 }
+
+/** Whether the other axis span lo..hi (null = whole lines) lies inside the op's band (no band: always). */
+const inBand = (op: StructOp, lo: number | null, hi: number | null) => !op.band || (lo != null && hi != null && lo >= op.band[0] && hi <= op.band[1]);
 
 const maxOf = (op: StructOp) => (op.axis === "row" ? MAX_ROW : MAX_COL);
 
@@ -63,6 +72,9 @@ export function adjustRefBody(body: string, op: StructOp): string | null {
   const a = ps[0]!, b = (ps[1] ?? ps[0])!;
   const key = op.axis === "row" ? "r" : "c";
   if (a[key] == null || b[key] == null) return body; // whole columns under a row change (or whole rows under a column change)
+  // cells shifted within a band: a reference that is not wholly inside it stays (Excel)
+  const other = op.axis === "row" ? "c" : "r";
+  if (op.band && !inBand(op, a[other] == null || b[other] == null ? null : Math.min(a[other]!, b[other]!), a[other] == null || b[other] == null ? null : Math.max(a[other]!, b[other]!))) return body;
   const lo = Math.min(a[key]!, b[key]!), hi = Math.max(a[key]!, b[key]!);
   const sp = ps.length === 1 ? (() => {
     const i = shiftIndex(lo, op);
@@ -122,6 +134,7 @@ export function adjustSqref(sqref: string, op: StructOp): string {
 export function adjustAddr(a: string, op: StructOp, clamp = false): string | null {
   const p = parseAddr(a);
   if (!p) return a;
+  if (op.band && !inBand(op, op.axis === "row" ? p.c : p.r, op.axis === "row" ? p.c : p.r)) return a;
   const i = shiftIndex(op.axis === "row" ? p.r : p.c, op);
   const j = i ?? (clamp ? Math.min(op.at, maxOf(op)) : null);
   if (j == null) return null;
@@ -174,14 +187,52 @@ export function applyStructToSheet(sh: SheetData, op: StructOp): void {
   }
   if (sh.tables) sh.tables = sh.tables.flatMap((t) => {
     const ref = adjustRange(t.ref, op);
-    return ref ? [{ ...t, ref }] : [];
+    if (!ref) return [];
+    const fr = t.filter && adjustRange(t.filter.ref, op);
+    return [{ ...t, ref, ...(t.filter ? { filter: fr ? { ...t.filter, ref: fr } : { ref } } : {}) }];
   });
+  // sparklines: their cells move with the lines; data ranges on this sheet too (the formula way: "Sheet1!C2:H2")
+  if (sh.sparks) {
+    const ownData = (ref: string) => {
+      const bang = ref.lastIndexOf("!");
+      const name = bang > 0 ? ref.slice(0, bang).replace(/^'|'$/g, "").replace(/''/g, "'") : own;
+      if (name.toLowerCase() !== own.toLowerCase()) return ref;
+      const body = adjustRange(ref.slice(bang + 1), op);
+      return body ? ref.slice(0, bang + 1) + body : null;
+    };
+    sh.sparks = sh.sparks
+      .map((g) => ({ ...g, items: g.items.flatMap((it) => { const at = adjustAddr(it.at, op); const ref = ownData(it.ref); return at && ref ? [{ at, ref }] : []; }) }))
+      .filter((g) => g.items.length);
+    if (!sh.sparks.length) delete sh.sparks;
+  }
+  // slicers move with the lines their anchor sits on (Excel's "move with cells"); in deleted lines they go to the
+  // first line after them
+  if (sh.slicers && !op.band) {
+    const mv = (i: number) => shiftIndex(i, op) ?? Math.min(op.at, maxOf(op));
+    sh.slicers = sh.slicers.map((sl) => {
+      const at = { ...sl.at };
+      if (op.axis === "row") {
+        if (shiftIndex(at.r0, op) == null) at.y0 = 0;
+        at.r0 = mv(at.r0);
+        if (at.r1 != null) at.r1 = Math.max(at.r0, mv(at.r1));
+      } else {
+        if (shiftIndex(at.c0, op) == null) at.x0 = 0;
+        at.c0 = mv(at.c0);
+        if (at.c1 != null) at.c1 = Math.max(at.c0, mv(at.c1));
+      }
+      return { ...sl, at };
+    });
+  }
   sh.cells = cells;
-  if (op.axis === "row") {
+  if (op.band) {
+    // only cells moved: the lines keep their heights / widths, hidden state, outline and frozen panes
+  } else if (op.axis === "row") {
     sh.rowH = shiftKeys(sh.rowH, op)!;
     sh.rowS = shiftKeys(sh.rowS, op);
     if (sh.rowAuto) sh.rowAuto = shiftKeys(sh.rowAuto, op); // (rows Excel fitted to their text move with their heights)
     sh.hiddenRows = shiftList(sh.hiddenRows, op);
+    if (sh.rowLevel) sh.rowLevel = shiftKeys(sh.rowLevel, op);
+    if (sh.rowLevel && !Object.keys(sh.rowLevel).length) delete sh.rowLevel;
     if (sh.rowS && !Object.keys(sh.rowS).length) delete sh.rowS;
     if (sh.rowAuto && !Object.keys(sh.rowAuto).length) delete sh.rowAuto;
     if (sh.hiddenRows && !sh.hiddenRows.length) delete sh.hiddenRows;
@@ -189,6 +240,8 @@ export function applyStructToSheet(sh: SheetData, op: StructOp): void {
     sh.colW = shiftKeys(sh.colW, op)!;
     sh.colS = shiftKeys(sh.colS, op);
     sh.hiddenCols = shiftList(sh.hiddenCols, op);
+    if (sh.colLevel) sh.colLevel = shiftKeys(sh.colLevel, op);
+    if (sh.colLevel && !Object.keys(sh.colLevel).length) delete sh.colLevel;
     if (sh.colS && !Object.keys(sh.colS).length) delete sh.colS;
     if (sh.hiddenCols && !sh.hiddenCols.length) delete sh.hiddenCols;
   }
@@ -200,7 +253,7 @@ export function applyStructToSheet(sh: SheetData, op: StructOp): void {
       .filter((c) => c.ranges.length);
     if (!sh.cond.length) delete sh.cond;
   }
-  if (sh.freeze) {
+  if (sh.freeze && !op.band) {
     const fr = { rows: op.axis === "row" ? frozenAfter(sh.freeze.rows, op) : sh.freeze.rows, cols: op.axis === "col" ? frozenAfter(sh.freeze.cols, op) : sh.freeze.cols };
     if (fr.rows || fr.cols) sh.freeze = fr;
     else delete sh.freeze;
@@ -231,7 +284,7 @@ export function applyStructToSheet(sh: SheetData, op: StructOp): void {
       const c0 = parseAddr(sh.filter.ref.split(":")[0])!.c;
       const cols: NonNullable<SheetData["filter"]>["cols"] = {};
       for (const [k, v] of Object.entries(sh.filter.cols ?? {})) {
-        if (op.axis === "row") cols[Number(k)] = v;
+        if (op.axis === "row" || op.band) cols[Number(k)] = v;
         else {
           const nc = shiftIndex(c0 + Number(k), op);
           const nc0 = parseAddr(ref.split(":")[0])!.c;
@@ -275,6 +328,7 @@ export function insertWouldLoseData(sh: SheetData, op: StructOp): boolean {
     const p = parseAddr(a);
     if (!p) continue;
     const i = op.axis === "row" ? p.r : p.c;
+    if (op.band && !inBand(op, op.axis === "row" ? p.c : p.r, op.axis === "row" ? p.c : p.r)) continue;
     if (i >= op.at && i + op.n > max && (sh.cells[a].v !== undefined || sh.cells[a].f)) return true;
   }
   return false;

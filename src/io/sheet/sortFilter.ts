@@ -139,19 +139,50 @@ export function filterHiddenRows(sh: SheetData, f: SheetFilter, lang: SheetLang)
   const g = parseRange(f.ref);
   if (!g) return [];
   const out: number[] = [];
-  const cols = Object.entries(f.cols ?? {}).filter(([, v]) => !v.other && v.vals);
+  const cols = Object.entries(f.cols ?? {}).filter(([, v]) => !v.other && (v.vals || v.custom));
   if (!cols.length) return out;
-  const sets = cols.map(([k, v]) => ({ c: g.c0 + Number(k), vals: new Set(v.vals!.map((x) => x.toLowerCase())), blank: !!v.blank }));
+  const sets = cols.map(([k, v]) => ({ c: g.c0 + Number(k), vals: v.vals ? new Set(v.vals.map((x) => x.toLowerCase())) : null, blank: !!v.blank, custom: v.custom }));
   for (let r = g.r0 + 1; r <= g.r1; r++) {
     for (const s of sets) {
-      const t = shownText(sh, sh.cells[addr(r, s.c)], lang);
-      if (t ? !s.vals.has(t.toLowerCase()) : !s.blank) {
+      const cell = sh.cells[addr(r, s.c)];
+      const t = shownText(sh, cell, lang);
+      const keep = s.custom ? customMatch(s.custom, cell?.v, t) : t ? s.vals!.has(t.toLowerCase()) : s.blank;
+      if (!keep) {
         out.push(r);
         break;
       }
     }
   }
   return out;
+}
+
+/** Whether a cell passes a custom filter (숫자 필터 / 텍스트 필터): numbers compared as numbers, texts with * ? wildcards. */
+export function customMatch(cf: NonNullable<NonNullable<SheetFilter["cols"]>[number]["custom"]>, v: unknown, shown: string): boolean {
+  const one = (x: { op: string; val: string }) => {
+    const n = Number(x.val);
+    if (typeof v === "number" && x.val.trim() !== "" && Number.isFinite(n)) {
+      switch (x.op) {
+        case "greaterThan": return v > n;
+        case "greaterThanOrEqual": return v >= n;
+        case "lessThan": return v < n;
+        case "lessThanOrEqual": return v <= n;
+        case "notEqual": return v !== n;
+        default: return v === n;
+      }
+    }
+    const re = new RegExp("^" + x.val.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$", "i");
+    const s = shown;
+    switch (x.op) {
+      case "notEqual": return !re.test(s);
+      case "greaterThan": return s.localeCompare(x.val) > 0;
+      case "greaterThanOrEqual": return s.localeCompare(x.val) >= 0;
+      case "lessThan": return s.localeCompare(x.val) < 0;
+      case "lessThanOrEqual": return s.localeCompare(x.val) <= 0;
+      default: return re.test(s);
+    }
+  };
+  const rs = cf.items.map(one);
+  return cf.and ? rs.every(Boolean) : rs.some(Boolean);
 }
 
 /** The filter range for a cell: its current region (grown down to the last filled row). */
@@ -178,6 +209,14 @@ export interface FindOpts {
   lookIn?: "formulas" | "values";
   /** search by columns instead of rows */
   byCols?: boolean;
+  /** 서식 찾기: only cells with these formats (bold, italic, fill, font colour, number format) */
+  format?: { bold?: boolean; italic?: boolean; fill?: string; color?: string; fmt?: string };
+}
+
+/** Whether a cell has the formats looked for (찾기 ▸ 서식). */
+function formatHit(sh: SheetData, cell: SheetCell, f: NonNullable<FindOpts["format"]>): boolean {
+  const st = sh.styles[cell.s ?? 0] ?? {};
+  return (Object.keys(f) as (keyof typeof f)[]).every((k) => (k === "bold" || k === "italic" ? !!st[k] === !!f[k] : (st[k] ?? "").toString().toLowerCase() === (f[k] ?? "").toString().toLowerCase()));
 }
 
 /** Excel's find pattern (* any text, ? one character, ~ escapes) as a regular expression. */
@@ -204,15 +243,16 @@ export function searchText(sh: SheetData, cell: SheetCell, o: FindOpts, lang: Sh
 
 /** Every matching cell of a range (the whole sheet when omitted), in Excel's order (by rows, or by columns). */
 export function findAll(sh: SheetData, q: string, o: FindOpts, lang: SheetLang, within?: Rect): string[] {
-  if (!q) return [];
+  if (!q && !o.format) return [];
   const re = findPattern(q, o);
   const hits: { a: string; r: number; c: number }[] = [];
   for (const [a, cell] of Object.entries(sh.cells)) {
     const p = parseAddr(a);
     if (!p) continue;
     if (within && (p.r < within.r0 || p.r > within.r1 || p.c < within.c0 || p.c > within.c1)) continue;
+    if (o.format && !formatHit(sh, cell, o.format)) continue;
     const text = searchText(sh, cell, o, lang);
-    if (text && re.test(text)) hits.push({ a, ...p });
+    if (!q ? cell.v !== undefined || !!cell.f || !!cell.s : text && re.test(text)) hits.push({ a, ...p });
   }
   hits.sort((x, y) => (o.byCols ? x.c - y.c || x.r - y.r : x.r - y.r || x.c - y.c));
   return hits.map((h) => h.a);

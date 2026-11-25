@@ -16,7 +16,6 @@ import type { Img } from "../../core/image/pixels";
 import { imageTarget, previewOf } from "../imageActions";
 import { dialogUndoKey, matteEditTarget,matteImage, matteOptionsOf, matteSource, matteTypeLabel, removeBackgroundSelection } from "../matteActions";
 import { useT } from "../../i18n";
-import { withProgress } from "../progress";
 import { Modal } from "./Dialogs";
 import { Seg } from "./controls";
 import { CheckRow, RangeRow, imgStyles } from "./imageControls";
@@ -87,6 +86,8 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
   const [ms, setMs] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** a person photo's second step is running (the person model): the preview shows the subject model's result first */
+  const [personPending, setPersonPending] = useState(false);
   const seq = useRef(0);
 
   useEffect(() => {
@@ -98,8 +99,16 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
         const p = previewOf(work, PREVIEW_SIDE);
         if (!alive) return;
         setSrc({ img: p.img, scale: p.ctx.scale });
-        const a = await runMatteAnalyze(p.img);
-        if (alive) setAna(a.value);
+        // staged: the subject model's analysis (and its preview) first; a subject that looks like a person is then
+        // checked with the person model, and the preview follows its result
+        const a = await runMatteAnalyze(p.img, { person: false });
+        if (!alive) return;
+        const cand = "personCandidate" in a.value && !!a.value.personCandidate;
+        setPersonPending(cand);
+        setAna(a.value);
+        if (!cand) return;
+        const b = await runMatteAnalyze(p.img, { sal: "sal" in a.value ? a.value.sal : undefined }).finally(() => alive && setPersonPending(false));
+        if (alive) setAna(b.value);
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
     return () => {
@@ -115,7 +124,7 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
     if (!src || !ana || !effType) return;
     const id = ++seq.current;
     const timer = setTimeout(() => {
-      runMatte(src.img, { type: effType, edge: { ...edgeFull, feather: edgeFull.feather * src.scale }, keepShadow, sal, inner: innerOpt(inner), hints })
+      runMatte(src.img, { type: effType, edge: { ...edgeFull, feather: edgeFull.feather * src.scale }, keepShadow, sal, inner: innerOpt(inner), hints, ...(personPending ? { person: false } : {}) })
         .then((r) => {
           if (id !== seq.current) return;
           setOut({ cut: r.value.cut, matte: matteImage(r.value.alpha, src.img.width, src.img.height), review: r.value.review });
@@ -127,7 +136,7 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(timer);
     // edgeFull is derived from edge + effType
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, ana, effType, edge, keepShadow, inner, hints]);
+  }, [src, ana, effType, edge, keepShadow, inner, hints, personPending]);
 
   const setE = (k: keyof EdgeOptions, v: number) => setEdge((e) => ({ ...e, [k]: v }));
   const aiType = effType === "portrait" || effType === "animal" || effType === "object" || effType === "complex" || effType === "product";
@@ -190,6 +199,11 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
                 </span>
               )}
               {ana && "backend" in ana && ana.backend && <span style={imgStyles.note}>{t(`image.matte.backend.${ana.backend}`)}</span>}
+              {personPending && (
+                <span style={imgStyles.note} role="status" className="matte-person-pending">
+                  {t("image.matte.personChecking")}
+                </span>
+              )}
               {ms !== null && <span style={imgStyles.note}>{t("image.matte.previewTime", { ms: Math.round(ms) })}</span>}
             </div>
             {review && <span style={{ ...imgStyles.note, color: "var(--warn, #e0a030)" }}>{t("image.matte.review")}</span>}
@@ -274,7 +288,8 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
               const same = edit ? matteEditTarget()?.node === edit.node : imageTarget()?.node === target?.node;
               const opts: MatteOptions = { type: type === "auto" ? undefined : type, edge, keepShadow, sal: same ? sal : undefined, hints };
               if (inner !== "auto") opts.inner = innerOpt(inner);
-              await withProgress(t("progress.matte"), () => removeBackgroundSelection(opts, edit));
+              // (removeBackgroundSelection shows its own progress, with the step and Cancel)
+              await removeBackgroundSelection(opts, edit);
               setBusy(false);
               onClose();
             }}

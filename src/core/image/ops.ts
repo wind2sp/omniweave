@@ -134,6 +134,18 @@ export const OPS: OpDef[] = [
     ],
     apply: (img, p) => A.blackWhite(img, { r: n(p, "r", 30), g: n(p, "g", 59), b: n(p, "b", 11), constant: n(p, "constant") }),
   },
+  {
+    id: "selectiveColor", label: "선택 색상", group: "adjust", point: true, spread: none, // i18n: ui
+    params: [
+      { key: "range", label: "색상", kind: "choice", def: 0, options: ["빨강 계열", "노랑 계열", "녹색 계열", "녹청 계열", "파랑 계열", "마젠타 계열", "흰색 계열", "중간색", "검정 계열"].map((label, value) => ({ value, label })) }, // i18n: ui
+      { key: "c", label: "녹청", kind: "range", min: -100, max: 100, step: 1, def: 0, unit: "%" }, // i18n: ui
+      { key: "m", label: "마젠타", kind: "range", min: -100, max: 100, step: 1, def: 0, unit: "%" }, // i18n: ui
+      { key: "y", label: "노랑", kind: "range", min: -100, max: 100, step: 1, def: 0, unit: "%" }, // i18n: ui
+      { key: "k", label: "검정", kind: "range", min: -100, max: 100, step: 1, def: 0, unit: "%" }, // i18n: ui
+      { key: "absolute", label: "방법", kind: "choice", def: 0, options: [{ value: 0, label: "상대치" }, { value: 1, label: "절대치" }] }, // i18n: ui
+    ],
+    apply: (img, p) => A.selectiveColor(img, { range: n(p, "range"), c: n(p, "c"), m: n(p, "m"), y: n(p, "y"), k: n(p, "k"), absolute: n(p, "absolute") }),
+  },
   { id: "invert", label: "반전", group: "adjust", point: true, spread: none, params: [], apply: (img) => A.invert(img) }, // i18n: ui
   {
     id: "posterize", label: "포스터화", group: "adjust", point: true, spread: none, // i18n: ui

@@ -32,9 +32,16 @@ import { effectsFingerprint } from "../../core/style/fingerprint";
 import type { Effect } from "../../core/style/types";
 import { buildEffectsDesc, effectsBlocks, globalLightAngle, parseFxBlock, writeFxBlock, type Desc } from "./psdFx";
 import { editTySh, psdTextKey } from "./psdText";
-import type { CmykXform } from "../../core/image/iccCmyk";
-import { LONG_KEYS, PSD_GROUP_SEP, colorChannels, decodeLayout, hasRealMergedData, importPsdPage, duotoneGrey, duotoneLut, type GreyOf, fxSourceBlock, layerCmykPlanes, parsePsdLayout, psdCmykProfile, psdLocked, rasterFingerprint, readChannelPlane, readCompositePlanes, recordName, sectionType, to8, type PsdBlock, type PsdLayout, type PsdRecord } from "./psd";
+import { defaultCmykProfile, type CmykXform } from "../../core/image/iccCmyk";
+import { LONG_KEYS, PSD_GROUP_SEP, blendOptionsKey, colorChannels, decodeLayout, hasRealMergedData, importPsdPage, duotoneGrey, duotoneLut, type GreyOf, fxSourceBlock, layerCmykPlanes, parsePsdLayout, psdCmykProfile, psdLocked, rasterFingerprint, readChannelPlane, readCompositePlanes, recordName, sectionType, to8, type PsdBlock, type PsdLayout, type PsdRecord } from "./psd";
 import { srgbToLinear } from "../../core/image/adjust";
+import { maskFingerprint, maskPlane, shownTiles } from "../../core/image/layerMask";
+import { tileBounds } from "../../core/image/pixels";
+import { adjustmentBlocks } from "./psdAdjustWrite";
+import { pathResources, readPaths, replacePathResources } from "./psdPaths";
+import { guidesResource, readGuides, replaceGuidesResource } from "./psdGuides";
+import { newTextTySh } from "./psdTextNew";
+import { linkedEntry, smartPlacedData } from "./psdSmartNew";
 import { PLACED_KEYS, placedWithCorners, placedWithSize, rebuildLinkedBlock, type LinkedData } from "./psdSmart";
 
 export type RasterizeNode = (doc: OmwDocument, page: Page, node: SceneNode) => Promise<{ png: Uint8Array; x: number; y: number; w: number; h: number } | null>;
@@ -233,12 +240,20 @@ function floatPlane(p: Uint8Array, coverage: boolean, keep?: (i: number, v: numb
 }
 
 /** RGBA → colour planes in the document mode, at the document depth (8 or 16 bits); `grey`: a duotone's colours. */
-function colourPlanes(rgba: Uint8Array, n: number, mode: number, depth: number, grey?: GreyOf | null): Uint8Array[] {
+function colourPlanes(rgba: Uint8Array, n: number, mode: number, depth: number, grey?: GreyOf | null, xf?: CmykXform | null): Uint8Array[] {
   const ch = colorChannels(mode);
   const p8 = Array.from({ length: ch }, () => new Uint8Array(n));
+  const ink = new Uint8Array(4);
   for (let i = 0; i < n; i++) {
     const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
-    if (mode === 3) {
+    if (mode === 4 && xf) {
+      // a document made CMYK here (이미지 › 모드): separated through its profile, as it is read back
+      xf.cmyk(r, g, b, ink, 0);
+      p8[0][i] = ink[0];
+      p8[1][i] = ink[1];
+      p8[2][i] = ink[2];
+      p8[3][i] = ink[3];
+    } else if (mode === 3) {
       p8[0][i] = r;
       p8[1][i] = g;
       p8[2][i] = b;
@@ -427,6 +442,108 @@ export function rasterPixels(n: RasterNode): LayerPixels | null {
       }
     }
   return cropAlpha({ rgba, left, top, width: w, height: h });
+}
+
+/** The pixels a layer shows (its mask applied): what the merged image is composited from. */
+export function shownPixels(n: RasterNode): LayerPixels | null {
+  return rasterPixels(n.mask && !n.mask.off && !n.adjust ? { ...n, tiles: shownTiles(n), mask: undefined } : n);
+}
+
+/**
+ * The PSD user mask of a layer (a pixel layer's layer mask, or an adjustment layer's own mask in its tiles), in page
+ * coordinates: the rectangle of its painted tiles, outside it the default colour. Null for a layer without one or one
+ * that is turned / scaled (its mask is applied to its pixels then).
+ */
+export function layerMaskSpec(n: RasterNode): NonNullable<FreshLayer["mask"]> | null {
+  const m = n.adjust ? { tiles: n.tiles, hide: n.adjust.hide } : n.mask;
+  const off = pixelOffset(n);
+  if (!m || (n.adjust && (!off || !Number.isInteger(n.transform.x) || !Number.isInteger(n.transform.y)))) return null;
+  if (!off) {
+    // a turned / scaled layer: the mask resampled through the same transform as its pixels (rasterPixels), in grey
+    const keys = new Set([...Object.keys(n.tiles), ...Object.keys(m.tiles)]);
+    const grey: RasterNode["tiles"] = {};
+    for (const k of keys) {
+      const u = k.indexOf("_");
+      const tx = +k.slice(0, u), ty = +k.slice(u + 1);
+      const p = maskPlane(m, tx * TILE, ty * TILE, TILE, TILE);
+      const d = new Uint8ClampedArray(TILE * TILE * 4);
+      for (let i = 0; i < p.length; i++) ((d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = p[i]), (d[i * 4 + 3] = 255));
+      grey[k] = { hash: `mask-${k}`, data: d };
+    }
+    const px = rasterPixels({ ...n, tiles: grey, mask: undefined });
+    if (!px) return null;
+    const data = new Uint8Array(px.width * px.height);
+    const def = m.hide ? 255 : 0;
+    for (let i = 0; i < data.length; i++) {
+      const a = px.rgba[i * 4 + 3];
+      data[i] = Math.round((px.rgba[i * 4] * a + def * (255 - a)) / 255);
+    }
+    return { left: px.left, top: px.top, width: px.width, height: px.height, data, defaultColor: def, disabled: !!n.mask?.off };
+  }
+  const tb = tileBounds(m.tiles);
+  const def = m.hide ? 255 : 0;
+  const disabled = !n.adjust && !!n.mask?.off;
+  if (!tb) return { left: 0, top: 0, width: 0, height: 0, data: new Uint8Array(0), defaultColor: def, disabled };
+  const data = maskPlane(m, tb.ox, tb.oy, tb.width, tb.height);
+  return { left: tb.ox + off.x, top: tb.oy + off.y, width: tb.width, height: tb.height, data, defaultColor: def, disabled };
+}
+
+/** A smart object made here (its content an asset): its placed-layer block and its linked-file entry, or null. */
+const concatBytes = (parts: Uint8Array[]) => {
+  const out = new Uint8Array(parts.reduce((a, p) => a + p.length, 0));
+  let o = 0;
+  for (const p of parts) (out.set(p, o), (o += p.length));
+  return out;
+};
+
+function newSmartParts(n: SceneNode, psb: boolean): { block: Uint8Array; entry: Uint8Array } | null {
+  if (n.type !== "RASTER" || !n.psdSmart?.edited || n.psdSmart.kind !== "embedded") return null;
+  const data = getBlob(n.psdSmart.edited.hash);
+  if (!data) return null;
+  const placed = `${n.psdSmart.id.slice(0, 8)}-${n.id.replace(/[^0-9a-z]/gi, "").slice(-12).padStart(12, "0")}`;
+  return { block: block("SoLd", smartPlacedData(n, placed), psb), entry: linkedEntry(n, data) };
+}
+
+/** The type tool block of a text box drawn here (its turn and scale in the text transform), as a layer block; null for anything else. */
+function textTyShBlock(n: SceneNode, psb: boolean): Uint8Array | null {
+  if (n.type !== "TEXT" || n.flow) return null;
+  if (!n.paragraphs.some((p) => p.runs.some((r) => r.text.trim()))) return null;
+  try {
+    return block("TySh", newTextTySh(n, localBounds(n).h), psb);
+  } catch {
+    return null;
+  }
+}
+
+/** A user mask's record parts: the mask data section and its channel (-2). */
+function maskParts(m: NonNullable<FreshLayer["mask"]>, depth: number, psb: boolean): { mask: Uint8Array; channel: { id: number; data: Uint8Array } } {
+  const mo = new Out();
+  mo.i32(m.top);
+  mo.i32(m.left);
+  mo.i32(m.top + m.height);
+  mo.i32(m.left + m.width);
+  mo.u8(m.defaultColor);
+  mo.u8(m.disabled ? 2 : 0);
+  mo.u16(0);
+  return { mask: mo.done(), channel: { id: -2, data: encodeChannel(depth === 16 ? widen(m.data) : m.data, m.width, m.height, depth / 8, psb) } };
+}
+
+/** A record for an adjustment layer made or edited here (settings blocks, mask); null for a kind not written. */
+function adjustRecord(n: RasterNode, mode: number, depth: number, psb: boolean, id: number): RecordParts | null {
+  const blocks = n.adjust ? adjustmentBlocks(n.adjust.adj) : null;
+  if (!blocks) return null;
+  const { parts } = newRecord(n.name, null, n, mode, depth, psb, id);
+  parts.blocks.push(...blocks.map(([k, d]) => block(k, d, psb)));
+  // pixel data irrelevant (bit 4, with bit 3 saying bit 4 is used): Photoshop's flags of an adjustment layer
+  parts.flags |= 0x10;
+  if (n.clip) parts.clipping = 1;
+  const ms = layerMaskSpec(n);
+  if (ms && depth !== 32) {
+    const mp = maskParts(ms, depth, psb);
+    parts.mask = mp.mask;
+    parts.channels.push(mp.channel);
+  }
+  return parts;
 }
 
 /** Minimal PNG decoder (8-bit RGB/RGBA, non-interlaced — what canvas.toBlob produces). */
@@ -889,14 +1006,24 @@ function patchFxBlocks(blks: { key: string; raw: Uint8Array }[], b: Uint8Array, 
   blks.push(...kept);
 }
 
+/** lspf protection bits of a node: all (bit 31), transparency (0), image pixels (1), position (2). */
+export function lockBits(n: Pick<SceneNode, "locked" | "lockAlpha" | "lockPixels" | "lockPosition">): number {
+  return ((n.locked ? 0x80000000 : 0) | (n.lockAlpha ? 1 : 0) | (n.lockPixels ? 2 : 0) | (n.lockPosition ? 4 : 0)) >>> 0;
+}
+
 function newRecord(name: string, px: LayerPixels | null, n: SceneNode, mode: number, depth: number, psb: boolean, id: number, inks?: LayerInks["planes"]): { parts: RecordParts } {
   // Photoshop's default blending options (clipped layers blend as a group, interior effects not, no knockout). A
   // record without any of them reads as a pre-CS layer: Photoshop then turns the opacity of a layer in one of the
   // eight special modes (colour / linear burn and dodge, vivid / linear light, hard mix, difference) into its fill
   // opacity — a different picture (QA 2026-11-18, Photoshop 28: Colour Burn at 70 % opened as opacity 100 % fill 70 %).
-  const blocks = [block("luni", luniData(name), psb), block("lyid", u32be(id), psb), block("clbl", u32be(0x01000000), psb), block("infx", u32be(0), psb), block("knko", u32be(0), psb)];
-  if (n.locked) blocks.push(block("lspf", u32be(0x80000000), psb));
+  // blending options (Photoshop's Layer Style dialog): fill opacity, interior effects, knockout, Blend If, locks
+  const blocks = [block("luni", luniData(name), psb), block("lyid", u32be(id), psb), block("clbl", u32be(0x01000000), psb), block("infx", u32be(n.fillInterior ? 0x01000000 : 0), psb), block("knko", u32be(n.knockout === "deep" ? 0x02000000 : n.knockout === "shallow" ? 0x01000000 : 0), psb)];
+  if ((n.fillOpacity ?? 1) < 1) blocks.push(block("iOpa", Uint8Array.from([Math.round(Math.max(0, n.fillOpacity!) * 255), 0, 0, 0]), psb));
+  const lock = lockBits(n);
+  if (lock) blocks.push(block("lspf", u32be(lock), psb));
   blocks.push(...fxBlocks(n.effects, psb));
+  const ranges = defaultRanges(colorChannels(mode));
+  if (n.blendIf) ranges.set(n.blendIf.slice(0, ranges.length));
   return {
     parts: {
       top: px?.top ?? 0,
@@ -910,7 +1037,7 @@ function newRecord(name: string, px: LayerPixels | null, n: SceneNode, mode: num
       flags: 0x08 | (n.visible ? 0 : 0x02),
       filler: 0,
       mask: new Uint8Array(0),
-      ranges: defaultRanges(colorChannels(mode)),
+      ranges,
       name: pascalName(name),
       blocks,
       tail: new Uint8Array(0),
@@ -949,6 +1076,10 @@ export interface FreshLayer {
   blendKey?: string;
   /** layer effects, written as lfx2 */
   effects?: Effect[];
+  /** an adjustment layer (its settings in `blocks`): Photoshop's "pixel data irrelevant" flag */
+  adjustment?: boolean;
+  /** blending options and partial locks (Layer Style dialog, lock buttons) */
+  options?: Pick<SceneNode, "fillOpacity" | "fillInterior" | "knockout" | "blendIf" | "lockAlpha" | "lockPixels" | "lockPosition">;
 }
 
 /** Section divider block (lsct): type 0..3; folder headers also carry the folder's blend key. */
@@ -984,6 +1115,10 @@ export interface FreshSpec {
   composite?: Uint8Array;
   /** extra global additional-info blocks (raw, test fixtures) */
   globalBlocks?: Uint8Array[];
+  /** more image resources (whole '8BIM' blocks) after the resolution: saved paths (psdPaths.ts) */
+  resources?: Uint8Array;
+  /** CMYK (mode 4): the profile the colours are separated through (layers and merged image) */
+  xf?: CmykXform | null;
 }
 
 /** Section type (lsct / lsdk) and folder blend key of a fresh layer's raw blocks; type 0 = not a marker. */
@@ -1026,6 +1161,18 @@ function freshComposite(layers: FreshLayer[], W: number, H: number): Uint8Array 
   return compositeTree(nodes, groups, (n) => pxOf.get(n.id) ?? null, W, H);
 }
 
+const NO_BYTES = new Uint8Array(0);
+/** one image resource block ('8BIM', id, empty name, data padded to even) */
+function resourceBlock(id: number, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(12 + data.length + (data.length % 2));
+  const dv = new DataView(out.buffer);
+  out.set([56, 66, 73, 77], 0);
+  dv.setUint16(4, id);
+  dv.setUint32(8, data.length);
+  out.set(data, 12);
+  return out;
+}
+
 /** A complete new PSD/PSB from scratch (merged image with transparency). */
 export function buildPsd(spec: FreshSpec): Uint8Array {
   const depth = spec.depth ?? 8, mode = spec.mode ?? 3, psb = !!spec.psb;
@@ -1033,7 +1180,8 @@ export function buildPsd(spec: FreshSpec): Uint8Array {
   const W = spec.width, H = spec.height;
   const colorCh = colorChannels(mode);
   const records = spec.layers.map((l, i) => {
-    const { parts } = newRecord(l.name, l.px, { visible: l.visible, opacity: l.opacity, blendMode: l.blend, locked: !!l.locked, effects: l.effects } as SceneNode, mode, depth, psb, i + 1);
+    const inks = mode === 4 && spec.xf && l.px ? cmykLayerInks(l.px, null, 0, 0, spec.xf).planes : undefined;
+    const { parts } = newRecord(l.name, l.px, { ...l.options, visible: l.visible, opacity: l.opacity, blendMode: l.blend, locked: !!l.locked, effects: l.effects } as SceneNode, mode, depth, psb, i + 1, inks);
     if (l.blocks) parts.blocks.push(...l.blocks);
     if (l.clipping) parts.clipping = 1;
     if (l.blendKey) parts.blend = l.blendKey;
@@ -1043,17 +1191,11 @@ export function buildPsd(spec: FreshSpec): Uint8Array {
       parts.blocks.push(block("lspf", u32be(0xd), psb));
     }
     if (l.mask) {
-      const m = l.mask, mo = new Out();
-      mo.i32(m.top);
-      mo.i32(m.left);
-      mo.i32(m.top + m.height);
-      mo.i32(m.left + m.width);
-      mo.u8(m.defaultColor);
-      mo.u8(m.disabled ? 2 : 0);
-      mo.u16(0);
-      parts.mask = mo.done();
-      parts.channels.push({ id: -2, data: encodeChannel(depth === 16 ? widen(m.data) : m.data, m.width, m.height, depth / 8, psb) });
+      const mp = maskParts(l.mask, depth, psb);
+      parts.mask = mp.mask;
+      parts.channels.push(mp.channel);
     }
+    if (l.adjustment) parts.flags |= 0x10;
     return parts;
   });
   const comp = spec.composite ?? freshComposite(spec.layers, W, H);
@@ -1079,6 +1221,7 @@ export function buildPsd(spec: FreshSpec): Uint8Array {
   res.u32(72 << 16);
   res.u16(1);
   res.u16(1);
+  if (spec.resources?.length) res.bytes(spec.resources);
   const resBytes = res.done();
   o.u32(resBytes.length);
   o.bytes(resBytes);
@@ -1098,7 +1241,7 @@ export function buildPsd(spec: FreshSpec): Uint8Array {
   o.len(lmBytes.length, psb);
   o.bytes(lmBytes);
   const n = W * H;
-  o.bytes(encodeImageData([...colourPlanes(comp, n, mode, depth), alphaPlane(comp, n, depth)], W, H, depth / 8, psb));
+  o.bytes(encodeImageData([...colourPlanes(comp, n, mode, depth, null, spec.xf), alphaPlane(comp, n, depth)], W, H, depth / 8, psb));
   return o.done();
 }
 
@@ -1291,6 +1434,12 @@ export async function writePsd(doc: OmwDocument, page: Page, opts: PsdWriteOptio
         warnings.push("원본 PSD와 레이어 연결 정보가 맞지 않아 새 PSD로 저장했습니다");
         L = null;
       }
+      // 이미지 › 모드 changed (RGB ↔ Grayscale ↔ CMYK): the file is written anew in that mode
+      const want = page.colorMode === "cmyk" ? 4 : page.colorMode === "gray" ? 1 : 3;
+      if (L && [1, 3, 4].includes(L.mode) && L.mode !== want) {
+        warnings.push(`색상 모드를 바꿔(${L.mode === 4 ? "CMYK" : L.mode === 1 ? "회색조" : "RGB"} → ${want === 4 ? "CMYK" : want === 1 ? "회색조" : "RGB"}) 새 PSD로 저장했습니다`);
+        L = null;
+      }
       if (L) {
         const c = psdCanvasSize(page, L);
         return guard(await surgery(doc, page, L, orig, meta, opts, warnings), { width: c.width, height: c.height, depth: L.depth, mode: L.mode, psb: L.psb }, orig);
@@ -1308,6 +1457,7 @@ async function fresh(doc: OmwDocument, page: Page, opts: PsdWriteOptions, warnin
   const nodes = contiguousOrder(page.nodes.filter((n) => n.id !== hidden), page.groups);
   const index = groupIndex(page.groups);
   const pxOf = new Map<string, LayerPixels | null>();
+  const smartEntries: Uint8Array[] = [];
   // folders: a divider opens each group the first time one of its members comes, the header closes it
   let open: LayerGroup[] = [];
   const close = (to: number) => {
@@ -1323,7 +1473,15 @@ async function fresh(doc: OmwDocument, page: Page, opts: PsdWriteOptions, warnin
       open.push(path[k]);
     }
     if (n.type === "RASTER" && n.adjust) {
-      skipped.push(n.name);
+      // an adjustment layer made or edited here: its settings and mask (psdAdjustWrite.ts); a kind not written is left out
+      const blocks = adjustmentBlocks(n.adjust.adj);
+      if (!blocks) {
+        skipped.push(n.name);
+        continue;
+      }
+      pxOf.set(n.id, rasterPixels(n));
+      const ms = layerMaskSpec(n);
+      layers.push({ name: n.name, px: null, opacity: n.opacity, visible: n.visible, blend: n.blendMode, locked: n.locked, adjustment: true, blocks: blocks.map(([k, d]) => block(k, d, psb)), ...(ms ? { mask: ms } : {}), ...(n.clip ? { clipping: true } : {}) });
       continue;
     }
     const px = await nodePixels(doc, page, n, opts);
@@ -1331,16 +1489,32 @@ async function fresh(doc: OmwDocument, page: Page, opts: PsdWriteOptions, warnin
       skipped.push(n.name);
       continue;
     }
-    pxOf.set(n.id, px);
-    layers.push({ name: n.type === "RASTER" ? n.name : `${n.name} (래스터로 굳힘)`, px, opacity: n.opacity, visible: n.visible, blend: n.blendMode, locked: n.locked, ...(n.clip ? { clipping: true } : {}), ...(n.effects?.length ? { effects: n.effects } : {}) });
+    // the merged image shows the layer through its mask; the record keeps every pixel and the mask beside them
+    const ms = n.type === "RASTER" ? layerMaskSpec(n) : null;
+    pxOf.set(n.id, ms && n.type === "RASTER" ? shownPixels(n) : px);
+    // a text box: an editable Photoshop text layer (its type block made here, our drawing as its pixels)
+    const ty = textTyShBlock(n, psb);
+    // a smart object made here: a placed layer, its file in the document's linked-file block
+    const so = newSmartParts(n, psb);
+    if (so) smartEntries.push(so.entry);
+    const extra = [...(ty ? [ty] : []), ...(so ? [so.block] : [])];
+    layers.push({ name: n.type === "RASTER" || ty ? n.name : `${n.name} (래스터로 굳힘)`, px, opacity: n.opacity, visible: n.visible, blend: n.blendMode, locked: n.locked, ...(extra.length ? { blocks: extra } : {}), options: { fillOpacity: n.fillOpacity, fillInterior: n.fillInterior, knockout: n.knockout, blendIf: n.blendIf, lockAlpha: n.lockAlpha, lockPixels: n.lockPixels, lockPosition: n.lockPosition }, ...(ms ? { mask: ms } : {}), ...(n.clip ? { clipping: true } : {}), ...(n.effects?.length ? { effects: n.effects } : {}) });
   }
   close(0);
   if (skipped.length) warnings.push(`래스터로 바꿀 수 없어 빠진 개체 ${skipped.length}개: ${skipped.slice(0, 5).join(", ")}`);
   // groups / clipping: the merged image follows Photoshop's compositing of the tree
-  const composite = hasStructure(nodes, page.groups) || nodes.some((n) => n.effects?.length)
+  const composite = hasStructure(nodes, page.groups) || nodes.some((n) => n.effects?.length || (n.fillOpacity ?? 1) < 1 || !!n.blendIf || !!n.knockout || (n.type === "RASTER" && (n.adjust || n.mask)))
     ? compositeTree(nodes.filter((n) => pxOf.has(n.id)), page.groups, (n) => pxOf.get(n.id) ?? null, page.width, page.height)
     : undefined;
-  const bytes = buildPsd({ width: page.width, height: page.height, layers, psb, composite });
+  // image resources after the resolution: saved paths (패스 panel) and ruler guides (resource 1032)
+  const extraRes = concatBytes([page.paths?.length ? pathResources(page.paths, page.width, page.height) : new Uint8Array(0), guidesResource(page.guides)]);
+  const mode = page.colorMode === "cmyk" ? 4 : page.colorMode === "gray" ? 1 : 3;
+  // CMYK: separated through the CMYK profile the file is read with (the shipped default), embedded (resource 1039) so
+  // Photoshop separates and shows it the same way
+  const xf = mode === 4 ? psdCmykProfile(NO_BYTES, []).xf : null;
+  const icc = xf ? defaultCmykProfile() : null;
+  const allRes = icc ? concatBytes([extraRes, resourceBlock(1039, icc.bytes)]) : extraRes;
+  const bytes = buildPsd({ width: page.width, height: page.height, mode, xf, layers, psb, composite, ...(allRes.length ? { resources: allRes } : {}), ...(smartEntries.length ? { globalBlocks: [block("lnk2", concatBytes(smartEntries), psb)] } : {}) });
   return { bytes, method: "fresh", warnings };
 }
 
@@ -1600,6 +1774,9 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
   const canvas = psdCanvasSize(page, L);
   const sizeChanged = canvas.changed;
   const outW = canvas.width, outH = canvas.height;
+  // ruler guides made or moved in the app (resource 1032): the file is rewritten for them too
+  const guidesOf = (g: { x?: number[]; y?: number[] } | undefined) => JSON.stringify(g?.x?.length || g?.y?.length ? { x: g.x ?? [], y: g.y ?? [] } : {});
+  const guidesChanged = guidesOf(readGuides(b, L.resItems)) !== guidesOf(page.guides);
   if (!canvas.fits) warnings.push(`캔버스 크기 변경(${L.width}×${L.height} → ${page.width}×${page.height})은 이 PSD에 담을 수 없어 원본 크기로 저장했습니다`);
   if (sizeChanged) warnings.push(`캔버스 크기를 ${L.width}×${L.height}에서 ${outW}×${outH}로 바꿔 저장했습니다 (레이어 위치도 함께 옮김)`);
 
@@ -1607,7 +1784,7 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
   const flat = meta.flatNode ? byId.get(meta.flatNode) : undefined;
   if (meta.flatNode && flat && flat.type === "RASTER" && nodes.length === 1) {
     const t = flat.transform;
-    const same = rasterFingerprint(flat) === meta.flatFp && t.x === 0 && t.y === 0 && t.rotation === 0 && t.scale === 1 && (t.scaleY ?? 1) === 1 && !flat.crop && flat.visible && flat.opacity === 1 && !sizeChanged;
+    const same = rasterFingerprint(flat) === meta.flatFp && t.x === 0 && t.y === 0 && t.rotation === 0 && t.scale === 1 && (t.scaleY ?? 1) === 1 && !flat.crop && flat.visible && flat.opacity === 1 && !sizeChanged && !guidesChanged;
     if (same) return { bytes: orig.slice(), method: "original", warnings };
   }
 
@@ -1650,7 +1827,9 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
       const tf = node.transform;
       const same = rasterFingerprint(node) === link.fp && tf.rotation === 0 && tf.scale === 1 && (tf.scaleY ?? 1) === 1 && !(node as RasterNode).crop;
       const shifted = same && (tf.x !== link.x || tf.y !== link.y) && Number.isInteger(tf.x) && Number.isInteger(tf.y) && canShiftContent(b, rec);
-      if (!same || ((tf.x !== link.x || tf.y !== link.y) && !shifted)) adjustMasks++;
+      // (settings or a mask changed here on a kind written here: the record is written anew — adjustRecord)
+      const rewritten = (!!(node as RasterNode).adjust!.edited || !same) && !!adjustmentBlocks((node as RasterNode).adjust!.adj);
+      if (!rewritten && (!same || ((tf.x !== link.x || tf.y !== link.y) && !shifted))) adjustMasks++;
       if (shifted || (sizeChanged && hasVectorMask(rec) && canShiftContent(b, rec))) action = "meta";
       if (fxChanged(node.effects, link) || node.name !== link.name || node.opacity !== link.opacity || node.visible !== link.visible || node.blendMode !== link.blend || node.locked !== link.locked || !!node.clip !== !!link.clip) action = "meta";
     } else if (node) {
@@ -1661,8 +1840,9 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
       // a moved smart object / shape / fill / text layer keeps its record: bounds and canvas anchors are shifted
       // (shiftContentBlock); a block of a layout that cannot be shifted rasterizes it, as before
       const shiftable = !background && hasContentBlocks(rec) && canShiftContent(b, rec);
-      if (rasterFingerprint(node) !== link.fp || !off || (moved && !shiftable && (hasContentBlocks(rec) || background)) || (sizeChanged && !shiftable && hasVectorMask(rec)) || (background && sizeChanged) || (background && (node.opacity !== link.opacity || node.blendMode !== link.blend))) action = "pixels";
-      else if (fxChanged(node.effects, link) || moved || (sizeChanged && hasVectorMask(rec)) || node.name !== link.name || node.opacity !== link.opacity || node.visible !== link.visible || node.blendMode !== link.blend || node.locked !== link.locked || !!node.clip !== !!link.clip || halfBackground(b, rec)) action = "meta";
+      // a layer mask added, painted, turned off or removed here (link.mfp: the mask as read, kept apart on import)
+      if (maskFingerprint((node as RasterNode).mask) !== (link.mfp ?? "") || rasterFingerprint(node) !== link.fp || !off || (moved && !shiftable && (hasContentBlocks(rec) || background)) || (sizeChanged && !shiftable && hasVectorMask(rec)) || (background && sizeChanged) || (background && (node.opacity !== link.opacity || node.blendMode !== link.blend))) action = "pixels";
+      else if (fxChanged(node.effects, link) || (link.opt !== undefined && blendOptionsKey(node) !== link.opt) || moved || (sizeChanged && hasVectorMask(rec)) || node.name !== link.name || node.opacity !== link.opacity || node.visible !== link.visible || node.blendMode !== link.blend || node.locked !== link.locked || !!node.clip !== !!link.clip || halfBackground(b, rec)) action = "meta";
     }
     const group = link.group ? page.groups?.find((g) => g.id === link.group) : undefined;
     if (group && groupChanged(group, link)) action = "meta";
@@ -1777,7 +1957,7 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
   // unedited: the original bytes — unless it carries orphaned linked files (an earlier version's leftovers that
   // Photoshop refuses), which only a rewrite removes
   const orphaned = opts.pruneLinkedFiles !== false && orphanLinks(b, L) > 0;
-  if (origOrder && !anyEdit && !sizeChanged && !orphaned) return { bytes: orig.slice(), method: "original", warnings };
+  if (origOrder && !anyEdit && !sizeChanged && !orphaned && !guidesChanged) return { bytes: orig.slice(), method: "original", warnings };
   const visual =
     sizeChanged ||
     !origOrder ||
@@ -1865,6 +2045,8 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
   let baked = 0, stripped = 0, bgConverted = 0, repaired = 0, retyped = 0, reinked = 0, turnedShapes = 0, resmart = 0;
   /** smart objects whose content was edited: linked-file entry id → the new embedded file */
   const smartReplace = new Map<string, LinkedData>();
+  /** linked-file entries of smart objects made here (new records) */
+  const newSmartEntries: Uint8Array[] = [];
   /** CMYK: the inks written for layers whose pixels were re-encoded (node id → planes), for the merged image */
   const inkLayers = new Map<string, LayerInks>();
   for (const p of plans) {
@@ -1880,13 +2062,21 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
     if (p.kind === "new") {
       if (flatMode) continue;
       // a copied adjustment layer has no record of its own to write (its settings live in the original's blocks)
+      // (an adjustment layer made here, or a copy of one whose kind is written here, gets a record of its own)
       if (p.node.type === "RASTER" && p.node.adjust) {
-        skipped.set(p.node.id, p.node.name);
+        const fresh = flatMode ? null : adjustRecord(p.node, mode, depth, psb, ++maxId);
+        if (!fresh) {
+          skipped.set(p.node.id, p.node.name);
+          continue;
+        }
+        records.push(fresh);
+        recOrigIndex.push(null);
         continue;
       }
       const px = await pixelsOf(p.node);
       if (skipped.has(p.node.id)) continue;
-      const name = p.node.type === "RASTER" ? p.node.name : `${p.node.name} (래스터로 굳힘)`;
+      const ty = textTyShBlock(p.node, psb);
+      const name = p.node.type === "RASTER" || ty ? p.node.name : `${p.node.name} (래스터로 굳힘)`;
       // CMYK: a new layer's inks are split from its colour (a pasted or duplicated layer's original inks are not
       // known here): the notice counts the raster ones, the merged image composites these inks
       const inks = mode === 4 && px ? cmykLayerInks(px, null, 0, 0, xf) : null;
@@ -1894,7 +2084,20 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
         inkLayers.set(p.node.id, inks);
         if (p.node.type === "RASTER" && inks.changed) reinked++;
       }
-      records.push(newRecord(name, px, p.node, mode, depth, psb, ++maxId, inks?.planes).parts);
+      const made = newRecord(name, px, p.node, mode, depth, psb, ++maxId, inks?.planes).parts;
+      if (ty) made.blocks.unshift(ty);
+      const so = newSmartParts(p.node, psb);
+      if (so) {
+        made.blocks.push(so.block);
+        newSmartEntries.push(so.entry);
+      }
+      const ms = p.node.type === "RASTER" && depth !== 32 ? layerMaskSpec(p.node) : null;
+      if (ms) {
+        const mp = maskParts(ms, depth, psb);
+        made.mask = mp.mask;
+        made.channels.push(mp.channel);
+      }
+      records.push(made);
       recOrigIndex.push(null);
       continue;
     }
@@ -1962,6 +2165,14 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
       records.push(parts);
       continue;
     }
+    // an adjustment layer whose settings or mask were changed here: written anew from them (psdAdjustWrite.ts)
+    if (node?.adjust && (node.adjust.edited || rasterFingerprint(node) !== link.fp)) {
+      const fresh = adjustRecord(node, mode, depth, psb, ++maxId);
+      if (fresh) {
+        records.push(fresh);
+        continue;
+      }
+    }
     if (action === "keep" || !node) {
       records.push(parts);
       continue;
@@ -1994,6 +2205,17 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
     if (node.locked !== link.locked) {
       const was = img.layers[rec.index]?.protect ?? 0;
       if (psdLocked(was) !== node.locked) replaceBlock("lspf", u32be(node.locked ? (was | 0x80000000) >>> 0 : 0));
+    }
+    // blending options changed here (the Layer Style dialog, the lock buttons): written as Photoshop keeps them
+    if (link.opt !== undefined && blendOptionsKey(node) !== link.opt) {
+      const was = img.layers[rec.index]?.protect ?? 0;
+      replaceBlock("lspf", u32be(((was & ~0x80000007) | lockBits(node)) >>> 0));
+      replaceBlock("iOpa", Uint8Array.from([Math.round(Math.max(0, Math.min(1, node.fillOpacity ?? 1)) * 255), 0, 0, 0]));
+      replaceBlock("infx", u32be(node.fillInterior ? 0x01000000 : 0));
+      replaceBlock("knko", u32be(node.knockout === "deep" ? 0x02000000 : node.knockout === "shallow" ? 0x01000000 : 0));
+      const r = defaultRanges(colorCh);
+      if (node.blendIf) r.set(node.blendIf.slice(0, r.length));
+      parts.ranges = r;
     }
     if (halfBackground(b, rec)) {
       // a layer with transparency still carrying the Background lock (written so by an earlier version):
@@ -2035,7 +2257,9 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
     }
     // ── pixels re-encoded
     const px = await pixelsOf(node);
-    const maskBaked = !!rec.maskInfo && rec.channels.some((c) => (c.id === -2 && !(rec.maskInfo!.flags & 2)) || (c.id === -3 && rec.maskInfo!.real && !(rec.maskInfo!.real.flags & 2)));
+    // a mask kept apart on import (link.mfp) is no baked mask: its channels go, the layer's own mask is written
+    const unbaked = link.mfp !== undefined;
+    const maskBaked = !unbaked && !!rec.maskInfo && rec.channels.some((c) => (c.id === -2 && !(rec.maskInfo!.flags & 2)) || (c.id === -3 && rec.maskInfo!.real && !(rec.maskInfo!.real.flags & 2)));
     const hadAlpha = rec.channels.some((c) => c.id === -1);
     const opaque = !!px && (() => {
       for (let i = 3; i < px.rgba.length; i += 4) if (px.rgba[i] !== 255) return false;
@@ -2070,7 +2294,14 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
     if (maskBaked) {
       parts.mask = new Uint8Array(0);
       baked++;
-    } else chans.push(...parts.channels.filter((c) => c.id < -1));
+    } else if (!node.mask && !unbaked) chans.push(...parts.channels.filter((c) => c.id < -1));
+    else parts.mask = new Uint8Array(0);
+    const ms = depth !== 32 ? layerMaskSpec(node) : null;
+    if (ms) {
+      const mp = maskParts(ms, depth, psb);
+      parts.mask = mp.mask;
+      chans.push(mp.channel);
+    }
     parts.channels = chans;
     parts.top = px?.top ?? 0;
     parts.left = px?.left ?? 0;
@@ -2234,7 +2465,9 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
       }
       return { ...px, rgba: g };
     };
-    const composeRgba = async (ns: SceneNode[], groups: LayerGroup[] | undefined, md: boolean, pxOf: (n: SceneNode) => Promise<LayerPixels | null>): Promise<Uint8Array> => {
+    const composeRgba = async (ns: SceneNode[], groups: LayerGroup[] | undefined, md: boolean, pxOf0: (n: SceneNode) => Promise<LayerPixels | null>): Promise<Uint8Array> => {
+      // a layer with a mask shows through it (the record holds every pixel and the mask)
+      const pxOf = async (n: SceneNode) => (n.type === "RASTER" && n.mask && !n.mask.off && !n.adjust ? shownPixels(n) : pxOf0(n));
       let out: Uint8Array;
       if (depth === 32 || hasStructure(ns, md ? groups : undefined) || ns.some((n) => n.visible && (n.effects?.length || (n.type === "RASTER" && n.adjust) || (n.fillOpacity ?? 1) < 1 || !!n.blendIf)) || (md && !!groups?.some((g) => g.effects?.length))) {
         // groups / clipping / layer effects / fill below 100 % / Blend If: Photoshop's compositing of the tree (effects drawn, as
@@ -2340,6 +2573,14 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
     if (L.resItems.length && L.resItems[L.resItems.length - 1].end < L.resources.end) ro.bytes(b.subarray(L.resItems[L.resItems.length - 1].end, L.resources.end));
     resources = ro.done();
   }
+  // saved paths (the 패스 panel): the file's path resources replaced by the page's (unchanged ones are written the same)
+  {
+    const key = (ps: readonly { name: string; contours: unknown }[]) => JSON.stringify(ps.map((p) => [p.name, p.contours]));
+    const same = !sizeChanged && key(page.paths ?? []) === key(readPaths(b, L.resItems, L.width, L.height, () => ""));
+    if (!same) resources = replacePathResources(resources, page.paths ?? [], outW, outH);
+  }
+  // ruler guides (resource 1032): the page's, when they differ from the file's
+  if (guidesChanged) resources = replaceGuidesResource(resources, page.guides);
 
   // ── layer and mask information
   const count = (L.mergedAlpha || (!L.records.length && outAlpha) ? -1 : 1) * records.length;
@@ -2359,6 +2600,15 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
   } else lm.u32(0);
   let placed = where === "main";
   const smartAfter = records.flatMap((r) => r.blocks.filter((raw) => raw.length >= 8 && SMART_KEYS.has(String.fromCharCode(raw[4], raw[5], raw[6], raw[7]))));
+  // smart objects made here: their entries join the file's lnk2 block (or a new one)
+  let newLinksPlaced = !newSmartEntries.length;
+  const lmPut = lm.bytes.bind(lm);
+  const lnkOut = (raw: Uint8Array, key: string, long: boolean) => {
+    if (newLinksPlaced || key !== "lnk2") return lmPut(raw);
+    const hdr = long ? 16 : 12;
+    lmPut(block("lnk2", concatBytes([raw.subarray(hdr), ...newSmartEntries]), psb));
+    newLinksPlaced = true;
+  };
   for (const blk of L.globalBlocks) {
     if (opts.dropContentCredentials && blk.key === "CAI ") continue;
     // the document-wide text engine copy (Txt2) is what Photoshop reads first: after a text edit it would bring the
@@ -2369,7 +2619,7 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
       const prune = opts.pruneLinkedFiles !== false;
       const rb = rebuildLinkedBlock(b, blk, psb, smartReplace, prune ? (id) => mentions(smartAfter, id) : undefined);
       if (rb && (rb.replaced || rb.dropped)) {
-        lm.bytes(rb.bytes);
+        lnkOut(rb.bytes, blk.key, psb && LONG_KEYS.has(blk.key));
         if (rb.dropped) warnings.push("어떤 고급 개체도 쓰지 않는 연결 파일 데이터를 정리했습니다");
         continue;
       }
@@ -2377,7 +2627,7 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
     if (LINK_KEYS.has(blk.key) && opts.pruneLinkedFiles !== false) {
       const pruned = pruneLinks(b, blk, smartAfter);
       if (pruned) {
-        lm.bytes(pruned);
+        lnkOut(pruned, blk.key, psb && LONG_KEYS.has(blk.key));
         warnings.push("어떤 고급 개체도 쓰지 않는 연결 파일 데이터를 정리했습니다");
         continue;
       }
@@ -2390,8 +2640,10 @@ async function surgery(doc: OmwDocument, page: Page, L: PsdLayout, orig: Uint8Ar
       placed = true;
       continue;
     }
-    lm.bytes(b.subarray(blk.start, blk.end));
+    if (LINK_KEYS.has(blk.key)) lnkOut(b.subarray(blk.start, blk.end), blk.key, psb && LONG_KEYS.has(blk.key));
+    else lm.bytes(b.subarray(blk.start, blk.end));
   }
+  if (!newLinksPlaced) lm.bytes(block("lnk2", concatBytes(newSmartEntries), psb));
   if (!placed && records.length) lm.bytes(block(where, content, psb));
   lm.bytes(b.subarray(L.globalTail.start, L.globalTail.end));
   const lmBytes = lm.done();

@@ -293,7 +293,7 @@ describe("DOCX: lineRule auto ↔ the Word multiple, exactly", () => {
     expect(docXml(pageOf([P("가나다", {}, { lineSpacing: 1.69, wordLine: { line: 259, lineSpacing: 1.69 } })]))).toContain('w:line="259" w:lineRule="auto"');
   });
   it("Office Surgeon: maps before model 3 compare the original in their older shape", () => {
-    expect(MODEL_VERSION).toBe(9); // 4: heading styles, 5: pictures, 6: Word styles, 7: notes, 8: empty line after a table, 9: comments and tracked changes (common.ts MODEL_WORD_MULTIPLE = 3 still decides this view)
+    expect(MODEL_VERSION).toBe(11); // 4: heading styles, 5: pictures, 6: Word styles, 7: notes, 8: empty line after a table, 9: comments and tracked changes, 10: named paragraph styles, 11: shapes and text boxes (common.ts MODEL_WORD_MULTIPLE = 3 still decides this view)
     expect(MODEL_WORD_MULTIPLE).toBe(3);
     const read = withWordMultiple(P("가나다"), 259 / 240);
     const old = P("가나다", {}, { lineSpacing: 1.69, wordLine: { line: 259, lineSpacing: 1.69 } });

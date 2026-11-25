@@ -259,7 +259,12 @@ export function NotesPane() {
     if (dirty.current && id) setNotes(id, val);
     dirty.current = false;
   };
-  useEffect(() => () => flush());
+  // what is typed is kept when the pane goes away or another slide is shown — only then. This cleanup used to run
+  // after every render (no dependency list): each keystroke wrote the text of the render before it into the slide,
+  // which reset the box to that older text and dropped letters ("speaker note" → "sekrnt", QA 2026-11-24 #1)
+  const latest = useRef(flush);
+  latest.current = flush;
+  useEffect(() => () => latest.current(), [id]);
   if (!page || page.kind !== "SLIDE") return null;
   return (
     <div className="notes-pane" style={{ height: h }}>

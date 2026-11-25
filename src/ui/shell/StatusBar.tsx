@@ -10,7 +10,7 @@ import { useSlideUI } from "../slideActions";
 import { useUI } from "./uiStore";
 import { useAids, gridFor, unitFor, toggleGrid, toggleGuides, toggleRulers, toggleSnap } from "../aids";
 import { PX_PER, defaultGrid, formatLength, fromUnit, toUnit } from "../../core/units";
-import { localBounds, nodeBounds } from "../../core/loom";
+import { localBounds, nodeBounds, rasterContentBounds } from "../../core/loom";
 import { unionRect, type Rect } from "../../core/geom";
 import { boxSize } from "../../core/transform";
 import { useXform } from "../xform";
@@ -120,7 +120,7 @@ function SelInfo({ page }: { page: Page }) {
   }
   if (nodes.length === 1) {
     const n = nodes[0];
-    const sz = boxSize({ t: n.transform, lb: localBounds(n) });
+    const sz = boxSize({ t: n.transform, lb: n.type === "RASTER" && !n.crop && !n.adjust ? rasterContentBounds(n) : localBounds(n) });
     return (
       <span className="sb-item sb-num sb-sel" data-tip={t("shell.sel.sizeTip")}>
         {formatLength(sz.w, u)} × {formatLength(sz.h, u)}

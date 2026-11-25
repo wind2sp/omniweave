@@ -105,18 +105,28 @@ export function cloneNodes(nodes: SceneNode[], dx: number, dy: number): SceneNod
   });
 }
 
-/** Paste the clipboard onto the current page (offset a step, or in place) as one undo step; the copies are selected. */
-export function pasteClipboard(inPlace = false): number {
+/**
+ * Paste the clipboard onto the current page (offset a step, or in place) as one undo step; the copies are selected.
+ * `at` (Illustrator's Paste in Front / Back, Ctrl+F / Ctrl+B): in place, directly above the topmost selected object
+ * (or below the lowest one) in its layer — on top / at the bottom of the page with nothing selected. `pageId`: onto
+ * that page instead of the current one (Paste on All Artboards).
+ */
+export function pasteClipboard(inPlace = false, at?: "front" | "back", pageId?: string): number {
   const s = S();
-  const page = currentPage();
+  const page = pageId ? s.doc.pages.find((p) => p.id === pageId) : currentPage();
   if (!page || !clip?.nodes.length) {
     s.notify(t("menu.toast.nothingToPaste"));
     return 0;
   }
+  if (at) inPlace = true;
   if (!inPlace) clip.pastes++;
   const d = inPlace ? 0 : PASTE_STEP * clip.pastes;
   // placed on top of the stack: out of groups, clipped only onto a pasted layer
   const copies = detachCopies(cloneNodes(clip.nodes, d, d));
+  // in front of / behind the selection: in its layer, next to it in the stack
+  const sel = at && !pageId ? page.nodes.filter((n) => s.selection.includes(n.id)) : [];
+  const anchor = at === "front" ? sel[sel.length - 1] : at === "back" ? sel[0] : undefined;
+  if (anchor) for (const c of copies) c.groupId = anchor.groupId;
   // the clipboard outlives the document: an asset id this document already uses for other bytes gets a new id
   const assets: Record<string, AssetRef> = {};
   const renamed = new Map<string, string>();
@@ -134,12 +144,31 @@ export function pasteClipboard(inPlace = false): number {
       if (c.type === "MEDIA" && c.posterAssetId && renamed.has(c.posterAssetId)) c.posterAssetId = renamed.get(c.posterAssetId)!;
       if ((c.type === "RASTER" || c.type === "IMAGE") && c.matte && renamed.has(c.matte.assetId)) c.matte.assetId = renamed.get(c.matte.assetId)!;
     }
-  s.commit(t("menu.hist.paste"), (doc) => {
+  s.commit(t(at === "front" ? "menu.hist.pasteFront" : at === "back" ? "menu.hist.pasteBack" : "menu.hist.paste"), (doc) => {
     for (const [id, a] of Object.entries(assets)) if (!doc.assets[id]) doc.assets[id] = a;
-    draftPage(doc, page.id)?.nodes.push(...(copies as any));
+    const pg = draftPage(doc, page.id);
+    if (!pg) return;
+    const i = anchor ? pg.nodes.findIndex((n) => n.id === anchor.id) : -1;
+    if (at === "back") pg.nodes.splice(i >= 0 ? i : 0, 0, ...(copies as any));
+    else if (at === "front" && i >= 0) pg.nodes.splice(i + 1, 0, ...(copies as any));
+    else pg.nodes.push(...(copies as any));
   });
-  S().set({ selection: copies.map((c) => c.id), editingTextId: null });
+  if (!pageId) S().set({ selection: copies.map((c) => c.id), editingTextId: null });
   return copies.length;
+}
+
+/** Illustrator's Paste on All Artboards (Ctrl+Alt+Shift+V): in place on every design page of the document. */
+export function pasteOnAllArtboards(): number {
+  const s = S();
+  if (!clip?.nodes.length) {
+    s.notify(t("menu.toast.nothingToPaste"));
+    return 0;
+  }
+  const cur = currentPage();
+  const pages = s.doc.pages.filter((p) => p.kind === "DESIGN" || p.id === cur?.id);
+  let n = 0;
+  for (const p of pages) n += pasteClipboard(true, undefined, p.id === cur?.id ? undefined : p.id);
+  return n;
 }
 
 /**
@@ -422,6 +451,7 @@ export function mergeDown() {
     const lo = pg.nodes.find((n) => n.id === lower.id) as RasterNode | undefined;
     if (!lo) return;
     lo.tiles = tiles as any;
+    delete lo.mask;
     if (!ontoBase) lo.opacity = 1;
     pg.nodes = pg.nodes.filter((n) => n.id !== upper.id);
     pg.animations = pg.animations.filter((a) => a.targetNodeId !== upper.id);

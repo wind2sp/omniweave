@@ -53,7 +53,8 @@ const registry = new Map<string, Set<string>>();
 export function registerDerived(assetHash: string, pages: Page[]) {
   let s = registry.get(assetHash);
   if (!s) registry.set(assetHash, (s = new Set()));
-  for (const p of pages) for (const n of p.nodes) if (n.type === "RASTER") for (const t of Object.values(n.tiles)) s.add(t.hash);
+  // (a layer with a layer mask kept apart: its tiles are not what the recipes derive — stored as pixels)
+  for (const p of pages) for (const n of p.nodes) if (n.type === "RASTER" && !n.mask) for (const t of Object.values(n.tiles)) s.add(t.hash);
 }
 
 /** Same, from tile hashes already known (an opened file's derived tiles). */
@@ -71,7 +72,9 @@ export function derivePsdTiles(bytes: Uint8Array, recipe: string = PSD_RECIPE): 
   const out = new Map<string, Uint8ClampedArray>();
   const hash = hashBytes(bytes);
   const legacy = !derivesAsImported(recipe, bytes);
-  const read = () => importPsdPage(bytes, "derive.psd", "derive", { id: "derive", hash });
+  // (masks baked, as every recipe decoded them: a layer whose mask the import keeps apart is stored as pixels instead —
+  // registerDerived leaves it out)
+  const read = () => importPsdPage(bytes, "derive.psd", "derive", { id: "derive", hash }, { keepMasks: false });
   const r = legacy ? withoutCmykManagement(read) : read();
   // a CMYK file that blends: keep its channels while it is decoded anyway (core/image/cmykComposite.ts) — not for
   // a colour-managed file's tiles decoded the old way, which the channels (keyed by today's tiles) do not match
