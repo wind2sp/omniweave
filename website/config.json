@@ -2,13 +2,13 @@
   "_help": "홈페이지 설정. 수정 후 이 파일만 다시 올리면 됩니다. 자세한 설명은 README.txt [config.json] 참고.",
   "siteUrl": "",
   "copyright": "© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · wind2sp@9rowpar.com",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "released": true,
-  "releaseDate": "2026-11-23",
+  "releaseDate": "2026-11-26",
   "notes": [
-    "지우개·배경 지우기·캔버스 맞춤 등 실제로 써 보며 찾은 문제 수정",
-    "SVG·AI 그레이디언트 도형 편집, PSD 투명 바탕, 문서 단 나누기",
-    "DOCX·HWPX 머리말 보존, PDF 저장·찾기·OCR, PPTX 애니메이션 저장"
+    "실제 화면 시험 900여 개(PC·휴대폰·Android·설치본)를 통과하며 매일 쓰는 기능을 채움",
+    "Excel 셀 서식·피벗·조건부 서식, 문서 캡션·상호 참조·문서 비교, 슬라이드 디자인 탭·SmartArt",
+    "PDF 가리기·양식·PDF/A, 이미지 레이어 스타일·배경 지우기 개선, 휴대폰 화면 새 단장"
   ],
   "repoPublic": true,
   "repoUrl": "https://github.com/wind2sp/omniweave",
