@@ -2,13 +2,13 @@
   "_help": "홈페이지 설정. 수정 후 이 파일만 다시 올리면 됩니다. 자세한 설명은 README.txt [config.json] 참고.",
   "siteUrl": "",
   "copyright": "© 2026 NINEROW partners Co., Ltd. and Omniweave contributors · wind2sp@9rowpar.com",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "released": true,
   "releaseDate": "2026-11-26",
   "notes": [
-    "실제 화면 시험 900여 개(PC·휴대폰·Android·설치본)를 통과하며 매일 쓰는 기능을 채움",
-    "Excel 셀 서식·피벗·조건부 서식, 문서 캡션·상호 참조·문서 비교, 슬라이드 디자인 탭·SmartArt",
-    "PDF 가리기·양식·PDF/A, 이미지 레이어 스타일·배경 지우기 개선, 휴대폰 화면 새 단장"
+    "배경 지우기에 고품질(사람·동물) 방식 추가 — PC, 처음 쓸 때 모델 한 번 받기",
+    "휴대폰 웹판이 새 판으로 스스로 바뀌고, Chrome '데스크톱 사이트'에서도 제 크기로 보임",
+    "휴대폰 웹판은 최근 파일 목록을 두지 않음(Android 앱·PC는 그대로)"
   ],
   "repoPublic": true,
   "repoUrl": "https://github.com/wind2sp/omniweave",
