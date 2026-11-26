@@ -77,7 +77,7 @@ export const MENUS: { id: string; entries: Entry[] }[] = [
   },
   {
     id: "image",
-    entries: [{ h: "menu.head.layers" }, "image.newLayer", "image.duplicateLayer", "image.deleteLayer", "image.mergeDown", "image.groupLayers", "image.ungroupLayers", "image.clippingMask", "image.rasterize", "image.editSmart", "image.brush", "image.eraser", "-", "image.removeBackground", "image.removeBackgroundDialog", "image.upscale", "-", { gen: "imageOps" }],
+    entries: [{ h: "menu.head.layers" }, "image.newLayer", "image.duplicateLayer", "image.deleteLayer", "image.mergeDown", "image.groupLayers", "image.ungroupLayers", "image.clippingMask", "image.rasterize", "image.editSmart", "image.brush", "image.eraser", "-", "image.removeBackground", "image.removeBackgroundHq", "image.removeBackgroundDialog", "image.upscale", "-", { gen: "imageOps" }],
   },
   { id: "text", entries: ["insert.text", "-", "text.bold", "text.italic", "text.underline", "format.paragraph", "-", "insert.symbol", "edit.find", "edit.replace", "text.wordCount", "review.spelling", "-", "text.editPdf", "text.fillPdfForm", "text.pdfHighlight", "text.pdfUnderline", "text.pdfStrike", "text.pdfNote", "text.pdfSign"] },
   {
@@ -132,7 +132,7 @@ export const IMAGE_MENUS: { id: string; entries: Entry[] }[] = [
       "object.flipH", "object.flipV", "-",
       "image.cropCanvas", { cmd: "object.crop", label: "topui.menu.cropLayer" }, "-",
       { sub: "topui.menu.adjust", icon: "sliders", entries: [{ gen: "adjust" }, "-", "image.desaturate"] },
-      "-", "image.removeBackground", "image.removeBackgroundDialog",
+      "-", "image.removeBackground", "image.removeBackgroundHq", "image.removeBackgroundDialog",
     ],
   },
   {
@@ -234,7 +234,7 @@ export function commandItem(c: Command): MenuItem {
   const on = enabled(c);
   // a greyed command says why on hover (the item stays hoverable)
   const why = on ? null : c.whyNot?.() ?? null;
-  return { label: commandLabel(c), icon: checked === undefined ? c.icon : undefined, kbd: c.kbd, checked, disabled: !on, onSelect: c.run, ...(why ? { tip: why } : {}) };
+  return { label: commandLabel(c), icon: checked === undefined ? c.icon : undefined, kbd: c.kbd, checked, disabled: !on, onSelect: c.run, ...(c.hint ? { hint: c.hint() } : {}), ...(why ? { tip: why } : {}) };
 }
 
 /** Menu items of `entries`, built when the menu opens (enabled / checked state is read then). */

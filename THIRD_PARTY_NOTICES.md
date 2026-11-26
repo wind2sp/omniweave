@@ -1015,6 +1015,36 @@ Background removal of person photos bundles the weights of **MODNet** (Zhanghan 
 
 **Changes (Apache-2.0 §4(b)):** converted once by `scripts/convert-modnet.mjs` into Omniweave's LWT graph format (`models/matte/modnet.lwt`): the ONNX file read as data only; shape sub-graphs folded, the Relu / Clip after a convolution fused into it, the squeeze-and-excitation matrix products turned into 1×1 convolutions; convolution weights stored as 8-bit integers with one single-precision scale per output channel. No retraining. The network is run by Omniweave's own code (Loom Infer); no ONNX Runtime or other inference library is shipped. The license text (the Apache License 2.0, as above for U²-Netp) ships next to the weights (`models/matte/LICENSE`).
 
+### BiRefNet-lite (MIT License)
+
+The optional high-quality background removal (Image › Remove Background (High Quality · People, Animals), PC only) uses the weights of **BiRefNet** with the Swin-T backbone (Peng Zheng et al., *Bilateral Reference for High-Resolution Dichotomous Image Segmentation*, CAAI AIR 2024), from https://github.com/ZhengPeng7/BiRefNet, licensed under the MIT License. The file used is the official release v1 export `BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx` (224,005,088 bytes). These weights are **not** in the installer, the portable build or the web build: they are downloaded once, when the user first chooses that option, from https://wind2sp.github.io/omniweave/models/birefnet/birefnet-int8.lwt (46,082,436 bytes, SHA-256 `98af9209821c8d98a328f466d88455be69f211360ff91f90dce4724797f623d4`, checked before use), where the license text below is published next to the file (`LICENSE`).
+
+**Changes:** converted by `scripts/convert-birefnet.mjs` into Omniweave's LWT graph format: the ONNX file read as data only; BatchNorm folded into the preceding convolutions, the last 1×1 convolution folded into the two 3×3 convolutions before it, weights quantized to 8-bit integers with one single-precision scale per output channel. No retraining. The network is run by Omniweave's own code (Loom Infer); no BiRefNet, PyTorch or ONNX Runtime code is run or shipped.
+
+```text
+MIT License
+
+Copyright (c) 2024 ZhengPeng
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### PP-OCRv5 text detection and Korean recognition (Apache License 2.0)
 
 Text recognition (OCR) bundles the weights of **PP-OCRv5_mobile_det** and **korean_PP-OCRv5_mobile_rec** by the PaddlePaddle Authors (PaddleOCR, https://github.com/PaddlePaddle/PaddleOCR), from the official model repositories https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det and https://huggingface.co/PaddlePaddle/korean_PP-OCRv5_mobile_rec (pinned revisions, file sizes and SHA-256 in `tests/fixtures/ocr/models-manifest.json`), licensed under the Apache License 2.0. The character list of the recognizer comes from the same repository.

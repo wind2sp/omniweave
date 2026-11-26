@@ -7,7 +7,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DICTS, LANGS, useLang, useT, t, type Lang } from "../../i18n";
 import { isTauri, openFiles, type OpenedFile } from "../../io/platform";
-import { switchLayout } from "../../web/phone";
+import { desktopSiteZoom, switchLayout } from "../../web/phone";
 import { setPasswordAsker } from "../../io/crypto/session";
 import { compressPdf, formatBytes, imagesToPdf, mergePdfs } from "../../io/tools/pdfTools";
 import { canvasRecompressor, compressImage, pdfToJpgs, sniffMime, toJpg, zipFiles } from "../../io/tools/imageTools";
@@ -22,6 +22,7 @@ import { ScanEditor, renderScanPage, scanPageFrom, type ScanPage } from "./scan"
 import { loadSignatures } from "./markup";
 import { useBackClose } from "./back";
 import { EDITOR_ONLY_EXTS, canEdit } from "./openDoc";
+import { PhoneUpdate } from "./phoneUpdate";
 import "./mobile.css";
 import "./theme.css";
 
@@ -197,6 +198,12 @@ function applyTheme(theme: Theme) {
   document.documentElement.style.colorScheme = dark ? "dark" : "light";
 }
 
+/** Recent files only in the Android app, which reopens a file by its content:// grant. A phone browser cannot reopen a
+ *  picked file (no file handles), and keeping copies of the files was decided against (2026-11-26): the phone web
+ *  screen keeps no recent list at all. */
+const KEEPS_RECENT = isTauri;
+const RECENT_COPIES_DB = "omniweave-recent-files";
+
 export function MobileApp() {
   const tr = useT();
   const lang = useLang((s) => s.lang);
@@ -206,7 +213,15 @@ export function MobileApp() {
   const [editing, setEditing] = useState<MobileDoc | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [recent, setRecent] = useState<RecentItem[]>(() => loadRecent());
+  const [recent, setRecent] = useState<RecentItem[]>(() => (KEEPS_RECENT ? loadRecent() : []));
+  // the phone web screen: forget a list (names) an earlier version kept, and the copies a test build kept
+  useEffect(() => {
+    if (KEEPS_RECENT) return;
+    if (loadRecent().length) clearRecent();
+    try {
+      indexedDB?.deleteDatabase(RECENT_COPIES_DB);
+    } catch {}
+  }, []);
   const [query, setQuery] = useState("");
   const [version, setVersion] = useState("");
   const [theme, setTheme] = useState<Theme>(readTheme);
@@ -265,6 +280,22 @@ export function MobileApp() {
   }, []);
   // back on another tab goes to the home tab first; on the home tab it leaves the app (Android's own behaviour)
   useBackClose(tab !== "home" && !doc && !editing && !scanPages, () => setTab("home"));
+  // the browser's desktop-site mode lays the page out ~980 px wide: draw the phone screen at the phone's real width
+  // (not on the PC feature screen, which is meant to be desktop width)
+  useEffect(() => {
+    if (isTauri || desk) return;
+    const root = document.documentElement;
+    const fit = () => {
+      const z = desktopSiteZoom(window.innerWidth, window.screen?.width ?? 0);
+      root.style.zoom = z === 1 ? "" : String(z);
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      root.style.zoom = "";
+    };
+  }, [desk]);
   useEffect(() => {
     applyTheme(theme);
     if (theme !== "system" || typeof matchMedia !== "function") return;
@@ -282,8 +313,10 @@ export function MobileApp() {
   const show = useCallback((d: MobileDoc, path: string | null = null) => {
     d = { ...d, name: nameWithExt(d.name, d.bytes) };
     if (d.origin !== "result") {
-      setRecent(addRecent({ name: d.name, size: d.bytes.length, path, at: Date.now(), fp: fingerprint(d.bytes) }));
-      void persistUri(path);
+      if (KEEPS_RECENT) {
+        setRecent(addRecent({ name: d.name, size: d.bytes.length, path, at: Date.now(), fp: fingerprint(d.bytes) }));
+        void persistUri(path);
+      }
     }
     const shown = { ...d, path: d.path ?? path, key: ++docSeq };
     setEditing(null);
@@ -627,6 +660,7 @@ export function MobileApp() {
   return (
     <div className="m-app">
       <input ref={scanInput} type="file" accept="image/*" capture="environment" multiple hidden onChange={onScanInput} />
+      {!isTauri && <PhoneUpdate idle={!doc && !editing && !(scanPages && scanPages.length > 0) && !busy} />}
       {scanPages && scanPages.length > 0 ? (
         <ScanEditor
           pages={scanPages}
@@ -651,7 +685,8 @@ export function MobileApp() {
             onSavedFile={(d) => {
               // the viewer under the editor shows (and shares) the saved file; the recent list has it too
               if (doc) setDoc({ ...d, key: ++docSeq });
-              setRecent(addRecent({ name: d.name, size: d.bytes.length, path: d.path ?? null, at: Date.now(), fp: fingerprint(d.bytes), saved: Date.now() }));
+              if (KEEPS_RECENT)
+                setRecent(addRecent({ name: d.name, size: d.bytes.length, path: d.path ?? null, at: Date.now(), fp: fingerprint(d.bytes), saved: Date.now() }));
             }}
           />
         </Suspense>
@@ -852,7 +887,7 @@ export function MobileApp() {
             )}
           </main>
           <nav className="m-nav">
-            {(["home", "files", "tools", "about"] as Tab[]).map((id) => (
+            {((KEEPS_RECENT ? ["home", "files", "tools", "about"] : ["home", "tools", "about"]) as Tab[]).map((id) => (
               <button key={id} className={tab === id ? "on" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}>
                 <Icon name={({ home: "home", files: "files", tools: "tools", about: "settings" } as const)[id]} />
                 {tr(id === "tools" ? "mobile.tools" : "mobile." + id)}

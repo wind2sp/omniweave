@@ -48,11 +48,9 @@ async function fetchVersion(): Promise<WebVersion | null> {
 
 type St = null | { kind: "new"; version?: string } | { kind: "stale" };
 
-/** The pill in the title bar (browser only; renders nothing until a new build is found). */
-export function WebUpdatePill() {
-  const t = useT();
+/** A new build of the web app: found by version.json, by the service worker, or by a lazy chunk that is gone. */
+export function useWebUpdate(): St {
   const [st, setSt] = useState<St>(null);
-  const [busy, setBusy] = useState(false);
   const { updateReady } = usePwa();
 
   useEffect(() => {
@@ -93,7 +91,14 @@ export function WebUpdatePill() {
     };
   }, []);
 
-  const shown: St = st ?? (updateReady ? { kind: "new" } : null);
+  return st ?? (updateReady ? { kind: "new" } : null);
+}
+
+/** The pill in the title bar (browser only; renders nothing until a new build is found). */
+export function WebUpdatePill() {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const shown = useWebUpdate();
   if (!shown) return null;
   const tip = shown.kind === "new" && shown.version ? `${t("web.update.tip", { version: shown.version })} — ${t("web.update.keep")}` : t("web.update.keep");
   return (
@@ -112,4 +117,25 @@ export function WebUpdatePill() {
       <span className="update-pill-label">{t("web.update.reload")}</span>
     </button>
   );
+}
+
+const AUTO_KEY = "omw.phoneAutoUpdate";
+const AUTO_GAP_MS = 2 * 60 * 1000;
+
+/** Whether the phone screen may hand over to the new build by itself now (not again right after doing so). */
+export function mayAutoUpdate(now = Date.now(), store: Pick<Storage, "getItem" | "setItem"> | null = safeSession()): boolean {
+  try {
+    const last = Number(store?.getItem(AUTO_KEY) ?? 0);
+    if (last && now - last < AUTO_GAP_MS) return false;
+    store?.setItem(AUTO_KEY, String(now));
+  } catch {}
+  return true;
+}
+
+function safeSession(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
 }

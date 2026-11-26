@@ -1,7 +1,8 @@
 // Browser (web) app: update check by version.json, other tabs at startup, the version.json the build writes.
 import { describe, expect, it } from "vitest";
-import { currentBuild, isNewBuild } from "../src/ui/shell/WebUpdate";
+import { currentBuild, isNewBuild, mayAutoUpdate } from "../src/ui/shell/WebUpdate";
 import { otherPagesOpen } from "../src/io/journal";
+import { desktopSiteZoom } from "../src/web/phone";
 import { webVersion } from "../vite.config";
 import { DICTS } from "../src/i18n";
 
@@ -69,5 +70,37 @@ describe("other browser tabs at startup", () => {
   it("no Web Locks (old browser, tests): false as before", async () => {
     expect(await otherPagesOpen(undefined)).toBe(false);
     expect(await otherPagesOpen({ query: async () => Promise.reject(new Error("x")), request: () => Promise.resolve() })).toBe(false);
+  });
+});
+
+describe("phone web update", () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
+  };
+  it("hands over by itself once, not again right after (no reload loop), and again later", () => {
+    const st = mem();
+    expect(mayAutoUpdate(1_000_000, st)).toBe(true);
+    expect(mayAutoUpdate(1_000_000 + 30_000, st)).toBe(false);
+    expect(mayAutoUpdate(1_000_000 + 3 * 60_000, st)).toBe(true);
+  });
+  it("works without session storage", () => {
+    expect(mayAutoUpdate(5, null)).toBe(true);
+  });
+  it("has the phone texts in every language", () => {
+    for (const d of Object.values(DICTS)) {
+      expect(d["web.update.phone"]).toBeTruthy();
+      expect(d["web.update.applying"]).toBeTruthy();
+    }
+  });
+});
+
+describe("phone screen in the browser's desktop-site mode", () => {
+  it("zooms the phone screen back to the phone's width only when the layout is clearly wider", () => {
+    expect(desktopSiteZoom(980, 384)).toBeCloseTo(2.552, 3);
+    expect(desktopSiteZoom(384, 384)).toBe(1);
+    expect(desktopSiteZoom(412, 384)).toBe(1);
+    expect(desktopSiteZoom(0, 384)).toBe(1);
+    expect(desktopSiteZoom(980, 0)).toBe(1);
   });
 });

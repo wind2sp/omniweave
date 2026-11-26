@@ -33,7 +33,9 @@ export interface GraphMeta {
   mean: [number, number, number];
   std: [number, number, number];
   nodes: GNode[];
-  weights: Record<string, { shape: number[]; w: [number, number]; s?: [number, number]; f32?: boolean }>;
+  /** f32: plain floats; s: int8 (one f32 scale per row) — or with q4, 4-bit codes (two per byte, low nibble first, value
+   *  code − 8) with one f32 scale per `g` consecutive values; neither: fp16 */
+  weights: Record<string, { shape: number[]; w: [number, number]; s?: [number, number]; f32?: boolean; q4?: boolean; g?: number }>;
   /** recognition models: CTC classes 1..n (0 = blank; n+1 = space) */
   dict?: string[];
 }
@@ -115,7 +117,15 @@ export function parseGraph(bytes: Uint8Array): GraphModel {
     if (checkShape(m.shape, name) !== n) bad("weight size of " + name);
     let d: Float32Array;
     if (m.f32) d = new Float32Array(bytes.buffer.slice(at(m.w[0], n * 4), at(m.w[0], n * 4) + n * 4));
-    else if (m.s) {
+    else if (m.q4) {
+      // 4-bit weights, one scale per group of g values
+      const g = m.g ?? 0, ms: [number, number] = m.s ?? [-1, -1];
+      if (!Array.isArray(ms) || !isIdx(ms[0]) || !isIdx(ms[1]) || !isIdx(g) || g < 1 || ms[1] !== Math.ceil(n / g)) bad("weight scales of " + name);
+      const q = new Uint8Array(bytes.buffer, at(m.w[0], Math.ceil(n / 2)), Math.ceil(n / 2));
+      const sc = new Float32Array(bytes.buffer.slice(at(ms[0], ms[1] * 4), at(ms[0], ms[1] * 4) + ms[1] * 4));
+      d = new Float32Array(n);
+      for (let i = 0; i < n; i++) d[i] = (((q[i >> 1] >> ((i & 1) * 4)) & 15) - 8) * sc[(i / g) | 0];
+    } else if (m.s) {
       if (!Array.isArray(m.s) || !isIdx(m.s[0]) || !isIdx(m.s[1]) || m.s[1] < 1 || n % m.s[1]) bad("weight scales of " + name);
       const q = new Int8Array(bytes.buffer, at(m.w[0], n), n);
       const sc = new Float32Array(bytes.buffer.slice(at(m.s[0], m.s[1] * 4), at(m.s[0], m.s[1] * 4) + m.s[1] * 4));
@@ -239,6 +249,16 @@ function transpose(x: Tensor, perm: number[]): Tensor {
   return o;
 }
 
+/** erf, Abramowitz & Stegun 7.1.26 (|error| < 1.5e-7; the WebGPU shader uses the same polynomial) */
+export function erf(x: number): number {
+  const s = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * x);
+  return s * (1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x));
+}
+/** exact GELU (PyTorch nn.GELU(), the ONNX export's Div / Erf / Add / Mul / Mul chain): x · ½ (1 + erf(x / √2)) */
+const gelu = (v: number) => v * 0.5 * (1 + erf(v * Math.SQRT1_2));
+
 function act(d: Float32Array, kind: string | undefined, a?: [number, number], post?: [number, number]) {
   if (kind === "relu") for (let i = 0; i < d.length; i++) d[i] = d[i] > 0 ? d[i] : 0;
   else if (kind === "relu6") for (let i = 0; i < d.length; i++) d[i] = d[i] > 0 ? (d[i] < 6 ? d[i] : 6) : 0;
@@ -252,7 +272,7 @@ function act(d: Float32Array, kind: string | undefined, a?: [number, number], po
   else if (kind === "hardsigmoid") {
     const [sl, of] = a ?? [1 / 6, 0.5];
     for (let i = 0; i < d.length; i++) d[i] = Math.min(1, Math.max(0, d[i] * sl + of));
-  }
+  } else if (kind === "gelu") for (let i = 0; i < d.length; i++) d[i] = gelu(d[i]);
   if (post) for (let i = 0; i < d.length; i++) d[i] = d[i] * post[0] + post[1];
 }
 
@@ -741,6 +761,266 @@ function concat(xs: Tensor[], axis: number): Tensor {
   return o;
 }
 
+// ---------- BiRefNet (Swin-T backbone, deformable ASPP decoder) — scripts/convert-birefnet.mjs ----------
+// The backbone runs in NCHW like every other graph here: Swin's token-wise linear layers are 1×1 convs (the conv pool,
+// the WebAssembly kernels and the per-channel int8 weights all apply as they are), its LayerNorm is a per-pixel norm
+// over the channels (ln_c), the window attention one op (win_attn) on the qkv conv's output.
+
+/** LayerNorm over the channel axis of NCHW (Swin's token LayerNorm with the tokens kept as pixels). */
+export function layerNormC(x: Tensor, g: Float32Array, b: Float32Array, eps: number): Tensor {
+  const C = x.s[1], HW = x.d.length / C, xd = x.d;
+  const mean = new Float64Array(HW), vr = new Float64Array(HW);
+  for (let c = 0; c < C; c++) for (let p = 0, o = c * HW; p < HW; p++) mean[p] += xd[o + p];
+  for (let p = 0; p < HW; p++) mean[p] /= C;
+  for (let c = 0; c < C; c++)
+    for (let p = 0, o = c * HW; p < HW; p++) {
+      const v = xd[o + p] - mean[p];
+      vr[p] += v * v;
+    }
+  for (let p = 0; p < HW; p++) vr[p] = 1 / Math.sqrt(vr[p] / C + eps);
+  const o = T(x.s.slice()), od = o.d;
+  for (let c = 0; c < C; c++) {
+    const gc = g[c], bc = b[c];
+    for (let p = 0, q = c * HW; p < HW; p++) od[q + p] = (xd[q + p] - mean[p]) * vr[p] * gc + bc;
+  }
+  return o;
+}
+
+/** Swin's shifted-window mask region of a row / column of the shifted, padded frame (3 bands: before the last window,
+ *  the last window up to the shift, the shift) */
+const swinRegion = (s: number, n: number, ws: number, shift: number) => (s < n - ws ? 0 : s < n - shift ? 1 : 2);
+
+export interface WinAttnArgs {
+  heads: number;
+  ws: number;
+  shift: number;
+  scale: number;
+}
+
+/**
+ * Swin window attention on the qkv conv's output (Swin-Transformer-Object-Detection's SwinTransformerBlock, the part
+ * between norm1 and proj): `qkv` [1, 3·nh·d, H, W] holds the q, k and v channels of heads [h0, h0 + nh) (all heads:
+ * the qkv conv's output as it is). The picture is padded at the bottom / right to whole windows (padded tokens carry
+ * the qkv bias — the original pads with zeros before the qkv linear layer), rolled up / left by `shift`, cut in ws × ws
+ * windows; per window and head softmax(scale · q kᵀ + relative position bias + shift mask) v; rolled back and cropped.
+ * Output [1, nh·d, H, W] (proj is the 1×1 conv after it).
+ */
+export function winAttn(qkv: Tensor, qb: Float32Array, relb: Float32Array, a: WinAttnArgs, h0 = 0, nh = a.heads): Tensor {
+  const [, C3, H, W] = qkv.s;
+  const d = C3 / 3 / nh, C = a.heads * d, cl = nh * d, ws = a.ws, N = ws * ws, sh = a.shift;
+  const Hp = Math.ceil(H / ws) * ws, Wp = Math.ceil(W / ws) * ws, HW = H * W;
+  const o = T([1, cl, H, W]), od = o.d, xd = qkv.d;
+  const pos = new Int32Array(N), reg = new Int32Array(N);
+  const q = new Float32Array(N * d), k = new Float32Array(N * d), v = new Float32Array(N * d), s = new Float64Array(N), acc = new Float64Array(d);
+  for (let wy = 0; wy < Hp / ws; wy++)
+    for (let wx = 0; wx < Wp / ws; wx++) {
+      for (let i = 0; i < N; i++) {
+        const sy = wy * ws + ((i / ws) | 0), sx = wx * ws + (i % ws);
+        const py = (sy + sh) % Hp, px = (sx + sh) % Wp;
+        pos[i] = py < H && px < W ? py * W + px : -1;
+        reg[i] = sh ? swinRegion(sy, Hp, ws, sh) * 3 + swinRegion(sx, Wp, ws, sh) : 0;
+      }
+      for (let h = 0; h < nh; h++) {
+        const hg = h0 + h;
+        for (let i = 0; i < N; i++)
+          for (let c = 0; c < d; c++) {
+            const p = pos[i], cq = h * d + c;
+            q[i * d + c] = (p >= 0 ? xd[cq * HW + p] : qb[hg * d + c]) * a.scale;
+            k[i * d + c] = p >= 0 ? xd[(cl + cq) * HW + p] : qb[C + hg * d + c];
+            v[i * d + c] = p >= 0 ? xd[(2 * cl + cq) * HW + p] : qb[2 * C + hg * d + c];
+          }
+        const rb = hg * N * N;
+        for (let i = 0; i < N; i++) {
+          let mx = -Infinity;
+          for (let j = 0; j < N; j++) {
+            let t = 0;
+            for (let c = 0; c < d; c++) t += q[i * d + c] * k[j * d + c];
+            t += relb[rb + i * N + j];
+            if (reg[i] !== reg[j]) t += -100;
+            s[j] = t;
+            if (t > mx) mx = t;
+          }
+          let sum = 0;
+          for (let j = 0; j < N; j++) sum += s[j] = Math.exp(s[j] - mx);
+          if (pos[i] < 0) continue;
+          acc.fill(0);
+          for (let j = 0; j < N; j++) {
+            const pj = s[j] / sum;
+            for (let c = 0; c < d; c++) acc[c] += pj * v[j * d + c];
+          }
+          for (let c = 0; c < d; c++) od[(h * d + c) * HW + pos[i]] = acc[c];
+        }
+      }
+    }
+  return o;
+}
+
+/** Swin's PatchMerging before its norm: 2×2 neighbours to channels (x[0::2, 0::2], x[1::2, 0::2], x[0::2, 1::2],
+ *  x[1::2, 1::2] — that order), odd sides padded with zeros. [1, C, H, W] → [1, 4C, ⌈H/2⌉, ⌈W/2⌉] */
+export function patchMerge(x: Tensor): Tensor {
+  const [, C, H, W] = x.s, oh = Math.ceil(H / 2), ow = Math.ceil(W / 2);
+  const o = T([1, 4 * C, oh, ow]), od = o.d, xd = x.d;
+  const off = [[0, 0], [1, 0], [0, 1], [1, 1]];
+  for (let q = 0; q < 4; q++) {
+    const [dy, dx] = off[q];
+    for (let c = 0; c < C; c++) {
+      const ob = (q * C + c) * oh * ow, ib = c * H * W;
+      for (let y = 0; y < oh; y++) {
+        const iy = 2 * y + dy;
+        if (iy >= H) continue;
+        for (let xx = 0; xx < ow; xx++) {
+          const ix = 2 * xx + dx;
+          if (ix < W) od[ob + y * ow + xx] = xd[ib + iy * W + ix];
+        }
+      }
+    }
+  }
+  return o;
+}
+
+/**
+ * Bilinear resize with align_corners (PyTorch F.interpolate(..., align_corners=True), every resize of BiRefNet). The
+ * size is the reference input's (the network input) divided by `div` — sizes are fixed fractions of the input, so one
+ * graph serves every input size (multiples of 32).
+ */
+export function resizeAC(x: Tensor, oh: number, ow: number): Tensor {
+  const [, C, H, W] = x.s;
+  if (!(oh > 0 && ow > 0 && Number.isInteger(oh) && Number.isInteger(ow))) bad("resize size");
+  if (oh === H && ow === W) return T(x.s.slice(), x.d.slice());
+  const o = T([1, C, oh, ow]), od = o.d, xd = x.d;
+  const y0 = new Int32Array(oh), y1 = new Int32Array(oh), fy = new Float32Array(oh);
+  for (let y = 0; y < oh; y++) {
+    const f = oh > 1 ? (y * (H - 1)) / (oh - 1) : 0;
+    y0[y] = Math.min(H - 1, Math.floor(f));
+    y1[y] = Math.min(H - 1, y0[y] + 1);
+    fy[y] = f - y0[y];
+  }
+  const x0 = new Int32Array(ow), x1 = new Int32Array(ow), fx = new Float32Array(ow);
+  for (let xx = 0; xx < ow; xx++) {
+    const f = ow > 1 ? (xx * (W - 1)) / (ow - 1) : 0;
+    x0[xx] = Math.min(W - 1, Math.floor(f));
+    x1[xx] = Math.min(W - 1, x0[xx] + 1);
+    fx[xx] = f - x0[xx];
+  }
+  for (let c = 0; c < C; c++) {
+    const ib = c * H * W, ob = c * oh * ow;
+    for (let y = 0; y < oh; y++) {
+      const r0 = ib + y0[y] * W, r1 = ib + y1[y] * W, wy = fy[y], orow = ob + y * ow;
+      for (let xx = 0; xx < ow; xx++) {
+        const wx = fx[xx];
+        od[orow + xx] = (xd[r0 + x0[xx]] * (1 - wx) + xd[r0 + x1[xx]] * wx) * (1 - wy) + (xd[r1 + x0[xx]] * (1 - wx) + xd[r1 + x1[xx]] * wx) * wy;
+      }
+    }
+  }
+  return o;
+}
+
+/**
+ * BiRefNet's image2patches as its ONNX export computes it: the picture cut in g × g blocks of h × w, stacked as
+ * channels block column first — block (row i, column j), channel c → output channel (j·g + i)·C + c
+ * ('b c (i h) (j w) -> b (j i c) h w').
+ */
+export function image2patches(x: Tensor, g: number): Tensor {
+  const [, C, H, W] = x.s;
+  if (!Number.isInteger(g) || g < 1 || H % g || W % g) bad("image2patches grid");
+  const h = H / g, w = W / g, o = T([1, C * g * g, h, w]), od = o.d, xd = x.d;
+  for (let c = 0; c < C; c++)
+    for (let i = 0; i < g; i++)
+      for (let j = 0; j < g; j++) {
+        const ob = ((j * g + i) * C + c) * h * w;
+        for (let y = 0; y < h; y++) od.set(xd.subarray((c * H + i * h + y) * W + j * w, (c * H + i * h + y) * W + j * w + w), ob + y * w);
+      }
+  return o;
+}
+
+export interface DeformArgs {
+  stride?: [number, number];
+  pad: [number, number];
+  dil?: [number, number];
+}
+
+/**
+ * Modulated deformable conv (torchvision.ops.deform_conv2d with `mask` — DCNv2; one offset group): every tap (ky, kx)
+ * of output (y, x) reads the input bilinearly at (y·s − p + ky·dil + Δy, x·s − p + kx·dil + Δx), zero outside the
+ * picture, times the tap's mask. `off` [1, 2·kh·kw, OH, OW] (Δy, Δx per tap), `mask` [1, kh·kw, OH, OW]. Rows
+ * [y0, y0 + band) of the output only (band = off's rows): the conv pool's workers each take a band.
+ * Done as sampled columns [cin·kh·kw, band·OW] times the weights (the 1×1 WebAssembly kernel where it is available).
+ */
+export function deformConv(x: Tensor, off: Tensor, mask: Tensor, w: Tensor, b: Float32Array | null, a: DeformArgs, y0 = 0): Tensor {
+  const [, cin, H, W] = x.s;
+  const [cout, cpg, kh, kw] = w.s;
+  if (cpg !== cin) bad("deform_conv groups");
+  const [sh, sw] = a.stride ?? [1, 1], [dh, dw] = a.dil ?? [1, 1], [ph, pw] = a.pad;
+  const OW = Math.floor((W + 2 * pw - dw * (kw - 1) - 1) / sw) + 1;
+  const band = off.s[2], KK = kh * kw, K = cin * KK, xd = x.d, od = off.d, md = mask.d;
+  if (off.s[1] !== 2 * KK || mask.s[1] !== KK || off.s[3] !== OW || mask.s[2] !== band) bad("deform_conv offsets");
+  const out = T([1, cout, band, OW]);
+  const bias = b ?? new Float32Array(cout);
+  const wk = T([cout, K, 1, 1], w.d);
+  // rows per step: the column matrix stays under 2²³ values
+  const step = Math.max(1, Math.min(band, Math.floor((1 << 23) / (K * OW))));
+  for (let r0 = 0; r0 < band; r0 += step) {
+    const rh = Math.min(step, band - r0), P = rh * OW, col = T([1, K, 1, P]), cd = col.d;
+    for (let t = 0; t < KK; t++) {
+      const ky = (t / kw) | 0, kx = t % kw;
+      for (let r = 0; r < rh; r++) {
+        const oy = y0 + r0 + r, ro = (r0 + r) * OW;
+        for (let ox = 0; ox < OW; ox++) {
+          const m = md[t * band * OW + ro + ox];
+          const py = oy * sh - ph + ky * dh + od[2 * t * band * OW + ro + ox];
+          const px = ox * sw - pw + kx * dw + od[(2 * t + 1) * band * OW + ro + ox];
+          const p = r * OW + ox;
+          if (!(py > -1 && py < H && px > -1 && px < W) || m === 0) continue;
+          const yl = Math.floor(py), xl = Math.floor(px), ly = py - yl, lx = px - xl;
+          const w00 = (1 - ly) * (1 - lx) * m, w01 = (1 - ly) * lx * m, w10 = ly * (1 - lx) * m, w11 = ly * lx * m;
+          const iy0 = yl >= 0, iy1 = yl + 1 <= H - 1, ix0 = xl >= 0, ix1 = xl + 1 <= W - 1;
+          for (let c = 0; c < cin; c++) {
+            const ib = c * H * W + yl * W + xl;
+            let v = 0;
+            if (iy0 && ix0) v += w00 * xd[ib];
+            if (iy0 && ix1) v += w01 * xd[ib + 1];
+            if (iy1 && ix0) v += w10 * xd[ib + W];
+            if (iy1 && ix1) v += w11 * xd[ib + W + 1];
+            cd[(c * KK + t) * P + p] = v;
+          }
+        }
+      }
+    }
+    const r = convWasm(col, wk, bias, 1, 1, 1, 0, false) ?? conv2d(col, wk, bias, { stride: [1, 1], pad: [0, 0], dil: [1, 1], groups: 1 });
+    for (let c = 0; c < cout; c++) out.d.set(r.d.subarray(c * P, (c + 1) * P), (c * band + r0) * OW);
+  }
+  return out;
+}
+
+/** A deform_conv node on the CPU (fused bias / activation); `rows`: output rows [y0, y1) only, off / mask cut to them. */
+export function deformNode(m: GraphModel, n: GNode, x: Tensor, off: Tensor, mask: Tensor, y0 = 0): Tensor {
+  const a = n.a ?? {};
+  const r = deformConv(x, off, mask, m.w.get(n.w!)!, n.b ? m.w.get(n.b)!.d : null, { stride: a.stride, pad: a.pad, dil: a.dil }, y0);
+  act(r.d, n.act, n.actA, n.post);
+  return r;
+}
+
+/** Rows [y0, y1) of an NCHW tensor (all channels). */
+export function rowsOf(t: Tensor, y0: number, y1: number): Tensor {
+  const [, C, H, W] = t.s, o = T([1, C, y1 - y0, W]);
+  for (let c = 0; c < C; c++) o.d.set(t.d.subarray((c * H + y0) * W, (c * H + y1) * W), c * (y1 - y0) * W);
+  return o;
+}
+
+/** Channels [c0, c1) of an NCHW tensor. */
+export function channelsOf(t: Tensor, c0: number, c1: number): Tensor {
+  const per = t.d.length / t.s[1];
+  return T([t.s[0], c1 - c0, ...t.s.slice(2)], t.d.slice(c0 * per, c1 * per));
+}
+
+/** The q, k and v channels of heads [h0, h1) of a win_attn input (what one conv pool worker computes). */
+export function headsOf(qkv: Tensor, heads: number, h0: number, h1: number): Tensor {
+  const C = qkv.s[1] / 3, d = C / heads, per = qkv.d.length / qkv.s[1], n = (h1 - h0) * d;
+  const o = T([1, 3 * n, ...qkv.s.slice(2)]);
+  for (let j = 0; j < 3; j++) o.d.set(qkv.d.subarray((j * C + h0 * d) * per, (j * C + h1 * d) * per), j * n * per);
+  return o;
+}
+
 // ---------- executor ----------
 
 /** Depth to space as PyTorch's PixelShuffle: out[c][y·r + i][x·r + j] = in[(c·r + i)·r + j][y][x]. */
@@ -842,7 +1122,11 @@ export function convNode(m: GraphModel, n: GNode, x: Tensor, oc?: [number, numbe
  * Convs another executor may take (the conv pool): returns the output, or null to run it here. Called for dense convs
  * only, with the node's index in the graph.
  */
-export type ConvOffload = (i: number, n: GNode, x: Tensor) => Promise<Tensor> | null;
+export type ConvOffload = (i: number, n: GNode, x: Tensor, ins?: Tensor[]) => Promise<Tensor> | null;
+
+/** ops runGraphAsync offers to the offload: dense convs, and BiRefNet's deformable convs and window attention (`ins`
+ *  then holds all inputs) */
+const offloadable = (n: GNode) => (n.op === "conv" && ((n.a ?? {}).groups ?? 1) === 1 && !(n.a ?? {}).shuffle) || n.op === "deform_conv" || n.op === "win_attn";
 
 /**
  * runGraph with dense convs handed to `offload` where it takes them (convPool.ts: output channels split across
@@ -863,10 +1147,9 @@ export async function runGraphAsync(m: GraphModel, input: Tensor, offload: ConvO
   const nodes = m.meta.nodes;
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
-    const a = n.a ?? {};
     let r: Val | null = null;
-    if (n.op === "conv" && (a.groups ?? 1) === 1 && !a.shuffle) {
-      const p = offload(i, n, get(n.in[0]) as Tensor);
+    if (offloadable(n)) {
+      const p = n.op === "conv" ? offload(i, n, get(n.in[0]) as Tensor) : offload(i, n, get(n.in[0]) as Tensor, n.in.map((x) => get(x) as Tensor));
       if (p) r = await p;
     }
     r ??= evalNode(m, n, get);
@@ -1025,6 +1308,26 @@ export function evalNode(m: GraphModel, n: GNode, get: (x: number | string) => V
       r = o;
       break;
     }
+    case "ln_c":
+      r = layerNormC(tt(n.in[0]), tt(n.in[1]).d, tt(n.in[2]).d, a.eps ?? 1e-5);
+      break;
+    case "win_attn":
+      r = winAttn(tt(n.in[0]), tt(n.in[1]).d, tt(n.in[2]).d, a as WinAttnArgs);
+      break;
+    case "patch_merge":
+      r = patchMerge(tt(n.in[0]));
+      break;
+    case "resize_ac": {
+      const x = tt(n.in[0]), ref = tt(n.in[1]), [dh, dw] = a.div as number[];
+      r = resizeAC(x, ref.s[2] / dh, ref.s[3] / dw);
+      break;
+    }
+    case "image2patches":
+      r = image2patches(tt(n.in[0]), a.g);
+      break;
+    case "deform_conv":
+      r = deformNode(m, n, tt(n.in[0]), tt(n.in[1]), tt(n.in[2]));
+      break;
     case "softmax": {
       const x = tt(n.in[0]);
       let ax = a.axis ?? -1;

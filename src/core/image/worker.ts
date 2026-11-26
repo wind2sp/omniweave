@@ -4,7 +4,7 @@ import type { ApplyCtx } from "./filters";
 import { applyOps, ImageOpError, type ImageOp } from "./ops";
 import type { Img } from "./pixels";
 import { traceImage, type TraceMap, type TraceOptions } from "./trace";
-import { analyze, MATTE_STAGES, removeBackground, type MatteOptions, type MatteStage } from "./matte/pipeline";
+import { analyze, hqMatte, MATTE_STAGES, removeBackground, type MatteOptions, type MatteStage } from "./matte/pipeline";
 import { modelFile, ocrModels, recognizePage, setModelBase, type OcrAccel, type OcrLang } from "./ocr/models";
 import type { OcrOptions } from "./ocr/pipeline";
 import { IdleRelease, localWorker, poolSize, RecPool, runLines } from "./ocr/recPool";
@@ -22,6 +22,7 @@ export type WorkerRequest =
   | { id: number; kind: "trace"; img: Img; opts: Partial<TraceOptions>; map: TraceMap }
   | { id: number; kind: "matte"; img: Img; opts: MatteOptions; base?: string }
   | { id: number; kind: "matteAnalyze"; img: Img; opts: MatteOptions; base?: string }
+  | { id: number; kind: "matteHq"; img: Img; cpuSide?: number }
   | { id: number; kind: "ocr"; img: Img; lang: OcrLang; opts: OcrOptions; base?: string }
   | { id: number; kind: "ocrWarm"; lang: OcrLang; base?: string }
   | { id: number; kind: "upscale"; img: UpImg; opts: UpscaleOptions }
@@ -144,6 +145,11 @@ scope.onmessage = async (e) => {
       const r = await removeBackground(req.img, { ...req.opts, onStage: stageTo(req.id) });
       const transfer: Transferable[] = [r.alpha.buffer, r.cut.data.buffer];
       scope.postMessage({ id: req.id, ok: true, matte: r, ms: performance.now() - t0 }, transfer);
+      return;
+    }
+    if (req.kind === "matteHq") {
+      const r = await hqMatte(req.img, { cpuSide: req.cpuSide });
+      scope.postMessage({ id: req.id, ok: true, hq: r, ms: performance.now() - t0 }, [r.map.buffer]);
       return;
     }
     if (req.kind === "ocrWarm") {

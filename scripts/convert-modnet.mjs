@@ -75,6 +75,10 @@ function tensor(b, s, e) {
   } else if (dt === 7) {
     if (raw) for (let i = 0; i < n; i++) data[i] = clampI(Number(raw.readBigInt64LE(i * 8)));
     else data.set(i64.map(clampI));
+  } else if (dt === 6 || dt === 9) {
+    // int32 / bool (shape bookkeeping of bigger graphs — BiRefNet; the converters only read them)
+    if (raw) for (let i = 0; i < n; i++) data[i] = dt === 6 ? raw.readInt32LE(i * 4) : raw[i];
+    else data.set(i64.map(clampI));
   } else throw new Error(`tensor ${name}: data type ${dt}`);
   return { name, shape: dims, data };
 }
@@ -108,6 +112,7 @@ export function readOnnx(buf) {
         if (y.f === 1) n.in.push(buf.toString("utf8", y.s, y.e));
         else if (y.f === 2) n.out.push(buf.toString("utf8", y.s, y.e));
         else if (y.f === 4) n.op = buf.toString("utf8", y.s, y.e);
+        else if (y.f === 3) n.name = buf.toString("utf8", y.s, y.e);
         else if (y.f === 5) { const [k, v] = attr(buf, y.s, y.e); n.a[k] = v; }
       }
       nodes.push(n);

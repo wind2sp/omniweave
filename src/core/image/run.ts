@@ -6,7 +6,7 @@ import type { ApplyCtx } from "./filters";
 import { applyOps, ImageOpError, type ImageOp } from "./ops";
 import type { Img } from "./pixels";
 import { traceImage, type TraceMap, type TraceOptions, type TraceResult } from "./trace";
-import { analyze, MATTE_STAGES, removeBackground, type MatteOptions, type MatteResult } from "./matte/pipeline";
+import { analyze, hqMatte, MATTE_STAGES, removeBackground, type HqMap, type MatteOptions, type MatteResult } from "./matte/pipeline";
 import { recognizePage, type OcrLang } from "./ocr/models";
 import type { OcrOptions, OcrPage } from "./ocr/pipeline";
 import { checkUpscale, upscale, type UpImg, type UpscaleOptions } from "./upscale";
@@ -246,5 +246,26 @@ export async function runMatteAnalyze(img: Img, opts: MatteOptions = {}): Promis
   }
   const t0 = performance.now();
   const value = await analyze(img, opts);
+  return { value, ms: performance.now() - t0 };
+}
+
+/**
+ * The high-quality model's matte of a picture (BiRefNet, the dialog's preview: computed once, then handed to every
+ * preview as `hq`). The model must be downloaded already (birefnetModel.ts ensureBirefnetModel). On the CPU the side is
+ * `cpuSide` (cheaper; the preview is ≤ 640 px).
+ */
+export async function runMatteHq(img: Img, cpuSide?: number): Promise<Timed<HqMap>> {
+  checkMatteSize(img);
+  const p = post<{ hq: HqMap; ms: number }>({ kind: "matteHq", img, cpuSide });
+  if (p) {
+    try {
+      const r = await p;
+      return { value: r.hq, ms: r.ms };
+    } catch (e) {
+      if (worker || img.width * img.height > MATTE_MAIN_THREAD_MAX) throw e;
+    }
+  }
+  const t0 = performance.now();
+  const value = await hqMatte(img, { cpuSide });
   return { value, ms: performance.now() - t0 };
 }

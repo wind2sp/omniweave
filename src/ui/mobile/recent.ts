@@ -1,5 +1,5 @@
 // Recent files of the phone app: names, sizes, times, the picked URI and a short fingerprint — never file
-// contents — on this device (docs/MOBILE_PLAN.md §2 "최근(앱 안 목록, 파일 내용은 저장 안 함)"). The home screen's
+// contents — on this device (the Android app only: the phone web screen keeps no recent list, MobileApp KEEPS_RECENT) (docs/MOBILE_PLAN.md §2 "최근(앱 안 목록, 파일 내용은 저장 안 함)"). The home screen's
 // "이어서 하기" card also keeps a small picture of the first page (≈ 96 px wide JPEG, this device only, gone with the
 // entry) and when the file was last saved in its own format.
 // One entry per file: the same URI, or the same contents reached through another URI (a file shared twice from

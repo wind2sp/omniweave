@@ -7,7 +7,7 @@
 // Worker count: one per spare core (navigator.hardwareConcurrency − 1), at most 8 on a PC; 2–4 on a phone (memory, heat,
 // and the copies grow with the count). Small layers stay on the calling thread (a round trip costs more than they do).
 
-import type { GNode, GraphModel, Tensor } from "./graph";
+import { convNode, deformNode, headsOf, rowsOf, winAttn, type GNode, type GraphModel, type Tensor, type WinAttnArgs } from "./graph";
 import type { ConvLayer } from "./model";
 import type { T } from "./cpu";
 
@@ -15,7 +15,10 @@ export type ConvPoolKind = "graph" | "u2";
 /** What a pool worker accepts (convWorker.ts). */
 export type ConvWorkerMsg =
   | { kind: "init"; model: ConvPoolKind; bytes: ArrayBuffer; part: number; parts: number }
-  | { kind: "conv"; id: number; layer: number; s: number[]; d: Float32Array; pad?: number[]; crop?: [number, number] };
+  | { kind: "conv"; id: number; layer: number; s: number[]; d: Float32Array; pad?: number[]; crop?: [number, number]; job?: GraphJob };
+/** BiRefNet's ops in the pool: a deformable conv by output rows (the whole input, the band's offsets and mask), the
+ *  window attention by heads (the heads' q, k, v channels) */
+export type GraphJob = { op: "deform"; y0: number; off: Tensor; mask: Tensor } | { op: "heads"; h0: number; h1: number };
 export type ConvWorkerReply = { id: number; s?: number[]; d?: Float32Array; error?: string };
 
 interface PoolWorker {
@@ -99,8 +102,15 @@ export class ConvPool {
    * picture (MODNet's high-resolution layers: 16–32 channels at 384 × 576) are split by output rows instead — each
    * worker gets only its band of the input (plus the kernel's reach), not the whole input.
    */
-  graphConv(m: GraphModel, i: number, n: GNode, x: Tensor): Promise<Tensor> | null {
+  graphConv(m: GraphModel, i: number, n: GNode, x: Tensor, ins?: Tensor[]): Promise<Tensor> | null {
     if (this.broken) return null;
+    if (n.op === "deform_conv") {
+      if (!ins) return null;
+      const [cout, cin, kh, kw] = m.w.get(n.w!)!.s, [, , OH, OW] = ins[1].s;
+      return OH * OW * cout * cin * kh * kw < GRAPH_MIN_MACS || OH < 2 * this.size ? null : this.deform(m, i, n, ins);
+    }
+    if (n.op === "win_attn") return ins ? this.heads(i, n, ins[0]) : null;
+    if (n.op !== "conv") return null;
     const w = m.w.get(n.w!)!;
     const [cout, cpg, kh, kw] = w.s;
     const a = n.a ?? {};
@@ -114,6 +124,51 @@ export class ConvPool {
     const OH = Math.floor((H + pt + pb - dh * (kh - 1) - 1) / sh) + 1, OW = Math.floor((W + pl + pr - dw * (kw - 1) - 1) / sw) + 1;
     if (OH < 2 * this.size) return cout >= 16 ? this.run(i, cout, x.s, x.d) : null;
     return this.rows(i, x, cout, OH, OW, { sh, dh, kh, pt, pb, pl, pr });
+  }
+
+  /** A deformable conv split by output rows: every worker gets the whole input and its band's offsets and mask. */
+  private deform(m: GraphModel, layer: number, n: GNode, [x, off, mask]: Tensor[]): Promise<Tensor> {
+    const cout = m.w.get(n.w!)!.s[0], [, , OH, OW] = off.s;
+    return this.bands(OH, (y0, y1) => ({ kind: "conv", id: 0, layer, s: x.s, d: x.d, job: { op: "deform", y0, off: rowsOf(off, y0, y1), mask: rowsOf(mask, y0, y1) } }), cout, OW);
+  }
+
+  /** Window attention split by heads: each worker gets its heads' q, k, v channels and sends back their outputs. */
+  private async heads(layer: number, n: GNode, qkv: Tensor): Promise<Tensor> {
+    const a = n.a as WinAttnArgs, per = Math.ceil(a.heads / this.size);
+    const jobs: Promise<ConvWorkerReply>[] = [];
+    for (let p = 0; p * per < a.heads; p++) {
+      const h0 = p * per, h1 = Math.min(a.heads, h0 + per), t = headsOf(qkv, a.heads, h0, h1);
+      const id = ++this.seq;
+      jobs.push(new Promise((ok, fail) => this.wait.set(id, { ok, fail })));
+      this.ws[p].postMessage({ kind: "conv", id, layer, s: t.s, d: t.d, job: { op: "heads", h0, h1 } } satisfies ConvWorkerMsg, [t.d.buffer]);
+    }
+    const rs = await Promise.all(jobs);
+    const out = new Float32Array(rs.reduce((q, r) => q + r.d!.length, 0));
+    let o = 0;
+    for (const r of rs) out.set(r.d!, o), (o += r.d!.length);
+    return { s: [1, qkv.s[1] / 3, qkv.s[2], qkv.s[3]], d: out };
+  }
+
+  /** Output rows split in bands, one per worker; the bands joined in row order (NCHW). */
+  private async bands(OH: number, msg: (y0: number, y1: number) => ConvWorkerMsg & { kind: "conv" }, cout: number, OW: number): Promise<Tensor> {
+    const band = Math.ceil(OH / this.size);
+    const jobs: Promise<ConvWorkerReply>[] = [];
+    const at: [number, number][] = [];
+    for (let p = 0; p < this.size; p++) {
+      const y0 = p * band, y1 = Math.min(OH, y0 + band);
+      if (y0 >= y1) break;
+      const id = ++this.seq;
+      jobs.push(new Promise((ok, fail) => this.wait.set(id, { ok, fail })));
+      this.ws[p].postMessage({ ...msg(y0, y1), id });
+      at.push([y0, y1]);
+    }
+    const rs = await Promise.all(jobs);
+    const out = new Float32Array(cout * OH * OW);
+    rs.forEach((r, j) => {
+      const [y0, y1] = at[j], bh = y1 - y0;
+      for (let c = 0; c < cout; c++) out.set(r.d!.subarray(c * bh * OW, (c + 1) * bh * OW), (c * OH + y0) * OW);
+    });
+    return { s: [1, cout, OH, OW], d: out };
   }
 
   private async rows(layer: number, x: Tensor, cout: number, OH: number, OW: number, k: { sh: number; dh: number; kh: number; pt: number; pb: number; pl: number; pr: number }): Promise<Tensor> {
@@ -187,6 +242,19 @@ export class ConvPool {
     this.ws = [];
     this.broken = true;
   }
+}
+
+/** What a pool worker computes for a graph model's message (convWorker.ts; the tests' in-process workers). */
+export function graphJob(g: GraphModel, m: ConvWorkerMsg & { kind: "conv" }, part: number, parts: number): Tensor {
+  const n = g.meta.nodes[m.layer];
+  const x = { s: m.s, d: m.d };
+  if (m.job?.op === "deform") return deformNode(g, n, x, m.job.off, m.job.mask, m.job.y0);
+  if (m.job?.op === "heads") {
+    const a = n.a as WinAttnArgs;
+    return winAttn(x, g.w.get((n.in[1] as string).slice(1))!.d, g.w.get((n.in[2] as string).slice(1))!.d, a, m.job.h0, m.job.h1 - m.job.h0);
+  }
+  // a band of rows (all channels, the band's own padding) or this worker's channels (the whole input)
+  return m.pad ? convNode(g, { ...n, a: { ...n.a, pad: m.pad } }, x) : convNode(g, n, x, partRange(g.w.get(n.w!)!.s[0], part, parts));
 }
 
 // ---------- pools per model (made where a worker script can be named) ----------

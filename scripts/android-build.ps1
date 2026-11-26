@@ -97,6 +97,9 @@ if ($list.Count -eq 1) {
   $skip += "-ParchList=$((($list | ForEach-Object { $map[$_].arch.ToLower() }) -join ','))"
   $skip += "-PtargetList=$($list -join ',')"
 }
+# Gradle can skip packaging when it thinks nothing changed, leaving the previous commit's APK in place;
+# the test harness would then run an old build. Clear the outputs so every build packs a fresh APK/AAB.
+foreach ($o in @('app/build/outputs/apk', 'app/build/outputs/bundle')) { if (Test-Path $o) { Remove-Item -Recurse -Force $o } }
 & .\gradlew.bat $task @skip --console=plain 2>&1 | ForEach-Object { "$_" }
 $code = $LASTEXITCODE
 Restore-Untouched

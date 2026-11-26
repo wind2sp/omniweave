@@ -3,6 +3,8 @@
   "web.update.tip": "新しいバージョン {version}",
   "web.update.keep": "保存していない内容は再読み込みの後に復元できます",
   "web.update.stale": "新しいバージョンが公開されたため、この機能を読み込めませんでした。右上の「再読み込みして更新」を押してください",
+  "web.update.phone": "新しいバージョンがあります — タップして更新",
+  "web.update.applying": "更新しています…",
   "web.start.sample": "サンプルを開く",
   "web.start.sampleSub": "サンプルの作業ファイルですぐに試す",
   "web.start.sampleFailed": "サンプルファイルを読み込めませんでした",

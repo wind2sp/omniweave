@@ -16,6 +16,11 @@ type Buf = any;
 const HEAD = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> P: array<u32>;
 fn pf(i: u32) -> f32 { return bitcast<f32>(P[i]); }
+fn erf1(x0: f32) -> f32 {
+  let x = abs(x0); let t = 1.0 / (1.0 + 0.3275911 * x);
+  let y = 1.0 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-x * x);
+  return select(y, -y, x0 < 0.0);
+}
 fn act(v: f32, k: u32, a0: f32, a1: f32) -> f32 {
   switch k {
     case 1u: { return max(v, 0.0); }
@@ -24,6 +29,7 @@ fn act(v: f32, k: u32, a0: f32, a1: f32) -> f32 {
     case 4u: { return 1.0 / (1.0 + exp(-v)); }
     case 5u: { return clamp(v * a0 + a1, 0.0, 1.0); }
     case 7u: { return clamp(v, 0.0, 6.0); }
+    case 8u: { return v * 0.5 * (1.0 + erf1(v * 0.70710678118654752)); }
     default: { return v; }
   }
 }
@@ -326,6 +332,93 @@ var<workgroup> r2: array<f32, 64>;
   let a0 = A[b + y0 * W + x0]; let a1 = A[b + y0 * W + x1]; let b0 = A[b + y1 * W + x0]; let b1 = A[b + y1 * W + x1];
   O[i] = (a0 + (a1 - a0) * wx) * (1.0 - wy) + (b0 + (b1 - b0) * wx) * wy;
 }`,
+  // ---- BiRefNet (graph.ts: ln_c, win_attn, patch_merge, resize_ac; image2patches is a copy, deform_conv igemmd) ----
+  // LayerNorm over the channels of NCHW, one invocation per pixel. P: n C xOff gOff bOff eps
+  lnc: `${IO2}${FLAT}
+  let C = P[1]; let HW = P[0]; let xo = P[2] + i;
+  var m = 0.0;
+  for (var c = 0u; c < C; c++) { m += A[xo + c * HW]; }
+  m = m / f32(C);
+  var v = 0.0;
+  for (var c = 0u; c < C; c++) { let d = A[xo + c * HW] - m; v += d * d; }
+  let r = 1.0 / sqrt(v / f32(C) + pf(5));
+  for (var c = 0u; c < C; c++) { O[c * HW + i] = (A[xo + c * HW] - m) * r * B[P[3] + c] + B[P[4] + c]; }
+}`,
+  // Swin window attention, one workgroup per (window, head): K and V of the window in workgroup memory, invocation
+  // i < N is query token i (its q, scores and output in registers). Head size ≤ 32, N·d ≤ 1600.
+  // P: groups C H W Hp Wp ws shift heads d xOff qbOff rbOff scale nWw
+  wattn: `${IO2}
+var<workgroup> KS: array<f32, 1600>;
+var<workgroup> VS: array<f32, 1600>;
+fn reg(s: u32, n: u32, ws: u32, sh: u32) -> u32 { if (s < n - ws) { return 0u; } if (s < n - sh) { return 1u; } return 2u; }
+@compute @workgroup_size(64) fn main(@builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>) {
+  let gid = wg.x + wg.y * nw.x;
+  if (gid >= P[0]) { return; }
+  let C = P[1]; let H = P[2]; let W = P[3]; let Hp = P[4]; let Wp = P[5]; let ws = P[6]; let sh = P[7]; let heads = P[8]; let d = P[9];
+  let N = ws * ws; let HW = H * W;
+  let h = gid % heads; let win = gid / heads; let wy = win / P[14]; let wx = win % P[14];
+  for (var e = li; e < N * d; e += 64u) {
+    let j = e / d; let c = e % d;
+    let sy = wy * ws + j / ws; let sx = wx * ws + j % ws;
+    let py = (sy + sh) % Hp; let px = (sx + sh) % Wp;
+    let ck = C + h * d + c; let cv = 2u * C + h * d + c;
+    if (py < H && px < W) { KS[e] = A[P[10] + ck * HW + py * W + px]; VS[e] = A[P[10] + cv * HW + py * W + px]; }
+    else { KS[e] = B[P[11] + ck]; VS[e] = B[P[11] + cv]; }
+  }
+  workgroupBarrier();
+  if (li >= N) { return; }
+  let sy = wy * ws + li / ws; let sx = wx * ws + li % ws;
+  let py = (sy + sh) % Hp; let px = (sx + sh) % Wp;
+  if (py >= H || px >= W) { return; }
+  var q: array<f32, 32>;
+  for (var c = 0u; c < d; c++) { q[c] = A[P[10] + (h * d + c) * HW + py * W + px] * pf(13); }
+  var ri = 0u;
+  if (sh > 0u) { ri = reg(sy, Hp, ws, sh) * 3u + reg(sx, Wp, ws, sh); }
+  var s: array<f32, 64>;
+  var mx = -3.4e38;
+  for (var j = 0u; j < N; j++) {
+    var t = 0.0;
+    for (var c = 0u; c < d; c++) { t += q[c] * KS[j * d + c]; }
+    t += B[P[12] + (h * N + li) * N + j];
+    if (sh > 0u) {
+      let sj = wy * ws + j / ws; let sxj = wx * ws + j % ws;
+      if (reg(sj, Hp, ws, sh) * 3u + reg(sxj, Wp, ws, sh) != ri) { t -= 100.0; }
+    }
+    s[j] = t;
+    mx = max(mx, t);
+  }
+  var sum = 0.0;
+  for (var j = 0u; j < N; j++) { s[j] = exp(s[j] - mx); sum += s[j]; }
+  let inv = 1.0 / sum;
+  for (var c = 0u; c < d; c++) {
+    var acc = 0.0;
+    for (var j = 0u; j < N; j++) { acc += s[j] * VS[j * d + c]; }
+    O[(h * d + c) * HW + py * W + px] = acc * inv;
+  }
+}`,
+  // Swin PatchMerging (2×2 to channels, x0 x1 x2 x3 order, zero padding). P: n C H W oh ow xOff
+  pmerge: `${IO1}${FLAT}
+  let C = P[1]; let H = P[2]; let W = P[3]; let oh = P[4]; let ow = P[5];
+  let x = i % ow; let t = i / ow; let y = t % oh; let oc = t / oh;
+  let q = oc / C; let c = oc % C;
+  let iy = 2u * y + (q & 1u); let ix = 2u * x + (q >> 1u);
+  var v = 0.0;
+  if (iy < H && ix < W) { v = A[P[6] + (c * H + iy) * W + ix]; }
+  O[i] = v;
+}`,
+  // bilinear, align_corners = true (graph.ts resizeAC). P: n C H W oh ow xOff
+  resizeac: `${IO1}${FLAT}
+  let ow = P[5]; let oh = P[4]; let H = P[2]; let W = P[3];
+  let x = i % ow; let t = i / ow; let y = t % oh; let c = t / oh;
+  var fy = 0.0; var fx = 0.0;
+  if (oh > 1u) { fy = f32(y) * f32(H - 1u) / f32(oh - 1u); }
+  if (ow > 1u) { fx = f32(x) * f32(W - 1u) / f32(ow - 1u); }
+  let y0 = min(H - 1u, u32(floor(fy))); let x0 = min(W - 1u, u32(floor(fx)));
+  let y1 = min(H - 1u, y0 + 1u); let x1 = min(W - 1u, x0 + 1u);
+  let wy = fy - f32(y0); let wx = fx - f32(x0);
+  let b = P[6] + c * H * W;
+  O[i] = (A[b + y0 * W + x0] * (1.0 - wx) + A[b + y0 * W + x1] * wx) * (1.0 - wy) + (A[b + y1 * W + x0] * (1.0 - wx) + A[b + y1 * W + x1] * wx) * wy;
+}`,
   gpool: `${IO1}
 var<workgroup> red: array<f32, 64>;
 @compute @workgroup_size(64) fn main(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>) {
@@ -339,7 +432,88 @@ var<workgroup> red: array<f32, 64>;
 }`,
 };
 
-const ACT: Record<string, number> = { relu: 1, hardswish: 2, swish: 3, sigmoid: 4, hardsigmoid: 5, prelu: 6, relu6: 7 };
+// Dense conv (groups 1, any kernel / stride / padding / dilation) and modulated deformable conv as a tiled implicit GEMM:
+// a workgroup computes 64 output channels × 64 output pixels, 16 values of the reduction (cin·kh·kw) at a time staged
+// in workgroup memory — the weights, and the input sampled for those taps (read straight for a conv; for a deformable
+// conv bilinearly at the offset position, zero outside, times the tap's mask); each invocation keeps 4 × 4 sums in
+// registers. Used for the convs the converter marks (a.gemm: BiRefNet) and for every deform_conv.
+// P: cout cin H W OH OW kh kw sh sw pt pl dh dw act a0 a1 post p0 p1 xOff wOff bOff hasB offOff mOff
+const IGEMM = (deform: boolean) => `${IO2}
+${deform ? "@group(0) @binding(4) var<storage, read> OF: array<f32>;\n@group(0) @binding(5) var<storage, read> MK: array<f32>;" : ""}
+var<workgroup> AS: array<f32, 1024>;
+var<workgroup> BS: array<f32, 1024>;
+fn sample(k: u32, p: u32) -> f32 {
+  let H = P[2]; let W = P[3]; let OW = P[5]; let kh = P[6]; let kw = P[7]; let KK = kh * kw;
+  let c = k / KK; let t = k % KK; let ky = t / kw; let kx = t % kw;
+  let oy = p / OW; let ox = p % OW;
+  ${
+    deform
+      ? `let NP = P[4] * OW;
+  let m = MK[P[25] + t * NP + p];
+  let fy = f32(oy * P[8]) - f32(P[10]) + f32(ky * P[12]) + OF[P[24] + 2u * t * NP + p];
+  let fx = f32(ox * P[9]) - f32(P[11]) + f32(kx * P[13]) + OF[P[24] + (2u * t + 1u) * NP + p];
+  if (!(fy > -1.0 && fy < f32(H) && fx > -1.0 && fx < f32(W))) { return 0.0; }
+  let yl = i32(floor(fy)); let xl = i32(floor(fx)); let ly = fy - f32(yl); let lx = fx - f32(xl);
+  let b = i32(P[20] + c * H * W); let Wi = i32(W);
+  var v = 0.0;
+  if (yl >= 0 && xl >= 0) { v += (1.0 - ly) * (1.0 - lx) * A[u32(b + yl * Wi + xl)]; }
+  if (yl >= 0 && xl + 1 < Wi) { v += (1.0 - ly) * lx * A[u32(b + yl * Wi + xl + 1)]; }
+  if (yl + 1 < i32(H) && xl >= 0) { v += ly * (1.0 - lx) * A[u32(b + (yl + 1) * Wi + xl)]; }
+  if (yl + 1 < i32(H) && xl + 1 < Wi) { v += ly * lx * A[u32(b + (yl + 1) * Wi + xl + 1)]; }
+  return v * m;`
+      : `let iy = i32(oy * P[8] + ky * P[12]) - i32(P[10]); let ix = i32(ox * P[9] + kx * P[13]) - i32(P[11]);
+  if (iy < 0 || iy >= i32(H) || ix < 0 || ix >= i32(W)) { return 0.0; }
+  return A[P[20] + (c * H + u32(iy)) * W + u32(ix)];`
+  }
+}
+@compute @workgroup_size(256) fn main(@builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>) {
+  let cout = P[0]; let K = P[1] * P[6] * P[7]; let NP = P[4] * P[5];
+  let tilesN = (NP + 63u) / 64u;
+  let wid = wg.x + wg.y * nw.x;
+  let live = wid < tilesN * ((cout + 63u) / 64u);
+  let m0 = (wid / tilesN) * 64u; let n0 = (wid % tilesN) * 64u;
+  let tx = li % 16u; let ty = li / 16u;
+  var acc: array<vec4<f32>, 4>;
+  for (var k0 = 0u; k0 < K; k0 += 16u) {
+    for (var q = 0u; q < 4u; q++) {
+      let e = li + q * 256u;
+      let mm = e / 16u; let ka = e % 16u; let oc = m0 + mm; let k = k0 + ka;
+      var a = 0.0;
+      if (live && oc < cout && k < K) { a = B[P[21] + oc * K + k]; }
+      AS[ka * 64u + mm] = a;
+      let kb = e / 64u; let nn = e % 64u; let p = n0 + nn; let k2 = k0 + kb;
+      var b = 0.0;
+      if (live && p < NP && k2 < K) { b = sample(k2, p); }
+      BS[kb * 64u + nn] = b;
+    }
+    workgroupBarrier();
+    for (var kk = 0u; kk < 16u; kk++) {
+      let ab = kk * 64u + ty * 4u; let bb = kk * 64u + tx * 4u;
+      let a = vec4<f32>(AS[ab], AS[ab + 1u], AS[ab + 2u], AS[ab + 3u]);
+      let b = vec4<f32>(BS[bb], BS[bb + 1u], BS[bb + 2u], BS[bb + 3u]);
+      acc[0] += a.x * b; acc[1] += a.y * b; acc[2] += a.z * b; acc[3] += a.w * b;
+    }
+    workgroupBarrier();
+  }
+  if (!live) { return; }
+  for (var r = 0u; r < 4u; r++) {
+    let oc = m0 + ty * 4u + r;
+    if (oc >= cout) { break; }
+    var bias = 0.0;
+    if (P[23] == 1u) { bias = B[P[22] + oc]; }
+    for (var j = 0u; j < 4u; j++) {
+      let p = n0 + tx * 4u + j;
+      if (p >= NP) { break; }
+      var v = act(acc[r][j] + bias, P[14], pf(15), pf(16));
+      if (P[17] == 1u) { v = v * pf(18) + pf(19); }
+      O[oc * NP + p] = v;
+    }
+  }
+}`;
+SHADERS.igemm = IGEMM(false);
+SHADERS.igemmd = IGEMM(true);
+
+const ACT: Record<string, number> = { relu: 1, hardswish: 2, swish: 3, sigmoid: 4, hardsigmoid: 5, prelu: 6, relu6: 7, gelu: 8 };
 
 /** The tiled 3×3 kernel (conv3t) applies: dense 3×3, stride 1, padding 1, wide enough to fill its 8-channel blocks. */
 let conv3tOn = true;
@@ -381,7 +555,11 @@ function getDevice(): Promise<{ dev: Buf; pipes: Map<string, Buf> } | null> {
       if (!graphGpuAvailable()) return null;
       const ad = await (navigator as any).gpu.requestAdapter({ powerPreference: "high-performance" });
       if (!ad) return null;
-      const dev = await ad.requestDevice();
+      // the default binding / buffer limits (128 / 256 MB) are below BiRefNet's weights (178 MB as f32) and its largest
+      // activation at 1024² (268 MB): ask for what the adapter has, up to 1 GB
+      const lim = ad.limits ?? {};
+      const want = (k: string, def: number) => Math.max(def, Math.min(Number(lim[k]) || def, 1 << 30));
+      const dev = await ad.requestDevice({ requiredLimits: { maxStorageBufferBindingSize: want("maxStorageBufferBindingSize", 134217728), maxBufferSize: want("maxBufferSize", 268435456) } });
       dev.lost?.then(() => (device = null));
       const names = Object.keys(SHADERS);
       const ps = await Promise.all(names.map((k) => dev.createComputePipelineAsync({ layout: "auto", compute: { module: dev.createShaderModule({ code: HEAD + SHADERS[k] }), entryPoint: "main" } })));
@@ -547,9 +725,84 @@ export class GraphGpu {
             if (n.act && !k) throw new Error("activation " + n.act);
             const [a0, a1] = n.actA ?? [1 / 6, 0.5];
             const post = n.post ?? [1, 0];
+            if (a.gemm && gr === 1 && shf === 1 && k !== 6) {
+              const P = [cout, cin, H, W, oh, ow, kh, kw, sh, sw, pt, pl, dh, dw, k, f2u(a0), f2u(a1), n.post ? 1 : 0, f2u(post[0]), f2u(post[1]), x.off, this.woff.get(n.w!)!, n.b ? this.woff.get(n.b)! : 0, n.b ? 1 : 0, 0, 0];
+              const tiles = Math.ceil(cout / 64) * Math.ceil((oh * ow) / 64);
+              recs.push({ pipe: "igemm", bufs: [x.buf, this.wbuf, o.buf], p: P, groups: [Math.min(tiles, 65535), Math.ceil(tiles / 65535)] });
+              r = o;
+              break;
+            }
             const threads = gr === 1 ? Math.ceil(cout / 4) * oh * Math.ceil(ow / 4) : size(o.s);
             const P = [threads, cin, H, W, cout, oh, ow, kh, kw, sh, sw, pt, pl, dh, dw, cpg, cout / gr, k, f2u(a0), f2u(a1), n.post ? 1 : 0, f2u(post[0]), f2u(post[1]), x.off, this.woff.get(n.w!)!, n.b ? this.woff.get(n.b)! : 0, n.b ? 1 : 0, n.p ? this.woff.get(n.p)! : 0, shf];
             dispatch(gr === 1 ? (conv3Fast(kh, kw, sh, sw, dh, dw, pt, pl, cin, cout) ? "conv3t" : "conv4") : "conv", [x.buf, this.wbuf, o.buf], P, gr === 1 && conv3Fast(kh, kw, sh, sw, dh, dw, pt, pl, cin, cout) ? conv3Threads(cout, oh, ow) : threads);
+            r = o;
+            break;
+          }
+          case "deform_conv": {
+            const x = g(n.in[0]), off = g(n.in[1]), mk = g(n.in[2]);
+            const w = m.w.get(n.w!)!;
+            const [cout, cin, kh, kw] = w.s;
+            const [, , H, W] = x.s, [, , OH, OW] = off.s;
+            const [sh, sw] = a.stride ?? [1, 1], [dh, dw] = a.dil ?? [1, 1], [ph, pw] = a.pad;
+            const k = n.act ? ACT[n.act] : 0;
+            if ((n.act && !k) || k === 6) throw new Error("activation " + n.act);
+            const [a0, a1] = n.actA ?? [1 / 6, 0.5];
+            const post = n.post ?? [1, 0];
+            const o = newT([1, cout, OH, OW]);
+            const P = [cout, cin, H, W, OH, OW, kh, kw, sh, sw, ph, pw, dh, dw, k, f2u(a0), f2u(a1), n.post ? 1 : 0, f2u(post[0]), f2u(post[1]), x.off, this.woff.get(n.w!)!, n.b ? this.woff.get(n.b)! : 0, n.b ? 1 : 0, off.off, mk.off];
+            const tiles = Math.ceil(cout / 64) * Math.ceil((OH * OW) / 64);
+            recs.push({ pipe: "igemmd", bufs: [x.buf, this.wbuf, off.buf, mk.buf, o.buf], p: P, groups: [Math.min(tiles, 65535), Math.ceil(tiles / 65535)] });
+            r = o;
+            break;
+          }
+          case "ln_c": {
+            const x = g(n.in[0]);
+            if (typeof n.in[1] !== "string" || typeof n.in[2] !== "string") throw new Error("ln_c weights");
+            const C = x.s[1], HW = size(x.s) / C;
+            const o = newT(x.s.slice());
+            dispatch("lnc", [x.buf, this.wbuf, o.buf], [HW, C, x.off, this.woff.get(n.in[1].slice(1))!, this.woff.get(n.in[2].slice(1))!, f2u(a.eps ?? 1e-5)], HW);
+            r = o;
+            break;
+          }
+          case "win_attn": {
+            const x = g(n.in[0]);
+            if (typeof n.in[1] !== "string" || typeof n.in[2] !== "string") throw new Error("win_attn weights");
+            const [, C3, H, W] = x.s, C = C3 / 3, heads: number = a.heads, d = C / heads, ws: number = a.ws, N = ws * ws;
+            if (d > 32 || N > 64 || N * d > 1600) throw new Error("win_attn size");
+            const Hp = Math.ceil(H / ws) * ws, Wp = Math.ceil(W / ws) * ws, groups = (Hp / ws) * (Wp / ws) * heads;
+            const o = newT([1, C, H, W]);
+            recs.push({ pipe: "wattn", bufs: [x.buf, this.wbuf, o.buf], p: [groups, C, H, W, Hp, Wp, ws, a.shift, heads, d, x.off, this.woff.get(n.in[1].slice(1))!, this.woff.get(n.in[2].slice(1))!, f2u(a.scale), Wp / ws], groups: [Math.min(groups, 65535), Math.ceil(groups / 65535)] });
+            r = o;
+            break;
+          }
+          case "patch_merge": {
+            const x = g(n.in[0]);
+            const [, C, H, W] = x.s, oh = Math.ceil(H / 2), ow = Math.ceil(W / 2);
+            const o = newT([1, 4 * C, oh, ow]);
+            dispatch("pmerge", [x.buf, o.buf], [size(o.s), C, H, W, oh, ow, x.off], size(o.s));
+            r = o;
+            break;
+          }
+          case "resize_ac": {
+            const x = g(n.in[0]);
+            const ref = gpu.get(n.in[1] as number) as GT | undefined;
+            if (!ref || Array.isArray(ref)) throw new Error("resize_ac reference");
+            const [, C, H, W] = x.s, [dh, dw] = a.div as number[];
+            const oh = ref.s[2] / dh, ow = ref.s[3] / dw;
+            if (!(Number.isInteger(oh) && Number.isInteger(ow) && oh > 0 && ow > 0)) throw new Error("resize_ac size");
+            const o = newT([1, C, oh, ow]);
+            dispatch("resizeac", [x.buf, o.buf], [size(o.s), C, H, W, oh, ow, x.off], size(o.s));
+            r = o;
+            break;
+          }
+          case "image2patches": {
+            const x = g(n.in[0]);
+            const [, C, H, W] = x.s, gg: number = a.g;
+            if (!Number.isInteger(gg) || gg < 1 || H % gg || W % gg) throw new Error("image2patches grid");
+            // output channel (j·g + i)·C + c ← block row i, column j, channel c (graph.ts image2patches)
+            const h = H / gg, w = W / gg, s5 = [gg, gg, C, h, w];
+            const o = newT([1, C * gg * gg, h, w]);
+            copy(x, o, s5, [w, h * W, H * W, W, 1], strides(s5), 0, 0);
             r = o;
             break;
           }
@@ -823,6 +1076,9 @@ export class GraphGpu {
         const entries = [{ binding: 0, resource: { buffer: pbuf, offset: k * step * 4, size: r.p.length * 4 } }, { binding: 1, resource: { buffer: ins[0] } }];
         if (ins.length > 1) entries.push({ binding: 2, resource: { buffer: ins[1] } });
         entries.push({ binding: 3, resource: { buffer: o } });
+        // (the deformable conv's offsets and mask)
+        if (ins.length > 2) entries.push({ binding: 4, resource: { buffer: ins[2] } });
+        if (ins.length > 3) entries.push({ binding: 5, resource: { buffer: ins[3] } });
         pass.setPipeline(p);
         pass.setBindGroup(0, dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries }));
         pass.dispatchWorkgroups(r.groups[0], r.groups[1]);
@@ -861,6 +1117,18 @@ const live = new Set<GraphGpu>();
  *  runs: a buffer in the cache may still be read by a run that is in flight. */
 export function trimGraphGpu() {
   for (const g of live) g.dispose(false);
+}
+/** Free one model's runner altogether — weights and cached activations (the high-quality background removal after a
+ *  minute unused: ≈ 1.3 GB). The next graphGpu(m) makes a new one. Only between runs, as trimGraphGpu. */
+export async function releaseGraphGpu(m: GraphModel): Promise<boolean> {
+  const r = runners.get(m);
+  if (!r) return false;
+  runners.delete(m);
+  const g = await r;
+  if (!g) return false;
+  live.delete(g);
+  g.dispose(true);
+  return true;
 }
 /** The model's WebGPU runner (created once), or null where WebGPU is missing or failed. */
 export function graphGpu(m: GraphModel): Promise<GraphGpu | null> {

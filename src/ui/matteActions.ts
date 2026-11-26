@@ -21,6 +21,9 @@ import { newImage, newRaster, type AssetRef, type ImageNode, type OmwDocument, t
 import { imageTarget, loadSource } from "./imageActions";
 import { revealTransparencyInPlace } from "./transparency";
 import { t as tr } from "../i18n";
+import { BirefnetModelError, birefnetModelReady, ensureBirefnetModel } from "../core/image/matte/birefnetModel";
+import { ImageOpError } from "../core/image/ops";
+import { isMobile } from "../io/platform";
 
 const S = () => useStore.getState();
 
@@ -121,11 +124,11 @@ export function matteEditTarget(): MatteEditTarget | null {
 }
 
 /** Dialog options saved in a cut-out's matte record (type, edge sliders, shadow, inner regions, hints). */
-export function matteOptionsOf(m: NodeMatte): { type: MatteType; edge: Partial<EdgeOptions>; keepShadow: boolean; inner: MatteOptions["inner"]; hints: MatteHint[] } {
+export function matteOptionsOf(m: NodeMatte): { type: MatteType; edge: Partial<EdgeOptions>; keepShadow: boolean; inner: MatteOptions["inner"]; hints: MatteHint[]; hq: boolean } {
   const { keepShadow, keepInner, ...rest } = m.edge;
   const edge: Partial<EdgeOptions> = {};
   for (const k of Object.keys(DEFAULT_EDGE) as (keyof EdgeOptions)[]) if (typeof rest[k] === "number") edge[k] = rest[k] as number;
-  return { type: m.type, edge, keepShadow: keepShadow === true, inner: keepInner === undefined ? "auto" : !keepInner, hints: (m.hints ?? []).map((h) => ({ ...h })) };
+  return { type: m.type, edge, keepShadow: keepShadow === true, inner: keepInner === undefined ? "auto" : !keepInner, hints: (m.hints ?? []).map((h) => ({ ...h })), hq: m.hq === true };
 }
 
 const NON_TEXT_INPUT = new Set(["range", "checkbox", "radio", "button", "submit", "reset", "color", "file", "image"]);
@@ -148,6 +151,75 @@ export function dialogUndoKey(e: Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "sh
 
 let busy = false;
 
+/** "고품질(사람·동물)" background removal is offered: the PC editor only (not the phone screen, not the Android app) */
+export function hqMatteOffered(): boolean {
+  return !isMobile && !(typeof __OMW_MOBILE__ !== "undefined" && __OMW_MOBILE__);
+}
+
+let gpuCheck: Promise<boolean> | null = null;
+/** WebGPU works here — an adapter, not only `navigator.gpu` (a browser with the GPU off has the object but no adapter);
+ *  else the high-quality model runs on the CPU: about 20 s a picture */
+export function hqHasGpu(): Promise<boolean> {
+  gpuCheck ??= (async () => {
+    const gpu = typeof navigator !== "undefined" ? (navigator as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu : undefined;
+    if (!gpu) return false;
+    try {
+      return !!(await gpu.requestAdapter());
+    } catch {
+      return false;
+    }
+  })();
+  return gpuCheck;
+}
+
+/** a failed download / check of the high-quality model, in the viewer's language */
+export function hqErrorText(e: unknown): string {
+  if (e instanceof BirefnetModelError) return tr(`image.matte.hq.err.${e.code}`, { detail: e.detail });
+  return e instanceof Error ? e.message : String(e);
+}
+
+/**
+ * The high-quality model, downloaded first when it is not kept yet (≈ 46 MB, with progress and Cancel). True when it
+ * is ready; false after a failure (a Korean message is shown) or a cancel — the picture is not touched either way.
+ */
+export async function prepareHqModel(): Promise<boolean> {
+  if (await birefnetModelReady()) return true;
+  try {
+    await withProgress(
+      tr("image.matte.hq.downloading", { got: 0, total: 46 }),
+      (p) =>
+        ensureBirefnetModel({
+          signal: p.signal,
+          onProgress: (got, total) => {
+            p.set(got / total);
+            p.label(tr("image.matte.hq.downloading", { got: Math.round(got / 1e6), total: Math.round(total / 1e6) }));
+          },
+        }),
+      { cancel: true },
+    );
+    return true;
+  } catch (e) {
+    if (isCancelled(e) || (e instanceof BirefnetModelError && e.code === "aborted")) return false;
+    S().notify(tr("image.matte.hq.failed", { error: hqErrorText(e) }));
+    return false;
+  }
+}
+
+/** 배경 지우기(고품질): the model (downloaded on first use), then the same background removal with `hq` */
+export async function removeBackgroundHq(opts: MatteOptions = {}, edit?: MatteEditTarget | null): Promise<MatteResult | null> {
+  if (!hqMatteOffered()) return null;
+  if (!(edit ? edit.node : imageTarget())) {
+    S().notify(tr("image.needTarget"));
+    return null;
+  }
+  if (busy) {
+    S().notify(tr("image.busy"));
+    return null;
+  }
+  if (!(await prepareHqModel())) return null;
+  return removeBackgroundSelection({ ...opts, hq: opts.hq && typeof opts.hq === "object" ? opts.hq : true }, edit);
+}
+
 /**
  * Remove the background of the selected raster / image. `opts.type` overrides the detected type. With `edit` the
  * cut-out `edit.cutout` is remade from its original (same node, same place) instead of adding a new one. Returns the
@@ -165,7 +237,9 @@ export async function removeBackgroundSelection(opts: MatteOptions = {}, edit?: 
   }
   busy = true;
   try {
-    S().notify(tr("image.matte.working"));
+    const hq = !!opts.hq;
+    const cpu = hq && !(await hqHasGpu());
+    S().notify(tr(hq ? (cpu ? "image.matte.hq.workingCpu" : "image.matte.hq.working") : "image.matte.working"));
     const { src, bounds: b, work } = await matteSource(t.node);
     // in the image worker, with the step on the progress line and Cancel (it stops the worker)
     const { value: res, ms } = await withProgress(
@@ -174,7 +248,8 @@ export async function removeBackgroundSelection(opts: MatteOptions = {}, edit?: 
         runMatte(work, {
           ...opts,
           onStage: (st) => {
-            p.label(tr(`progress.matte.${st}`));
+            // (the high-quality model on the CPU: the line says it is slow)
+            p.label(tr(cpu && st === "hq" ? "progress.matte.hqCpu" : `progress.matte.${st}`));
             p.set(MATTE_STAGES.indexOf(st) / MATTE_STAGES.length);
           },
         }),
@@ -229,6 +304,7 @@ export async function removeBackgroundSelection(opts: MatteOptions = {}, edit?: 
     const matte: NodeMatte = { assetId: matteAsset.id, sourceId: t.node.id, type: r.type, edge };
     if (b) matte.bounds = b;
     if (opts.hints?.length) matte.hints = opts.hints.map((h) => ({ x: h.x, y: h.y, fg: h.fg }));
+    if (r.hq) matte.hq = true;
     node.matte = matte;
     if (edit) {
       // re-edit: the same cut-out node gets the new pixels and options; its place, name and look stay
@@ -259,11 +335,13 @@ export async function removeBackgroundSelection(opts: MatteOptions = {}, edit?: 
       if (orig) orig.visible = false;
     });
     s.set({ selection: [node.id] });
-    s.notify(tr(r.review ? "image.matte.doneReview" : "image.matte.done", { type: matteTypeLabel(r.type), ms: Math.round(ms) }));
+    if (hq && !r.hq) s.notify(tr("image.matte.hq.notPhoto", { type: matteTypeLabel(r.type), ms: Math.round(ms) }));
+    else if (r.hq) s.notify(tr("image.matte.hq.done", { type: matteTypeLabel(r.type), ms: Math.round(ms), backend: tr(`image.matte.backend.${r.hq.backend ?? "cpu"}`) }));
+    else s.notify(tr(r.review ? "image.matte.doneReview" : "image.matte.done", { type: matteTypeLabel(r.type), ms: Math.round(ms) }));
     return r;
   } catch (e) {
     if (isCancelled(e) || (e instanceof Error && e.message === CANCELLED)) return null;
-    S().notify(tr("image.matte.failed", { error: e instanceof Error ? e.message : String(e) }));
+    S().notify(tr("image.matte.failed", { error: e instanceof ImageOpError ? tr(e.code, e.vars) : e instanceof Error ? e.message : String(e) }));
     return null;
   } finally {
     busy = false;

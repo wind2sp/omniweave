@@ -9,12 +9,12 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { MATTE_TYPES, type MatteType } from "../../core/image/matte/classify";
 import { DEFAULT_EDGE, type EdgeOptions } from "../../core/image/matte/refine";
-import { TYPE_EDGE, type MatteOptions } from "../../core/image/matte/pipeline";
+import { TYPE_EDGE, type HqMap, type MatteOptions } from "../../core/image/matte/pipeline";
 import type { MatteHint } from "../../core/image/matte/hints";
-import { runMatte, runMatteAnalyze, type MatteAnalysis } from "../../core/image/run";
+import { runMatte, runMatteAnalyze, runMatteHq, type MatteAnalysis } from "../../core/image/run";
 import type { Img } from "../../core/image/pixels";
 import { imageTarget, previewOf } from "../imageActions";
-import { dialogUndoKey, matteEditTarget,matteImage, matteOptionsOf, matteSource, matteTypeLabel, removeBackgroundSelection } from "../matteActions";
+import { dialogUndoKey, hqErrorText, hqHasGpu, hqMatteOffered, matteEditTarget, matteImage, matteOptionsOf, matteSource, matteTypeLabel, prepareHqModel, removeBackgroundHq, removeBackgroundSelection } from "../matteActions";
 import { useT } from "../../i18n";
 import { Modal } from "./Dialogs";
 import { Seg } from "./controls";
@@ -88,6 +88,15 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   /** a person photo's second step is running (the person model): the preview shows the subject model's result first */
   const [personPending, setPersonPending] = useState(false);
+  /** "고품질(사람·동물)" (BiRefNet, PC only): the model's map of the preview picture, made once when it is turned on */
+  const offerHq = useMemo(() => hqMatteOffered(), []);
+  const [hqOn, setHqOn] = useState(offerHq && saved?.hq === true);
+  const [hqMap, setHqMap] = useState<HqMap | null>(null);
+  const [hqBusy, setHqBusy] = useState(false);
+  const [hqGpu, setHqGpu] = useState(true);
+  useEffect(() => {
+    if (offerHq) void hqHasGpu().then(setHqGpu);
+  }, [offerHq]);
   const seq = useRef(0);
 
   useEffect(() => {
@@ -116,15 +125,37 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
     };
   }, [target]);
 
+  // the high-quality map of the preview picture: the model first (downloaded on first use, with its own progress), then
+  // one run (on the CPU at 768: the preview is ≤ 640 px); a failure turns it off again and says why
+  useEffect(() => {
+    if (!hqOn || !src || hqMap) return;
+    let alive = true;
+    setHqBusy(true);
+    (async () => {
+      if (!(await prepareHqModel())) return alive && setHqOn(false);
+      const r = await runMatteHq(src.img, 768);
+      if (alive) setHqMap(r.value);
+    })()
+      .catch((e) => alive && (setHqOn(false), setError(hqErrorText(e))))
+      .finally(() => alive && setHqBusy(false));
+    return () => {
+      alive = false;
+    };
+  }, [hqOn, src, hqMap]);
+
   const effType: MatteType | null = type !== "auto" ? type : ana ? ana.type : null;
   const edgeFull: EdgeOptions = { ...DEFAULT_EDGE, ...(effType ? TYPE_EDGE[effType] : {}), ...edge };
   const sal = ana && "sal" in ana ? ana.sal : undefined;
 
+  const hqType = !!effType && (effType === "portrait" || effType === "animal" || effType === "object" || effType === "complex" || effType === "product");
+  const useHq = offerHq && hqOn && hqType;
   useEffect(() => {
     if (!src || !ana || !effType) return;
+    // (high quality on: the preview waits for its map)
+    if (useHq && !hqMap) return;
     const id = ++seq.current;
     const timer = setTimeout(() => {
-      runMatte(src.img, { type: effType, edge: { ...edgeFull, feather: edgeFull.feather * src.scale }, keepShadow, sal, inner: innerOpt(inner), hints, ...(personPending ? { person: false } : {}) })
+      runMatte(src.img, { type: type === "auto" && useHq ? undefined : effType, edge: { ...edgeFull, feather: edgeFull.feather * src.scale }, keepShadow, sal, inner: innerOpt(inner), hints, ...(personPending || useHq ? { person: false } : {}), ...(useHq && hqMap ? { hq: hqMap } : {}) })
         .then((r) => {
           if (id !== seq.current) return;
           setOut({ cut: r.value.cut, matte: matteImage(r.value.alpha, src.img.width, src.img.height), review: r.value.review });
@@ -136,7 +167,7 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(timer);
     // edgeFull is derived from edge + effType
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, ana, effType, edge, keepShadow, inner, hints, personPending]);
+  }, [src, ana, effType, edge, keepShadow, inner, hints, personPending, useHq, hqMap]);
 
   const setE = (k: keyof EdgeOptions, v: number) => setEdge((e) => ({ ...e, [k]: v }));
   const aiType = effType === "portrait" || effType === "animal" || effType === "object" || effType === "complex" || effType === "product";
@@ -209,6 +240,27 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
             {review && <span style={{ ...imgStyles.note, color: "var(--warn, #e0a030)" }}>{t("image.matte.review")}</span>}
           </div>
           <div style={imgStyles.side}>
+            {offerHq && (
+              <div style={imgStyles.row} className="matte-model-row">
+                <span style={imgStyles.rowHead}>{t("image.matte.model")}</span>
+                <Seg
+                  value={hqOn ? "hq" : "std"}
+                  options={[
+                    { value: "std", label: t("image.matte.model.std") },
+                    { value: "hq", label: t("image.matte.model.hq") },
+                  ]}
+                  onChange={(v) => (setHqOn(v === "hq"), setError(null))}
+                  ariaLabel={t("image.matte.model")}
+                />
+                <span style={imgStyles.note}>{t("image.matte.model.hqNote")}</span>
+                {hqOn && !hqGpu && <span style={{ ...imgStyles.note, color: "var(--warn, #e0a030)" }}>{t("image.matte.model.hqNoteCpu")}</span>}
+                {hqOn && hqBusy && (
+                  <span style={imgStyles.note} role="status" className="matte-hq-pending">
+                    {t("image.matte.model.hqLoading")}
+                  </span>
+                )}
+              </div>
+            )}
             <label style={imgStyles.row}>
               <span style={imgStyles.rowHead}>{t("image.matte.typeLabel")}</span>
               <select value={type} onChange={(e) => setType(e.target.value as MatteType | "auto")} aria-label={t("image.matte.typeLabel")}>
@@ -281,15 +333,16 @@ export function MatteDialog({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             className="btn btn-primary"
-            disabled={busy || !ana || !effType}
+            disabled={busy || !ana || !effType || (useHq && hqBusy)}
             onClick={async () => {
               setBusy(true);
               // the saliency map belongs to the dialog's picture: reuse it only while that is still the target
               const same = edit ? matteEditTarget()?.node === edit.node : imageTarget()?.node === target?.node;
               const opts: MatteOptions = { type: type === "auto" ? undefined : type, edge, keepShadow, sal: same ? sal : undefined, hints };
               if (inner !== "auto") opts.inner = innerOpt(inner);
-              // (removeBackgroundSelection shows its own progress, with the step and Cancel)
-              await removeBackgroundSelection(opts, edit);
+              // (removeBackgroundSelection shows its own progress, with the step and Cancel; high quality runs the
+              // model again on the full-resolution picture)
+              await (useHq ? removeBackgroundHq(opts, edit) : removeBackgroundSelection(opts, edit));
               setBusy(false);
               onClose();
             }}

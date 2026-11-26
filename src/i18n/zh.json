@@ -132,7 +132,7 @@
   "about.show.notices": "许可证与声明",
   "about.show.license": "GPL v3 全文",
   "about.source": "源代码：{url} — 根据 GPL v3，可在此获取本版本的完整源代码。",
-  "about.network": "网络：不会向外发送文档和个人信息。AI 模型、字体和颜色配置文件内置于应用中，无需下载。直接安装的桌面版会在启动时及每 6 小时连接 github.com 检查新版本（GitHub 会收到连接的 IP 地址）。",
+  "about.network": "网络：不会向外发送文档和个人信息。AI 模型、字体和颜色配置文件内置于应用中，无需下载。唯一例外：在电脑上选择“删除背景（高质量·人物·动物）”时，首次会从 wind2sp.github.io (GitHub Pages) 下载一次该模型（约 46MB），校验大小和 SHA-256 后保存在本机（不发送图片）。直接安装的桌面版会在启动时及每 6 小时连接 github.com 检查新版本（GitHub 会收到连接的 IP 地址）。",
   "common.close": "关闭",
   "quick.combine": "多个文件合并为一个 PDF",
   "quick.merge": "合并 PDF",

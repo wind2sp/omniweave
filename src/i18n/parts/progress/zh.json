@@ -7,5 +7,7 @@
   "progress.matte": "正在去除背景…",
   "progress.matte.subject": "正在查找主体…",
   "progress.matte.person": "正在细化人物轮廓…",
-  "progress.matte.refine": "正在细化边缘…"
+  "progress.matte.refine": "正在细化边缘…",
+  "progress.matte.hq": "正在用高质量模型查找轮廓…",
+  "progress.matte.hqCpu": "正在用高质量模型查找轮廓… 使用 CPU 处理，可能超过 20 秒"
 }

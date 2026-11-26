@@ -7,5 +7,7 @@
   "progress.matte": "背景を削除しています…",
   "progress.matte.subject": "被写体を探しています…",
   "progress.matte.person": "人物の輪郭を整えています…",
-  "progress.matte.refine": "境界を整えています…"
+  "progress.matte.refine": "境界を整えています…",
+  "progress.matte.hq": "高品質モデルで輪郭を検出中…",
+  "progress.matte.hqCpu": "高品質モデルで輪郭を検出中… CPUで処理するため20秒以上かかることがあります"
 }

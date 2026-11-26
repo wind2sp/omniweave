@@ -270,6 +270,8 @@ export interface NodeMatte {
   edge: Partial<EdgeOptions> & Record<string, number | boolean>;
   /** subject (fg) / background points clicked in the dialog, as fractions of the source area (kept for re-editing) */
   hints?: { x: number; y: number; fg: boolean }[];
+  /** made with the high-quality model ("고품질(사람·동물)", core/image/matte/birefnet.ts): re-editing uses it again */
+  hq?: boolean;
 }
 
 export interface RasterNode extends NodeBase {

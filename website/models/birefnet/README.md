@@ -1,0 +1,1 @@
+BiRefNet-lite 배경 지우기 모델(오메 '배경 지우기(고품질·사람·동물)', PC 전용): 앱이 처음 쓸 때 이 폴더의 `birefnet-int8.lwt`(46,082,436 B, SHA-256 `98af9209821c8d98a328f466d88455be69f211360ff91f90dce4724797f623d4`)를 받아 크기·해시를 확인합니다. 원본 ZhengPeng7/BiRefNet(MIT) — 출처·변경·전문은 `LICENSE`.

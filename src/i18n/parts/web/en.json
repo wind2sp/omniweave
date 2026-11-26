@@ -3,6 +3,8 @@
   "web.update.tip": "New version {version}",
   "web.update.keep": "Unsaved changes can be recovered after the reload",
   "web.update.stale": "A new version was published, so this feature couldn't load. Click 'Reload to update' at the top right",
+  "web.update.phone": "A new version is ready — tap to update",
+  "web.update.applying": "Updating…",
   "web.start.sample": "Open a sample",
   "web.start.sampleSub": "Look around with a sample workspace",
   "web.start.sampleFailed": "Couldn't load the sample file",

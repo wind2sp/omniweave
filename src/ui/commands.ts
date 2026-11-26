@@ -21,7 +21,7 @@ import { canvasCropAvailable, croppableSelection, startCanvasCrop, startCrop } f
 import { imageTarget, solidFill } from "./imageActions";
 import { canCrop } from "../core/crop";
 import { addLayer, deleteLayers, duplicateLayers } from "./layers";
-import { removeBackgroundSelection } from "./matteActions";
+import { hqMatteOffered, removeBackgroundHq, removeBackgroundSelection } from "./matteActions";
 import { flipCanvas, rotateCanvas180 } from "./canvasActions";
 import { allClipped, clipToggleUsable, groupSelection, toggleClipping, ungroupSelection, ungroupUsable } from "./groups";
 import { pasteClipboard, pasteOnAllArtboards } from "./menuActions";
@@ -102,6 +102,8 @@ export interface Command {
   dialog?: boolean;
   /** listed at all (default: yes) — e.g. Quit only in the desktop app */
   only?: () => boolean;
+  /** a short line under its label in the menus (배경 지우기(고품질): what it is for, the first download) */
+  hint?: () => string;
   /** its own label instead of `cmd.<id>` (generated commands: 내보내기 ▸ PDF) */
   label?: () => string;
   /** why it cannot be used now, said on its greyed row (generated export commands: no table, no text…) */
@@ -383,6 +385,8 @@ export const COMMANDS: Command[] = [
   { id: "image.editSmart", icon: "image", when: () => !!smartTarget(), run: () => void openSmartObject() },
   // background removal on the selected raster / image: one click (automatic type), or the refine dialog
   { id: "image.removeBackground", icon: "sparkle", when: () => !!imageTarget(), whyNot: whyPicture, run: () => void removeBackgroundSelection() },
+  // the manual high-quality model (BiRefNet, downloaded on first use; PC only — not on the phone screen / Android)
+  { id: "image.removeBackgroundHq", icon: "sparkle", only: hqMatteOffered, hint: () => t("image.matte.menu.hqHint"), when: () => !!imageTarget(), whyNot: whyPicture, run: () => void removeBackgroundHq() },
   { id: "image.upscale", icon: "image", dialog: true, when: () => !!imageTarget(), whyNot: whyPicture, run: () => useImageUI.getState().set({ kind: "upscale" }) },
   // text recognition (the PDF ribbon's 글자 인식 and the picture menu's), by name in command search too
   { id: "image.ocr", icon: "search", dialog: true, when: () => !!imageTarget(), whyNot: whyPicture, run: () => useImageUI.getState().set({ kind: "ocr" }) },

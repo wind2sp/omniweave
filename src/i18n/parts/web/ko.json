@@ -3,6 +3,8 @@
   "web.update.tip": "새 버전 {version}",
   "web.update.keep": "저장하지 않은 내용은 새로 고친 뒤 복구할 수 있습니다",
   "web.update.stale": "새 버전이 배포되어 이 기능을 불러오지 못했습니다. 오른쪽 위 '새로 고쳐서 업데이트'를 눌러 주세요",
+  "web.update.phone": "새 버전이 있습니다 — 눌러서 업데이트",
+  "web.update.applying": "업데이트하는 중…",
   "web.start.sample": "예시 열기",
   "web.start.sampleSub": "예시 작업 파일로 바로 둘러보기",
   "web.start.sampleFailed": "예시 파일을 불러오지 못했습니다",

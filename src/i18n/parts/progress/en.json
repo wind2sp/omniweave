@@ -7,5 +7,7 @@
   "progress.matte": "Removing background…",
   "progress.matte.subject": "Finding the subject…",
   "progress.matte.person": "Refining the person's outline…",
-  "progress.matte.refine": "Refining the edges…"
+  "progress.matte.refine": "Refining the edges…",
+  "progress.matte.hq": "Finding the outline with the high-quality model…",
+  "progress.matte.hqCpu": "Finding the outline with the high-quality model… on the CPU, this can take over 20 s"
 }

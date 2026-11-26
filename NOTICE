@@ -56,6 +56,14 @@ converted (8-bit weights with per-channel scales) to Omniweave's own format
 and run by Omniweave's own code; the license text ships in
 models/matte/LICENSE.
 
+The optional high-quality background removal (PC only) downloads, when the
+user first chooses it, the BiRefNet-lite weights (Copyright (c) 2024
+ZhengPeng; https://github.com/ZhengPeng7/BiRefNet, MIT), converted
+(BatchNorm folded, 8-bit weights with per-channel scales) to Omniweave's
+own format and run by Omniweave's own code; the file is not bundled and its
+license text is published next to it
+(https://wind2sp.github.io/omniweave/models/birefnet/LICENSE).
+
 CMYK documents without a usable colour profile are shown through an
 altered, reduced version of the FOGRA39L Coated profile from the OpenICC /
 colord free profile set (Kai-Uwe Behrmann, Marti Maria, Photogamut,

@@ -1,10 +1,10 @@
 // A conv pool worker (convPool.ts): parses the model once, keeps its own slice (part `part` of `parts`) of every conv's
 // output channels, and runs one layer at a time on the input it is sent.
 
-import { convNode, parseGraph, type GraphModel } from "./graph";
+import { parseGraph, type GraphModel } from "./graph";
 import { convLayer } from "./cpu";
 import { parseModel, type ConvLayer, type Model } from "./model";
-import { partRange, type ConvWorkerMsg, type ConvWorkerReply } from "./convPool";
+import { graphJob, type ConvWorkerMsg, type ConvWorkerReply } from "./convPool";
 
 interface Scope {
   onmessage: ((e: MessageEvent<ConvWorkerMsg>) => void) | null;
@@ -28,9 +28,7 @@ scope.onmessage = (e) => {
   try {
     let s: number[], d: Float32Array;
     if (graph) {
-      const n = graph.meta.nodes[m.layer];
-      // a band of rows (all channels, the band's own padding) or this worker's channels (the whole input)
-      const r = m.pad ? convNode(graph, { ...n, a: { ...n.a, pad: m.pad } }, { s: m.s, d: m.d }) : convNode(graph, n, { s: m.s, d: m.d }, partRange(graph.w.get(n.w!)!.s[0], part, parts));
+      const r = graphJob(graph, m, part, parts);
       (s = r.s), (d = r.d);
     } else if (u2) {
       const L = u2.layers[m.layer] as ConvLayer;

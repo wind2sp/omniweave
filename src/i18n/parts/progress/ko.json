@@ -7,5 +7,7 @@
   "progress.matte": "배경 지우는 중…",
   "progress.matte.subject": "주인공을 찾는 중…",
   "progress.matte.person": "사람 윤곽을 다듬는 중…",
-  "progress.matte.refine": "가장자리를 다듬는 중…"
+  "progress.matte.refine": "가장자리를 다듬는 중…",
+  "progress.matte.hq": "고품질 모델로 윤곽을 찾는 중…",
+  "progress.matte.hqCpu": "고품질 모델로 윤곽을 찾는 중… CPU로 처리해 20초 넘게 걸릴 수 있습니다"
 }

@@ -1,0 +1,34 @@
+birefnet-int8.lwt — background removal model for Omniweave's "고품질(사람·동물)" option
+
+Source:   BiRefNet by ZhengPeng7 (https://github.com/ZhengPeng7/BiRefNet), official release v1,
+          BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx (224,005,088 bytes)
+          https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx
+Changes:  converted by Omniweave's scripts/convert-birefnet.mjs to its own LWT1 graph format; weights quantized to
+          int8 per output channel; batch normalisation folded into the preceding convolutions; the final 1x1
+          convolution folded into the two 3x3 convolutions before it. No retraining.
+File:     birefnet-int8.lwt, 46,082,436 bytes,
+          SHA-256 98af9209821c8d98a328f466d88455be69f211360ff91f90dce4724797f623d4
+
+License of the original weights and code (MIT, from the BiRefNet repository's LICENSE):
+
+MIT License
+
+Copyright (c) 2024 ZhengPeng
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

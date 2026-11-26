@@ -132,7 +132,7 @@
   "about.show.notices": "Licenses & notices",
   "about.show.license": "GPL v3 text",
   "about.source": "Source code: {url} — under the GPL v3 the complete source code of this version is available there.",
-  "about.network": "Network: documents and personal data are never sent anywhere. AI models, fonts and colour profiles are built in, not downloaded. The directly installed desktop edition contacts github.com at start-up and every 6 hours to check for a new version (GitHub receives the connecting IP address).",
+  "about.network": "Network: documents and personal data are never sent anywhere. AI models, fonts and colour profiles are built in, not downloaded — except that choosing ‘Remove Background (High Quality · People, Animals)’ on a PC downloads its model (about 46 MB) once from wind2sp.github.io (GitHub Pages), checks its size and SHA-256 and keeps it on this PC (no picture is sent). The directly installed desktop edition contacts github.com at start-up and every 6 hours to check for a new version (GitHub receives the connecting IP address).",
   "common.close": "Close",
   "quick.combine": "Combine Files into One PDF",
   "quick.merge": "Merge PDFs",

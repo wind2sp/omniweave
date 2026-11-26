@@ -4,7 +4,7 @@
 import { create } from "zustand";
 import { OPS, defaultParams, type OpGroup } from "../../core/image/ops";
 import { applyImageOps, imageTarget, opHint, opLabel } from "../imageActions";
-import { removeBackgroundSelection } from "../matteActions";
+import { hqMatteOffered, removeBackgroundHq, removeBackgroundSelection } from "../matteActions";
 import { t } from "../../i18n";
 import type { MenuItem } from "./controls";
 
@@ -55,6 +55,7 @@ export function matteMenuItems(disabled = !imageTarget()): MenuItem[] {
   return [
     { heading: t("image.matte.menu.group") },
     { label: t("image.matte.menu.auto"), hint: t("image.matte.menu.autoHint"), disabled, onSelect: () => void removeBackgroundSelection() },
+    ...(hqMatteOffered() ? [{ label: t("cmd.image.removeBackgroundHq"), hint: t("image.matte.menu.hqHint"), disabled, onSelect: () => void removeBackgroundHq() }] : []),
     { label: `${t("image.matte.title")}…`, hint: t("image.matte.menu.dialogHint"), disabled, onSelect: () => useImageUI.getState().set({ kind: "matte" }) },
   ];
 }

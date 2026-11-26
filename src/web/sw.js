@@ -86,6 +86,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
   const path = url.pathname.slice(scope.pathname.length);
   if (path === "version.json" || path === "sw.js") return; // always the network (update checks)
+  // the high-quality background removal model (46 MB): the app checks and keeps it itself (birefnetModel.ts, cache
+  // "hq-models") — not a second copy here
+  if (/(^|\/)models\/birefnet\//.test(path)) return;
 
   if (req.mode === "navigate") {
     if (url.searchParams.has("sw")) return; // ?sw=off: let the page reach the network and unregister

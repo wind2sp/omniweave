@@ -8,6 +8,16 @@
  *  where the automatic test says otherwise (so "휴대폰 화면으로" always lands on the phone screen) */
 export const PHONE_LAYOUT_KEY = "omniweave.web.layout";
 
+/**
+ * Chrome's "데스크톱 사이트" (desktop site) ignores the viewport meta and lays the page out ~980 px wide on a phone,
+ * so the phone screen would be drawn at desktop width and shrunk to tiny type. The zoom that brings it back to the
+ * phone's real width: layout width ÷ screen width when the layout is clearly wider than the screen, else 1.
+ */
+export function desktopSiteZoom(layoutWidth: number, screenWidth: number): number {
+  if (!(layoutWidth > 0) || !(screenWidth > 0) || layoutWidth <= screenWidth * 1.15) return 1;
+  return Math.round((layoutWidth / screenWidth) * 1000) / 1000;
+}
+
 /** Switch this visit to the desktop editor ("desktop") or the phone screen ("phone"), then reload. */
 export function switchLayout(to: "desktop" | "phone"): void {
   try {

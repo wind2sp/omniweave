@@ -24,6 +24,7 @@ import { CellEditor, useCellSel, type CellTarget } from "./CellEditor";
 import { pickForMenu, tableMenuItems } from "./tableMenu";
 import { cellClipboardMenu, emptyMenu, joinMenus, objectMenu, textMenu } from "./contextMenu";
 import { useImageUI } from "./shell/imageMenu";
+import { hqMatteOffered, removeBackgroundHq } from "./matteActions";
 import { PT, drawnShape, shapeName, useShapeParams, type ShapeKind } from "./drawDefaults";
 import { RichTextEditor } from "./RichTextEditor";
 import { FlowEditor, PicLayoutButton } from "./FlowEditor";
@@ -2654,6 +2655,7 @@ export function CanvasView() {
             items: [
               { label: `${tr("cmd.image.upscale")}…`, onSelect: () => useImageUI.getState().set({ kind: "upscale" }) },
               { label: `${tr("cmd.image.removeBackgroundDialog")}…`, onSelect: () => useImageUI.getState().set({ kind: "matte" }) },
+              ...(hqMatteOffered() ? [{ label: tr("cmd.image.removeBackgroundHq"), onSelect: () => void removeBackgroundHq() }] : []),
               { sep: true, label: "" },
               ...objectMenu(),
             ],

@@ -3,6 +3,8 @@
   "web.update.tip": "新版本 {version}",
   "web.update.keep": "刷新后可以恢复未保存的内容",
   "web.update.stale": "已发布新版本，无法加载此功能。请点击右上角的“刷新以更新”",
+  "web.update.phone": "有新版本 — 点按以更新",
+  "web.update.applying": "正在更新…",
   "web.start.sample": "打开示例",
   "web.start.sampleSub": "用示例工作文件直接体验",
   "web.start.sampleFailed": "无法加载示例文件",

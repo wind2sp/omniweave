@@ -9,6 +9,8 @@ import { SAL, saliency, type Backend } from "../infer";
 import { decideFast, decideWithSaliency, imageFeatures, NEEDS_AI, needsReview, saliencyStats, type ImageFeatures, type MatteType, type SaliencyStats } from "./classify";
 import { extendBody } from "./person";
 import { looksLikePerson, personMatte, personStats, withHeadHint } from "./modnet";
+import { birefnetMatte, useKeptBirefnet } from "./birefnet";
+import { ImageOpError } from "../ops";
 import { chromaKey, chromaScreen, flatBackground, paperRemoval, studioKey, borderModel, type InnerHoles, type SelectResult } from "./select";
 import { dropComponents, hintPixels, hintSaliency, type MatteHint } from "./hints";
 import { clamp01, composeCutout, DEFAULT_EDGE, GUIDE, guidedFilter, hardenAlpha, matteBand, resizePlane, rgbPlanes, shapeAlpha, upsampleAlpha, workSize, type EdgeOptions } from "./refine";
@@ -33,10 +35,34 @@ export interface MatteOptions {
   pool?: boolean;
   /** what is being done now (the image worker reports it as progress): the subject model, the person model, the edges */
   onStage?: (stage: MatteStage) => void;
+  /** "고품질(사람·동물)": the matte comes from BiRefNet-lite (birefnet.ts; the model must be downloaded first,
+   *  birefnetModel.ts) instead of U²-Netp / MODNet. true = run it on this picture; a map = one computed earlier for
+   *  this picture (the dialog's previews). Photo types only — the colour-key methods (graphic, document, chroma,
+   *  transparent) are unchanged. */
+  hq?: boolean | HqMap;
+}
+
+/** BiRefNet's matte of a picture (side × side over the whole picture, 0..1) */
+export interface HqMap {
+  map: Float32Array;
+  side: number;
+  backend?: "webgpu" | "cpu";
+  ms?: number;
+}
+
+/** the photo types the high-quality model replaces the subject map of */
+export const HQ_TYPES = new Set<MatteType>(["portrait", "animal", "object", "complex", "product"]);
+
+/** The high-quality model's map, or an error the main thread shows in Korean (image.matte.hq.err.missing). */
+export async function hqMatte(img: Img, opts: Pick<MatteOptions, "pool"> & { cpuSide?: number }): Promise<HqMap> {
+  useKeptBirefnet();
+  const r = await birefnetMatte(img, { pool: opts.pool, cpuSide: opts.cpuSide });
+  if (!r) throw new ImageOpError("image.matte.hq.err.missing");
+  return { map: r.map, side: r.side, backend: r.backend, ms: r.ms };
 }
 
 /** steps of background removal, in order (progress: index + 1 of MATTE_STAGES.length) */
-export const MATTE_STAGES = ["subject", "person", "refine"] as const;
+export const MATTE_STAGES = ["subject", "person", "hq", "refine"] as const;
 export type MatteStage = (typeof MATTE_STAGES)[number];
 
 export interface MatteResult {
@@ -60,6 +86,8 @@ export interface MatteResult {
   person?: boolean;
   /** the subject looked like a person (a result made with `person: false` may change with the person model) */
   personCandidate?: boolean;
+  /** the matte came from the high-quality model (opts.hq) */
+  hq?: { backend?: "webgpu" | "cpu"; ms?: number; side: number };
   ms: { classify: number; ai: number; refine: number; total: number; person?: number };
 }
 
@@ -157,9 +185,11 @@ export function aiMatte(img: Img, map: Float32Array, w: number, h: number, edge:
 
 export async function removeBackground(img: Img, opts: MatteOptions = {}): Promise<MatteResult> {
   const T0 = now();
-  const a = await analyze(img, opts);
+  // high quality: the subject model only classifies (the person model is not needed — BiRefNet makes the matte)
+  const a = await analyze(img, opts.hq ? { ...opts, person: false } : opts);
   const tClassify = a.ms - a.aiMs;
-  const type = opts.type ?? a.type;
+  let type = opts.type ?? a.type;
+  const useHq = !!opts.hq && HQ_TYPES.has(type);
   const W = img.width, H = img.height;
   let sal = "sal" in a ? a.sal : opts.sal ? { map: opts.sal.map, hi: opts.sal.hi, lo: opts.sal.lo ?? 0 } : undefined;
   let backend = "backend" in a ? a.backend : opts.sal?.backend;
@@ -175,7 +205,18 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
   // matting model's matte (modnet.ts) is the map from here on — unless it found nothing there
   let map = sal?.map;
   let side = SAL, person = false, tPerson: number | undefined;
-  if (map && type === "portrait" && opts.person !== false) {
+  let hq: MatteResult["hq"];
+  if (useHq) {
+    opts.onStage?.("hq");
+    const t = now();
+    const h = typeof opts.hq === "object" ? opts.hq : await hqMatte(img, opts);
+    tPerson = now() - t;
+    map = h.map;
+    side = h.side;
+    hq = { backend: h.backend, ms: h.ms, side: h.side };
+    // a person the classifier saw as an object / scene: the person edge settings (the user's choice stays)
+    if (!opts.type && type !== "animal" && looksLikePerson(personStats(img, map, side))) type = "portrait";
+  } else if (map && type === "portrait" && opts.person !== false) {
     opts.onStage?.("person");
     const t = now();
     const pm = await personMatte(img, { pool: opts.pool });
@@ -194,7 +235,7 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
   // original stays in `sal`)
   let grown = false;
   if (map && hints.length && NEEDS_AI.has(type)) {
-    const h = hintSaliency(img, map, side, person ? withHeadHint(map, side, hints) : hints);
+    const h = hintSaliency(img, map, side, person && !hq ? withHeadHint(map, side, hints) : hints);
     map = h.map;
     grown = h.grown;
   }
@@ -223,7 +264,7 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
     // the guided saliency matte is the base (a colour key alone loses white-on-white rims and handles: real-image eval,
     // docs/design/MATTE_EVAL.md); the studio key only clears what is certainly backdrop (border-connected, key ≈ 0)
     const { w, h } = workSize(W, H);
-    const m = aiMatte(img, map!, w, h, edge);
+    const m = aiMatte(img, map!, w, h, edge, side);
     alpha = m.alpha;
     for (let p = 0; p < W * H; p++) {
       if (r.alpha[p] < 8 && alpha[p] < 128) alpha[p] = 0;
@@ -250,7 +291,8 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
     alpha = m.alpha;
     // a person whose body the subject model missed (it saw the head): the body under it is kept too (person.ts)
     // (not when the person marked places to remove: their 지울 곳 points decide there)
-    if ((type === "portrait" || type === "object" || type === "complex") && !hints.some((h) => !h.fg)) extendBody(img, alpha);
+    // (not with the high-quality model: it sees the whole body itself)
+    if (!hq && (type === "portrait" || type === "object" || type === "complex") && !hints.some((h) => !h.fg)) extendBody(img, alpha);
     cut = composeCutout(img, alpha, m.band.bg, m.band.fg, w, h, edge.decontaminate);
   }
   const tRefine = now() - t1;
@@ -268,6 +310,7 @@ export async function removeBackground(img: Img, opts: MatteOptions = {}): Promi
     grown,
     person,
     personCandidate: "personCandidate" in a ? a.personCandidate : undefined,
+    ...(hq ? { hq } : {}),
     ms: { classify: tClassify, ai: tAi, refine: tRefine, total: now() - T0, ...(tPerson !== undefined ? { person: tPerson } : {}) },
   };
 }

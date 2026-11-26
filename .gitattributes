@@ -3,3 +3,6 @@
 src-tauri/Cargo.toml text eol=lf
 src-tauri/gen/android/gradlew text eol=lf
 src-tauri/gen/android/app/src/main/AndroidManifest.xml text eol=lf
+# downloaded on first use and checked by size and SHA-256 (src/core/image/matte/birefnetModel.ts, src/ui/spellDict.ts): served byte for byte
+website/models/** -text
+website/dict/** -text
